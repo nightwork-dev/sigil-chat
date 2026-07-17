@@ -105,7 +105,7 @@ prompt described next, not whether the registry itself will run the tool.
 export default defineMcpClientConnection({
   url: process.env.GONK_MCP_URL ?? "http://sigil-chat-gonk.localhost:1355/mcp",
   description:
-    "Application tools generated and governed by the Gonk registry. Includes graph editing, LiveOps review inspection and annotations, and semantic UI highlighting. Prefer batched tools for related changes so they use one approval and land together.",
+    "Application tools generated and governed by the Gonk registry. Includes graph editing, article review inspection and annotations, and semantic UI highlighting. Prefer batched tools for related changes so they use one approval and land together.",
   approval: ({ session }) =>
     session.auth.current?.attributes.sigilToolApproval === "always"
       ? "not-applicable"

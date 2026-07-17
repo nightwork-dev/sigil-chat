@@ -55,7 +55,7 @@ import type {
   Decision,
   ReviewRevision,
 } from "@workspace/review/lib/types"
-import { createWeeklyTournamentReviewDocument } from "@workspace/review-store/sample"
+import { createDraftArticleReviewDocument } from "@workspace/review-store/sample"
 import type {
   ReviewDocument,
   ReviewPassage,
@@ -68,16 +68,16 @@ import { Separator } from "@workspace/ui/components/separator"
 import { TextEditor } from "@workspace/ui/components/text-editor"
 import { cn } from "@workspace/ui/lib/utils"
 
-const DOCUMENT_ID = "weekly-tournament-liveops"
+const DOCUMENT_ID = "draft-article-review"
 
 interface Passage extends ReviewPassage {
   section: string
 }
 
-const DEFAULT_DOCUMENT = createWeeklyTournamentReviewDocument()
+const DEFAULT_DOCUMENT = createDraftArticleReviewDocument()
 
 function passagesFromDocument(
-  document: ReturnType<typeof createWeeklyTournamentReviewDocument>,
+  document: ReturnType<typeof createDraftArticleReviewDocument>,
 ): Passage[] {
   const sectionById = new Map(
     document.outline.map((section) => [section.id, section.title]),
@@ -474,7 +474,7 @@ export function ReviewWorkspace() {
       kind: "document-review",
       id: DOCUMENT_ID,
       revision: document.revision,
-      label: "Weekly Tournament LiveOps",
+      label: "Draft Article Review",
     },
     selection: attentionSelections[0],
     selections: attentionSelections,
@@ -489,7 +489,7 @@ export function ReviewWorkspace() {
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
               <h1 className="truncate text-sm font-medium">
-                Weekly Tournament LiveOps
+                Draft Article Review
               </h1>
               <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
                 revision {document.revision}
@@ -515,7 +515,7 @@ export function ReviewWorkspace() {
             <ReviewWorkbench.Root
               description="Annotate the selected passage, settle decisions, clear review debt, then sign off."
               size="lg"
-              title="Review — Weekly Tournament LiveOps"
+              title="Review — Draft Article"
               trigger={
                 <Button size="sm" variant="outline">
                   <FileCheck2Icon />

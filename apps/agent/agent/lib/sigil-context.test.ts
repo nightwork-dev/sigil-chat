@@ -30,7 +30,7 @@ describe("Sigil Eve context integration", () => {
     const send = vi.fn(async () => session())
 
     const response = await postSession(channel, send, {
-      message: "Can you check @liveops-readiness for this rollout?",
+      message: "Can you check @editorial-readiness for this draft?",
       clientContext: "client-declared attention",
     })
 
@@ -38,8 +38,8 @@ describe("Sigil Eve context integration", () => {
     expect(send).toHaveBeenCalledOnce()
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("Client context:")
-    expect(JSON.stringify(payload)).toContain("Managed skill: liveops-readiness")
-    expect(JSON.stringify(payload)).toContain("AUTHORIZED_LIVEOPS_CONTEXT")
+    expect(JSON.stringify(payload)).toContain("Managed skill: editorial-readiness")
+    expect(JSON.stringify(payload)).toContain("AUTHORIZED_EDITORIAL_CONTEXT")
   })
 
   it("does not bulk-inject skills when none are required or deterministically matched", async () => {
@@ -57,26 +57,26 @@ describe("Sigil Eve context integration", () => {
     expect(response.status).toBe(202)
     expect(send).toHaveBeenCalledOnce()
     const [payload] = firstSendCall(send)
-    expect(JSON.stringify(payload)).not.toContain("AUTHORIZED_LIVEOPS_CONTEXT")
+    expect(JSON.stringify(payload)).not.toContain("AUTHORIZED_EDITORIAL_CONTEXT")
   })
 
   it("does not leak denied context", async () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: { sigilContextDeny: "skill:liveops-readiness" },
+        attributes: { sigilContextDeny: "skill:editorial-readiness" },
       },
       compiler: compilerWith([
         createSkillContextContributor({
           registry: skillRegistry(),
-          requiredSkillIds: ["liveops-readiness"],
+          requiredSkillIds: ["editorial-readiness"],
         }),
       ]),
     })
     const send = vi.fn(async () => session())
 
     const response = await postSession(channel, send, {
-      message: "Can you check liveops readiness?",
+      message: "Can you check editorial readiness?",
       clientContext: "client context cannot authorize SERVER_SECRET",
     })
 
@@ -106,7 +106,7 @@ describe("Sigil Eve context integration", () => {
       compiler: compilerWith([
         createSkillContextContributor({
           registry: skillRegistry(),
-          requiredSkillIds: ["missing-liveops-gate"],
+          requiredSkillIds: ["missing-editorial-gate"],
         }),
       ]),
     })
@@ -125,7 +125,7 @@ describe("Sigil Eve context integration", () => {
       compiler: compilerWith([
         createSkillContextContributor({
           registry: throwingSkillRegistry(),
-          requiredSkillIds: ["liveops-readiness"],
+          requiredSkillIds: ["editorial-readiness"],
         }),
       ]),
     })
@@ -153,7 +153,7 @@ describe("Sigil Eve context integration", () => {
     const send = vi.fn(async () => session())
 
     const response = await postSession(channel, send, {
-      message: "Can you check @liveops-readiness?",
+      message: "Can you check @editorial-readiness?",
     })
 
     expect(response.status).toBe(204)
@@ -347,8 +347,8 @@ function skillRegistry(): ManagedSkillRegistry {
         status: "ok",
         skills: [
           {
-            id: "liveops-readiness",
-            description: "Use when assessing LiveOps launch readiness.",
+            id: "editorial-readiness",
+            description: "Use when assessing draft publish readiness.",
             origin: { kind: "workspace", adapterId: "test" },
             scope: "project",
             lifecycle: "active",
@@ -362,14 +362,14 @@ function skillRegistry(): ManagedSkillRegistry {
       }
     },
     async get(request) {
-      if (request.id !== "liveops-readiness") {
+      if (request.id !== "editorial-readiness") {
         return { status: "not-found", id: request.id }
       }
       return {
         status: "found",
         skill: {
-          id: "liveops-readiness",
-          description: "Use when assessing LiveOps launch readiness.",
+          id: "editorial-readiness",
+          description: "Use when assessing draft publish readiness.",
           origin: { kind: "workspace", adapterId: "test" },
           scope: "project",
           lifecycle: "active",
@@ -378,7 +378,7 @@ function skillRegistry(): ManagedSkillRegistry {
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           contentHash:
             "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          body: "AUTHORIZED_LIVEOPS_CONTEXT\nCheck rollout, monitoring, rollback, and ownership.",
+          body: "AUTHORIZED_EDITORIAL_CONTEXT\nCheck outline, sources, decisions, and annotations.",
           supportingFiles: [],
           otherDefinitions: [],
         },

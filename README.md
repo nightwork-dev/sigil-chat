@@ -24,15 +24,24 @@ tools go in `apps/gonk/src/registry.ts`, not into Eve directly (see below).
 
 ## Run locally
 
-Requires Node 24. All dependencies — including the `@gonk/*` and
-`@niwork/agent*` packages — resolve from the public npm registry.
+Requires Node 24 and [Portless](https://www.npmjs.com/package/portless)
+(`npm i -g portless`), which turns each service's dev script into a stable
+`.localhost` URL — no per-service port juggling. All other dependencies,
+including the `@gonk/*` and `@niwork/agent*` packages, resolve from the
+public npm registry.
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Turbo starts the three Portless services listed above.
+Turbo starts the three Portless services listed above. To run the services on
+plain, unproxied ports instead — no Portless daemon, no `.localhost` routing —
+set `PORTLESS=0`:
+
+```bash
+PORTLESS=0 pnpm dev
+```
 
 Run `codex login` before starting the app. Eve's `experimental_chatgpt()` model
 reads that local login and calls the Codex backend directly; Sigil Chat does not
@@ -40,6 +49,67 @@ use Vercel AI Gateway. The template defaults to `gpt-5.6-terra`; set
 `CODEX_MODEL` to a bare OpenAI model slug to override it. Gonk requires `GONK_MCP_KEY`; set the
 same bearer on the Eve and Gonk services. The mounted adapter has no
 unauthenticated mode, including for local development.
+
+## Add a tool
+
+New tools live in one place, [`apps/gonk/src/registry.ts`](apps/gonk/src/registry.ts).
+Here is the simplest real tool in the registry, `sigil-chat-status`:
+
+```ts
+registry.register({
+  name: "sigil-chat-status",
+  description:
+    "Report the live Sigil Chat runtime architecture and server time.",
+  visibility: "always",
+  approval: "read",
+  input: shape<Record<string, never>>(
+    isEmptyObject,
+    "Expected an empty object.",
+  ),
+  inputJsonSchema: emptyObjectSchema(),
+  hints: readHints,
+  handler: async () => ({
+    data: {
+      application: "sigil-chat",
+      agentRuntime: "eve",
+      toolRegistry: "gonk",
+      graphModel: "typed-reducer-graph",
+      transport: "mcp-streamable-http",
+      serverTime: new Date().toISOString(),
+    },
+  }),
+});
+```
+
+1. Save `registry.ts` — `apps/gonk`'s `tsx watch` process reloads it automatically, no restart.
+2. Eve discovers the new tool over MCP through `apps/agent/agent/connections/gonk.ts`; there is nothing to add on the agent side.
+3. Set the client's tool-approval preference to "ask" and drive it from `/chat` to see the approval prompt and result.
+
+See [`adding-a-tool.md`](docs/guides/adding-a-tool.md) for approval tiers, the
+`GONK_MCP_KEY` requirement, and full verification steps.
+
+## Install a UI component
+
+`packages/ui` components install from the Sigil Design registry as owned
+source, not a dependency — you get the file in your tree and restyle freely.
+Add the registry to `components.json` once:
+
+```json
+{
+  "registries": {
+    "@sigil": "https://ui.nightwork.dev/r/{name}.json"
+  }
+}
+```
+
+Then install any component by name:
+
+```bash
+pnpm dlx shadcn@latest add @sigil/<name>
+```
+
+Browse what's available at the Sigil Design repo's `/showcase` catalog — the
+always-current source of truth for every component that exists.
 
 ## Extending
 
@@ -108,12 +178,11 @@ tools should not be copied into Eve definitions by hand.
    rm -f apps/web/src/routeTree.gen.ts
    ```
 
-2. Rename the project — portless runs one shared daemon on `:1355`, so every
-   app on the machine needs a unique subdomain. This repo ships three
-   service names (`sigil-chat`, `sigil-chat-agent`, `sigil-chat-gonk`) that
-   **must** all change together, or your new project's dev servers will
-   collide with the original sigil-chat checkout (or any other project still
-   using those names):
+2. Rename the project — Portless runs one shared daemon per machine, so every
+   app needs a unique subdomain. This repo ships three service names
+   (`sigil-chat`, `sigil-chat-agent`, `sigil-chat-gonk`) that **must** all
+   change together, or your new project's dev servers will collide with any
+   other project still using those names:
    - Root `package.json` → `"name": "my-project"`
    - `apps/web/package.json` → `"dev": "portless my-project vite dev --host"`
    - `apps/agent/package.json` → `"dev": "portless my-project-agent eve dev --no-ui --host 127.0.0.1"`

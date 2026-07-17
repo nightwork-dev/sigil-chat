@@ -19,8 +19,8 @@ delete what you don't need without guessing.
 ### Demonstration workspaces — pattern reference, delete per-app
 
 These show the domain-outcome and attention patterns in `building-workspaces.md`
-end to end, but are demo domains (a reducer graph, a LiveOps review document,
-a stat dashboard), not part of the chat product itself.
+end to end, but are demo domains (a reducer graph, a draft article review
+document, a stat dashboard), not part of the chat product itself.
 
 | Route | Backing feature | Demonstrates |
 | --- | --- | --- |

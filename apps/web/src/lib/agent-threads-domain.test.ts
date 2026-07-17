@@ -218,7 +218,7 @@ describe("AgentThreadRepository", () => {
 
   it("forks with provenance and a bounded semantic packet, never Eve handles", () => {
     const repo = repository();
-    const source = repo.create({ title: "LiveOps launch" });
+    const source = repo.create({ title: "Draft review" });
     const saved = repo.saveSnapshot(
       source.id,
       {

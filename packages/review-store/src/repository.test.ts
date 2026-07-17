@@ -24,8 +24,8 @@ describe("FileReviewRepository", () => {
     const agent = new FileReviewRepository(filePath);
 
     const initial = await human.get();
-    const passage = initial.passages.find(({ id }) => id === "preflight-02");
-    if (!passage) throw new Error("Missing preflight passage.");
+    const passage = initial.passages.find(({ id }) => id === "draft-02");
+    if (!passage) throw new Error("Missing draft passage.");
 
     const humanEdit = await human.updatePassages(
       [
@@ -81,7 +81,7 @@ describe("FileReviewRepository", () => {
     const annotation = await repository.addAnnotations(
       [
         {
-          passageIds: ["monitoring-01"],
+          passageIds: ["factcheck-01"],
           kind: "note",
           body: "Verify the alert window against production telemetry.",
           author: "human",
@@ -101,7 +101,7 @@ describe("FileReviewRepository", () => {
     ).document;
     document = (
       await repository.lockDecision(
-        "decision-preflight-owner",
+        "decision-draft-owner",
         document.revision,
       )
     ).document;
@@ -125,7 +125,7 @@ describe("FileReviewRepository", () => {
       resolutionNote: "Promoted during review",
     });
     expect(
-      reloaded.decisions.find(({ id }) => id === "decision-preflight-owner"),
+      reloaded.decisions.find(({ id }) => id === "decision-draft-owner"),
     ).toMatchObject({ status: "locked" });
     expect(
       reloaded.acceptance.checklist.find(({ id }) => id === "check-pressure"),
@@ -142,7 +142,7 @@ describe("FileReviewRepository", () => {
     const repository = new FileReviewRepository(join(directory, "review.json"));
     const initial = await repository.get();
 
-    await repository.lockDecision("decision-preflight-owner", initial.revision);
+    await repository.lockDecision("decision-draft-owner", initial.revision);
 
     await expect(
       repository.setAcceptanceCheck("check-pressure", true, initial.revision),
@@ -168,7 +168,7 @@ describe("FileReviewRepository", () => {
     );
 
     const result = await repository.lockDecision(
-      "decision-preflight-owner",
+      "decision-draft-owner",
       initial.revision,
     );
 

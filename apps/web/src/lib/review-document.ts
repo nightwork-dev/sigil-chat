@@ -15,7 +15,7 @@ import type {
   ReviewUpdateResult,
 } from "@workspace/review-store/types";
 
-export const REVIEW_DOCUMENT_ID = "weekly-tournament-liveops";
+export const REVIEW_DOCUMENT_ID = "draft-article-review";
 
 const getReviewDocumentFn = createServerFn({ method: "GET" }).handler(
   async () => {

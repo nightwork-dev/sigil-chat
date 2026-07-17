@@ -45,7 +45,7 @@ file does not repeat it.
 │   │       ├── channels/eve.ts        → Eve channel wiring
 │   │       ├── connections/gonk.ts    → MCP client connection to apps/gonk
 │   │       ├── instructions.md        → Agent system instructions
-│   │       ├── skills/liveops-readiness/SKILL.md
+│   │       ├── skills/editorial-readiness/SKILL.md
 │   │       └── subagents/review-critic/ → agent.ts + instructions.md
 │   └── gonk/                → Authenticated Gonk MCP server (sigil-chat-gonk)
 │       └── src/
@@ -150,6 +150,9 @@ parallel:
 
 Prerequisites and required env:
 
+- [Portless](https://www.npmjs.com/package/portless) (`npm i -g portless`) —
+  provides the shared daemon behind the `.localhost` URLs above. `PORTLESS=0`
+  bypasses it and runs the three services on plain, unproxied ports.
 - Run `codex login` before starting the app — Eve's `experimental_chatgpt()`
   model reads that local login and calls the Codex backend directly.
 - `CODEX_MODEL` — optional, overrides Eve's default subscription-backed model

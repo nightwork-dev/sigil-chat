@@ -9,9 +9,9 @@ describe("agent catalog projection", () => {
       skills: {
         static: [
           {
-            name: "liveops-readiness",
+            name: "editorial-readiness",
             description: "Review launch readiness.",
-            logicalPath: "skills/liveops-readiness/SKILL.md",
+            logicalPath: "skills/editorial-readiness/SKILL.md",
           },
         ],
         dynamic: [],
@@ -34,7 +34,7 @@ describe("agent catalog projection", () => {
     });
 
     expect(catalog.skills[0]).toMatchObject({
-      name: "liveops-readiness",
+      name: "editorial-readiness",
       runtimeStatus: "model-discoverable",
       capabilities: ["read"],
     });

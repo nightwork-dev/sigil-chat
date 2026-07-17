@@ -261,7 +261,7 @@ Examples:
   kind: "review.document.changed",
   resource: {
     kind: "review-document",
-    id: "weekly-tournament-liveops",
+    id: "draft-article-review",
     revision: 12,
   },
   operation: "annotations.add",

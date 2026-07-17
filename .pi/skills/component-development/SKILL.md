@@ -238,22 +238,40 @@ polymorphism is the `render` prop. Do not invent a different mechanism.
    the best material. Always run a second, deeper pass over app-level
    component directories before concluding "there's nothing else here."
 
+## RULE 6b: Know where the component lives
+
+`packages/ui` (`@workspace/ui`) — shared shadcn base + custom components.
+`packages/chat` (`@workspace/chat`) — chat-specific primitives (ChatMessage,
+ChatInput, ChatList, streaming, markdown). Product composition —
+`apps/web/src/features/<name>/` (workspace) or `apps/web/src/components/`
+(shared app piece — `agent/` is the reference; see `extending-this-template`
+skill). `apps/web/src/routes/showcase/*`, `gallery/*`, `examples/*` are
+INHERITED `sigil-design` scaffold, not product surface — see
+`docs/guides/trimming-the-template.md`. Do NOT default new product-facing
+component demos there.
+
 ## RULE 7: Verification bar — run ALL FOUR before reporting a component done
 
 Do not skip steps. Do not report completion after step 1 alone.
 
-1. `pnpm --filter @workspace/ui typecheck` (or the consuming app's
+1. `pnpm --filter @workspace/ui typecheck` (or the consuming package/app's
    typecheck) — zero NEW errors. Pre-existing unrelated repo errors are not
    yours to silently fix, but do not add to the count.
-2. `pnpm build` in `apps/web` — confirms actual compile/SSR, not just
-   type-level correctness.
+2. `pnpm --filter @workspace/ui test` (or the consuming package's `test`,
+   e.g. `pnpm --filter web test`) — vitest. ANY component with real logic
+   (formatting, derivation, a reducer) MUST have a real test — a typecheck
+   pass alone is not evidence the logic is correct.
 3. **Load it in a real browser and drive the exact interaction the
    component exists for.** "It renders" is not sufficient evidence of
    anything. A drag-to-conflict slider must be dragged into conflict and
    the conflict state checked. A scroll-spy shell needs real overflow and a
-   real scroll, not a static DOM snapshot. Wire a working demo into the
-   showcase (`/showcase/<category>`) in the SAME change — not as a
-   follow-up task.
+   real scroll, not a static DOM snapshot. Run `pnpm dev` (starts all three
+   Portless services) and drive the component inside the REAL workspace
+   that consumes it (`http://sigil-chat.localhost:1355/chat`, `/studio`,
+   `/review`, etc.) in the SAME change — not as a follow-up task. Only fall
+   back to the inherited `/showcase/<category>` catalog when the component
+   is genuinely shared/generic with no product consumer yet, and say so
+   explicitly when reporting the change.
 4. Check the browser console for errors AND warnings — not just that the
    page visually renders correctly. Render-phase store conflicts,
    hydration mismatches, and duplicate-landmark bugs (two `<main>`

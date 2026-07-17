@@ -10,7 +10,7 @@ import { reviewDocumentKeys } from "./review-document"
 describe("agent domain outcome reconciliation", () => {
   it("invalidates only the affected review document query", async () => {
     const queryClient = new QueryClient()
-    const affected = reviewDocumentKeys.detail("weekly-tournament-liveops")
+    const affected = reviewDocumentKeys.detail("draft-article-review")
     const unaffected = reviewDocumentKeys.detail("another-review")
     queryClient.setQueryData(affected, { revision: 7 })
     queryClient.setQueryData(unaffected, { revision: 3 })
@@ -20,7 +20,7 @@ describe("agent domain outcome reconciliation", () => {
       kind: "review.document.changed",
       resource: {
         kind: "review-document",
-        id: "weekly-tournament-liveops",
+        id: "draft-article-review",
         revision: 8,
       },
       operation: "annotations.add",
@@ -57,7 +57,7 @@ describe("agent domain outcome reconciliation", () => {
           kind: "review.document.changed",
           resource: {
             kind: "review-document",
-            id: "weekly-tournament-liveops",
+            id: "draft-article-review",
             revision: 8,
           },
           operation: "passages.update",
@@ -78,7 +78,7 @@ describe("agent domain outcome reconciliation", () => {
       kind: "review.document.changed" as const,
       resource: {
         kind: "review-document" as const,
-        id: "weekly-tournament-liveops",
+        id: "draft-article-review",
         revision: 9,
       },
       operation: "passages.update",
@@ -102,7 +102,7 @@ describe("agent domain outcome reconciliation", () => {
       kind: "review.document.changed" as const,
       resource: {
         kind: "review-document" as const,
-        id: "weekly-tournament-liveops",
+        id: "draft-article-review",
         revision: 10,
       },
       operation: "passages.update",
@@ -125,7 +125,7 @@ describe("agent domain outcome reconciliation", () => {
       kind: "review.document.changed" as const,
       resource: {
         kind: "review-document" as const,
-        id: "weekly-tournament-liveops",
+        id: "draft-article-review",
       },
       operation: "annotations.add",
       deduplicate: false,

@@ -4,7 +4,7 @@ import {
   resolveWorkspaceDataPath,
 } from "@workspace/file-store-core";
 
-import { createWeeklyTournamentReviewDocument } from "./sample.js";
+import { createDraftArticleReviewDocument } from "./sample.js";
 import type {
   ReviewAnnotation,
   ReviewAcceptanceInput,
@@ -56,7 +56,7 @@ export class MemoryReviewRepository implements ReviewRepository {
 
   constructor(options?: { document?: ReviewDocument; now?: () => string }) {
     this.document = structuredClone(
-      options?.document ?? createWeeklyTournamentReviewDocument(),
+      options?.document ?? createDraftArticleReviewDocument(),
     );
     this.now = options?.now ?? (() => new Date().toISOString());
   }
@@ -157,7 +157,7 @@ export class FileReviewRepository implements ReviewRepository {
     this.store = new JsonFileStore({
       filePath,
       lockLabel: "review",
-      createInitial: createWeeklyTournamentReviewDocument,
+      createInitial: createDraftArticleReviewDocument,
       parse: parseReviewDocument,
       corruptError: (path) =>
         new Error(
@@ -552,7 +552,7 @@ function prependHistory(
 }
 
 function normalizeReviewDocument(document: ReviewDocument): ReviewDocument {
-  const sample = createWeeklyTournamentReviewDocument();
+  const sample = createDraftArticleReviewDocument();
   return {
     ...document,
     decisions: document.decisions.map((decision) => {

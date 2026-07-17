@@ -531,7 +531,7 @@ export function createSigilRegistry(
   registry.register({
     name: "sigil-review-inspect",
     description:
-      "Inspect the complete weekly tournament LiveOps review document, including its ordered outline, all passages, decisions, and annotations.",
+      "Inspect the complete draft article review document, including its ordered outline, all passages, decisions, and annotations.",
     visibility: "always",
     approval: "read",
     input: shape<Record<string, never>>(

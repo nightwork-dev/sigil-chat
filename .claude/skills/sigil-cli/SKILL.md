@@ -5,7 +5,11 @@ description: Use when scaffolding a project from this template or turning a .tsx
 
 # sigil CLI
 
-`packages/cli` (bin `sigil`, package `sigil`) is the repo's CLI. Two jobs:
+`packages/cli` (bin `sigil`, package `sigil`) is vendored `sigil-design`
+tooling — nothing under `apps/` or `packages/*/src` imports it, and
+`docs/guides/trimming-the-template.md` lists it as delete-freely if you don't
+use the CLI standalone from this repo. If you delete `packages/cli`, delete
+this skill (and its `.pi/skills` mirror) with it. Two jobs while it's here:
 scaffold a new project from this template, and render a `.tsx` report into ONE
 self-contained, distributable HTML file.
 

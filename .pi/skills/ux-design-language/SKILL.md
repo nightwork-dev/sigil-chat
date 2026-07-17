@@ -42,8 +42,8 @@ thing?"** State the answer in one sentence before writing the code.
   gradients as its identity (check `apps/web/src/styles/themes.css` first —
   none of this template's default themes do).
 - A generic icon next to a heading purely for visual balance. An icon must
-  either be functional (nav wayfinding — see `extending-this-template` Rule
-  3.3) or it must be cut.
+  either be functional (nav wayfinding — see the `extending-this-template`
+  skill) or it must be cut.
 - Uniform equal-sized grid cards when the underlying data has unequal
   importance. Do not default to a 3-column or 4-column grid without
   checking whether the content actually has equal weight.

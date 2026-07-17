@@ -5,7 +5,12 @@ description: Use when scaffolding a project from this template or turning a .tsx
 
 # sigil CLI — hard rules
 
-`packages/cli` (bin `sigil`). Every rule below is a requirement.
+`packages/cli` (bin `sigil`) is VENDORED `sigil-design` tooling. Nothing
+under `apps/` or `packages/*/src` imports it — `docs/guides/trimming-the-template.md`
+lists it as delete-freely if you don't use the CLI standalone. If
+`packages/cli` is deleted, DELETE this skill (and the `.claude/skills`
+mirror) in the same change. Every rule below is a requirement while it's
+still vendored.
 
 ## Commands
 

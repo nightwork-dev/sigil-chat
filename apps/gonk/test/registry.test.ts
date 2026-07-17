@@ -323,7 +323,7 @@ describe("Sigil Chat Gonk registry", () => {
     expect((await repository.run()).outputs["batch-sum"]?.sum).toBe(5);
   });
 
-  it("exposes the complete LiveOps review document and adjacent passage context", async () => {
+  it("exposes the complete draft article review document and adjacent passage context", async () => {
     const { registry } = await makeRegistry();
     const inspect = await collectToolOutcome(
       registry.invoke("sigil-review-inspect", {}, makeBaseContext()),
@@ -331,8 +331,8 @@ describe("Sigil Chat Gonk registry", () => {
     expect(inspect).toMatchObject({
       ok: true,
       data: {
-        id: "weekly-tournament-liveops",
-        title: "Weekly Tournament LiveOps Runbook",
+        id: "draft-article-review",
+        title: "Draft Article Review: A Technical Onboarding Guide",
       },
     });
     if (inspect.ok) {
@@ -342,18 +342,18 @@ describe("Sigil Chat Gonk registry", () => {
       };
       expect(data.outline).toContainEqual(
         expect.objectContaining({
-          id: "preflight",
-          passageIds: ["preflight-01", "preflight-02"],
+          id: "draft",
+          passageIds: ["draft-01", "draft-02"],
         }),
       );
       expect(data.passages).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            id: "preflight-02",
-            sectionId: "preflight",
+            id: "draft-02",
+            sectionId: "draft",
           }),
           expect.objectContaining({
-            id: "rollback-01",
+            id: "revise-01",
             sectionId: "closeout",
           }),
         ]),
@@ -363,20 +363,20 @@ describe("Sigil Chat Gonk registry", () => {
     const adjacent = await collectToolOutcome(
       registry.invoke(
         "sigil-review-passages",
-        { ids: ["preflight-02", "rollback-01"], before: 1, after: 1 },
+        { ids: ["draft-02", "revise-01"], before: 1, after: 1 },
         makeBaseContext(),
       ),
     );
     expect(adjacent).toMatchObject({
       ok: true,
       data: {
-        requestedIds: ["preflight-02", "rollback-01"],
+        requestedIds: ["draft-02", "revise-01"],
         passages: [
-          { id: "preflight-01" },
-          { id: "preflight-02" },
-          { id: "monitoring-01" },
-          { id: "rollback-01" },
-          { id: "closeout-02" },
+          { id: "draft-01" },
+          { id: "draft-02" },
+          { id: "factcheck-01" },
+          { id: "revise-01" },
+          { id: "publish-02" },
         ],
       },
     });
@@ -387,7 +387,7 @@ describe("Sigil Chat Gonk registry", () => {
     const decisions = await collectToolOutcome(
       registry.invoke(
         "sigil-review-decisions",
-        { passageIds: ["preflight-02", "rollback-01"], status: "open" },
+        { passageIds: ["draft-02", "revise-01"], status: "open" },
         makeBaseContext(),
       ),
     );
@@ -395,8 +395,8 @@ describe("Sigil Chat Gonk registry", () => {
       ok: true,
       data: {
         decisions: [
-          { id: "decision-preflight-owner" },
-          { id: "decision-rollback-authority" },
+          { id: "decision-draft-owner" },
+          { id: "decision-publish-authority" },
         ],
       },
     });
@@ -404,7 +404,7 @@ describe("Sigil Chat Gonk registry", () => {
     const annotations = await collectToolOutcome(
       registry.invoke(
         "sigil-review-annotations",
-        { ids: ["annotation-rollback-inputs"] },
+        { ids: ["annotation-publish-inputs"] },
         makeBaseContext(),
       ),
     );
@@ -413,8 +413,8 @@ describe("Sigil Chat Gonk registry", () => {
       data: {
         annotations: [
           {
-            id: "annotation-rollback-inputs",
-            passageIds: ["rollback-01"],
+            id: "annotation-publish-inputs",
+            passageIds: ["revise-01"],
             kind: "question",
           },
         ],
@@ -430,15 +430,15 @@ describe("Sigil Chat Gonk registry", () => {
         {
           annotations: [
             {
-              passageIds: ["preflight-02"],
+              passageIds: ["draft-02"],
               kind: "note",
-              body: "Link this check to the regional certification artifact.",
+              body: "Link this check to the style guide's section-order rule.",
             },
             {
-              id: "agent-rollback-ownership",
-              passageIds: ["rollback-01", "closeout-02"],
+              id: "agent-publish-ownership",
+              passageIds: ["revise-01", "publish-02"],
               kind: "flag",
-              body: "Name the rollback owner and closeout approver.",
+              body: "Name the revision owner and publish approver.",
               author: "embedded-agent",
             },
           ],
@@ -456,8 +456,8 @@ describe("Sigil Chat Gonk registry", () => {
             createdAt: "2026-07-16T12:00:00.000Z",
           },
           {
-            id: "agent-rollback-ownership",
-            passageIds: ["rollback-01", "closeout-02"],
+            id: "agent-publish-ownership",
+            passageIds: ["revise-01", "publish-02"],
             author: "embedded-agent",
           },
         ],
@@ -468,7 +468,7 @@ describe("Sigil Chat Gonk registry", () => {
             operation: "annotations.add",
             changedIds: [
               "agent-annotation-1",
-              "agent-rollback-ownership",
+              "agent-publish-ownership",
             ],
           },
         },
@@ -482,20 +482,20 @@ describe("Sigil Chat Gonk registry", () => {
       };
       expect(data.clientCommand.payload.changedIds).toEqual([
         "agent-annotation-1",
-        "agent-rollback-ownership",
+        "agent-publish-ownership",
       ]);
     }
 
     const after = await collectToolOutcome(
       registry.invoke(
         "sigil-review-annotations",
-        { passageIds: ["closeout-02"] },
+        { passageIds: ["publish-02"] },
         makeBaseContext(),
       ),
     );
     expect(after).toMatchObject({
       ok: true,
-      data: { annotations: [{ id: "agent-rollback-ownership" }] },
+      data: { annotations: [{ id: "agent-publish-ownership" }] },
     });
   });
 
@@ -507,14 +507,14 @@ describe("Sigil Chat Gonk registry", () => {
         {
           passages: [
             {
-              id: "preflight-01",
+              id: "draft-01",
               expectedBody:
-                "Confirm the tournament is visible in every active region and that the published start time resolves correctly in each supported locale.",
-              body: "Confirm tournament visibility and localized start times in every active region.",
+                "Rewrite the opening to lead with the reader's actual problem, not the history of the topic. Cut the throat-clearing paragraphs that come before the first concrete example.",
+              body: "Rewrite the opening to lead with the reader's problem, not the topic's history.",
             },
             {
-              id: "preflight-02",
-              body: "Run the synthetic entry flow in every active region and record the resulting bracket id.",
+              id: "draft-02",
+              body: "Walk each major section in the mistake/why/fix order and record which sections still skip the 'why' step.",
             },
           ],
         },
@@ -526,12 +526,12 @@ describe("Sigil Chat Gonk registry", () => {
       data: {
         passages: [
           {
-            id: "preflight-01",
-            body: "Confirm tournament visibility and localized start times in every active region.",
+            id: "draft-01",
+            body: "Rewrite the opening to lead with the reader's problem, not the topic's history.",
           },
           {
-            id: "preflight-02",
-            body: "Run the synthetic entry flow in every active region and record the resulting bracket id.",
+            id: "draft-02",
+            body: "Walk each major section in the mistake/why/fix order and record which sections still skip the 'why' step.",
           },
         ],
         clientCommand: {
@@ -539,7 +539,7 @@ describe("Sigil Chat Gonk registry", () => {
           payload: {
             kind: "review.document.changed",
             operation: "passages.update",
-            changedIds: ["preflight-01", "preflight-02"],
+            changedIds: ["draft-01", "draft-02"],
           },
         },
       },
@@ -551,12 +551,12 @@ describe("Sigil Chat Gonk registry", () => {
         {
           passages: [
             {
-              id: "preflight-01",
+              id: "draft-01",
               expectedBody: "stale text",
               body: "This must not be applied.",
             },
             {
-              id: "rollback-01",
+              id: "revise-01",
               body: "This must also not be applied.",
             },
           ],
@@ -570,10 +570,10 @@ describe("Sigil Chat Gonk registry", () => {
         applied: false,
         conflict: {
           kind: "passage",
-          id: "preflight-01",
+          id: "draft-01",
           expectedBody: "stale text",
           actualBody:
-            "Confirm tournament visibility and localized start times in every active region.",
+            "Rewrite the opening to lead with the reader's problem, not the topic's history.",
         },
       },
     });
@@ -581,7 +581,7 @@ describe("Sigil Chat Gonk registry", () => {
     const after = await collectToolOutcome(
       registry.invoke(
         "sigil-review-passages",
-        { ids: ["rollback-01"] },
+        { ids: ["revise-01"] },
         makeBaseContext(),
       ),
     );
@@ -590,8 +590,8 @@ describe("Sigil Chat Gonk registry", () => {
       data: {
         passages: [
           {
-            id: "rollback-01",
-            body: "If rollback is declared, disable new enrollment, restore the last known-good configuration revision, preserve affected account ids, and open a reward-reconciliation plan before event closeout.",
+            id: "revise-01",
+            body: "If a section is cut, remove its cross-references, archive the removed prose in the revision history, and open a follow-up note for any claim the cut section was the only place substantiating.",
           },
         ],
       },
@@ -607,11 +607,11 @@ describe("Sigil Chat Gonk registry", () => {
           clearPrevious: false,
           actions: [
             {
-              targetIds: ["passage:preflight-02", "passage:rollback-01"],
+              targetIds: ["passage:draft-02", "passage:revise-01"],
               effect: "pulse",
             },
             {
-              targetIds: ["decision:decision-rollback-authority"],
+              targetIds: ["decision:decision-publish-authority"],
               effect: "focus",
             },
           ],
@@ -628,11 +628,11 @@ describe("Sigil Chat Gonk registry", () => {
             clearPrevious: false,
             actions: [
               {
-                targetIds: ["passage:preflight-02", "passage:rollback-01"],
+                targetIds: ["passage:draft-02", "passage:revise-01"],
                 effect: "pulse",
               },
               {
-                targetIds: ["decision:decision-rollback-authority"],
+                targetIds: ["decision:decision-publish-authority"],
                 effect: "focus",
               },
             ],

@@ -63,9 +63,9 @@ it.
   alone already carries the message. Every additional line is something the
   reader has to decide is worth reading.
 - No generic emoji badges or icon-only decoration unless it's an
-  established part of the product's visual language (this template's
-  showcase icons are functional nav wayfinding, not decoration — see
-  `extending-this-template` skill Rule 3.3).
+  established part of the product's visual language (the `_app` sidebar's
+  nav icons are functional wayfinding, not decoration — see the
+  `extending-this-template` skill).
 - A badge, pill, or status indicator must display a value that can change.
   If it always renders the same text, it's not a badge, it's a label —
   either make it dynamic or delete it and use plain text.
