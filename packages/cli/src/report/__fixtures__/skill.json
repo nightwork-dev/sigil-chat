@@ -1,8 +1,0 @@
-{
-  "name": "sample-reader",
-  "version": "1.0",
-  "description": "How to inspect the sample report.",
-  "content": "Treat status rows as report-local evidence.",
-  "scope": "report-reader",
-  "trust": "advisory"
-}

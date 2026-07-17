@@ -1,5 +1,5 @@
 // ArticleShell — a two-pane long-form article layout rendered by the CLI
-// `sigil render` pipeline (see packages/cli/src/report) into one portable HTML
+// Sigil Design's `sigil render` pipeline into one portable HTML
 // document that is SSR'd AND hydrated in the browser.
 //
 // Scroll-spy is a React-owned hook (like its sibling GuideShell): a post-

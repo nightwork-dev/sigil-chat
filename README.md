@@ -168,34 +168,26 @@ tools should not be copied into Eve definitions by hand.
 
 ## Use as a template
 
-1. Copy the repo (excluding generated/local state):
+Sigil Chat is generated from the Sigil Design base plus this repository's
+versioned Chat overlay. Do not copy this reference checkout or revive its old
+vendored scaffold CLI.
+
+1. Install or build the current Sigil Design CLI, then generate through the
+   published overlay (or a local checkout while developing both repositories):
    ```bash
-   cp -r /path/to/sigil-chat /path/to/new-project
-   cd /path/to/new-project
-   rm -rf node_modules apps/web/node_modules apps/agent/node_modules apps/gonk/node_modules \
-     packages/*/node_modules pnpm-lock.yaml
-   rm -rf .data apps/agent/.eve
-   rm -f apps/web/src/routeTree.gen.ts
+   sigil create my-project \
+     --profile chat \
+     --overlay @sigil-design/chat-overlay
+   cd my-project
    ```
 
-2. Rename the project — Portless runs one shared daemon per machine, so every
-   app needs a unique subdomain. This repo ships three service names
-   (`sigil-chat`, `sigil-chat-agent`, `sigil-chat-gonk`) that **must** all
-   change together, or your new project's dev servers will collide with any
-   other project still using those names:
-   - Root `package.json` → `"name": "my-project"`
-   - `apps/web/package.json` → `"dev": "portless my-project vite dev --host"`
-   - `apps/agent/package.json` → `"dev": "portless my-project-agent eve dev --no-ui --host 127.0.0.1"`
-   - `apps/gonk/package.json` → `"dev": "portless my-project-gonk tsx watch src/server.ts"`
-   - Update `apps/agent/agent/connections/gonk.ts`'s default `url` and this
-     README's URLs to match the new Gonk portless name.
-   - Reserved names (`run/get/alias/hosts/list/trust/proxy`) can't be used for
-     any of the three.
+2. Review `.env.example`. The generated app has typed defaults for the three
+   local Portless services; use `EVE_ORIGIN`, `GONK_MCP_URL`, and `PORT` for a
+   plain-port or deployed topology.
 
 3. Set `GONK_MCP_KEY` (same value for the Eve and Gonk processes), run
    `codex login`, then install and run:
    ```bash
-   pnpm install
    pnpm dev
    ```
 

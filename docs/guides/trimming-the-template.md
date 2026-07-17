@@ -76,7 +76,6 @@ freely" means the grep returned nothing outside the package's own source.
 | `@workspace/data` | `packages/data/src/components/entity-browser.tsx`, `packages/ui/src/components/views/entity-browser.tsx`, `apps/web/src/routes/examples/data.tsx`, `examples-gallery.tsx` | Only reached from the `_app/data.tsx` demo workspace and the `examples/` scaffold. Delete freely if you delete both. |
 | `@workspace/canvas` | `apps/web/src/routes/examples/canvas.tsx`, `examples-gallery.tsx` | Only reached from the `examples/` scaffold — **not** `_app/canvas.tsx`, which is a separate, unrelated demo route. Delete freely if you delete `examples/`. |
 | `@workspace/file-store-core` | `packages/review-store/src/repository.ts`, `packages/graph-store/src/repository.ts` | Internal dependency of the two `-store` packages above, not imported directly by any app. Delete only alongside both stores. |
-| `packages/cli` (published as `sigil`) | Nothing under `apps/` or `packages/*/src` imports it | Not consumed by the running app at all — it's the vendored `sigil-design` CLI (`create`/`render`/`pack-template`) for scaffolding, invoked standalone via its own bin, not from application code. Delete freely if you don't use the CLI from this repo. |
 
 ## Deletion recipe
 
@@ -90,7 +89,7 @@ Studio workspace and the graph tools):
    `sigil-graph-*` tools and their input-guard/schema helpers at the bottom
    of the file).
 3. `rm -rf packages/graph packages/graph-store` (or `packages/review
-   packages/review-store`, `packages/data`, `packages/canvas`, `packages/cli`
+   packages/review-store`, `packages/data`, or `packages/canvas`
    — whichever you're dropping).
 4. Remove the corresponding `"@workspace/<name>": "workspace:*"` line from
    `apps/web/package.json` and/or `apps/gonk/package.json` dependencies, and
