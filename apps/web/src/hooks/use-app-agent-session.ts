@@ -10,6 +10,7 @@ import {
   clearContextDraft,
   clearTurnContextAttachments,
   getAttentionExclusions,
+  getContextDraftScope,
   getTurnContextAttachments,
   serializeAttentionDraft,
 } from "@niwork/agent/context-draft"
@@ -19,6 +20,10 @@ import {
   getToolApprovalMode,
   TOOL_APPROVAL_HEADER,
 } from "@/lib/agent-tool-approval"
+import {
+  commitAttentionDelivery,
+  pendingAttentionContext,
+} from "@/lib/agent-attention-delivery"
 
 export function useAppAgentSession(
   source?: AgentRuntimeSession,
@@ -29,13 +34,15 @@ export function useAppAgentSession(
 
   const send = useCallback<AgentRuntimeSession["send"]>(
     async (input) => {
+      const contextScope = getContextDraftScope()
+      const pendingAttention = pendingAttentionContext(attention, contextScope)
       const attachments = getTurnContextAttachments()
       const result = await session.send({
         ...input,
-        ...(attention || attachments.length > 0
+        ...(pendingAttention || attachments.length > 0
           ? {
               clientContext: serializeAttentionDraft(
-                attention,
+                pendingAttention,
                 getAttentionPrivacyLevel(),
                 getAttentionExclusions(),
                 attachments,
@@ -48,6 +55,7 @@ export function useAppAgentSession(
         },
       })
       if (result.status === "succeeded") {
+        commitAttentionDelivery(attention, contextScope)
         clearAttentionExclusions()
         clearTurnContextAttachments()
       }

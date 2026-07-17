@@ -55,6 +55,8 @@ import {
 import { Separator } from "@workspace/ui/components/separator"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { usePendingAttentionContext } from "@/lib/agent-attention-delivery"
+
 interface ContextTrayValue {
   attention: AttentionContext | null
   attachments: readonly TurnContextAttachment[]
@@ -79,13 +81,14 @@ function Root({
   attention: AttentionContext | null
   children: ReactNode
 }) {
+  const pendingAttention = usePendingAttentionContext(attention)
   const privacy = useAttentionPrivacyLevel()
   const excludedKeys = useAttentionExclusions()
   const attachments = useTurnContextAttachments()
   const preview =
-    attention || attachments.length > 0
+    pendingAttention || attachments.length > 0
       ? createAttentionContextPreview(
-          attention,
+          pendingAttention,
           privacy,
           excludedKeys,
           attachments,
@@ -94,7 +97,13 @@ function Root({
 
   return (
     <ContextTrayContext.Provider
-      value={{ attention, attachments, excludedKeys, preview, privacy }}
+      value={{
+        attention: pendingAttention,
+        attachments,
+        excludedKeys,
+        preview,
+        privacy,
+      }}
     >
       <Popover>{children}</Popover>
     </ContextTrayContext.Provider>
@@ -141,7 +150,8 @@ function Content({ className }: { className?: string }) {
           <div>
             <PopoverTitle>Context for this turn</PopoverTitle>
             <PopoverDescription>
-              Inspect or exclude application attention before sending.
+              Current selections are included automatically. Inspect or exclude
+              application attention before sending.
             </PopoverDescription>
           </div>
           <Select
@@ -212,7 +222,8 @@ function Content({ className }: { className?: string }) {
                 ))
               ) : (
                 <EmptySection>
-                  Add a selection above to keep it explicitly attached.
+                  Pin a selection above only when it should outlive the current
+                  workspace selection.
                 </EmptySection>
               )}
             </ContextSection>

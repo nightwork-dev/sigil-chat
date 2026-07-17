@@ -156,6 +156,14 @@ annotation in the review UI, that selection becomes part of the next agent
 turn's `clientContext` automatically, with no per-call plumbing in the
 component that sends the message.
 
+Selections describe current attention, so they accompany every turn while
+they remain selected unless the user excludes them. Activity is different:
+Sigil Chat keeps a delivery cursor per agent thread and sends only semantic
+events recorded since that thread's last successful turn. A failed send does
+not advance the cursor, and activity that occurs while a turn is in flight is
+left pending for the next turn. This cursor is application policy over the
+bounded telemetry buffer; it is not durable agent memory.
+
 Every part of what gets serialized is user-inspectable and user-editable
 before it's sent, via `ContextTray`
 ([`apps/web/src/components/agent/context-tray.tsx`](../../apps/web/src/components/agent/context-tray.tsx)),
