@@ -1,0 +1,22 @@
+{
+  "name": "@workspace/agent-contracts",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@niwork/agent": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  },
+  "exports": {
+    "./client-command": "./src/client-command.ts",
+    "./ui-highlight": "./src/ui-highlight.ts"
+  }
+}

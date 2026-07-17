@@ -10,6 +10,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
+      "@workspace/agent-contracts/*": ["../../packages/agent-contracts/src/*"],
       "@workspace/graph/*": ["../../packages/graph/src/*"],
       "@workspace/graph-store/*": ["../../packages/graph-store/src/*"],
       "@workspace/review-store": ["../../packages/review-store/src/repository.ts"],

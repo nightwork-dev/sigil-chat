@@ -4,6 +4,11 @@ import {
   type ApprovalProvider,
 } from "@gonk/tool-registry";
 import {
+  agentUiHighlightEffects,
+  isAgentUiHighlightInput,
+  type AgentUiHighlightInput,
+} from "@workspace/agent-contracts/ui-highlight";
+import {
   builtinReducers,
   createBuiltinReducerRegistry,
 } from "@workspace/graph/builtins";
@@ -90,8 +95,6 @@ interface GraphEditInput {
   expectedRevision?: number;
 }
 
-type HighlightEffect = "focus" | "pulse" | "dim-others" | "trace";
-
 interface ReviewPassagesInput {
   ids: string[];
   before?: number;
@@ -117,14 +120,6 @@ interface AddReviewAnnotationsInput {
 interface UpdateReviewPassagesInput {
   passages: ReviewPassageEdit[];
   expectedRevision?: number;
-}
-
-interface UiHighlightInput {
-  actions: Array<{
-    targetIds: string[];
-    effect: HighlightEffect;
-  }>;
-  clearPrevious?: boolean;
 }
 
 const readHints = {
@@ -785,8 +780,8 @@ export function createSigilRegistry(
       "Return a structured client command that highlights stable application target ids. Targets are semantic ids, never CSS selectors.",
     visibility: "always",
     approval: "read",
-    input: shape<UiHighlightInput>(
-      isUiHighlightInput,
+    input: shape<AgentUiHighlightInput>(
+      isAgentUiHighlightInput,
       "Expected a non-empty actions array with targetIds and a supported effect.",
     ),
     inputJsonSchema: {
@@ -805,7 +800,7 @@ export function createSigilRegistry(
               },
               effect: {
                 type: "string",
-                enum: ["focus", "pulse", "dim-others", "trace"],
+                enum: [...agentUiHighlightEffects],
               },
             },
             ["targetIds", "effect"],
@@ -1132,33 +1127,6 @@ function isUpdateReviewPassagesInput(
         isOptionalString(passage, "expectedBody"),
     ) &&
     isOptionalInteger(value, "expectedRevision")
-  );
-}
-
-function isHighlightEffect(value: unknown): value is HighlightEffect {
-  return (
-    value === "focus" ||
-    value === "pulse" ||
-    value === "dim-others" ||
-    value === "trace"
-  );
-}
-
-function isUiHighlightInput(value: unknown): value is UiHighlightInput {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, ["actions", "clearPrevious"]) &&
-    Array.isArray(value.actions) &&
-    value.actions.length > 0 &&
-    (value.clearPrevious === undefined ||
-      typeof value.clearPrevious === "boolean") &&
-    value.actions.every(
-      (action) =>
-        isRecord(action) &&
-        hasOnlyKeys(action, ["targetIds", "effect"]) &&
-        isStringArray(action.targetIds) &&
-        isHighlightEffect(action.effect),
-    )
   );
 }
 

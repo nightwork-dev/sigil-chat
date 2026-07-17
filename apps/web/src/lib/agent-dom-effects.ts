@@ -1,18 +1,21 @@
+import {
+  agentUiHighlightEffects,
+  isAgentTargetId,
+  isAgentUiHighlightAction,
+  type AgentUiHighlightAction,
+  type AgentUiHighlightEffect,
+} from "@workspace/agent-contracts/ui-highlight"
+
+export { isAgentTargetId } from "@workspace/agent-contracts/ui-highlight"
+
 export const AGENT_DOM_COMMAND_EVENT = "sigil:agent-dom-command"
 
-export const agentDomEffects = [
-  "focus",
-  "pulse",
-  "dim-others",
-  "trace",
-] as const
+export const agentDomEffects = agentUiHighlightEffects
 
-export type AgentDomEffect = (typeof agentDomEffects)[number]
+export type AgentDomEffect = AgentUiHighlightEffect
 export type AgentDomScroll = "none" | "nearest" | "center"
 
-export interface AgentDomCommand {
-  targetIds: string[]
-  effect: AgentDomEffect
+export interface AgentDomCommand extends AgentUiHighlightAction {
   durationMs?: number
   scroll?: AgentDomScroll
 }
@@ -33,25 +36,14 @@ export type AgentDomCommandEventDetail =
 const MIN_DURATION_MS = 300
 const MAX_DURATION_MS = 10_000
 const DEFAULT_DURATION_MS = 2_500
-const TARGET_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9:._/-]{0,127}$/
-
-export function isAgentTargetId(value: unknown): value is string {
-  return typeof value === "string" && TARGET_ID_PATTERN.test(value)
-}
 
 export function isAgentDomCommand(value: unknown): value is AgentDomCommand {
-  if (!value || typeof value !== "object") return false
+  if (!value || typeof value !== "object" || !isAgentUiHighlightAction(value))
+    return false
 
-  const command = value as Record<string, unknown>
-  const targetIds = command.targetIds
+  const command = value as unknown as Record<string, unknown>
 
   return (
-    Array.isArray(targetIds) &&
-    targetIds.length > 0 &&
-    targetIds.length <= 50 &&
-    targetIds.every(isAgentTargetId) &&
-    typeof command.effect === "string" &&
-    agentDomEffects.includes(command.effect as AgentDomEffect) &&
     (command.durationMs === undefined ||
       (typeof command.durationMs === "number" &&
         Number.isFinite(command.durationMs))) &&

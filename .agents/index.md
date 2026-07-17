@@ -55,7 +55,8 @@ file does not repeat it.
 │           └── registry.ts     → Application tool registry (add tools here)
 ├── packages/
 │   ├── ui/            → @workspace/ui — shared shadcn + custom components, tokens, hooks
-│   ├── chat/           → @workspace/chat — ChatMessage, ChatInput, ChatList, streaming, markdown
+│   ├── agent-contracts/ → @workspace/agent-contracts — shared client command and semantic highlight contracts
+│   ├── chat/           → @workspace/chat — ChatMessage, ChatInput, ChatList, markdown
 │   ├── data/           → @workspace/data — EntityBrowser, EntityTable, DetailPanel
 │   ├── canvas/         → @workspace/canvas — spatial editor primitives, grid types
 │   ├── graph/           → @workspace/graph — reducer graph engine (nodes, sockets, data-kinds, document, builtins)
