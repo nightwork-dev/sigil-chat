@@ -10,7 +10,7 @@ The demonstrated `@gonk/tool-registry-mcp@0.0.23` session-reuse defect is
 tracked and fixed on Gonk branch `feat/auth-support` in:
 
 ```text
-the Gonk Core repository's worktree at gonk-worktrees/auth-support
+a development worktree of the Gonk Core repository
 ```
 
 The Web handler now stores:

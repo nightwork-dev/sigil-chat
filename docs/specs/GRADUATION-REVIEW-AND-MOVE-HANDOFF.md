@@ -9,7 +9,7 @@
 
 - Destination chosen by the maintainer: this repository (sigil-chat) — Sigil
   Chat graduates as a template/scaffold/starter, not an app.
-- Source: the sigil-design repository's git worktree at `worktrees/sigil-chat`,
+- Source: a development worktree of the sigil-design repository,
   branch `codex/sigil-chat` in the sigil-design repository.
 - Rollback commit: `4e6c132` ("docs: record cross-model review closure for
   T1-T22"), preceded by `cb54604` (T1 regression backfill). The source
@@ -36,12 +36,12 @@
   page (per-instance `_serverFn` endpoint ids) and do not reproduce on a
   fresh load.
 - Source worktree retired 2026-07-17: `git worktree remove` of the
-  sigil-design repository's worktree at `worktrees/sigil-chat`. The branch
+  development worktree of the sigil-design repository. The branch
   `codex/sigil-chat` remains in the sigil-design repository at the rollback
   commit `4e6c132`. The worktree's untracked runtime and agent-session state
   (`.agents`, `.omc`, `.omx`, `.remember`, `.data`, `traces`) is preserved in
   the sigil-design repository's worktree archive
-  `worktrees/sigil-chat-retired-state-20260717.tgz`;
+  an archive retained alongside the source repository;
   the review-document store was carried into this repository's `.data/`.
 
 ## Review boundary
@@ -88,7 +88,7 @@ pnpm test
 pnpm typecheck
 ```
 
-Run from the sigil-design repository's worktree at `worktrees/sigil-chat`:
+Run from the development worktree of the sigil-design repository:
 
 ```sh
 pnpm -r test

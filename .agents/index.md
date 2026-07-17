@@ -205,7 +205,10 @@ section elsewhere without updating the source of truth in `README.md`.
 
 ## Docs and specs
 
-See [`docs/specs/README.md`](../docs/specs/README.md) for the index of active
+See [`docs/guides/`](../docs/guides/) for task-oriented usage/extension
+guides — adding a tool, customizing the agent, building a workspace, and
+trimming template boilerplate — and
+[`docs/specs/README.md`](../docs/specs/README.md) for the index of active
 contracts versus historical/evidence records versus specs inherited from the
 `sigil-design` lineage that don't apply to this product.
 

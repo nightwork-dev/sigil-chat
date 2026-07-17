@@ -72,18 +72,7 @@ Record what happened; not sources of current truth for ongoing design.
 
 ## Inherited from the `sigil-design` lineage — not Sigil Chat scope
 
-Carried over through shared git history with `templates/sigil-design`. These
-describe that template's registry/CLI/theming work, not this product. Left in
-place for provenance; treat `templates/sigil-design`'s own `docs/specs/` as
-authoritative for this material going forward.
-
-- [`COLOR-SCHEME-GENERATOR-SPEC.md`](COLOR-SCHEME-GENERATOR-SPEC.md)
-- [`COMPONENT-CONSOLIDATION-SWEEP.md`](COMPONENT-CONSOLIDATION-SWEEP.md)
-- [`devkit-shape-pass.md`](devkit-shape-pass.md)
-- [`react-19-api-recommendations.md`](react-19-api-recommendations.md)
-- [`registry-tranche-2.md`](registry-tranche-2.md)
-- [`sigil-cli-improvements-task-list.md`](sigil-cli-improvements-task-list.md)
-- [`tapestry-registry-hitlist.md`](tapestry-registry-hitlist.md)
-- [`tapestry-registry-requests-batch-2.md`](tapestry-registry-requests-batch-2.md)
-- [`tapestry-registry-requests.md`](tapestry-registry-requests.md)
-- [`template-cli-and-static-report-proposal.md`](template-cli-and-static-report-proposal.md)
+Design-system registry/CLI/theming documents carried over through shared git
+history were removed from this repository's tracked docs; the Sigil Design
+repository's own `docs/specs/` is authoritative for that material. (Local
+checkouts may retain copies under the gitignored `docs.local/`.)

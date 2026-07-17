@@ -199,7 +199,7 @@ Boundaries that hold regardless:
   dependency enters at product level (sigil-chat) and adapter level (a
   Deadletters-backed `ReviewRepository`; the Deadletters corpus as the
   flagship `native-index` retrieval source, per the ecosystem ruling).
-- **Timing caveat:** the Deadletters source-of-truth audit (`apps/blog` vs
+- **Timing caveat:** the Deadletters source-of-truth audit (the Deadletters monorepo vs
   `deadletters-core`) is incomplete; adopt it as the review backend only
   after one canonical home per `@deadletters/*` package exists. Until then
   `review-store` stays the honest placeholder it is.

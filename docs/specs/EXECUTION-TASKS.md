@@ -266,7 +266,7 @@ already-completed extraction.
 **T14 historical reconciliation note (implementation lane, 2026-07-16; superseded below).**
 `FloatingDock` is implemented
 but uncommitted in the sigil-design repository's worktree at
-`worktrees/sigil-floating-dock` on `codex/floating-dock-shell`; its
+a sigil-design development worktree on `codex/floating-dock-shell`; its
 targeted/full UI tests, typechecks, build,
 registry build, and external-install smoke have implementation evidence. It
 awaits the maintainer-managed Fable review and canonical landing. `json-value` and

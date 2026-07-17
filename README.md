@@ -1,4 +1,4 @@
-# Sigil Chat
+<p align="center"><img src="assets/wordmark.svg" alt="sigil chat" width="660"></p>
 
 An agentic chat template with deliberately narrow ownership:
 
@@ -39,6 +39,29 @@ use Vercel AI Gateway. Set `CODEX_MODEL` to a bare OpenAI model slug to override
 Eve's default subscription-backed model. Gonk requires `GONK_MCP_KEY`; set the
 same bearer on the Eve and Gonk services. The mounted adapter has no
 unauthenticated mode, including for local development.
+
+## Extending
+
+Four task-oriented guides in [`docs/guides/`](docs/guides/) cover the things
+this README only points at:
+
+- [`adding-a-tool.md`](docs/guides/adding-a-tool.md) — the end-to-end worked
+  path for a new application tool, using the real `sigil-chat-status` tool as
+  the example: registry shape, approval tiers, the `GONK_MCP_KEY`
+  requirement, and how to verify a new tool over MCP and in chat.
+- [`customizing-the-agent.md`](docs/guides/customizing-the-agent.md) — the
+  `apps/agent` anatomy: model config, system instructions, the Eve channel,
+  adding a second MCP connection, subagents, and resetting local `.eve`
+  state.
+- [`building-workspaces.md`](docs/guides/building-workspaces.md) — the
+  route/content split, and the two loops that keep a workspace and the agent
+  in sync: a tool result becoming a React Query cache update via
+  `@niwork/agent-react-query` domain outcomes, and workspace selection state
+  reaching the agent through the attention/context tray.
+- [`trimming-the-template.md`](docs/guides/trimming-the-template.md) — the
+  honest boilerplate map: which routes and workspace packages are core,
+  which are pattern-reference demos, which are inherited `sigil-design`
+  scaffold, backed by real import greps, plus a deletion recipe.
 
 ## Trust model
 
@@ -106,8 +129,9 @@ tools should not be copied into Eve definitions by hand.
    pnpm dev
    ```
 
-See [`docs/specs/README.md`](docs/specs/README.md) for the index of active
-specs, historical evidence records, and material inherited from the
-`sigil-design` lineage that doesn't apply to this product — and
-[`.agents/index.md`](.agents/index.md) (symlinked from `CLAUDE.md` /
+See [`docs/guides/`](docs/guides/) for the task-oriented usage/extension
+guides ("Extending" above), [`docs/specs/README.md`](docs/specs/README.md)
+for the index of active specs, historical evidence records, and material
+inherited from the `sigil-design` lineage that doesn't apply to this product
+— and [`.agents/index.md`](.agents/index.md) (symlinked from `CLAUDE.md` /
 `AGENTS.md`) for the full agent-facing project orientation.
