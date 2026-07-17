@@ -36,8 +36,8 @@ Turbo starts the three Portless services listed above.
 
 Run `codex login` before starting the app. Eve's `experimental_chatgpt()` model
 reads that local login and calls the Codex backend directly; Sigil Chat does not
-use Vercel AI Gateway. Set `CODEX_MODEL` to a bare OpenAI model slug to override
-Eve's default subscription-backed model. Gonk requires `GONK_MCP_KEY`; set the
+use Vercel AI Gateway. The template defaults to `gpt-5.6-terra`; set
+`CODEX_MODEL` to a bare OpenAI model slug to override it. Gonk requires `GONK_MCP_KEY`; set the
 same bearer on the Eve and Gonk services. The mounted adapter has no
 unauthenticated mode, including for local development.
 
