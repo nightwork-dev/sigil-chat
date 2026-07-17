@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 
-import type { AgentToolCallPart, AgentToolInputResponse } from "@zigil/agent-surface"
+import type { AgentToolCallPart, AgentToolInputResponse } from "@zigil/agent-surface/contracts"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import {

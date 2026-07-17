@@ -4,15 +4,15 @@ import { act, createElement } from "react"
 import * as ReactRuntime from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { AgentRuntimeSessionProvider } from "@zigil/agent-react/session"
 import {
-  AgentRuntimeSessionProvider,
   addContextAttachment,
   getAttentionExclusions,
   getTurnContextAttachments,
   resetContextDraftForTests,
   setAttentionItemExcluded,
-} from "@zigil/agent-react"
-import type { AgentRuntimeSession } from "@zigil/agent-surface"
+} from "@zigil/agent-react/context-draft"
+import type { AgentRuntimeSession } from "@zigil/agent-surface/contracts"
 
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 

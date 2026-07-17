@@ -22,12 +22,12 @@ import {
   useUpdateReviewPassages,
 } from "@/lib/review-document"
 import { passageDraftReducer, projectPassageDraft } from "@/lib/passage-draft"
-import { useAttentionTelemetry } from "@zigil/agent-react"
+import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
 import {
   AttentionProvider,
   type AttentionContext,
   type AttentionSelection,
-} from "@zigil/agent-react"
+} from "@zigil/agent-react/attention"
 import { AgentHud } from "@/components/agent/agent-hud"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import {

@@ -13,9 +13,9 @@ import {
   type AgentMessagePart,
   type AgentRuntimeSession,
   type AgentToolInputResponse,
-} from "@zigil/agent-surface"
-import { useAgentThreadControls } from "@zigil/agent-react"
-import { useAttention } from "@zigil/agent-react"
+} from "@zigil/agent-surface/contracts"
+import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
+import { useAttention } from "@zigil/agent-react/attention"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 import { ChatList } from "@workspace/chat/components/chat-list"
 import { ChatMessage } from "@workspace/chat/components/chat-message"

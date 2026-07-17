@@ -2755,12 +2755,12 @@ packages:
       '@tanstack/react-query': ^5.0.0
 
   '@zigil/agent-react@0.1.0':
-    resolution: {integrity: sha512-a6QUhKJwIU9ed/Mnlc9bZne+5qqjpnfozxP9VReZueH0zbOyX1T268kFqyddMcIXwI0xFetQebiEa8ZwVXL8AQ==}
+    resolution: {integrity: sha512-HODrRWW6fldkIrPxux6oTgDuLpgWSdjJsqcvp1fj7iotamfNGNeEdFVxEJXe1ACKaPo0arWD0udl5WeA+Fc9dw==}
     peerDependencies:
       react: ^19.0.0
 
   '@zigil/agent-surface@0.1.0':
-    resolution: {integrity: sha512-dsFVeDGiSAYdSlT4/pJAAOR+qe12AU7GKzZh+1Rg9o+JWa5nzTNomQzAg1bRwOaytBZAHgtbtcKIUebiMcyixA==}
+    resolution: {integrity: sha512-nZei7yguVFqFobhTcaJHXx3egPkEhiei3OCoNpvSkuvolab0wUzr3sAIIDE32SX4CZp876/ak8WjCZMxQBuF4g==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}

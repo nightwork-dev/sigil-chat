@@ -6,11 +6,11 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { EveAgentStoreSnapshot } from "eve/client"
 import type { EveMessageData } from "eve/react"
-import { useAgentRuntimeSession } from "@zigil/agent-react"
+import { useAgentRuntimeSession } from "@zigil/agent-react/session"
 import type {
   AgentRuntimeSession,
   AgentTurnResult,
-} from "@zigil/agent-surface"
+} from "@zigil/agent-surface/contracts"
 
 import { AppAgentSessions } from "./agent-sessions"
 import {

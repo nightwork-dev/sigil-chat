@@ -4,12 +4,9 @@ import { BotIcon } from "lucide-react"
 import {
   hasPendingApproval,
   isAgentSessionBusy,
-} from "@zigil/agent-surface"
-import {
-  formatAttentionLabel,
-  useAgentRuntimeSession,
-  useAttention,
-} from "@zigil/agent-react"
+} from "@zigil/agent-surface/contracts"
+import { formatAttentionLabel, useAttention } from "@zigil/agent-react/attention"
+import { useAgentRuntimeSession } from "@zigil/agent-react/session"
 import { FloatingDock } from "@workspace/ui/components/floating-dock"
 import { StatusDot } from "@workspace/ui/components/status-dot"
 
