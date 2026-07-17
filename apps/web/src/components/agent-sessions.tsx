@@ -19,13 +19,13 @@ import {
   type AgentRuntimeSession,
   type AgentSendInput,
   type AgentThreadControls,
-} from "@sigil/agent"
-import { useEveRuntimeSession } from "@sigil/agent-eve"
+} from "@niwork/agent"
+import { useEveRuntimeSession } from "@niwork/agent-eve"
 import {
   addContextAttachment,
   removeTurnContextAttachment,
   setContextDraftScope,
-} from "@sigil/agent/context-draft"
+} from "@niwork/agent/context-draft"
 import {
   Alert,
   AlertDescription,

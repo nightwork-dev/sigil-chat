@@ -81,7 +81,7 @@ importers:
       '@gonk/tool-registry-mcp':
         specifier: 0.3.1
         version: 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
-      '@sigil/agent-gonk':
+      '@niwork/agent-gonk':
         specifier: 0.1.2
         version: 0.1.2(@gonk/scope@0.3.1)(zod@4.4.3)
       '@workspace/graph':
@@ -118,13 +118,13 @@ importers:
       '@gonk/store':
         specifier: 0.3.1
         version: 0.3.1
-      '@sigil/agent':
+      '@niwork/agent':
         specifier: 0.1.0
         version: 0.1.0(react@19.2.4)
-      '@sigil/agent-eve':
+      '@niwork/agent-eve':
         specifier: 0.1.0
         version: 0.1.0(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(react@19.2.4)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
-      '@sigil/agent-react-query':
+      '@niwork/agent-react-query':
         specifier: 0.1.0
         version: 0.1.0(@tanstack/react-query@5.101.2(react@19.2.4))(react@19.2.4)
       '@tailwindcss/vite':
@@ -1384,6 +1384,24 @@ packages:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
 
+  '@niwork/agent-eve@0.1.0':
+    resolution: {integrity: sha512-xRIE0lO811MEx4ehiPbY0VrzCDeHksTgqBbwWWT3RmYFZymrdQgorTE0RZ5IaF8WjovNPZuWfQF5iAub8BpY7A==}
+    peerDependencies:
+      react: ^19.0.0
+
+  '@niwork/agent-gonk@0.1.2':
+    resolution: {integrity: sha512-qMVQf9V8Pf05wENNfORADGPdHDKkNKtyFfen7EMF5R4deGwic6Z5YoG1puC9yqoayjj5A5wDa0uNutfS0JbDKg==}
+
+  '@niwork/agent-react-query@0.1.0':
+    resolution: {integrity: sha512-vY0E91CCarBeTlrGw7FMhLMt/TLJ9M/fx4oOE4W4zJCLbvhDDHjZ2dWSb6pFCAGMuCWKJsOAAn3ZkYvsKr94KA==}
+    peerDependencies:
+      '@tanstack/react-query': ^5.0.0
+
+  '@niwork/agent@0.1.0':
+    resolution: {integrity: sha512-kYMt7ObB2TXT3zkBZ2/MoAibcRoFmccVej4CKvRL+g17ZJB61NWMyjJtrDaPiXYuJluYmwwg2n0lTH47sATXFQ==}
+    peerDependencies:
+      react: ^19.0.0
+
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
     engines: {node: ^14.21.3 || >=16}
@@ -1873,24 +1891,6 @@ packages:
         optional: true
       react:
         optional: true
-
-  '@sigil/agent-eve@0.1.0':
-    resolution: {integrity: sha512-B1ATu9S64AlVh5RR1mNW7yrtqvZ9GQx7PC/H7c9L1NImwSSRWMx0p+Vto/fqXgCnABdp+Thn0KkN3VrbJxF5YA==}
-    peerDependencies:
-      react: ^19.0.0
-
-  '@sigil/agent-gonk@0.1.2':
-    resolution: {integrity: sha512-0pMzdM0vNRfjcclYsqr5BmZL5rtBsPxZ026NfG0w8qzO/AmmE8DDgiUKnDN5PTiSRrWeow+YevnsFaoWPGO2bA==}
-
-  '@sigil/agent-react-query@0.1.0':
-    resolution: {integrity: sha512-H8ehT9MQ3v2emClCjdiRdolCipPaMdqFdojU8ZTXhFfvinHZOWvfX8FMzVFHXV9PhZ+pKoiXpdXKqBbesBxhMg==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.0.0
-
-  '@sigil/agent@0.1.0':
-    resolution: {integrity: sha512-dECcCVZ2EPjKn3zUprvvvko37R61rz71+1BUSoWpcDEK46L0WFPgWALn7QtHsNvmKc1d0h+JzrTMFLCDInjMFg==}
-    peerDependencies:
-      react: ^19.0.0
 
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
@@ -6863,6 +6863,80 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
+  '@niwork/agent-eve@0.1.0(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(react@19.2.4)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))':
+    dependencies:
+      '@niwork/agent': 0.1.0(react@19.2.4)
+      eve: 0.24.4(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+      react: 19.2.4
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@netlify/blobs'
+      - '@netlify/runtime'
+      - '@opentelemetry/api'
+      - '@planetscale/database'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/functions'
+      - '@vercel/kv'
+      - '@vercel/queue'
+      - ai
+      - aws4fetch
+      - better-sqlite3
+      - braintrust
+      - chokidar
+      - dotenv
+      - drizzle-orm
+      - giget
+      - idb-keyval
+      - ioredis
+      - jiti
+      - just-bash
+      - lru-cache
+      - microsandbox
+      - miniflare
+      - mongodb
+      - mysql2
+      - rollup
+      - sqlite3
+      - uploadthing
+      - vite
+      - wrangler
+      - xml2js
+      - zephyr-agent
+
+  '@niwork/agent-gonk@0.1.2(@gonk/scope@0.3.1)(zod@4.4.3)':
+    dependencies:
+      '@gonk/auth': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - '@gonk/scope'
+      - supports-color
+      - zod
+
+  '@niwork/agent-react-query@0.1.0(@tanstack/react-query@5.101.2(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@niwork/agent': 0.1.0(react@19.2.4)
+      '@standard-schema/spec': 1.1.0
+      '@tanstack/react-query': 5.101.2(react@19.2.4)
+    transitivePeerDependencies:
+      - react
+
+  '@niwork/agent@0.1.0(react@19.2.4)':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      react: 19.2.4
+
   '@noble/ciphers@1.3.0': {}
 
   '@noble/curves@1.9.7':
@@ -7215,80 +7289,6 @@ snapshots:
   '@shadcn/react@0.2.0(@types/react@19.2.14)(react@19.2.4)':
     optionalDependencies:
       '@types/react': 19.2.14
-      react: 19.2.4
-
-  '@sigil/agent-eve@0.1.0(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(react@19.2.4)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))':
-    dependencies:
-      '@sigil/agent': 0.1.0(react@19.2.4)
-      eve: 0.24.4(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
-      react: 19.2.4
-    transitivePeerDependencies:
-      - '@azure/app-configuration'
-      - '@azure/cosmos'
-      - '@azure/data-tables'
-      - '@azure/identity'
-      - '@azure/keyvault-secrets'
-      - '@azure/storage-blob'
-      - '@capacitor/preferences'
-      - '@deno/kv'
-      - '@electric-sql/pglite'
-      - '@libsql/client'
-      - '@netlify/blobs'
-      - '@netlify/runtime'
-      - '@opentelemetry/api'
-      - '@planetscale/database'
-      - '@upstash/redis'
-      - '@vercel/blob'
-      - '@vercel/functions'
-      - '@vercel/kv'
-      - '@vercel/queue'
-      - ai
-      - aws4fetch
-      - better-sqlite3
-      - braintrust
-      - chokidar
-      - dotenv
-      - drizzle-orm
-      - giget
-      - idb-keyval
-      - ioredis
-      - jiti
-      - just-bash
-      - lru-cache
-      - microsandbox
-      - miniflare
-      - mongodb
-      - mysql2
-      - rollup
-      - sqlite3
-      - uploadthing
-      - vite
-      - wrangler
-      - xml2js
-      - zephyr-agent
-
-  '@sigil/agent-gonk@0.1.2(@gonk/scope@0.3.1)(zod@4.4.3)':
-    dependencies:
-      '@gonk/auth': 0.3.1
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
-      '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - '@gonk/scope'
-      - supports-color
-      - zod
-
-  '@sigil/agent-react-query@0.1.0(@tanstack/react-query@5.101.2(react@19.2.4))(react@19.2.4)':
-    dependencies:
-      '@sigil/agent': 0.1.0(react@19.2.4)
-      '@standard-schema/spec': 1.1.0
-      '@tanstack/react-query': 5.101.2(react@19.2.4)
-    transitivePeerDependencies:
-      - react
-
-  '@sigil/agent@0.1.0(react@19.2.4)':
-    dependencies:
-      '@standard-schema/spec': 1.1.0
       react: 19.2.4
 
   '@sindresorhus/merge-streams@4.0.0': {}

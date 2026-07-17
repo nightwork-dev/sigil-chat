@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 
-import type { AgentToolCallPart, AgentToolInputResponse } from "@sigil/agent"
+import type { AgentToolCallPart, AgentToolInputResponse } from "@niwork/agent"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import {

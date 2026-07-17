@@ -25,7 +25,7 @@ Primary evidence:
 
 The original donor hook and integration test were removed during the released
 package cutover. The live-host regression now exercises the current
-`@sigil/agent` composition directly: a failed result retains turn attachments
+`@niwork/agent` composition directly: a failed result retains turn attachments
 and exclusions, while a succeeded result clears them.
 
 Current negative control (2026-07-17): temporarily removing the

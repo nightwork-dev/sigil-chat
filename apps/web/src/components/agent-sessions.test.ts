@@ -10,7 +10,7 @@ import {
   useAgentRuntimeSession,
   type AgentRuntimeSession,
   type AgentTurnResult,
-} from "@sigil/agent"
+} from "@niwork/agent"
 
 import { AppAgentSessions } from "./agent-sessions"
 import {
@@ -49,7 +49,7 @@ const harness = vi.hoisted(() => ({
 
 let repository: AgentThreadRepository
 
-vi.mock("@sigil/agent-eve", () => ({
+vi.mock("@niwork/agent-eve", () => ({
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
     harness.eveCallbacks = callbacks
     return {

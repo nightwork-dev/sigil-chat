@@ -7,7 +7,7 @@ repo root are symlinks to it — edit this file, not those.
 This repo graduated out of a shared development worktree (2026-07-17) into its
 own repository. It still shares conventions and lineage with the Sigil Design
 repository (the shared component/scaffold template) and consumes released
-`@sigil/agent*` packages, but it is a distinct product with its own runtime,
+`@niwork/agent*` packages, but it is a distinct product with its own runtime,
 trust model, and specs. Do not assume anything from Sigil Design's
 project-instructions file is true here without checking this file first.
 
@@ -100,15 +100,15 @@ Every route file carries the mandatory ancestor-path + chrome-description
 header comment (see any file above for the format) — this prevents
 duplicate-`<main>`/nested-chrome bugs. Preserve it when adding routes.
 
-## The `@sigil/agent*` packages
+## The `@niwork/agent*` packages
 
 `apps/web` consumes released packages rather than owning agent runtime logic
 directly:
 
-- `@sigil/agent` (0.1.0) — neutral agent contracts
-- `@sigil/agent-eve` (0.1.0) — Eve host adapter
-- `@sigil/agent-react-query` (0.1.0) — React Query hooks/state over agent contracts
-- `@sigil/agent-gonk` (0.1.2, consumed by `apps/gonk`) — Gonk registry adapter
+- `@niwork/agent` (0.1.0) — neutral agent contracts
+- `@niwork/agent-eve` (0.1.0) — Eve host adapter
+- `@niwork/agent-react-query` (0.1.0) — React Query hooks/state over agent contracts
+- `@niwork/agent-gonk` (0.1.2, consumed by `apps/gonk`) — Gonk registry adapter
 
 Plus registry-installed HUD source (owned, not published) and `@gonk/scope`,
 `@gonk/store` for local scoping/storage primitives.

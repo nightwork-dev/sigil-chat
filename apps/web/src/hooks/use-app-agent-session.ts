@@ -4,7 +4,7 @@ import {
   useAgentRuntimeSession,
   useAttention,
   type AgentRuntimeSession,
-} from "@sigil/agent"
+} from "@niwork/agent"
 import {
   clearAttentionExclusions,
   clearContextDraft,
@@ -12,8 +12,8 @@ import {
   getAttentionExclusions,
   getTurnContextAttachments,
   serializeAttentionDraft,
-} from "@sigil/agent/context-draft"
-import { getAttentionPrivacyLevel } from "@sigil/agent/context-privacy"
+} from "@niwork/agent/context-draft"
+import { getAttentionPrivacyLevel } from "@niwork/agent/context-privacy"
 
 import {
   getToolApprovalMode,

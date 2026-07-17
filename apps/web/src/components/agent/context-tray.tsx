@@ -23,17 +23,17 @@ import {
   type AttentionContextPreview,
   type ContextRetention,
   type TurnContextAttachment,
-} from "@sigil/agent/context-draft"
+} from "@niwork/agent/context-draft"
 import {
   setAttentionPrivacyLevel,
   useAttentionPrivacyLevel,
   type AttentionPrivacyLevel,
-} from "@sigil/agent/context-privacy"
+} from "@niwork/agent/context-privacy"
 import type {
   AttentionActivityEvent,
   AttentionContext,
   AttentionSelection,
-} from "@sigil/agent/attention"
+} from "@niwork/agent/attention"
 import { Button } from "@workspace/ui/components/button"
 import { CodeBlock } from "@workspace/ui/components/code-block"
 import {

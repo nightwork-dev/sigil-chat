@@ -14,8 +14,8 @@ import {
   type AgentMessagePart,
   type AgentRuntimeSession,
   type AgentToolInputResponse,
-} from "@sigil/agent"
-import { useAttention } from "@sigil/agent/attention"
+} from "@niwork/agent"
+import { useAttention } from "@niwork/agent/attention"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 import { ChatList } from "@workspace/chat/components/chat-list"
 import { ChatMessage } from "@workspace/chat/components/chat-message"

@@ -34,7 +34,7 @@ types into core UI or copying Sigil Chat application code.
 - [x] Sigil Chat is the canonical live integration host: it consumes the
   released neutral, Eve, and React Query packages; uses local Codex through
   Eve; and reaches authenticated Gonk tools through the mounted MCP adapter.
-- [x] `@sigil/agent-gonk@0.1.2` is published and consumed by Sigil Chat with
+- [x] `@niwork/agent-gonk@0.1.2` is published and consumed by Sigil Chat with
   exact Gonk Core 0.3.1 dependencies; the duplicate worktree-local adapter
   package has been removed.
 - [x] The Gonk/Sigil documentation split is complete: Gonk Core owns the

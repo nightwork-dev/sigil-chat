@@ -1,4 +1,4 @@
-import type { AgentMcpAuthorizationPolicy } from "@sigil/agent-gonk"
+import type { AgentMcpAuthorizationPolicy } from "@niwork/agent-gonk"
 
 export const authorizeSigilMcpRequest: AgentMcpAuthorizationPolicy = () => {
   // Sigil currently exposes one trusted service principal: possession of

@@ -1,6 +1,6 @@
 import { KeyRoundIcon } from "lucide-react"
 
-import type { AgentAuthorizationPart } from "@sigil/agent"
+import type { AgentAuthorizationPart } from "@niwork/agent"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 

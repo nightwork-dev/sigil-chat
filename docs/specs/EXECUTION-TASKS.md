@@ -427,8 +427,8 @@ FloatingDock source rather than a fake declaration. The simulated TanStack
 Start/Nitro experiment passed package tests, recursive typecheck, production
 build, desktop/390px interaction smoke, and console inspection, but did not
 exercise a real model and therefore never satisfied the reference-host claim.
-Clean external installation of the four `@sigil/agent*` packages
-passed; `@sigil/agent-gonk@0.1.1` is published after the G4 `APPROVE` review and
+Clean external installation of the four `@niwork/agent*` packages
+passed; `@niwork/agent-gonk@0.1.1` is published after the G4 `APPROVE` review and
 is consumed by Sigil Chat's Gonk composition. The host's optional live
 Eve/Gonk integration smoke and Sigil Chat's full core/Eve/React Query repoint
 remain open, so T20 and T22 are not marked done.
@@ -465,7 +465,7 @@ and the remaining independent review gates.
 `@gonk/*` dependency is pinned exactly to the reviewed Core 0.3.1 train,
 including auth, context, retrieval, skills, scope, store, registry, Web MCP, and
 the test-only orchestrator. The mounted listener consumes published
-`@sigil/agent-gonk@0.1.2`, whose packed and registry-published manifest also
+`@niwork/agent-gonk@0.1.2`, whose packed and registry-published manifest also
 pins its Core dependencies exactly to 0.3.1. Fresh recursive tests and
 typechecks plus the production build pass after lockfile refresh; the
 authenticated adapter suite still proves missing/invalid bearer rejection,
@@ -555,8 +555,8 @@ negative controls, trace, and fresh integrated verification are assembled;
 only the independent verdict remains before these statuses may change.
 
 **T18/T19/T22 live cutover (implementation lane, 2026-07-17; awaiting final review).** Sigil
-Chat now consumes exact released `@sigil/agent@0.1.0`,
-`@sigil/agent-eve@0.1.0`, and `@sigil/agent-react-query@0.1.0` packages. The
+Chat now consumes exact released `@niwork/agent@0.1.0`,
+`@niwork/agent-eve@0.1.0`, and `@niwork/agent-react-query@0.1.0` packages. The
 worktree-local `@workspace/agent` package and alias are removed; application
 presentation, approval preference, DOM projection, and domain reconciliation
 remain app-owned. The real multi-session suite runs through the Eve adapter,

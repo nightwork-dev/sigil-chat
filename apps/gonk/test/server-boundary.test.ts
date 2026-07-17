@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest"
 
-import { createAgentMcpBearerHeaders } from "@sigil/agent-gonk"
+import { createAgentMcpBearerHeaders } from "@niwork/agent-gonk"
 
 import { createSigilMcpHandler } from "../src/mcp-handler.js"
 

@@ -12,7 +12,7 @@ import {
   resetContextDraftForTests,
   setAttentionItemExcluded,
   type AgentRuntimeSession,
-} from "@sigil/agent"
+} from "@niwork/agent"
 
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 

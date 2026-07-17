@@ -7,7 +7,7 @@ import {
   isAgentSessionBusy,
   useAgentRuntimeSession,
   useAttention,
-} from "@sigil/agent"
+} from "@niwork/agent"
 import { FloatingDock } from "@workspace/ui/components/floating-dock"
 import { StatusDot } from "@workspace/ui/components/status-dot"
 

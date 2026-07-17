@@ -17,9 +17,9 @@
   "dependencies": {
     "@gonk/scope": "0.3.1",
     "@gonk/store": "0.3.1",
-    "@sigil/agent": "0.1.0",
-    "@sigil/agent-eve": "0.1.0",
-    "@sigil/agent-react-query": "0.1.0",
+    "@niwork/agent": "0.1.0",
+    "@niwork/agent-eve": "0.1.0",
+    "@niwork/agent-react-query": "0.1.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-hotkeys": "^0.10.0",
     "@tanstack/react-query": "^5.101.2",
