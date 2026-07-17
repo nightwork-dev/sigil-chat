@@ -17,6 +17,9 @@
     "lib": "@workspace/ui/lib",
     "ui": "@workspace/ui/components"
   },
+  "registries": {
+    "@sigil": "https://ui.nightwork.dev/r/{name}.json"
+  },
   "rtl": false,
   "menuColor": "default-translucent",
   "menuAccent": "subtle"

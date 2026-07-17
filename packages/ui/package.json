@@ -20,6 +20,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@niwork/agent": "0.1.0",
     "@shadcn/react": "^0.2.0",
     "@tanstack/react-hotkeys": "^0.10.0",
     "@tanstack/react-router": "^1.170.16",

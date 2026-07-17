@@ -471,6 +471,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
+      '@niwork/agent':
+        specifier: 0.1.0
+        version: 0.1.0(react@19.2.4)
       '@shadcn/react':
         specifier: ^0.2.0
         version: 0.2.0(@types/react@19.2.14)(react@19.2.4)

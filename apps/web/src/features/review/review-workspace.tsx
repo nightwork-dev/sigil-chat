@@ -708,7 +708,7 @@ export function ReviewWorkspace() {
         >
           <AgentHud.Trigger />
           <AgentHud.Panel
-            actions={<AgentHud.Expand render={<Link to="/chat" />} />}
+            navigationTarget={<Link to="/chat" />}
             chatProps={{
               approvalMode,
               onApprovalModeChange: setToolApprovalMode,

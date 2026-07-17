@@ -35,7 +35,15 @@ function isGeneratedPath(path) {
   return relative
     .split("/")
     .some((segment) =>
-      ["node_modules", "dist", ".turbo", ".output", "coverage"].includes(
+      [
+        "node_modules",
+        "dist",
+        ".turbo",
+        ".output",
+        ".vite",
+        ".eve",
+        "coverage",
+      ].includes(
         segment,
       ),
     );
