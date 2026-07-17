@@ -10,7 +10,7 @@ import {
 } from "@niwork/agent-gonk";
 
 import { authorizeSigilMcpRequest } from "../src/auth.js";
-import { sigilApprovalProvider } from "../src/registry.js";
+import { createSigilRegistry, sigilApprovalProvider } from "../src/registry.js";
 
 const endpoint = "http://sigil.test/mcp";
 const token = "sigil-test-token";
@@ -90,11 +90,131 @@ function webHandler(
 }
 
 describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => {
+  it("preserves Sigil registry MCP initialize, list, call, and masked error parity", async () => {
+    const registry = createSigilRegistry();
+    const handler = webHandler(registry, ({ request }) =>
+      request.resource.target === "sigil-ui-highlight"
+        ? { outcome: "deny", reason: "Hidden from this principal" }
+        : { outcome: "allow", reason: "Visible to this principal" },
+    );
+    const sessionId = await initialize(handler);
+
+    const listed = await rpc(handler, sessionId, 2, "tools/list", {});
+    expect((listed.result as { tools: unknown[] }).tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "sigil-chat-status",
+          description:
+            "Report the live Sigil Chat runtime architecture and server time.",
+        }),
+        expect.objectContaining({
+          name: "sigil-graph-edit",
+          inputSchema: expect.objectContaining({
+            required: ["actions"],
+          }),
+        }),
+        expect.objectContaining({
+          name: "sigil-review-add-annotation",
+          annotations: expect.objectContaining({
+            readOnlyHint: false,
+          }),
+        }),
+      ]),
+    );
+    expect((listed.result as { tools: unknown[] }).tools).toHaveLength(18);
+    expect(JSON.stringify(listed)).not.toContain("sigil-ui-highlight");
+
+    const visibleCall = await rpc(handler, sessionId, 3, "tools/call", {
+      name: "sigil-chat-status",
+      arguments: {},
+    });
+    expect(visibleCall).toMatchObject({
+      result: {
+        structuredContent: {
+          application: "sigil-chat",
+          toolRegistry: "gonk",
+          transport: "mcp-streamable-http",
+        },
+      },
+    });
+
+    const malformedCall = await rpc(handler, sessionId, 4, "tools/call", {
+      name: "sigil-graph-add-node",
+      arguments: { reducerId: 42 },
+    });
+    expect(malformedCall).toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          error: {
+            code: "INVALID_INPUT",
+            message: "Input validation failed",
+          },
+        },
+      },
+    });
+
+    const hiddenCall = await rpc(handler, sessionId, 5, "tools/call", {
+      name: "sigil-ui-highlight",
+      arguments: {},
+    });
+    const unknownCall = await rpc(handler, sessionId, 6, "tools/call", {
+      name: "sigil-does-not-exist",
+      arguments: {},
+    });
+    const normalizeRequestedName = (value: unknown) =>
+      JSON.stringify(value)
+        .replaceAll("sigil-ui-highlight", "<requested-tool>")
+        .replaceAll("sigil-does-not-exist", "<requested-tool>")
+        .replace(/"id":\d+/, '"id":0');
+    expect(normalizeRequestedName(hiddenCall)).toBe(
+      normalizeRequestedName(unknownCall),
+    );
+    expect(JSON.stringify(hiddenCall)).not.toContain(
+      "Return a structured client command",
+    );
+
+    const deniedRegistry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    deniedRegistry.register({
+      name: "sigil-test-exec-denied",
+      description: "Exercise Sigil approval denial over MCP.",
+      approval: "exec",
+      input: passthrough(),
+      handler: async () => ({ data: { executed: true } }),
+    });
+    const deniedHandler = webHandler(deniedRegistry);
+    const deniedSessionId = await initialize(deniedHandler);
+    const deniedCall = await rpc(
+      deniedHandler,
+      deniedSessionId,
+      7,
+      "tools/call",
+      {
+        name: "sigil-test-exec-denied",
+        arguments: {},
+      },
+    );
+    expect(deniedCall).toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          error: {
+            code: "APPROVAL_DENIED",
+            message: "Sigil Chat does not permit executable MCP tools",
+          },
+        },
+      },
+    });
+  });
+
   it("propagates the authenticated bearer principal into the real tool context", async () => {
     const registry = new ToolRegistry();
     registry.register({
       name: "sigil-test-whoami",
-      description: "Return the authenticated principal for integration testing.",
+      description:
+        "Return the authenticated principal for integration testing.",
       approval: "read",
       input: passthrough(),
       handler: async (_input, context) => ({
@@ -250,7 +370,9 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
       },
     });
     expect(JSON.stringify(response)).not.toContain("sigil-test-hidden");
-    expect(JSON.stringify(response)).not.toContain("Sensitive hidden description");
+    expect(JSON.stringify(response)).not.toContain(
+      "Sensitive hidden description",
+    );
 
     const hiddenCall = await rpc(handler, sessionId, 3, "tools/call", {
       name: "sigil-test-hidden",
@@ -263,9 +385,7 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
     expect(hiddenCall).toMatchObject({
       result: {
         isError: true,
-        content: [
-          { type: "text", text: "Unknown tool: sigil-test-hidden" },
-        ],
+        content: [{ type: "text", text: "Unknown tool: sigil-test-hidden" }],
       },
     });
     const normalizeRequestedName = (value: unknown) =>
@@ -275,7 +395,9 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
     expect(normalizeRequestedName(hiddenCall)).toBe(
       normalizeRequestedName(missingCall),
     );
-    expect(JSON.stringify(hiddenCall)).not.toContain("Sensitive hidden description");
+    expect(JSON.stringify(hiddenCall)).not.toContain(
+      "Sensitive hidden description",
+    );
     expect(hiddenExecuted).toBe(false);
   });
 
@@ -300,7 +422,8 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
       scope: "mcp",
     });
     const handler = webHandler(orchestrator, ({ request }) =>
-      request.action === "tool.invoke" && request.resource.target === "load_tool"
+      request.action === "tool.invoke" &&
+      request.resource.target === "load_tool"
         ? { outcome: "deny", reason: "Pin mutation denied" }
         : { outcome: "allow", reason: "Allowed for test" },
     );

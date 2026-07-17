@@ -10,6 +10,7 @@ import {
   createReviewDemoRepository,
   createSigilRegistry,
 } from "../src/registry.js";
+import { expectedRegistryToolContracts } from "./fixtures/registry-contract.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -35,6 +36,34 @@ async function makeRegistry() {
 }
 
 describe("Sigil Chat Gonk registry", () => {
+  it("preserves discovery metadata, schemas, and ordered tool contracts", async () => {
+    const { registry } = await makeRegistry();
+    const contract = registry.list().map((tool) => {
+      const schema = tool.inputJsonSchema as {
+        type?: string;
+        required?: string[];
+        properties?: Record<string, unknown>;
+        additionalProperties?: boolean;
+      };
+      return {
+        name: tool.name,
+        description: tool.description,
+        visibility: tool.visibility,
+        approval: tool.approval,
+        schema: {
+          type: schema.type,
+          required: schema.required ?? [],
+          properties: Object.keys(schema.properties ?? {}),
+          additionalProperties: schema.additionalProperties,
+        },
+        mcpAnnotations: tool.hints?.mcp?.annotations,
+      };
+    });
+
+    expect(contract).toEqual(expectedRegistryToolContracts);
+    expect(contract).toHaveLength(19);
+  });
+
   it("runs an authenticated write through Sigil's registry approval provider", async () => {
     const { registry } = await makeRegistry();
     const auth: AuthContext = {
@@ -466,10 +495,7 @@ describe("Sigil Chat Gonk registry", () => {
           payload: {
             kind: "review.document.changed",
             operation: "annotations.add",
-            changedIds: [
-              "agent-annotation-1",
-              "agent-publish-ownership",
-            ],
+            changedIds: ["agent-annotation-1", "agent-publish-ownership"],
           },
         },
       },
