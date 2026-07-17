@@ -310,7 +310,7 @@ Machine bar:
 - [x] Zero graph imports (`@workspace/graph*`) inside `packages/agent`.
 
 Behavior bar (component-development verification: real browser, real interaction —
-requires `codex login` + local registry + `pnpm dev`):
+requires `codex login` + `pnpm dev`):
 
 Mounted integration coverage in
 `packages/agent/src/components/agent-session-integration.test.tsx` locks the

@@ -131,9 +131,8 @@ tool definitions into Eve.
 
 ## Dev workflow
 
-Requires Node 24 and the local `@gonk` registry running at
-`http://localhost:4873` (a single shared local npm registry instance — do not
-start a second one).
+Requires Node 24. All dependencies — including the `@gonk/*` and
+`@niwork/agent*` packages — resolve from the public npm registry.
 
 ```bash
 pnpm install

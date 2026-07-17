@@ -24,7 +24,8 @@ tools go in `apps/gonk/src/registry.ts`, not into Eve directly (see below).
 
 ## Run locally
 
-Requires Node 24 and the local `@gonk` registry at `http://localhost:4873`.
+Requires Node 24. All dependencies — including the `@gonk/*` and
+`@niwork/agent*` packages — resolve from the public npm registry.
 
 ```bash
 pnpm install
