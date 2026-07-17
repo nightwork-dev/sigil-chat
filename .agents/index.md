@@ -113,8 +113,8 @@ directly:
 Plus registry-installed HUD source (owned, not published) and `@gonk/scope`,
 `@gonk/store` for local scoping/storage primitives.
 
-Per the ratified split in
-[`docs/specs/GRADUATION-REVIEW-AND-MOVE-HANDOFF.md`](../docs/specs/GRADUATION-REVIEW-AND-MOVE-HANDOFF.md#canonical-versus-awaiting-review):
+Per the ratified split from the graduation move handoff (executed 2026-07-17;
+retained locally as program history, not part of the public spec tree):
 
 - **Sigil Design** owns shared graph, review, chat, text-editor,
   SpotlightScrim, and FloatingDock surfaces.
