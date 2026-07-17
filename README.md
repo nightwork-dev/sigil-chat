@@ -9,6 +9,8 @@ An agentic chat template with deliberately narrow ownership:
 
 ## Architecture
 
+<p align="center"><img src="docs/diagrams/architecture.svg" alt="Sigil Chat runtime topology: the browser renders chat, studio, and review workspaces plus an agent HUD, served over SSR and server functions by apps/web. apps/web hands sessions to apps/agent, the Eve host that owns durable sessions, streaming, and interruption through a local Codex login. apps/agent calls apps/gonk, the authenticated Gonk MCP server, over Streamable HTTP with a GONK_MCP_KEY bearer token. apps/web persists to a file-backed .data store; apps/agent persists Eve snapshots under .eve. Three trust boundaries: the tool-approval header is a client display preference, not a security control; GONK_MCP_KEY authenticates only the MCP transport; and threads plus the active-session preference are deployment-global in local dev, with no per-user ownership." width="1060"></p>
+
 Three services, each with a narrow, non-overlapping job:
 
 | Service | App | Owns | Portless URL |
