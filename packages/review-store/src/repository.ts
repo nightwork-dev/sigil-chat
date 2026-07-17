@@ -3,6 +3,7 @@ import {
   JsonFileStore,
   resolveWorkspaceDataPath,
 } from "@workspace/file-store-core";
+import { readStorageEnvironment } from "@workspace/runtime-env/server";
 
 import { createDraftArticleReviewDocument } from "./sample.js";
 import type {
@@ -584,7 +585,7 @@ function normalizeReviewDocument(document: ReviewDocument): ReviewDocument {
 
 export function resolveReviewStorePath(startDirectory = process.cwd()): string {
   return resolveWorkspaceDataPath({
-    envPath: process.env.SIGIL_CHAT_REVIEW_PATH,
+    envPath: readStorageEnvironment(process.env).reviewPath,
     relativePath: ".data/review-document.json",
     rootPackageName: "sigil-chat",
     startDirectory,

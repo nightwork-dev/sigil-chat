@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@workspace/file-store-core": "workspace:*",
-    "@workspace/graph": "workspace:*"
+    "@workspace/graph": "workspace:*",
+    "@workspace/runtime-env": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",

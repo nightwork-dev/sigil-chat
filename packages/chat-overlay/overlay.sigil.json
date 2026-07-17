@@ -8,8 +8,10 @@
     "template": "sigil-design"
   },
   "replacements": [
+    "turbo.json",
     "apps/web/package.json",
     "apps/web/tsconfig.json",
+    "apps/web/vite.config.static.ts",
     "apps/web/vite.config.ts",
     "apps/web/src/routes/__root.tsx"
   ],

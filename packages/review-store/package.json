@@ -5,7 +5,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@workspace/file-store-core": "workspace:*"
+    "@workspace/file-store-core": "workspace:*",
+    "@workspace/runtime-env": "workspace:*"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

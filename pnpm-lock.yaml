@@ -433,6 +433,9 @@ importers:
       '@workspace/graph':
         specifier: workspace:*
         version: link:../graph
+      '@workspace/runtime-env':
+        specifier: workspace:*
+        version: link:../runtime-env
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
@@ -480,6 +483,9 @@ importers:
       '@workspace/file-store-core':
         specifier: workspace:*
         version: link:../file-store-core
+      '@workspace/runtime-env':
+        specifier: workspace:*
+        version: link:../runtime-env
     devDependencies:
       '@types/node':
         specifier: ^25.1.0

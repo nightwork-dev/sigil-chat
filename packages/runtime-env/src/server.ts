@@ -1,8 +1,11 @@
 import {
   readRuntimeTopology,
+  RuntimeEnvironmentError,
   type RuntimeEnvironment,
   type SigilRuntimeTopology,
 } from "./topology.js";
+
+export const DEFAULT_CODEX_MODEL = "gpt-5.6-terra";
 
 export interface GonkServerEnvironment extends SigilRuntimeTopology {
   apiKey: string | undefined;
@@ -11,6 +14,46 @@ export interface GonkServerEnvironment extends SigilRuntimeTopology {
 
 export interface GonkClientEnvironment extends SigilRuntimeTopology {
   apiKey: string | undefined;
+}
+
+export interface AgentRuntimeEnvironment {
+  model: string;
+}
+
+export interface StorageRuntimeEnvironment {
+  graphPath: string | undefined;
+  reviewPath: string | undefined;
+}
+
+export function readAgentEnvironment(
+  env: RuntimeEnvironment,
+): AgentRuntimeEnvironment {
+  const model = env.CODEX_MODEL;
+  if (model === undefined) return { model: DEFAULT_CODEX_MODEL };
+  const normalized = model.trim();
+  if (!normalized || /\s/.test(normalized)) {
+    throw new RuntimeEnvironmentError(
+      "INVALID_MODEL",
+      "CODEX_MODEL",
+      "must be a non-empty model slug without whitespace",
+    );
+  }
+  return { model: normalized };
+}
+
+export function readStorageEnvironment(
+  env: RuntimeEnvironment,
+): StorageRuntimeEnvironment {
+  return {
+    graphPath: parseOptionalStoragePath(
+      env.SIGIL_CHAT_GRAPH_PATH,
+      "SIGIL_CHAT_GRAPH_PATH",
+    ),
+    reviewPath: parseOptionalStoragePath(
+      env.SIGIL_CHAT_REVIEW_PATH,
+      "SIGIL_CHAT_REVIEW_PATH",
+    ),
+  };
 }
 
 export function readGonkClientEnvironment(
@@ -45,12 +88,34 @@ export function parsePort(
 ): number {
   const candidate = value?.trim();
   if (!candidate) return fallback;
-  if (!/^\d+$/.test(candidate)) {
-    throw new Error(`${name} must be an integer between 1 and 65535`);
-  }
+  if (!/^\d+$/.test(candidate)) throw invalidPort(name);
   const port = Number(candidate);
   if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`${name} must be an integer between 1 and 65535`);
+    throw invalidPort(name);
   }
   return port;
+}
+
+function parseOptionalStoragePath(
+  value: string | undefined,
+  name: string,
+): string | undefined {
+  if (value === undefined) return undefined;
+  const path = value.trim();
+  if (!path || path.includes("\0")) {
+    throw new RuntimeEnvironmentError(
+      "INVALID_STORAGE_PATH",
+      name,
+      "must be a non-empty filesystem path without null bytes",
+    );
+  }
+  return path;
+}
+
+function invalidPort(name: string): RuntimeEnvironmentError {
+  return new RuntimeEnvironmentError(
+    "INVALID_PORT",
+    name,
+    "must be an integer between 1 and 65535",
+  );
 }

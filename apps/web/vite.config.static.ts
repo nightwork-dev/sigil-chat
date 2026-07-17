@@ -3,6 +3,9 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import viteTsConfigPaths from "vite-tsconfig-paths"
 import tailwindcss from "@tailwindcss/vite"
+import { readPublicWebEnvironment } from "@workspace/runtime-env/topology"
+
+const { pagesBase } = readPublicWebEnvironment(process.env)
 
 // Static SPA build for GitHub Pages. Same as vite.config.ts but with Nitro
 // dropped and SPA mode enabled — TanStack Start prerenders a static hydration
@@ -14,7 +17,7 @@ import tailwindcss from "@tailwindcss/vite"
 // will NOT work in this export — there is no server to run them against.
 // SPA export is only valid for routes that don't rely on server functions.
 const config = defineConfig({
-  base: process.env.PAGES_BASE || "/",
+  base: pagesBase,
   plugins: [
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],

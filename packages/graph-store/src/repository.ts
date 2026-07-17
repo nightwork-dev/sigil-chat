@@ -14,6 +14,7 @@ import {
   type ReducerGraphRun,
 } from "@workspace/graph/document";
 import { sampleReducerGraph } from "@workspace/graph/sample";
+import { readStorageEnvironment } from "@workspace/runtime-env/server";
 
 interface StoredGraph {
   current: ReducerGraphDocument;
@@ -158,7 +159,7 @@ export const graphRepository = new FileGraphRepository();
 
 export function resolveGraphStorePath(startDirectory = process.cwd()): string {
   return resolveWorkspaceDataPath({
-    envPath: process.env.SIGIL_CHAT_GRAPH_PATH,
+    envPath: readStorageEnvironment(process.env).graphPath,
     relativePath: ".data/reducer-graph.json",
     rootPackageName: "sigil-chat",
     startDirectory,
