@@ -1,0 +1,97 @@
+{
+  "kind": "compress",
+  "spec": "\u00a77.1\u2013\u00a77.3, \u00a710",
+  "description": "Black Friday 7d template into 72h. Basis span = teaser 24h + gap 12h + offers 120h + drain 12h = 168h, target 72h, deficit 96h. Flex*basis weights teaser 24, gap 36, offers 240. First pass freezes offers at 48h floor; redistribute remaining 24h over teaser/gap weights 24:36, gap would go below 0 so gap freezes at 0; remaining 12h lands on teaser so teaser=12h. Drain rigid stays 12h. Sum 12+0+48+12=72h exact.",
+  "tree": {
+    "kind": "absolute",
+    "id": "sale-week",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "teaser",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 86400,
+          "min": 21600,
+          "flex": 1,
+          "quantum": {
+            "unit": 21600,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "main-offers",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "teaser"
+        },
+        "offset": {
+          "basis": 43200,
+          "direction": "after",
+          "min": 0,
+          "flex": 3,
+          "quantum": {
+            "unit": 3600,
+            "mode": "floor"
+          }
+        },
+        "duration": {
+          "basis": 432000,
+          "min": 172800,
+          "flex": 2,
+          "quantum": {
+            "unit": 86400,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "checkout-drain",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "main-offers"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 43200,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "sale-week",
+    "targetSpan": 259200
+  },
+  "expect": {
+    "ok": true,
+    "durations": {
+      "teaser": 43200,
+      "main-offers": 172800,
+      "checkout-drain": 43200
+    },
+    "offsets": {
+      "main-offers": 0
+    }
+  }
+}

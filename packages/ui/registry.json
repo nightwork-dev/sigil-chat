@@ -1,0 +1,3622 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "sigil-design",
+  "homepage": "https://github.com/abrisene/sigil-design",
+  "items": [
+    {
+      "name": "accordion",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/accordion.tsx",
+          "type": "registry:ui",
+          "target": "@ui/accordion.tsx"
+        }
+      ]
+    },
+    {
+      "name": "alert",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/alert.tsx",
+          "type": "registry:ui",
+          "target": "@ui/alert.tsx"
+        }
+      ]
+    },
+    {
+      "name": "alert-dialog",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/alert-dialog.tsx",
+          "type": "registry:ui",
+          "target": "@ui/alert-dialog.tsx"
+        }
+      ]
+    },
+    {
+      "name": "animated-beam",
+      "type": "registry:ui",
+      "dependencies": [
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/effects/animated-beam.tsx",
+          "type": "registry:ui",
+          "target": "@ui/effects/animated-beam.tsx"
+        }
+      ]
+    },
+    {
+      "name": "animated-patterns",
+      "type": "registry:ui",
+      "dependencies": [
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/seeded-random",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/effects/animated-patterns.tsx",
+          "type": "registry:ui",
+          "target": "@ui/effects/animated-patterns.tsx"
+        }
+      ]
+    },
+    {
+      "name": "area-viz",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/range",
+        "@sigil/value-status",
+        "@sigil/viz-frame"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/viz/area-viz.tsx",
+          "type": "registry:ui",
+          "target": "@ui/viz/area-viz.tsx"
+        }
+      ]
+    },
+    {
+      "name": "argument-field",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react",
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/checkbox",
+        "@sigil/field",
+        "@sigil/input",
+        "@sigil/select",
+        "@sigil/textarea",
+        "@sigil/tooltip"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/argument-field.tsx",
+          "type": "registry:ui",
+          "target": "@ui/argument-field.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/cli-argument.ts",
+          "type": "registry:lib",
+          "target": "@lib/cli-argument.ts"
+        }
+      ]
+    },
+    {
+      "name": "article-shell",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/use-scroll-spy",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/guide/article-shell.tsx",
+          "type": "registry:ui",
+          "target": "@ui/guide/article-shell.tsx"
+        }
+      ]
+    },
+    {
+      "name": "aspect-ratio",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/aspect-ratio.tsx",
+          "type": "registry:ui",
+          "target": "@ui/aspect-ratio.tsx"
+        }
+      ]
+    },
+    {
+      "name": "attachment",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/attachment.tsx",
+          "type": "registry:ui",
+          "target": "@ui/attachment.tsx"
+        }
+      ]
+    },
+    {
+      "name": "attention-tile",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/skeleton"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/attention-tile.tsx",
+          "type": "registry:ui",
+          "target": "@ui/attention-tile.tsx"
+        }
+      ]
+    },
+    {
+      "name": "audio-player",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/use-element-width",
+        "@sigil/use-theme-colors"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/media/audio-player.tsx",
+          "type": "registry:ui",
+          "target": "@ui/media/audio-player.tsx"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-audio-spectrogram.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-audio-spectrogram.ts"
+        }
+      ]
+    },
+    {
+      "name": "audiobook",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/audio-player"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/media/audiobook.tsx",
+          "type": "registry:ui",
+          "target": "@ui/media/audiobook.tsx"
+        }
+      ]
+    },
+    {
+      "name": "avatar",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/avatar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/avatar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "avatar-stack",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/avatar"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/image/avatar-stack.tsx",
+          "type": "registry:ui",
+          "target": "@ui/image/avatar-stack.tsx"
+        }
+      ]
+    },
+    {
+      "name": "badge",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/badge.tsx",
+          "type": "registry:ui",
+          "target": "@ui/badge.tsx"
+        }
+      ]
+    },
+    {
+      "name": "bezier-curve",
+      "type": "registry:ui",
+      "dependencies": [
+        "d3",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/compact-slider",
+        "@sigil/field",
+        "@sigil/seeded-random",
+        "@sigil/select"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/bezier-curve.tsx",
+          "type": "registry:ui",
+          "target": "@ui/bezier-curve.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/bezier-curve.ts",
+          "type": "registry:lib",
+          "target": "@lib/bezier-curve.ts"
+        }
+      ]
+    },
+    {
+      "name": "bezier-curve-editor",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/bezier-curve",
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/bezier-curve-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/bezier-curve-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "breadcrumb",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/breadcrumb.tsx",
+          "type": "registry:ui",
+          "target": "@ui/breadcrumb.tsx"
+        }
+      ]
+    },
+    {
+      "name": "bubble",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/bubble.tsx",
+          "type": "registry:ui",
+          "target": "@ui/bubble.tsx"
+        }
+      ]
+    },
+    {
+      "name": "button",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/button.tsx",
+          "type": "registry:ui",
+          "target": "@ui/button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "button-group",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/separator"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/button-group.tsx",
+          "type": "registry:ui",
+          "target": "@ui/button-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "calendar",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react",
+        "react-day-picker"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/calendar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/calendar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "canvas",
+      "type": "registry:page",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/patterns",
+        "@sigil/property-panel",
+        "@sigil/separator",
+        "@sigil/tooltip"
+      ],
+      "categories": [
+        "view"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/views/canvas.tsx",
+          "type": "registry:page",
+          "target": "@ui/views/canvas.tsx"
+        }
+      ]
+    },
+    {
+      "name": "capped-bar",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/range",
+        "@sigil/utils",
+        "@sigil/value-status",
+        "@sigil/viz-scale"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/viz/capped-bar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/viz/capped-bar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/card.tsx",
+          "type": "registry:ui",
+          "target": "@ui/card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "carousel",
+      "type": "registry:ui",
+      "dependencies": [
+        "embla-carousel-react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/carousel.tsx",
+          "type": "registry:ui",
+          "target": "@ui/carousel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chart",
+      "type": "registry:ui",
+      "dependencies": [
+        "recharts"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/chart.tsx",
+          "type": "registry:ui",
+          "target": "@ui/chart.tsx"
+        }
+      ]
+    },
+    {
+      "name": "checkbox",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/checkbox.tsx",
+          "type": "registry:ui",
+          "target": "@ui/checkbox.tsx"
+        }
+      ]
+    },
+    {
+      "name": "cli-argument-builder",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react",
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/argument-field",
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/field",
+        "@sigil/input"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/cli-argument-builder.tsx",
+          "type": "registry:ui",
+          "target": "@ui/cli-argument-builder.tsx"
+        }
+      ]
+    },
+    {
+      "name": "click-to-edit",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/input"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/click-to-edit.tsx",
+          "type": "registry:ui",
+          "target": "@ui/click-to-edit.tsx"
+        }
+      ]
+    },
+    {
+      "name": "code-block",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/code-block.tsx",
+          "type": "registry:ui",
+          "target": "@ui/code-block.tsx"
+        }
+      ]
+    },
+    {
+      "name": "collapsible",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/collapsible.tsx",
+          "type": "registry:ui",
+          "target": "@ui/collapsible.tsx"
+        }
+      ]
+    },
+    {
+      "name": "color",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/interaction"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/color.ts",
+          "type": "registry:lib",
+          "target": "@lib/color.ts"
+        }
+      ]
+    },
+    {
+      "name": "color-input",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/color",
+        "@sigil/use-bounded-vector",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/color-input.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/color-input.tsx"
+        }
+      ]
+    },
+    {
+      "name": "color-scope",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/color-swatch"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/color-scope.tsx",
+          "type": "registry:ui",
+          "target": "@ui/color-scope.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/color-scheme.ts",
+          "type": "registry:lib",
+          "target": "@lib/color-scheme.ts"
+        }
+      ]
+    },
+    {
+      "name": "color-swatch",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/color-swatch.tsx",
+          "type": "registry:ui",
+          "target": "@ui/color-swatch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "color-wheel",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/color",
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/color-wheel.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/color-wheel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "combobox",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/input-group"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/combobox.tsx",
+          "type": "registry:ui",
+          "target": "@ui/combobox.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command",
+      "type": "registry:ui",
+      "dependencies": [
+        "cmdk",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/dialog",
+        "@sigil/input-group"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/command.tsx",
+          "type": "registry:ui",
+          "target": "@ui/command.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command-menu",
+      "type": "registry:ui",
+      "dependencies": [
+        "@tanstack/react-hotkeys",
+        "lucide-react",
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/command",
+        "@sigil/dialog"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/command-menu.tsx",
+          "type": "registry:ui",
+          "target": "@ui/command-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command-palette",
+      "type": "registry:ui",
+      "dependencies": [
+        "cmdk"
+      ],
+      "registryDependencies": [
+        "@sigil/command",
+        "@sigil/dialog"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/command-palette.tsx",
+          "type": "registry:ui",
+          "target": "@ui/command-palette.tsx"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-debounce-with-cooldown.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-debounce-with-cooldown.ts"
+        }
+      ]
+    },
+    {
+      "name": "commit-handle",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/constraints/commit-handle.tsx",
+          "type": "registry:ui",
+          "target": "@ui/constraints/commit-handle.tsx"
+        }
+      ]
+    },
+    {
+      "name": "compact-slider",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-bounded-vector",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tweak/compact-slider.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tweak/compact-slider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "compare-panel",
+      "type": "registry:block",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/empty"
+      ],
+      "categories": [
+        "block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/blocks/compare-panel.tsx",
+          "type": "registry:block",
+          "target": "@ui/blocks/compare-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "conflict-mark",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/status-dot"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/constraints/conflict-mark.tsx",
+          "type": "registry:ui",
+          "target": "@ui/constraints/conflict-mark.tsx"
+        }
+      ]
+    },
+    {
+      "name": "context-menu",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/menu-classes",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/context-menu.tsx",
+          "type": "registry:ui",
+          "target": "@ui/context-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "curve-viz",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/range",
+        "@sigil/value-status",
+        "@sigil/viz-frame"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/viz/curve-viz.tsx",
+          "type": "registry:ui",
+          "target": "@ui/viz/curve-viz.tsx"
+        }
+      ]
+    },
+    {
+      "name": "dashboard",
+      "type": "registry:page",
+      "dependencies": [
+        "@tanstack/react-router",
+        "recharts"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/card",
+        "@sigil/chart",
+        "@sigil/skeleton",
+        "@sigil/stat-grid",
+        "@sigil/table"
+      ],
+      "categories": [
+        "view"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/views/dashboard.tsx",
+          "type": "registry:page",
+          "target": "@ui/views/dashboard.tsx"
+        }
+      ]
+    },
+    {
+      "name": "data-format-editor",
+      "type": "registry:ui",
+      "dependencies": [
+        "json5",
+        "lucide-react",
+        "yaml"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/textarea"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/data-format-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/data-format-editor.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/data-format.ts",
+          "type": "registry:lib",
+          "target": "@lib/data-format.ts"
+        }
+      ]
+    },
+    {
+      "name": "data-label",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/data-label.tsx",
+          "type": "registry:ui",
+          "target": "@ui/data-label.tsx"
+        }
+      ]
+    },
+    {
+      "name": "data-peek",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/constraints/data-peek.tsx",
+          "type": "registry:ui",
+          "target": "@ui/constraints/data-peek.tsx"
+        }
+      ]
+    },
+    {
+      "name": "delayed-load",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/delayed-load.tsx",
+          "type": "registry:ui",
+          "target": "@ui/delayed-load.tsx"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-cooldown.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-cooldown.ts"
+        }
+      ]
+    },
+    {
+      "name": "diagram-node",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/graph/diagram-node.tsx",
+          "type": "registry:ui",
+          "target": "@ui/graph/diagram-node.tsx"
+        }
+      ]
+    },
+    {
+      "name": "dialog",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/dialog.tsx",
+          "type": "registry:ui",
+          "target": "@ui/dialog.tsx"
+        }
+      ]
+    },
+    {
+      "name": "direction",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/direction.tsx",
+          "type": "registry:ui",
+          "target": "@ui/direction.tsx"
+        }
+      ]
+    },
+    {
+      "name": "display-glow",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/display-glow.ts",
+          "type": "registry:lib",
+          "target": "@lib/display-glow.ts"
+        }
+      ]
+    },
+    {
+      "name": "document-minimap",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/document-minimap.tsx",
+          "type": "registry:ui",
+          "target": "@ui/document-minimap.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/minimap.ts",
+          "type": "registry:lib",
+          "target": "@lib/minimap.ts"
+        }
+      ]
+    },
+    {
+      "name": "drawer",
+      "type": "registry:ui",
+      "dependencies": [
+        "vaul"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/drawer.tsx",
+          "type": "registry:ui",
+          "target": "@ui/drawer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "dropdown-menu",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/menu-classes",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/dropdown-menu.tsx",
+          "type": "registry:ui",
+          "target": "@ui/dropdown-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/empty.tsx",
+          "type": "registry:ui",
+          "target": "@ui/empty.tsx"
+        }
+      ]
+    },
+    {
+      "name": "entity-panel",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/click-to-edit",
+        "@sigil/dropdown-menu",
+        "@sigil/toggle"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/entity-panel.tsx",
+          "type": "registry:ui",
+          "target": "@ui/entity-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "envelope-editor",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sequencer/envelope-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sequencer/envelope-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "era-band",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/patterns",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/era-band.tsx",
+          "type": "registry:ui",
+          "target": "@ui/era-band.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/era-axis.ts",
+          "type": "registry:lib",
+          "target": "@lib/era-axis.ts"
+        }
+      ]
+    },
+    {
+      "name": "error-boundary",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/error-boundary.tsx",
+          "type": "registry:ui",
+          "target": "@ui/error-boundary.tsx"
+        }
+      ]
+    },
+    {
+      "name": "exhibit-card",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/install-snippet"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/exhibit-card.tsx",
+          "type": "registry:ui",
+          "target": "@ui/exhibit-card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "faceted-filter",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/command",
+        "@sigil/popover",
+        "@sigil/separator"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/faceted-filter.tsx",
+          "type": "registry:ui",
+          "target": "@ui/faceted-filter.tsx"
+        }
+      ]
+    },
+    {
+      "name": "fader",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-bounded-vector",
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/instrument/fader.tsx",
+          "type": "registry:ui",
+          "target": "@ui/instrument/fader.tsx"
+        }
+      ]
+    },
+    {
+      "name": "field",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/label",
+        "@sigil/separator"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/field.tsx",
+          "type": "registry:ui",
+          "target": "@ui/field.tsx"
+        }
+      ]
+    },
+    {
+      "name": "figure",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/image"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/image/figure.tsx",
+          "type": "registry:ui",
+          "target": "@ui/image/figure.tsx"
+        }
+      ]
+    },
+    {
+      "name": "floating-dock",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/floating-dock.tsx",
+          "type": "registry:ui",
+          "target": "@ui/floating-dock.tsx"
+        }
+      ]
+    },
+    {
+      "name": "frequency-bar",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/frequency-bar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/frequency-bar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "gauge",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/instrument/gauge.tsx",
+          "type": "registry:ui",
+          "target": "@ui/instrument/gauge.tsx"
+        }
+      ]
+    },
+    {
+      "name": "gradient-editor",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/gradient-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/gradient-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "graph",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/types"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/graph.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/graph.ts"
+        }
+      ]
+    },
+    {
+      "name": "graph-canvas",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/graph/graph-canvas.tsx",
+          "type": "registry:ui",
+          "target": "@ui/graph/graph-canvas.tsx"
+        }
+      ]
+    },
+    {
+      "name": "guide-content",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/guide-shell"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/guide/guide-content.tsx",
+          "type": "registry:ui",
+          "target": "@ui/guide/guide-content.tsx"
+        }
+      ]
+    },
+    {
+      "name": "guide-shell",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/guide/guide-shell.tsx",
+          "type": "registry:ui",
+          "target": "@ui/guide/guide-shell.tsx"
+        }
+      ]
+    },
+    {
+      "name": "hover-card",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/hover-card.tsx",
+          "type": "registry:ui",
+          "target": "@ui/hover-card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "image",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/aspect-ratio"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/image/image.tsx",
+          "type": "registry:ui",
+          "target": "@ui/image/image.tsx"
+        }
+      ]
+    },
+    {
+      "name": "image-compare",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/image/image-compare.tsx",
+          "type": "registry:ui",
+          "target": "@ui/image/image-compare.tsx"
+        }
+      ]
+    },
+    {
+      "name": "inbox",
+      "type": "registry:page",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/data-label",
+        "@sigil/page-header",
+        "@sigil/status-dot"
+      ],
+      "categories": [
+        "view"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/views/inbox.tsx",
+          "type": "registry:page",
+          "target": "@ui/views/inbox.tsx"
+        }
+      ]
+    },
+    {
+      "name": "input",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/input.tsx",
+          "type": "registry:ui",
+          "target": "@ui/input.tsx"
+        }
+      ]
+    },
+    {
+      "name": "input-group",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/input",
+        "@sigil/textarea"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/input-group.tsx",
+          "type": "registry:ui",
+          "target": "@ui/input-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "input-otp",
+      "type": "registry:ui",
+      "dependencies": [
+        "input-otp",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/input-otp.tsx",
+          "type": "registry:ui",
+          "target": "@ui/input-otp.tsx"
+        }
+      ]
+    },
+    {
+      "name": "install-snippet",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/install-snippet.tsx",
+          "type": "registry:ui",
+          "target": "@ui/install-snippet.tsx"
+        }
+      ]
+    },
+    {
+      "name": "interaction",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/interaction.ts",
+          "type": "registry:lib",
+          "target": "@lib/interaction.ts"
+        }
+      ]
+    },
+    {
+      "name": "item",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/separator"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/item.tsx",
+          "type": "registry:ui",
+          "target": "@ui/item.tsx"
+        }
+      ]
+    },
+    {
+      "name": "item-row",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/item-row.tsx",
+          "type": "registry:ui",
+          "target": "@ui/item-row.tsx"
+        }
+      ]
+    },
+    {
+      "name": "kbd",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/kbd.tsx",
+          "type": "registry:ui",
+          "target": "@ui/kbd.tsx"
+        }
+      ]
+    },
+    {
+      "name": "key-value-editor",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/textarea"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/key-value-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/key-value-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "knob",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/rotary",
+        "@sigil/use-bounded-vector",
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/instrument/knob.tsx",
+          "type": "registry:ui",
+          "target": "@ui/instrument/knob.tsx"
+        }
+      ]
+    },
+    {
+      "name": "label",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/label.tsx",
+          "type": "registry:ui",
+          "target": "@ui/label.tsx"
+        }
+      ]
+    },
+    {
+      "name": "led",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/instrument/led.tsx",
+          "type": "registry:ui",
+          "target": "@ui/instrument/led.tsx"
+        }
+      ]
+    },
+    {
+      "name": "lightbox",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/dialog",
+        "@sigil/image"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/image/lightbox.tsx",
+          "type": "registry:ui",
+          "target": "@ui/image/lightbox.tsx"
+        }
+      ]
+    },
+    {
+      "name": "loading-dots",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/loading-dots.tsx",
+          "type": "registry:ui",
+          "target": "@ui/loading-dots.tsx"
+        }
+      ]
+    },
+    {
+      "name": "marker",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/marker.tsx",
+          "type": "registry:ui",
+          "target": "@ui/marker.tsx"
+        }
+      ]
+    },
+    {
+      "name": "marquee",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/patterns",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sequencer/marquee.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sequencer/marquee.tsx"
+        }
+      ]
+    },
+    {
+      "name": "menu-classes",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/menu-classes.ts",
+          "type": "registry:lib",
+          "target": "@lib/menu-classes.ts"
+        }
+      ]
+    },
+    {
+      "name": "menubar",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/dropdown-menu"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/menubar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/menubar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "message",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/message.tsx",
+          "type": "registry:ui",
+          "target": "@ui/message.tsx"
+        }
+      ]
+    },
+    {
+      "name": "message-scroller",
+      "type": "registry:ui",
+      "dependencies": [
+        "@shadcn/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/message-scroller.tsx",
+          "type": "registry:ui",
+          "target": "@ui/message-scroller.tsx"
+        }
+      ]
+    },
+    {
+      "name": "meter",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/tone",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/meter.tsx",
+          "type": "registry:ui",
+          "target": "@ui/meter.tsx"
+        }
+      ]
+    },
+    {
+      "name": "monitor",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/sparkline"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tweak/monitor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tweak/monitor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "native-select",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/native-select.tsx",
+          "type": "registry:ui",
+          "target": "@ui/native-select.tsx"
+        }
+      ]
+    },
+    {
+      "name": "navigation-menu",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/navigation-menu.tsx",
+          "type": "registry:ui",
+          "target": "@ui/navigation-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "node-diagram",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/range",
+        "@sigil/utils",
+        "@sigil/value-status"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/graph/node-diagram.tsx",
+          "type": "registry:ui",
+          "target": "@ui/graph/node-diagram.tsx"
+        }
+      ]
+    },
+    {
+      "name": "now-playing",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/audio-player"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/media/now-playing.tsx",
+          "type": "registry:ui",
+          "target": "@ui/media/now-playing.tsx"
+        }
+      ]
+    },
+    {
+      "name": "oscilloscope",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/display-glow",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/oscilloscope.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/oscilloscope.tsx"
+        }
+      ]
+    },
+    {
+      "name": "page-header",
+      "type": "registry:block",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "categories": [
+        "block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/blocks/page-header.tsx",
+          "type": "registry:block",
+          "target": "@ui/blocks/page-header.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pagination",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/pagination.tsx",
+          "type": "registry:ui",
+          "target": "@ui/pagination.tsx"
+        }
+      ]
+    },
+    {
+      "name": "param-row",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/param-row.tsx",
+          "type": "registry:ui",
+          "target": "@ui/param-row.tsx"
+        }
+      ]
+    },
+    {
+      "name": "patch-bay",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sequencer/patch-bay.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sequencer/patch-bay.tsx"
+        }
+      ]
+    },
+    {
+      "name": "patterns",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/patterns.ts",
+          "type": "registry:lib",
+          "target": "@lib/patterns.ts"
+        }
+      ]
+    },
+    {
+      "name": "piano-roll",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/piano-roll.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/piano-roll.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pill-bar",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/toggle-group"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/pill-bar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/pill-bar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pinnable-track",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/conflict-mark",
+        "@sigil/range",
+        "@sigil/value-status"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/constraints/pinnable-track.tsx",
+          "type": "registry:ui",
+          "target": "@ui/constraints/pinnable-track.tsx"
+        }
+      ]
+    },
+    {
+      "name": "playlist",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/media/playlist.tsx",
+          "type": "registry:ui",
+          "target": "@ui/media/playlist.tsx"
+        }
+      ]
+    },
+    {
+      "name": "popover",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/popover.tsx",
+          "type": "registry:ui",
+          "target": "@ui/popover.tsx"
+        }
+      ]
+    },
+    {
+      "name": "popover-edit",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/popover"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/popover-edit.tsx",
+          "type": "registry:ui",
+          "target": "@ui/popover-edit.tsx"
+        }
+      ]
+    },
+    {
+      "name": "popover-edit-select",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/popover-edit",
+        "@sigil/radio-group"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/popover-edit-select.tsx",
+          "type": "registry:ui",
+          "target": "@ui/popover-edit-select.tsx"
+        }
+      ]
+    },
+    {
+      "name": "popover-edit-slider",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/popover-edit",
+        "@sigil/slider"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/popover-edit-slider.tsx",
+          "type": "registry:ui",
+          "target": "@ui/popover-edit-slider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "progress",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/progress.tsx",
+          "type": "registry:ui",
+          "target": "@ui/progress.tsx"
+        }
+      ]
+    },
+    {
+      "name": "property-panel",
+      "type": "registry:block",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "categories": [
+        "block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/blocks/property-panel.tsx",
+          "type": "registry:block",
+          "target": "@ui/blocks/property-panel.tsx"
+        }
+      ]
+    },
+    {
+      "name": "radial-context-menu",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority",
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/radial-context-menu.tsx",
+          "type": "registry:ui",
+          "target": "@ui/radial-context-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "radio-group",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/radio-group.tsx",
+          "type": "registry:ui",
+          "target": "@ui/radio-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "range",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/range.ts",
+          "type": "registry:lib",
+          "target": "@lib/range.ts"
+        }
+      ]
+    },
+    {
+      "name": "range-feasibility",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/commit-handle"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/constraints/range-feasibility.tsx",
+          "type": "registry:ui",
+          "target": "@ui/constraints/range-feasibility.tsx"
+        }
+      ]
+    },
+    {
+      "name": "range-slider",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/patterns",
+        "@sigil/range",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/constraints/range-slider.tsx",
+          "type": "registry:ui",
+          "target": "@ui/constraints/range-slider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "range-track",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/interaction",
+        "@sigil/range",
+        "@sigil/utils",
+        "@sigil/value-status"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/range-track.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/range-track.tsx"
+        }
+      ]
+    },
+    {
+      "name": "reader-surface",
+      "type": "registry:page",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "categories": [
+        "layout"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/layouts/reader-surface.tsx",
+          "type": "registry:page",
+          "target": "@ui/layouts/reader-surface.tsx"
+        }
+      ]
+    },
+    {
+      "name": "readout",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/readout-lcd-cells",
+        "@sigil/readout-nixie-glyphs",
+        "@sigil/readout-segment-digits",
+        "@sigil/readout-vfd-cells",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/readout.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/readout.tsx"
+        }
+      ]
+    },
+    {
+      "name": "readout-lcd-cells",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/display-glow"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/readout-lcd-cells.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/readout-lcd-cells.tsx"
+        }
+      ]
+    },
+    {
+      "name": "readout-nixie-glyphs",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/readout-nixie-glyphs.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/readout-nixie-glyphs.tsx"
+        }
+      ]
+    },
+    {
+      "name": "readout-segment-digits",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/readout-segment-digits.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/readout-segment-digits.tsx"
+        }
+      ]
+    },
+    {
+      "name": "readout-vfd-cells",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/display/readout-vfd-cells.tsx",
+          "type": "registry:ui",
+          "target": "@ui/display/readout-vfd-cells.tsx"
+        }
+      ]
+    },
+    {
+      "name": "resizable",
+      "type": "registry:ui",
+      "dependencies": [
+        "react-resizable-panels"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/resizable.tsx",
+          "type": "registry:ui",
+          "target": "@ui/resizable.tsx"
+        }
+      ]
+    },
+    {
+      "name": "resource-gallery",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/badge"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/media/resource-gallery.tsx",
+          "type": "registry:ui",
+          "target": "@ui/media/resource-gallery.tsx"
+        }
+      ]
+    },
+    {
+      "name": "responsive-overlay",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/drawer",
+        "@sigil/popover",
+        "@sigil/use-mobile"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/responsive-overlay.tsx",
+          "type": "registry:ui",
+          "target": "@ui/responsive-overlay.tsx"
+        }
+      ]
+    },
+    {
+      "name": "review-minimap",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/review-minimap.tsx",
+          "type": "registry:ui",
+          "target": "@ui/review-minimap.tsx"
+        },
+        {
+          "path": ".registry-staging/src/components/review-minimap/use-minimap-viewport.ts",
+          "type": "registry:ui",
+          "target": "@ui/review-minimap/use-minimap-viewport.ts"
+        }
+      ]
+    },
+    {
+      "name": "ring-buffer",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/ring-buffer.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/ring-buffer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "rotary",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/interaction"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/rotary.ts",
+          "type": "registry:lib",
+          "target": "@lib/rotary.ts"
+        }
+      ]
+    },
+    {
+      "name": "rotary-switch",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/rotary",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/instrument/rotary-switch.tsx",
+          "type": "registry:ui",
+          "target": "@ui/instrument/rotary-switch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "scroll-area",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/scroll-area.tsx",
+          "type": "registry:ui",
+          "target": "@ui/scroll-area.tsx"
+        }
+      ]
+    },
+    {
+      "name": "scroll-spy",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/select",
+        "@sigil/use-scroll-spy"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/scroll-spy.tsx",
+          "type": "registry:ui",
+          "target": "@ui/scroll-spy.tsx"
+        }
+      ]
+    },
+    {
+      "name": "section-header",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/section-header.tsx",
+          "type": "registry:ui",
+          "target": "@ui/section-header.tsx"
+        }
+      ]
+    },
+    {
+      "name": "seeded-random",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/seeded-random.ts",
+          "type": "registry:lib",
+          "target": "@lib/seeded-random.ts"
+        }
+      ]
+    },
+    {
+      "name": "segment-viz",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/range-track"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/viz/segment-viz.tsx",
+          "type": "registry:ui",
+          "target": "@ui/viz/segment-viz.tsx"
+        }
+      ]
+    },
+    {
+      "name": "select",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/select.tsx",
+          "type": "registry:ui",
+          "target": "@ui/select.tsx"
+        }
+      ]
+    },
+    {
+      "name": "separator",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/separator.tsx",
+          "type": "registry:ui",
+          "target": "@ui/separator.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sequencer",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sequencer/sequencer.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sequencer/sequencer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sheet",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sheet.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sheet.tsx"
+        }
+      ]
+    },
+    {
+      "name": "shells",
+      "type": "registry:page",
+      "dependencies": [
+        "@tanstack/react-hotkeys",
+        "@tanstack/react-router",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/breadcrumb",
+        "@sigil/button",
+        "@sigil/resizable",
+        "@sigil/separator",
+        "@sigil/sidebar"
+      ],
+      "categories": [
+        "layout"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/layouts/shells.tsx",
+          "type": "registry:page",
+          "target": "@ui/layouts/shells.tsx"
+        },
+        {
+          "path": ".registry-staging/src/components/layouts/nav.tsx",
+          "type": "registry:page",
+          "target": "@ui/layouts/nav.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sidebar",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/input",
+        "@sigil/separator",
+        "@sigil/sheet",
+        "@sigil/skeleton",
+        "@sigil/tooltip",
+        "@sigil/use-mobile"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sidebar.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sidebar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "skeleton",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/skeleton.tsx",
+          "type": "registry:ui",
+          "target": "@ui/skeleton.tsx"
+        }
+      ]
+    },
+    {
+      "name": "skill-component-development",
+      "type": "registry:item",
+      "title": "Skill: component development",
+      "description": "Agent skill (Claude Code .claude/skills format) covering the authoring standard these components follow: compound Root/Parts + CVA, base-ui render-prop conventions, useEffect/useMemo restrictions, and the verification bar. Install alongside the components so your agent composes with them correctly. Some examples reference monorepo paths; adjust to your project's aliases.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../.claude/skills/component-development/SKILL.md",
+          "type": "registry:file",
+          "target": "~/.claude/skills/component-development/SKILL.md"
+        }
+      ]
+    },
+    {
+      "name": "skill-ux-design-language",
+      "type": "registry:item",
+      "title": "Skill: UX design language",
+      "description": "Agent skill (Claude Code .claude/skills format): the semantic-visual-encoding check behind this design system — every color, shadow, badge, gradient, and motion must justify itself; badges display values that can change. Install so your agent keeps new screens inside the language.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../.claude/skills/ux-design-language/SKILL.md",
+          "type": "registry:file",
+          "target": "~/.claude/skills/ux-design-language/SKILL.md"
+        }
+      ]
+    },
+    {
+      "name": "slider",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/slider.tsx",
+          "type": "registry:ui",
+          "target": "@ui/slider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sonner",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react",
+        "sonner"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sonner.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sonner.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sparkline",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sparkline.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sparkline.tsx"
+        }
+      ]
+    },
+    {
+      "name": "spectrum-analyzer",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sequencer/spectrum-analyzer.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sequencer/spectrum-analyzer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "spinner",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/spinner.tsx",
+          "type": "registry:ui",
+          "target": "@ui/spinner.tsx"
+        }
+      ]
+    },
+    {
+      "name": "spotlight-scrim",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/spotlight-scrim.tsx",
+          "type": "registry:ui",
+          "target": "@ui/spotlight-scrim.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/spotlight-focus.ts",
+          "type": "registry:lib",
+          "target": "@lib/spotlight-focus.ts"
+        }
+      ]
+    },
+    {
+      "name": "stat-grid",
+      "type": "registry:block",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/card"
+      ],
+      "categories": [
+        "block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/blocks/stat-grid.tsx",
+          "type": "registry:block",
+          "target": "@ui/blocks/stat-grid.tsx"
+        }
+      ]
+    },
+    {
+      "name": "status-badge",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/badge"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/status-badge.tsx",
+          "type": "registry:ui",
+          "target": "@ui/status-badge.tsx"
+        }
+      ]
+    },
+    {
+      "name": "status-dot",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/tone",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/status-dot.tsx",
+          "type": "registry:ui",
+          "target": "@ui/status-dot.tsx"
+        }
+      ]
+    },
+    {
+      "name": "stepper",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/stepper.tsx",
+          "type": "registry:ui",
+          "target": "@ui/stepper.tsx"
+        }
+      ]
+    },
+    {
+      "name": "streaming-cursor",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/streaming-cursor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/streaming-cursor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "switch",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/switch.tsx",
+          "type": "registry:ui",
+          "target": "@ui/switch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "table",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/table.tsx",
+          "type": "registry:ui",
+          "target": "@ui/table.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tabs",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tabs.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tabs.tsx"
+        }
+      ]
+    },
+    {
+      "name": "template-resolver",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/field",
+        "@sigil/input",
+        "@sigil/textarea"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/template-resolver.tsx",
+          "type": "registry:ui",
+          "target": "@ui/template-resolver.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/template.ts",
+          "type": "registry:lib",
+          "target": "@lib/template.ts"
+        }
+      ]
+    },
+    {
+      "name": "terminal",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/terminal.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/terminal.tsx"
+        }
+      ]
+    },
+    {
+      "name": "text-editor",
+      "type": "registry:ui",
+      "dependencies": [
+        "@tiptap/extension-placeholder",
+        "@tiptap/react",
+        "@tiptap/starter-kit"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/text-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/text-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "textarea",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/textarea.tsx",
+          "type": "registry:ui",
+          "target": "@ui/textarea.tsx"
+        }
+      ]
+    },
+    {
+      "name": "themes",
+      "type": "registry:item",
+      "title": "Sigil theme envelopes",
+      "description": "The seven thermal-envelope theme classes (amber, copper, midnight, rose-gold, jade, bone, ultraviolet). Overrides the token slots defined by your base styles; apply a theme class on <html> alongside \"dark\". The file intentionally lives app-side in this repo (UI package defines token SLOTS, the app fills them) — the registry inlines its content at build time.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../apps/web/src/styles/themes.css",
+          "type": "registry:file",
+          "target": "~/src/styles/themes.css"
+        }
+      ]
+    },
+    {
+      "name": "time-scrubber",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/patterns",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/time-scrubber.tsx",
+          "type": "registry:ui",
+          "target": "@ui/time-scrubber.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/scrubber-stops.ts",
+          "type": "registry:lib",
+          "target": "@lib/scrubber-stops.ts"
+        }
+      ]
+    },
+    {
+      "name": "timeline",
+      "type": "registry:ui",
+      "dependencies": [
+        "@tanstack/react-hotkeys",
+        "d3",
+        "zustand"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/graph",
+        "@sigil/native-select",
+        "@sigil/timeline-inspector",
+        "@sigil/types",
+        "@sigil/use-element-width",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/timeline.tsx",
+          "type": "registry:ui",
+          "target": "@ui/timeline.tsx"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-minimap-drag.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-minimap-drag.ts"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-timeline-event-drag.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-timeline-event-drag.ts"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-timeline-keyboard.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-timeline-keyboard.ts"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-timeline-occurrence-drag.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-timeline-occurrence-drag.ts"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-timeline-scroll.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-timeline-scroll.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/layout.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/layout.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/scale.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/scale.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/index.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/index.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/normalize.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/normalize.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/occurrences.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/occurrences.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/operators.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/operators.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/recurrence.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/recurrence.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/resolve.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/resolve.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/validate.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/validate.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/shadows.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/shadows.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/store.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/store.ts"
+        },
+        {
+          "path": ".registry-staging/src/lib/timeline/types.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/types.ts"
+        }
+      ]
+    },
+    {
+      "name": "timeline-inspector",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/collapsible",
+        "@sigil/graph",
+        "@sigil/label",
+        "@sigil/native-select",
+        "@sigil/tooltip",
+        "@sigil/types",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/timeline-inspector.tsx",
+          "type": "registry:ui",
+          "target": "@ui/timeline-inspector.tsx"
+        },
+        {
+          "path": ".registry-staging/src/components/timeline-inspector-logic.ts",
+          "type": "registry:ui",
+          "target": "@ui/timeline-inspector-logic.ts"
+        }
+      ]
+    },
+    {
+      "name": "toggle",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/toggle.tsx",
+          "type": "registry:ui",
+          "target": "@ui/toggle.tsx"
+        }
+      ]
+    },
+    {
+      "name": "toggle-group",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/toggle"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/toggle-group.tsx",
+          "type": "registry:ui",
+          "target": "@ui/toggle-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "toggle-switch",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/instrument/toggle-switch.tsx",
+          "type": "registry:ui",
+          "target": "@ui/instrument/toggle-switch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tone",
+      "type": "registry:lib",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/tone.ts",
+          "type": "registry:lib",
+          "target": "@lib/tone.ts"
+        }
+      ]
+    },
+    {
+      "name": "tooltip",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tooltip.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tooltip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tree-view",
+      "type": "registry:ui",
+      "dependencies": [
+        "@dnd-kit/core",
+        "@dnd-kit/modifiers",
+        "@dnd-kit/sortable",
+        "@dnd-kit/utilities",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/tree-view.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/tree-view.tsx"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-has-mounted.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-has-mounted.ts"
+        }
+      ]
+    },
+    {
+      "name": "types",
+      "type": "registry:lib",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/timeline/schedule/types.ts",
+          "type": "registry:lib",
+          "target": "@lib/timeline/schedule/types.ts"
+        }
+      ]
+    },
+    {
+      "name": "typeset",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/typeset.tsx",
+          "type": "registry:ui",
+          "target": "@ui/typeset.tsx"
+        },
+        {
+          "path": ".registry-staging/src/components/typeset.css",
+          "type": "registry:ui",
+          "target": "@ui/typeset.css"
+        }
+      ]
+    },
+    {
+      "name": "use-bounded-vector",
+      "type": "registry:hook",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/interaction"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/hooks/use-bounded-vector.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-bounded-vector.ts"
+        }
+      ]
+    },
+    {
+      "name": "use-element-width",
+      "type": "registry:hook",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/hooks/use-element-width.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-element-width.ts"
+        }
+      ]
+    },
+    {
+      "name": "use-mobile",
+      "type": "registry:hook",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/hooks/use-mobile.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-mobile.ts"
+        }
+      ]
+    },
+    {
+      "name": "use-scroll-spy",
+      "type": "registry:hook",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/hooks/use-scroll-spy.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-scroll-spy.ts"
+        }
+      ]
+    },
+    {
+      "name": "use-theme-colors",
+      "type": "registry:hook",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/hooks/use-theme-colors.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-theme-colors.ts"
+        }
+      ]
+    },
+    {
+      "name": "utils",
+      "type": "registry:lib",
+      "dependencies": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/utils.ts",
+          "type": "registry:lib",
+          "target": "@lib/utils.ts"
+        }
+      ]
+    },
+    {
+      "name": "validated-draft",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/code-block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/validated-draft.tsx",
+          "type": "registry:ui",
+          "target": "@ui/validated-draft.tsx"
+        }
+      ]
+    },
+    {
+      "name": "validation-message",
+      "type": "registry:ui",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/validation-message.tsx",
+          "type": "registry:ui",
+          "target": "@ui/validation-message.tsx"
+        }
+      ]
+    },
+    {
+      "name": "value-scrubber",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tweak/value-scrubber.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tweak/value-scrubber.tsx"
+        }
+      ]
+    },
+    {
+      "name": "value-status",
+      "type": "registry:lib",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/value-status.ts",
+          "type": "registry:lib",
+          "target": "@lib/value-status.ts"
+        }
+      ]
+    },
+    {
+      "name": "vector-editor",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react",
+        "motion"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/compact-slider",
+        "@sigil/value-scrubber"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/creative/vector-editor.tsx",
+          "type": "registry:ui",
+          "target": "@ui/creative/vector-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "viz-frame",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-bounded-vector",
+        "@sigil/utils",
+        "@sigil/viz-scale"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/viz/viz-frame.tsx",
+          "type": "registry:ui",
+          "target": "@ui/viz/viz-frame.tsx"
+        }
+      ]
+    },
+    {
+      "name": "viz-scale",
+      "type": "registry:lib",
+      "dependencies": [
+        "d3-scale",
+        "d3-shape"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/lib/viz-scale.ts",
+          "type": "registry:lib",
+          "target": "@lib/viz-scale.ts"
+        }
+      ]
+    },
+    {
+      "name": "waveform-display",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/sequencer/waveform-display.tsx",
+          "type": "registry:ui",
+          "target": "@ui/sequencer/waveform-display.tsx"
+        }
+      ]
+    },
+    {
+      "name": "workflow",
+      "type": "registry:page",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/badge",
+        "@sigil/button",
+        "@sigil/card",
+        "@sigil/patterns",
+        "@sigil/separator"
+      ],
+      "categories": [
+        "view"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/views/workflow.tsx",
+          "type": "registry:page",
+          "target": "@ui/views/workflow.tsx"
+        }
+      ]
+    },
+    {
+      "name": "xy-pad",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/use-theme-colors",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tweak/xy-pad.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tweak/xy-pad.tsx"
+        }
+      ]
+    }
+  ]
+}

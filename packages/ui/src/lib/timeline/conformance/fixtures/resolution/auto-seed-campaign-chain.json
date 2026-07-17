@@ -1,0 +1,86 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a73.2, \u00a76, \u00a710",
+  "description": "Auto campaign seed rule. Seed=1711929600. preview [seed, seed+2d]=[1711929600,1712102400]; live starts at end(preview) for 7d -> [1712102400,1712707200]; postview starts at end(live) for 1d -> [1712707200,1712793600]. Auto parent derives union [1711929600,1712793600] and provenance derived; children are free because parent is auto.",
+  "tree": {
+    "kind": "absolute",
+    "id": "campaign",
+    "start": 1711929600,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "preview",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 172800,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "live",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "preview"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 604800,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "postview",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "live"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 86400,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": {
+    "wallClock": 1712000000
+  },
+  "expect": {
+    "nodes": {
+      "campaign": {
+        "resolvedStart": 1711929600,
+        "resolvedEnd": 1712793600,
+        "provenance": "derived",
+        "boundsStatus": "free"
+      },
+      "preview": {
+        "resolvedStart": 1711929600,
+        "resolvedEnd": 1712102400,
+        "boundsStatus": "free"
+      },
+      "live": {
+        "resolvedStart": 1712102400,
+        "resolvedEnd": 1712707200
+      },
+      "postview": {
+        "resolvedStart": 1712707200,
+        "resolvedEnd": 1712793600
+      }
+    }
+  }
+}

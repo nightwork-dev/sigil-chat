@@ -1,0 +1,67 @@
+{
+  "kind": "compress",
+  "spec": "\u00a77.3",
+  "description": "Effective floors: q has flex>0, no min, quantum 5, so floor is one quantum=5. n has flex>0, no min, no quantum, basis 10; spec says it never compresses exactly to 0 unless min:0 is authored, so a target forcing both to 0 fails. Floors q=5 and n>0 make target 0 impossible; blockers are q and n and reported deficit uses q floor 5 plus n nonzero floor treated as 10 by the discrete blocker fixture.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "q",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 10,
+          "flex": 1,
+          "quantum": {
+            "unit": 5,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "n",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "q"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 10,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "root",
+    "targetSpan": 0
+  },
+  "expect": {
+    "ok": false,
+    "deficit": 15,
+    "blockers": [
+      "q",
+      "n"
+    ]
+  }
+}

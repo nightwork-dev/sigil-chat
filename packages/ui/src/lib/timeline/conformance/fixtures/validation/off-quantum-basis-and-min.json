@@ -1,0 +1,49 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.5",
+  "description": "Duration basis 100 is not a multiple of quantum.unit 60, and min 50 is not a multiple either. \u00a72.5 rejects authored values the quantum forbids.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "bad-quantum",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 100,
+          "min": 50,
+          "flex": 1,
+          "quantum": {
+            "unit": 60,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 1000
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "off-quantum-value",
+        "nodeIds": [
+          "bad-quantum"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.7",
+  "description": "Root carries daily recurrence and descendant child carries daily recurrence too. \u00a72.7 rejects nested recurrence because occurrence overrides have only one index.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 100,
+        "boundsMode": "fixed",
+        "children": [],
+        "recurrence": {
+          "frequency": "daily"
+        }
+      }
+    ],
+    "end": 1000,
+    "recurrence": {
+      "frequency": "daily"
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "nested-recurrence",
+        "nodeIds": [
+          "child"
+        ]
+      }
+    ]
+  }
+}

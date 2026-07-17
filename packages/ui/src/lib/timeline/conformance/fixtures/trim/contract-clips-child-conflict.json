@@ -1,0 +1,61 @@
+{
+  "kind": "trim",
+  "spec": "\u00a78, \u00a73.1, \u00a74.3",
+  "description": "Root [1000,10000] has child [2000,8000]. Trim root by grid unit 4000 origin 0 contract: start ceils to 4000, end floors to 8000, so root becomes [4000,8000]. Re-resolve keeps child anchored startOfParent +2000 -> [6000,12000], which overruns new end by 4000 and is conflicting.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 1000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 2000,
+          "direction": "after"
+        },
+        "duration": 6000,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 10000
+  },
+  "currentValues": {
+    "wallClock": 5000
+  },
+  "op": {
+    "nodeId": "root",
+    "grid": {
+      "unit": 4000,
+      "mode": "ceil",
+      "origin": 0
+    },
+    "policy": "contract"
+  },
+  "expect": {
+    "nodes": {
+      "root": {
+        "resolvedStart": 4000,
+        "resolvedEnd": 8000
+      },
+      "child": {
+        "resolvedStart": 6000,
+        "resolvedEnd": 12000,
+        "boundsStatus": "conflicting",
+        "conflict": {
+          "edge": "end",
+          "overrun": 4000,
+          "compressible": false
+        }
+      }
+    }
+  }
+}

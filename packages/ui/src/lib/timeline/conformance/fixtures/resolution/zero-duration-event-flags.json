@@ -1,0 +1,46 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a71.6, \u00a74.1, \u00a76",
+  "description": "Event child starts at 1000 with duration 0, so resolvedEnd equals resolvedStart=1000 and isEvent=true. At now=1000, active requires now < end, so false because now>=end at the instant; expired is true once now>=start.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "marker",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 1000,
+          "direction": "after"
+        },
+        "duration": 0,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 2000
+  },
+  "currentValues": {
+    "wallClock": 1000
+  },
+  "expect": {
+    "nodes": {
+      "marker": {
+        "resolvedStart": 1000,
+        "resolvedEnd": 1000,
+        "isEvent": true,
+        "isActive": false,
+        "isPending": false,
+        "isExpired": true
+      }
+    }
+  }
+}

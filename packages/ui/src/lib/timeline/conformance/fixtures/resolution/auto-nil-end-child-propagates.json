@@ -1,0 +1,57 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a73.2, \u00a76",
+  "description": "Auto parent seed=1000. finite vector [1000,4600]. absolute child open starts at 5000 with end absent, so resolvedEnd=null. \u00a73.2 says any nil child end makes auto parent derived end nil; parent start=min(1000,5000)=1000, end=null.",
+  "tree": {
+    "kind": "absolute",
+    "id": "auto-indefinite",
+    "start": 1000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "finite",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 3600,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "absolute",
+        "id": "open",
+        "start": 5000,
+        "timeContext": {
+          "kind": "wallClock"
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": {
+    "wallClock": 6000
+  },
+  "expect": {
+    "nodes": {
+      "auto-indefinite": {
+        "resolvedStart": 1000,
+        "resolvedEnd": null,
+        "provenance": "derived"
+      },
+      "open": {
+        "resolvedStart": 5000,
+        "resolvedEnd": null,
+        "boundsStatus": "free"
+      }
+    }
+  }
+}

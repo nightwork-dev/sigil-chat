@@ -1,0 +1,45 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.5",
+  "description": "Duration min 200 > basis 100 violates min \u2264 basis, so \u00a72.5 constraint sanity rejects the node.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "too-small-basis",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 100,
+          "min": 200,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 1000
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "constraint-sanity",
+        "nodeIds": [
+          "too-small-basis"
+        ]
+      }
+    ]
+  }
+}

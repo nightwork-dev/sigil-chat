@@ -1,0 +1,45 @@
+{
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "eslint.config.js",
+    "prettier.config.js",
+    "vite.config.js"
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    /* Linting */
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@workspace/canvas/*": ["../../packages/canvas/src/*"],
+      "@workspace/chat/*": ["../../packages/chat/src/*"],
+      "@workspace/data/*": ["../../packages/data/src/*"],
+      "@workspace/review/*": ["../../packages/review/src/*"],
+      "@workspace/review-store": ["../../packages/review-store/src/repository.ts"],
+      "@workspace/review-store/*": ["../../packages/review-store/src/*"],
+      "@workspace/graph/*": ["../../packages/graph/src/*"],
+      "@workspace/graph-store/*": ["../../packages/graph-store/src/*"],
+      "@workspace/ui/*": ["../../packages/ui/src/*"]
+    }
+  }
+}

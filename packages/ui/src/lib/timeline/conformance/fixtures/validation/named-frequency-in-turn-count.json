@@ -1,0 +1,29 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.4",
+  "description": "Named daily recurrence requires wallClock or calendar-bearing custom context. The root timeContext is turnCount, so \u00a72.4 rejects calendar-frequency-context.",
+  "tree": {
+    "kind": "absolute",
+    "id": "turn-daily",
+    "start": 0,
+    "timeContext": {
+      "kind": "turnCount"
+    },
+    "boundsMode": "fixed",
+    "children": [],
+    "end": 10,
+    "recurrence": {
+      "frequency": "daily"
+    }
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "calendar-frequency-context",
+        "nodeIds": [
+          "turn-daily"
+        ]
+      }
+    ]
+  }
+}

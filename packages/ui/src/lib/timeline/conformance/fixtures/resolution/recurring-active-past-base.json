@@ -1,0 +1,50 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a75.2, \u00a76",
+  "description": "Recurring node base window [1000,1100] is past at now=87450. Daily step is 86400; occurrence 1 window is [87400,87500], and 87400 <= now 87450 < 87500, so recurring node isActive=true even though base occurrence is expired.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "daily-pulse",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 1000,
+          "direction": "after"
+        },
+        "duration": 100,
+        "boundsMode": "fixed",
+        "children": [],
+        "recurrence": {
+          "frequency": "daily",
+          "interval": 1,
+          "count": 3
+        }
+      }
+    ],
+    "end": 200000
+  },
+  "currentValues": {
+    "wallClock": 87450
+  },
+  "expect": {
+    "nodes": {
+      "daily-pulse": {
+        "resolvedStart": 1000,
+        "resolvedEnd": 1100,
+        "isActive": true,
+        "isPending": false,
+        "isExpired": false
+      }
+    }
+  }
+}

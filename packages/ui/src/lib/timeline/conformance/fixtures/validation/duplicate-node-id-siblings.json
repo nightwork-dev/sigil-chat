@@ -1,0 +1,34 @@
+{
+  "kind": "validate",
+  "spec": "§2 rule 7",
+  "description": "Node ids are globally unique. Two siblings with the same id are invalid and report duplicate-node-id with the duplicated id once.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "dup",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": 1,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "dup",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": 1,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "expect": { "errors": [ { "code": "duplicate-node-id", "nodeIds": ["dup"] } ] }
+}

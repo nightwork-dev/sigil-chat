@@ -1,0 +1,74 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a73.1, \u00a74.3, \u00a77.5, \u00a710",
+  "description": "Maintenance window [1711929600,1711933200] is exactly 1h. migration duration basis 2h=7200 starts at parent start and ends 1711936800, overrun=1711936800-1711933200=3600; min 45min=2700 <= parent span 3600 so compressible true. rigid-check also basis 2h and ends 1h late, but flex=0/minimal rigid span 7200 > 3600 so compressible false.",
+  "tree": {
+    "kind": "absolute",
+    "id": "maintenance-window",
+    "start": 1711929600,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "migration",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 7200,
+          "min": 2700,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "rigid-check",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 7200,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 1711933200
+  },
+  "currentValues": {
+    "wallClock": 1711930000
+  },
+  "expect": {
+    "nodes": {
+      "migration": {
+        "resolvedStart": 1711929600,
+        "resolvedEnd": 1711936800,
+        "boundsStatus": "conflicting",
+        "conflict": {
+          "edge": "end",
+          "overrun": 3600,
+          "compressible": true
+        }
+      },
+      "rigid-check": {
+        "boundsStatus": "conflicting",
+        "conflict": {
+          "edge": "end",
+          "overrun": 3600,
+          "compressible": false
+        }
+      }
+    }
+  }
+}

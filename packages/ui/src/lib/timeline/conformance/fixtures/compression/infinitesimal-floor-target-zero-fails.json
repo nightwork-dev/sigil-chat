@@ -1,0 +1,26 @@
+{
+  "kind": "compress",
+  "spec": "§7.3",
+  "description": "The same no-min/no-quantum flexible item contributes 0 to computation floors, but an exact target 0 would event-ify it without authored min:0; it fails and the item is the blocker.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 10, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": { "nodeId": "root", "targetSpan": 0 },
+  "expect": { "ok": false, "deficit": 10, "blockers": ["child"] }
+}

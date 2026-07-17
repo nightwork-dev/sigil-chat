@@ -1,0 +1,67 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a71.3, \u00a73.2, \u00a76",
+  "description": "Depth 3 anchor hops. Outer vector starts at root start 1000 +100 =1100, auto seed=1100. Inner vector child aligns startOfParent +50 -> [1150,1350]. Auto outer derives to inner union [1150,1350], provenance derived. Root remains [1000,5000].",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 1000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "outer",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 100,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 1000,
+          "flex": 0
+        },
+        "boundsMode": "auto",
+        "children": [
+          {
+            "kind": "vector",
+            "id": "inner",
+            "alignment": {
+              "kind": "startOfParent"
+            },
+            "offset": {
+              "duration": 50,
+              "direction": "after"
+            },
+            "duration": 200,
+            "boundsMode": "fixed",
+            "children": []
+          }
+        ]
+      }
+    ],
+    "end": 5000
+  },
+  "currentValues": {
+    "wallClock": 1200
+  },
+  "expect": {
+    "nodes": {
+      "outer": {
+        "resolvedStart": 1150,
+        "resolvedEnd": 1350,
+        "provenance": "derived",
+        "boundsStatus": "bounded"
+      },
+      "inner": {
+        "resolvedStart": 1150,
+        "resolvedEnd": 1350,
+        "boundsStatus": "free"
+      }
+    }
+  }
+}

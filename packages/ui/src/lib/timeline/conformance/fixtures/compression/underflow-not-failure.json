@@ -1,0 +1,72 @@
+{
+  "kind": "compress",
+  "spec": "\u00a77.3",
+  "description": "Two 5s flexible items with quantum 4 floor, target 7. Basis span=10 deficit=3. Each continuous duration=3.5, then quantize toward compression by floor to 0 would eventify, so effective floor is one quantum=4; both land at 4 for total 8 would overflow. Instead largest allowed underflow solution keeps one item at 4 and one at 0 only because min:0 explicitly permits eventification for b, total 4 <= 7. Slack 3 is not failure.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 8,
+          "flex": 1,
+          "quantum": {
+            "unit": 4,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 4,
+          "min": 0,
+          "flex": 1,
+          "quantum": {
+            "unit": 4,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "root",
+    "targetSpan": 7
+  },
+  "expect": {
+    "ok": true,
+    "durations": {
+      "a": 4,
+      "b": 0
+    },
+    "offsets": {}
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "kind": "compress",
+  "spec": "\u00a77.3, \u00a710",
+  "description": "Black Friday into 48h. Quantized floors are teaser 6h + gap 0 + offers 48h + rigid drain 12h = 66h. Target 48h is short by 18h=64800, so compression fails. Blockers per amended \u00a77.3 step 5: chain members with NONZERO final floor (teaser 6h, main-offers 48h, checkout-drain 12h); the gap froze at 0 and is not a blocker. Adjudicated 2026-07-01: the original \u00a710 comment listed only two blockers and disagreed with \u00a77.3 - spec amended, this fixture encodes the ruling.",
+  "tree": {
+    "kind": "absolute",
+    "id": "sale-week",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "teaser",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 86400,
+          "min": 21600,
+          "flex": 1,
+          "quantum": {
+            "unit": 21600,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "main-offers",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "teaser"
+        },
+        "offset": {
+          "basis": 43200,
+          "direction": "after",
+          "min": 0,
+          "flex": 3,
+          "quantum": {
+            "unit": 3600,
+            "mode": "floor"
+          }
+        },
+        "duration": {
+          "basis": 432000,
+          "min": 172800,
+          "flex": 2,
+          "quantum": {
+            "unit": 86400,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "checkout-drain",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "main-offers"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 43200,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "sale-week",
+    "targetSpan": 172800
+  },
+  "expect": {
+    "ok": false,
+    "deficit": 64800,
+    "blockers": [
+      "teaser",
+      "main-offers",
+      "checkout-drain"
+    ]
+  }
+}

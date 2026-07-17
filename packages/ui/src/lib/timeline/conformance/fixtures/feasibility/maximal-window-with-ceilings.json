@@ -1,0 +1,61 @@
+{
+  "kind": "feasibility",
+  "spec": "\u00a77.5",
+  "description": "Single chain maximum is sum of max ceilings: a max 100 + b max 200 + connecting offset max 50 = 350. All chain members have max, so maximalWindow=350.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 10,
+          "max": 100,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "basis": 5,
+          "direction": "after",
+          "max": 50,
+          "flex": 1
+        },
+        "duration": {
+          "basis": 20,
+          "max": 200,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "root"
+  },
+  "expect": {
+    "maximalWindow": 350
+  }
+}

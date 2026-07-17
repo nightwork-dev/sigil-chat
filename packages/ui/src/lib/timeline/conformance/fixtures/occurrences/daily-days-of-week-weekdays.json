@@ -1,0 +1,69 @@
+{
+  "kind": "instances",
+  "spec": "\u00a75.1, \u00a75.3, \u00a710",
+  "description": "Base start 345600 is Monday Jan 5 1970 UTC. Daily count 7 raw indices map Mon..Sun. daysOfWeek [1,2,3,4,5] keeps weekdays and filters weekend indices 5(Sat) and 6(Sun); indices remain 0-4 for returned weekday instances.",
+  "tree": {
+    "kind": "absolute",
+    "id": "standup",
+    "start": 345600,
+    "end": 347400,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "interval": 1,
+      "count": 7,
+      "daysOfWeek": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "children": []
+  },
+  "currentValues": {
+    "wallClock": 345600
+  },
+  "op": {
+    "rangeStart": 345600,
+    "rangeEnd": 950400
+  },
+  "expect": {
+    "instances": [
+      {
+        "scheduleId": "standup",
+        "occurrenceIndex": 0,
+        "resolvedStart": 345600,
+        "resolvedEnd": 347400
+      },
+      {
+        "scheduleId": "standup",
+        "occurrenceIndex": 1,
+        "resolvedStart": 432000,
+        "resolvedEnd": 433800
+      },
+      {
+        "scheduleId": "standup",
+        "occurrenceIndex": 2,
+        "resolvedStart": 518400,
+        "resolvedEnd": 520200
+      },
+      {
+        "scheduleId": "standup",
+        "occurrenceIndex": 3,
+        "resolvedStart": 604800,
+        "resolvedEnd": 606600
+      },
+      {
+        "scheduleId": "standup",
+        "occurrenceIndex": 4,
+        "resolvedStart": 691200,
+        "resolvedEnd": 693000
+      }
+    ]
+  }
+}

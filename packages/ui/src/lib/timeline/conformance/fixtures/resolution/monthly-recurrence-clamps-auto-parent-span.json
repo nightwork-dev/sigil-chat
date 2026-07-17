@@ -1,0 +1,26 @@
+{
+  "kind": "resolve",
+  "spec": "§5.2, §5.3",
+  "description": "Monthly recurrence uses clamped UTC month stepping shared with occurrenceStartAt: Jan 31 2024 + 1 month is Feb 29 2024, so a 1-day child with count 2 makes the auto parent end at Mar 1 2024 (1709251200), not Mar 3 from unclamped overflow.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 1706659200,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "monthly",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": 86400,
+        "boundsMode": "fixed",
+        "recurrence": { "frequency": "monthly", "interval": 1, "count": 2 },
+        "children": []
+      }
+    ]
+  },
+  "currentValues": { "wallClock": 1706659200 },
+  "expect": { "nodes": { "root": { "resolvedStart": 1706659200, "resolvedEnd": 1709251200 } } }
+}

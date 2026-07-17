@@ -1,0 +1,40 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.3",
+  "description": "Child uses endOfParent under an auto parent. Auto parent end is derived from children, so \u00a72.3 rejects the circular alignment.",
+  "tree": {
+    "kind": "absolute",
+    "id": "auto-root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": {
+          "kind": "endOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 100,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "end-of-parent-under-auto",
+        "nodeIds": [
+          "child"
+        ]
+      }
+    ]
+  }
+}

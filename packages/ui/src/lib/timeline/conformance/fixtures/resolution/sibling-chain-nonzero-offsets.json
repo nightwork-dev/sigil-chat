@@ -1,0 +1,80 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a71.4, \u00a71.5, \u00a76",
+  "description": "A [1000,4600]. B aligns endOf(A) with +1800, so starts 6400 and lasts 3600 -> [6400,10000]. C aligns endOf(B) with before offset 600, so starts 9400 and lasts 1200 -> [9400,10600]. This proves sibling endOf anchors plus nonzero after/before offsets.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 1000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 3600,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "duration": 1800,
+          "direction": "after"
+        },
+        "duration": 3600,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "c",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "b"
+        },
+        "offset": {
+          "duration": 600,
+          "direction": "before"
+        },
+        "duration": 1200,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 20000
+  },
+  "currentValues": {
+    "wallClock": 9500
+  },
+  "expect": {
+    "nodes": {
+      "a": {
+        "resolvedStart": 1000,
+        "resolvedEnd": 4600
+      },
+      "b": {
+        "resolvedStart": 6400,
+        "resolvedEnd": 10000
+      },
+      "c": {
+        "resolvedStart": 9400,
+        "resolvedEnd": 10600
+      }
+    }
+  }
+}

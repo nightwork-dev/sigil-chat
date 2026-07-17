@@ -1,0 +1,47 @@
+{
+  "kind": "resolve",
+  "spec": "§1.5, §3.1, §6",
+  "description": "Fixed absolute root, one vector child at startOfParent +100 for 200. Hand-computed: child [1100,1300], pinned, bounded. now=1150: both active.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 1000,
+    "end": 2000,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 100, "direction": "after" },
+        "duration": 200,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": { "wallClock": 1150 },
+  "expect": {
+    "nodes": {
+      "root": {
+        "resolvedStart": 1000,
+        "resolvedEnd": 2000,
+        "provenance": "pinned",
+        "boundsStatus": "free",
+        "isActive": true,
+        "isPending": false,
+        "isExpired": false,
+        "isEvent": false
+      },
+      "child": {
+        "resolvedStart": 1100,
+        "resolvedEnd": 1300,
+        "provenance": "pinned",
+        "boundsStatus": "bounded",
+        "isActive": true,
+        "isEvent": false
+      }
+    }
+  }
+}

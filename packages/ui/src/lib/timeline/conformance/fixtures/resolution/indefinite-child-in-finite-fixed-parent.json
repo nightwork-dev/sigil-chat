@@ -1,0 +1,44 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a73.1, \u00a74.3",
+  "description": "Fixed parent [1000,2000]. Absolute child starts 1500 and has nil end. A nil-end child inside finite fixed parent violates the end edge with unbounded overrun, so conflict edge=end, overrun=null.",
+  "tree": {
+    "kind": "absolute",
+    "id": "fixed-parent",
+    "start": 1000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "absolute",
+        "id": "open-child",
+        "start": 1500,
+        "timeContext": {
+          "kind": "wallClock"
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 2000
+  },
+  "currentValues": {
+    "wallClock": 1600
+  },
+  "expect": {
+    "nodes": {
+      "open-child": {
+        "resolvedStart": 1500,
+        "resolvedEnd": null,
+        "boundsStatus": "conflicting",
+        "conflict": {
+          "edge": "end",
+          "overrun": null,
+          "compressible": false
+        }
+      }
+    }
+  }
+}

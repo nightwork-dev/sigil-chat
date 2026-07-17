@@ -1,0 +1,63 @@
+{
+  "kind": "instances",
+  "spec": "\u00a75.3",
+  "description": "Daily count 3 starts 0,86400,172800 with duration 100. Override daily:1 moves occurrence 1 to 90000, so isModified true and window [90000,90100]. Override daily:2 sets cancelled true; it remains at [172800,172900] with isModified true and cancelled true.",
+  "tree": {
+    "kind": "absolute",
+    "id": "daily",
+    "start": 0,
+    "end": 100,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "count": 3
+    },
+    "children": []
+  },
+  "currentValues": {
+    "wallClock": 0
+  },
+  "op": {
+    "rangeStart": 0,
+    "rangeEnd": 300000,
+    "overrides": {
+      "daily:1": {
+        "start": 90000
+      },
+      "daily:2": {
+        "cancelled": true
+      }
+    }
+  },
+  "expect": {
+    "instances": [
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 0,
+        "resolvedStart": 0,
+        "resolvedEnd": 100,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 1,
+        "resolvedStart": 90000,
+        "resolvedEnd": 90100,
+        "isModified": true,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 2,
+        "resolvedStart": 172800,
+        "resolvedEnd": 172900,
+        "isModified": true,
+        "cancelled": true
+      }
+    ]
+  }
+}

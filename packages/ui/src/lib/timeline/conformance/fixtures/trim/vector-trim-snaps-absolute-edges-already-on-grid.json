@@ -1,0 +1,36 @@
+{
+  "kind": "trim",
+  "spec": "§8",
+  "description": "Trim snaps the vector node's resolved absolute edges, not its local offset values. With root start 33, a=[33,43], b aligned endOf(a) offset 7 has resolved window [50,60], already on the 10-unit grid, so trim leaves it there.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 33,
+    "end": 100,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": 10,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": { "kind": "endOf", "siblingId": "a" },
+        "offset": { "duration": 7, "direction": "after" },
+        "duration": 10,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": { "wallClock": 0 },
+  "op": { "nodeId": "b", "grid": { "unit": 10, "mode": "nearest", "origin": 0 }, "policy": "nearest" },
+  "expect": { "nodes": { "b": { "resolvedStart": 50, "resolvedEnd": 60 } } }
+}

@@ -1,0 +1,62 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a74.1, \u00a76",
+  "description": "At now=5000, future child [6000,7000] has now<start so pending=true active=false expired=false. Past child [1000,2000] has now>=end so expired=true active=false pending=false.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "future",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 6000,
+          "direction": "after"
+        },
+        "duration": 1000,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "past",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 1000,
+          "direction": "after"
+        },
+        "duration": 1000,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 10000
+  },
+  "currentValues": {
+    "wallClock": 5000
+  },
+  "expect": {
+    "nodes": {
+      "future": {
+        "isPending": true,
+        "isActive": false,
+        "isExpired": false
+      },
+      "past": {
+        "isPending": false,
+        "isActive": false,
+        "isExpired": true
+      }
+    }
+  }
+}

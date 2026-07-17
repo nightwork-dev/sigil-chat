@@ -1,0 +1,66 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a71.5, \u00a73.2, \u00a76",
+  "description": "Auto parent seed=1000. lead is startOfParent with before offset 6h=21600, so start=1000-21600=-20600 and end=-20600+12h(43200)=22600. body is chained from lead end for 1h -> [22600,26200]. Parent derived start is min(-20600,22600)=-20600, earlier than seed, end=max(22600,26200)=26200.",
+  "tree": {
+    "kind": "absolute",
+    "id": "auto-root",
+    "start": 1000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "lead",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 21600,
+          "direction": "before"
+        },
+        "duration": 43200,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "body",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "lead"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 3600,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": {
+    "wallClock": 0
+  },
+  "expect": {
+    "nodes": {
+      "auto-root": {
+        "resolvedStart": -20600,
+        "resolvedEnd": 26200,
+        "provenance": "derived"
+      },
+      "lead": {
+        "resolvedStart": -20600,
+        "resolvedEnd": 22600,
+        "boundsStatus": "free"
+      },
+      "body": {
+        "resolvedStart": 22600,
+        "resolvedEnd": 26200
+      }
+    }
+  }
+}

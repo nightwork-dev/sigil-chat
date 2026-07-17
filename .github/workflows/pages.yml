@@ -1,0 +1,53 @@
+name: Deploy web app to GitHub Pages
+
+# Builds apps/web as a static SPA (see apps/web/vite.config.static.ts) and
+# deploys it to GitHub Pages on every push to main, plus manual dispatch.
+# Requires the repo to be PUBLIC with Pages source set to "GitHub Actions"
+# (Settings -> Pages) — set both before the first deploy. If the repo isn't
+# served from the domain root, also set PAGES_BASE to "/<repo-name>/" below.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build static site
+        run: pnpm --filter web build:static
+        # env:
+        #   PAGES_BASE: /<repo-name>/
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/web/dist/client
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

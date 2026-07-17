@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+
+# Turbo
+.turbo
+
+# Vercel
+.vercel
+
+# Build Outputs
+dist
+.output
+.nitro
+.tanstack
+.vinxi
+.eve
+.data
+
+# Debug
+npm-debug.log*
+
+# Generated
+**/routeTree.gen.ts
+# shadcn registry build output (regenerate: pnpm --filter @workspace/ui registry:build)
+apps/web/public/r/
+packages/ui/.registry-staging/
+
+# Sigil CLI render temp dir
+.sigil-render
+
+# Reports are generated/local. Not tracked — no exceptions.
+reports/
+
+# Misc
+.DS_Store
+*.pem
+
+# Agent tooling scratch state — .agents/index.md is the canonical instructions
+# file (CLAUDE.md/AGENTS.md symlink to it), keep it; ignore everything else
+# under .agents (session memory, etc.)
+.agents/*
+!.agents/index.md
+.omc
+.playwright-mcp
+traces/
+apps/web/public/llms.txt
+
+# Internal planning/strategy docs — not shipped in the public template
+docs.local/

@@ -1,0 +1,65 @@
+{
+  "kind": "compress",
+  "spec": "\u00a77.1, \u00a77.3",
+  "description": "Stretch case targetSpan > basis span. Chain has a=10 max 15 flex 1 and b=10 max 30 flex 3. Basis span 20, target 40, grow amount 20. Flex*basis weights 10 and 30. Continuous grow gives a +5 -> 15 (at max) and b +15 -> 25, total 40. a hits its max ceiling exactly.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 10,
+          "max": 15,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 10,
+          "max": 30,
+          "flex": 3
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "root",
+    "targetSpan": 40
+  },
+  "expect": {
+    "ok": true,
+    "durations": {
+      "a": 15,
+      "b": 25
+    },
+    "offsets": {}
+  }
+}

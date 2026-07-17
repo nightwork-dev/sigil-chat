@@ -1,0 +1,249 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Fonts: DM Sans + JetBrains Mono load via Google Fonts in the root layout */
+
+@custom-variant dark (&:is(.dark *));
+@source "../../../../apps/**/*.{ts,tsx}";
+@source "../../../../packages/chat/src/**/*.{ts,tsx}";
+@source "../../../../packages/canvas/src/**/*.{ts,tsx}";
+@source "../../../../packages/data/src/**/*.{ts,tsx}";
+@source "../../../../packages/review/src/**/*.{ts,tsx}";
+@source "../**/*.{ts,tsx}";
+
+/*
+ * Theme architecture:
+ *   1. :root defines CSS custom properties (the actual color values)
+ *   2. @theme inline maps Tailwind tokens to those custom properties via var()
+ *   3. Theme classes (.theme-*) override the :root custom properties
+ *
+ * This two-layer approach lets theme classes win the cascade — they override
+ * the :root vars, and Tailwind reads the updated var() values automatically.
+ */
+
+/* ─── Layer 1: Default values as CSS custom properties ─── */
+
+:root {
+  --color-background: #0d0b0f;
+  --color-foreground: #e8e0d6;
+  --color-card: #151216;
+  --color-card-foreground: #e8e0d6;
+  --color-popover: #151216;
+  --color-popover-foreground: #e8e0d6;
+  --color-primary: #d4a853;
+  --color-primary-foreground: #0d0b0f;
+  --color-secondary: #1e1a20;
+  --color-secondary-foreground: #e8e0d6;
+  --color-muted: #1a1620;
+  --color-muted-foreground: #8b8578;
+  --color-accent: #1e1a20;
+  --color-accent-foreground: #e8e0d6;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #e8e0d6;
+  /* Semantic status — the vocabulary LLMs and shadcn-trained code expect.
+     Recognizable hues (green/orange/blue), temperature-tuned per theme. */
+  --color-success: #4cb782;
+  --color-success-foreground: #0d0b0f;
+  --color-warning: #e09143;
+  --color-warning-foreground: #0d0b0f;
+  --color-info: #5b9dc4;
+  --color-info-foreground: #0d0b0f;
+  --color-border: #2a2530;
+  --color-input: #2a2530;
+  --color-ring: #d4a853;
+
+  --color-sidebar: #121014;
+  --color-sidebar-foreground: #e8e0d6;
+  --color-sidebar-primary: #d4a853;
+  --color-sidebar-primary-foreground: #0d0b0f;
+  --color-sidebar-border: #2a2530;
+  --color-sidebar-accent: #1e1a20;
+  --color-sidebar-accent-foreground: #e8e0d6;
+  --color-sidebar-ring: #d4a853;
+
+  /* Chart palette — themed per variant */
+  --color-chart-1: #d4a853;
+  --color-chart-2: #b87333;
+  --color-chart-3: #c4956a;
+  --color-chart-4: #8b7355;
+  --color-chart-5: #6b5b45;
+  --color-chart-err: #e5484d;
+
+  /* Display/CRT phosphor tokens — themed per variant. Read directly by
+     LCDDisplay/Oscilloscope's "theme" variant (their default) as inline
+     style values, not through Tailwind, since they're CRT-glow colors,
+     not UI chrome. The fixed green/amber/blue/white phosphor presets on
+     those components are unrelated and unaffected by these tokens. */
+  --display-bg: #281a08;
+  --display-text: #ffb84d;
+  --display-ghost: rgba(255, 184, 77, 0.08);
+  --display-glow: rgba(255, 184, 77, 0.4);
+
+  /* Grain noise overlay */
+  --grain-opacity: 0.025;
+
+  /* Corner radii — base values live here (not as @theme inline literals) so a
+     runtime override (Theme Studio's derived --radius-*) is actually read.
+     Values unchanged from before; only the indirection layer moved. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+/* ─── Layer 2: Tailwind token slots (reference the custom properties) ─── */
+
+@theme inline {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-card: var(--color-card);
+  --color-card-foreground: var(--color-card-foreground);
+  --color-popover: var(--color-popover);
+  --color-popover-foreground: var(--color-popover-foreground);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-foreground: var(--color-destructive-foreground);
+  --color-success: var(--color-success);
+  --color-success-foreground: var(--color-success-foreground);
+  --color-warning: var(--color-warning);
+  --color-warning-foreground: var(--color-warning-foreground);
+  --color-info: var(--color-info);
+  --color-info-foreground: var(--color-info-foreground);
+  --color-border: var(--color-border);
+  --color-input: var(--color-input);
+  --color-ring: var(--color-ring);
+
+  --color-sidebar: var(--color-sidebar);
+  --color-sidebar-foreground: var(--color-sidebar-foreground);
+  --color-sidebar-primary: var(--color-sidebar-primary);
+  --color-sidebar-primary-foreground: var(--color-sidebar-primary-foreground);
+  --color-sidebar-border: var(--color-sidebar-border);
+  --color-sidebar-accent: var(--color-sidebar-accent);
+  --color-sidebar-accent-foreground: var(--color-sidebar-accent-foreground);
+  --color-sidebar-ring: var(--color-sidebar-ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ─── Base ─── */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Noise texture */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: var(--grain-opacity, 0.025);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px;
+}
+
+/* ─── Theme transition ─── */
+/* Smooth color shift when switching themes. Only color properties — no layout thrash. */
+* {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    fill 150ms ease,
+    stroke 150ms ease;
+}
+/* Disable transition on initial load and for reduced-motion preference */
+html.no-transition *,
+html.no-transition *::before,
+html.no-transition *::after {
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+/* Accordion/Collapsible panels use a CSS animation (height) for open/close —
+   the theme-transition rule above collides with it (Base UI warns when both
+   a transition and an animation apply to the same panel). */
+[data-slot="accordion-content"] {
+  transition: none;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
+
+/* ─── Animations ─── */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes breathing-blink {
+  0%, 45% { opacity: 1; }
+  50%, 95% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes staggered-pulse {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* "Now playing" equalizer bar — bottom-anchored height pulse; stagger the
+   delay per bar for the classic dancing-bars look. */
+@keyframes equalize {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+.animate-fade-up { animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in { animation: fade-in 0.3s ease both; }
+.animate-breathing-blink { animation: breathing-blink 1.06s step-end infinite; }
+.animate-staggered-pulse { animation: staggered-pulse 1.4s ease-in-out infinite; }
+.animate-equalize { animation: equalize 0.9s ease-in-out infinite; transform-origin: bottom; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-card) 25%, var(--color-secondary) 50%, var(--color-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}

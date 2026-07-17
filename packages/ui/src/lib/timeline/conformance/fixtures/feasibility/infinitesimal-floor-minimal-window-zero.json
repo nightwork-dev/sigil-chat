@@ -1,0 +1,26 @@
+{
+  "kind": "feasibility",
+  "spec": "§7.3, §7.5",
+  "description": "minimalWindow uses the computation floor: a flex item with no min and no quantum contributes 0, matching compress feasibility for nonzero targets.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 10, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": { "nodeId": "root" },
+  "expect": { "minimalWindow": 0 }
+}

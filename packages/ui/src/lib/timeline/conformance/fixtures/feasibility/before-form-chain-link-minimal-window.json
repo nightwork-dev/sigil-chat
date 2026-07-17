@@ -1,0 +1,35 @@
+{
+  "kind": "feasibility",
+  "spec": "§7.2, §7.5",
+  "description": "The before-form b startOf(a) + direction before joins b and a into one chain. Its floor is b offset 0 + b duration 0 + a duration min 5 = 5.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 10, "min": 5, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": { "kind": "startOf", "siblingId": "a" },
+        "offset": { "basis": 5, "direction": "before", "min": 0, "flex": 1 },
+        "duration": { "basis": 5, "min": 0, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": { "nodeId": "root" },
+  "expect": { "minimalWindow": 5 }
+}

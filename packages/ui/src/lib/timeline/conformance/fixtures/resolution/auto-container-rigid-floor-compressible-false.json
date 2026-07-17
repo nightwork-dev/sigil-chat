@@ -1,0 +1,45 @@
+{
+  "kind": "resolve",
+  "spec": "§7.2, §7.3, §7.5, §4.3",
+  "description": "An auto chain member is a container: its floor is its contents' derived minimal window. The auto wrapper's authored min 5 does not make a rigid 20s child fit in a 10s fixed parent, so the conflict is not compressible.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "auto",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 20, "min": 5, "flex": 1 },
+        "boundsMode": "auto",
+        "children": [
+          {
+            "kind": "vector",
+            "id": "inner-rigid",
+            "alignment": { "kind": "startOfParent" },
+            "offset": { "duration": 0, "direction": "after" },
+            "duration": 20,
+            "boundsMode": "fixed",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "currentValues": { "wallClock": 0 },
+  "expect": {
+    "nodes": {
+      "auto": {
+        "resolvedStart": 0,
+        "resolvedEnd": 20,
+        "boundsStatus": "conflicting",
+        "conflict": { "edge": "end", "overrun": 10, "compressible": false }
+      }
+    }
+  }
+}

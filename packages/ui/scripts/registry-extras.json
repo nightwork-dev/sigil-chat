@@ -1,0 +1,53 @@
+{
+  "excludedItems": [
+    { "name": "chat", "reason": "Module-owned view; @workspace/chat is not yet represented as an installable Sigil registry module." },
+    { "name": "entity-browser", "reason": "Module-owned view; @workspace/data is not yet represented as an installable Sigil registry module." }
+  ],
+  "items": [
+    {
+      "name": "themes",
+      "type": "registry:item",
+      "title": "Sigil theme envelopes",
+      "description": "The seven thermal-envelope theme classes (amber, copper, midnight, rose-gold, jade, bone, ultraviolet). Overrides the token slots defined by your base styles; apply a theme class on <html> alongside \"dark\". The file intentionally lives app-side in this repo (UI package defines token SLOTS, the app fills them) — the registry inlines its content at build time.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../apps/web/src/styles/themes.css",
+          "type": "registry:file",
+          "target": "~/src/styles/themes.css"
+        }
+      ]
+    },
+    {
+      "name": "skill-component-development",
+      "type": "registry:item",
+      "title": "Skill: component development",
+      "description": "Agent skill (Claude Code .claude/skills format) covering the authoring standard these components follow: compound Root/Parts + CVA, base-ui render-prop conventions, useEffect/useMemo restrictions, and the verification bar. Install alongside the components so your agent composes with them correctly. Some examples reference monorepo paths; adjust to your project's aliases.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../.claude/skills/component-development/SKILL.md",
+          "type": "registry:file",
+          "target": "~/.claude/skills/component-development/SKILL.md"
+        }
+      ]
+    },
+    {
+      "name": "skill-ux-design-language",
+      "type": "registry:item",
+      "title": "Skill: UX design language",
+      "description": "Agent skill (Claude Code .claude/skills format): the semantic-visual-encoding check behind this design system — every color, shadow, badge, gradient, and motion must justify itself; badges display values that can change. Install so your agent keeps new screens inside the language.",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "../../.claude/skills/ux-design-language/SKILL.md",
+          "type": "registry:file",
+          "target": "~/.claude/skills/ux-design-language/SKILL.md"
+        }
+      ]
+    }
+  ]
+}

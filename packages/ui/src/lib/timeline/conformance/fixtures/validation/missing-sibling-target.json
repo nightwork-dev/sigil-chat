@@ -1,0 +1,42 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.6",
+  "description": "Node lonely aligns to endOf(nope), but no sibling has id nope. \u00a72.6 requires sibling-target-missing.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "lonely",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "nope"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 100,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 1000
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "sibling-target-missing",
+        "nodeIds": [
+          "lonely"
+        ]
+      }
+    ]
+  }
+}

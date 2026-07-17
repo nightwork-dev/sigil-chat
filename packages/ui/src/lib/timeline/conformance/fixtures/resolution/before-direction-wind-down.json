@@ -1,0 +1,44 @@
+{
+  "kind": "resolve",
+  "spec": "\u00a71.5, \u00a73.1, \u00a710",
+  "description": "Wind-down example. Parent end=1712534400. Child aligned endOfParent with before offset 24h=86400: start=1712534400-86400=1712448000. Duration 24h gives end=1712534400, exactly parent end, so bounded.",
+  "tree": {
+    "kind": "absolute",
+    "id": "weekend-event",
+    "start": 1711929600,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "wind-down",
+        "alignment": {
+          "kind": "endOfParent"
+        },
+        "offset": {
+          "duration": 86400,
+          "direction": "before"
+        },
+        "duration": 86400,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 1712534400
+  },
+  "currentValues": {
+    "wallClock": 1712450000
+  },
+  "expect": {
+    "nodes": {
+      "wind-down": {
+        "resolvedStart": 1712448000,
+        "resolvedEnd": 1712534400,
+        "provenance": "pinned",
+        "boundsStatus": "bounded"
+      }
+    }
+  }
+}

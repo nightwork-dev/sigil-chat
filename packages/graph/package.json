@@ -1,0 +1,19 @@
+{
+  "name": "@workspace/graph",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.6"
+  },
+  "exports": {
+    "./*": "./src/*.ts"
+  }
+}

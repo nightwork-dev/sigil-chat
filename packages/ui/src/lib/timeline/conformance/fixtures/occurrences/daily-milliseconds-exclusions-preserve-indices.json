@@ -1,0 +1,33 @@
+{
+  "kind": "instances",
+  "spec": "§1.8, §5.1, §5.3",
+  "description": "Daily recurrence in millisecond units preserves occurrenceIndex under exclusions. Raw starts for count 10 are index*N where N=86400000 ms: 0, 86400000, 172800000, 259200000, 345600000, 432000000, 518400000, 604800000, 691200000, 777600000. Excluding starts 86400000(index1), 259200000(index3), and 604800000(index7) leaves indices 0,2,4,5,6,8,9 unchanged.",
+  "tree": {
+    "kind": "absolute",
+    "id": "daily-ms",
+    "start": 0,
+    "end": 1000,
+    "timeContext": { "kind": "wallClock", "unit": "milliseconds" },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "interval": 1,
+      "count": 10,
+      "excludeValues": [86400000, 259200000, 604800000]
+    },
+    "children": []
+  },
+  "currentValues": { "wallClock": 0 },
+  "op": { "rangeStart": 0, "rangeEnd": 864000000 },
+  "expect": {
+    "instances": [
+      { "scheduleId": "daily-ms", "occurrenceIndex": 0, "resolvedStart": 0, "resolvedEnd": 1000, "isModified": false, "cancelled": false },
+      { "scheduleId": "daily-ms", "occurrenceIndex": 2, "resolvedStart": 172800000, "resolvedEnd": 172801000, "isModified": false, "cancelled": false },
+      { "scheduleId": "daily-ms", "occurrenceIndex": 4, "resolvedStart": 345600000, "resolvedEnd": 345601000, "isModified": false, "cancelled": false },
+      { "scheduleId": "daily-ms", "occurrenceIndex": 5, "resolvedStart": 432000000, "resolvedEnd": 432001000, "isModified": false, "cancelled": false },
+      { "scheduleId": "daily-ms", "occurrenceIndex": 6, "resolvedStart": 518400000, "resolvedEnd": 518401000, "isModified": false, "cancelled": false },
+      { "scheduleId": "daily-ms", "occurrenceIndex": 8, "resolvedStart": 691200000, "resolvedEnd": 691201000, "isModified": false, "cancelled": false },
+      { "scheduleId": "daily-ms", "occurrenceIndex": 9, "resolvedStart": 777600000, "resolvedEnd": 777601000, "isModified": false, "cancelled": false }
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "validate",
+  "spec": "\u00a71.6, \u00a72.5",
+  "description": "Duration basis 0 is an event; min/flex/quantum are meaningless and must be absent. This node carries min and flex, so \u00a72.5 constraint sanity rejects it.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "bad-event",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 0,
+          "min": 0,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 1000
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "constraint-sanity",
+        "nodeIds": [
+          "bad-event"
+        ]
+      }
+    ]
+  }
+}

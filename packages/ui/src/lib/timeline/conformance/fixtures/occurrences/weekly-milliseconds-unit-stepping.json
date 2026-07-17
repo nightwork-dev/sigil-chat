@@ -1,0 +1,24 @@
+{
+  "kind": "instances",
+  "spec": "§1.8, §5.1, §5.3",
+  "description": "wallClock unit milliseconds scales weekly stepping: WEEK = 7*24*60*60*1000 = 604800000 context units. From start 0 with count 3, raw starts are 0, 604800000, 1209600000; each 1000-duration instance ends start+1000.",
+  "tree": {
+    "kind": "absolute",
+    "id": "weekly-ms",
+    "start": 0,
+    "end": 1000,
+    "timeContext": { "kind": "wallClock", "unit": "milliseconds" },
+    "boundsMode": "fixed",
+    "recurrence": { "frequency": "weekly", "interval": 1, "count": 3 },
+    "children": []
+  },
+  "currentValues": { "wallClock": 0 },
+  "op": { "rangeStart": 0, "rangeEnd": 1209601000 },
+  "expect": {
+    "instances": [
+      { "scheduleId": "weekly-ms", "occurrenceIndex": 0, "resolvedStart": 0, "resolvedEnd": 1000 },
+      { "scheduleId": "weekly-ms", "occurrenceIndex": 1, "resolvedStart": 604800000, "resolvedEnd": 604801000 },
+      { "scheduleId": "weekly-ms", "occurrenceIndex": 2, "resolvedStart": 1209600000, "resolvedEnd": 1209601000 }
+    ]
+  }
+}

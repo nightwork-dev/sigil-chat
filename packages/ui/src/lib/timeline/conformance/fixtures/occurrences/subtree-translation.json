@@ -1,0 +1,79 @@
+{
+  "kind": "instances",
+  "spec": "\u00a75.2, \u00a75.3",
+  "description": "Recurring root base starts at 1000 and child is [1050,1075]. Occurrence 1 starts at 1000+86400=87400, delta=86400, so child subtree translates to [87450,87475].",
+  "tree": {
+    "kind": "absolute",
+    "id": "series",
+    "start": 1000,
+    "end": 1100,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "count": 2
+    },
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 50,
+          "direction": "after"
+        },
+        "duration": 25,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": {
+    "wallClock": 0
+  },
+  "op": {
+    "rangeStart": 80000,
+    "rangeEnd": 90000
+  },
+  "expect": {
+    "instances": [
+      {
+        "scheduleId": "series",
+        "occurrenceIndex": 1,
+        "resolvedStart": 87400,
+        "resolvedEnd": 87500,
+        "isModified": false,
+        "cancelled": false,
+        "subtree": {
+          "id": "series",
+          "resolvedStart": 87400,
+          "resolvedEnd": 87500,
+          "provenance": "pinned",
+          "boundsStatus": "free",
+          "isActive": false,
+          "isPending": true,
+          "isExpired": false,
+          "isEvent": false,
+          "children": [
+            {
+              "id": "child",
+              "resolvedStart": 87450,
+              "resolvedEnd": 87475,
+              "provenance": "pinned",
+              "boundsStatus": "bounded",
+              "isActive": false,
+              "isPending": true,
+              "isExpired": false,
+              "isEvent": false,
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

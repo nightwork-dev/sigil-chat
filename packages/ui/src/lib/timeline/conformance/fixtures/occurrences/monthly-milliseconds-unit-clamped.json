@@ -1,0 +1,23 @@
+{
+  "kind": "instances",
+  "spec": "§1.8, §5.1, §5.3",
+  "description": "wallClock unit milliseconds scales UTC month clamping. Jan 31 2024 00:00 UTC = 1706659200000 ms; +1 calendar month clamps to Feb 29 2024 00:00 UTC = 1709164800000 ms; one-day duration is 86400000 ms, so ends are Feb 1 (1706745600000) and Mar 1 (1709251200000).",
+  "tree": {
+    "kind": "absolute",
+    "id": "monthly-ms",
+    "start": 1706659200000,
+    "end": 1706745600000,
+    "timeContext": { "kind": "wallClock", "unit": "milliseconds" },
+    "boundsMode": "fixed",
+    "recurrence": { "frequency": "monthly", "interval": 1, "count": 2 },
+    "children": []
+  },
+  "currentValues": { "wallClock": 1706659200000 },
+  "op": { "rangeStart": 1706659200000, "rangeEnd": 1709251200000 },
+  "expect": {
+    "instances": [
+      { "scheduleId": "monthly-ms", "occurrenceIndex": 0, "resolvedStart": 1706659200000, "resolvedEnd": 1706745600000 },
+      { "scheduleId": "monthly-ms", "occurrenceIndex": 1, "resolvedStart": 1709164800000, "resolvedEnd": 1709251200000 }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "kind": "compress",
+  "spec": "§7.3",
+  "description": "A flex item with no authored min and no quantum has computation floor 0, not its authored basis. Root target 1 compresses the child from basis 10 to basis 1 successfully.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "child",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 10, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": { "nodeId": "root", "targetSpan": 1 },
+  "expect": { "ok": true, "durations": { "child": 1 } }
+}

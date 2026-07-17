@@ -1,0 +1,721 @@
+/*
+ * Theme variants for the material language design system.
+ *
+ * These override the :root custom properties from @workspace/ui/globals.css.
+ * The UI package defines the token SLOTS (via var()). This file fills them.
+ *
+ * Each theme is a thermal envelope — all surfaces, text, signals, and seams
+ * share a consistent physical temperature.
+ *
+ * Two orthogonal axes:
+ *   - ENVELOPE: which `.theme-*` class (amber, copper, midnight, …).
+ *   - MODE: `.dark` (default) or `.light`, a marker class on <html>.
+ *
+ * The `.theme-*` block below holds each envelope's DARK tokens. Its LIGHT
+ * counterpart lives in a `.theme-*.light` block near the bottom of this file
+ * and overrides the surface stack while keeping the envelope's temperature.
+ * Light mode inverts the surface stack but keeps the density (Design Principle
+ * #2): only surfaces/ink/signal-contrast change — spacing, monospace, tabular
+ * numerals and the instrument feel are identical. `.light` also removes `.dark`
+ * so `dark:` Tailwind variants correctly turn off.
+ *
+ * Usage: apply a theme class on <html> alongside "dark" or "light".
+ *   <html class="dark theme-amber">    -- canonical dark amber
+ *   <html class="light theme-amber">   -- light amber
+ *   <html class="dark theme-midnight"> -- cool variant
+ */
+
+/* ─── Amber (canonical) ─────────────────────────────────────────────────────
+ * Precision instrument in a dark room.
+ * Warm near-black, amber signal, cream text, purple-shifted seams.
+ */
+.theme-amber {
+  --color-background: #0d0b0f;
+  --color-foreground: #e8e0d6;
+  --color-card: #151216;
+  --color-card-foreground: #e8e0d6;
+  --color-popover: #151216;
+  --color-popover-foreground: #e8e0d6;
+  --color-primary: #d4a853;
+  --color-primary-foreground: #0d0b0f;
+  --color-secondary: #1e1a20;
+  --color-secondary-foreground: #e8e0d6;
+  --color-muted: #1a1620;
+  --color-muted-foreground: #8b8578;
+  --color-accent: #1e1a20;
+  --color-accent-foreground: #e8e0d6;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #e8e0d6;
+  --color-success: #4cb782;
+  --color-success-foreground: #0d0b0f;
+  --color-warning: #e09143;
+  --color-warning-foreground: #0d0b0f;
+  --color-info: #5b9dc4;
+  --color-info-foreground: #0d0b0f;
+  --color-border: #2a2530;
+  --color-input: #2a2530;
+  --color-ring: #d4a853;
+  --color-sidebar: #121014;
+  --color-sidebar-foreground: #e8e0d6;
+  --color-sidebar-primary: #d4a853;
+  --color-sidebar-primary-foreground: #0d0b0f;
+  --color-sidebar-border: #2a2530;
+  --color-sidebar-accent: #1e1a20;
+  --color-sidebar-accent-foreground: #e8e0d6;
+  --color-sidebar-ring: #d4a853;
+  --color-chart-1: #d4a853;
+  --color-chart-2: #b87333;
+  --color-chart-3: #c4956a;
+  --color-chart-4: #8b7355;
+  --color-chart-5: #6b5b45;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.025;
+  --display-bg: #281a08;
+  --display-text: #ffb84d;
+  --display-ghost: rgba(255, 184, 77, 0.08);
+  --display-glow: rgba(255, 184, 77, 0.4);
+}
+
+/* ─── Copper ─────────────────────────────────────────────────────────────────
+ * Oxidized metal. Warmer than amber, signal shifted toward red-orange.
+ * The patina palette. Aged brass under workshop light.
+ */
+.theme-copper {
+  --color-background: #0f0b0d;
+  --color-foreground: #e8ddd2;
+  --color-card: #161012;
+  --color-card-foreground: #e8ddd2;
+  --color-popover: #161012;
+  --color-popover-foreground: #e8ddd2;
+  --color-primary: #c67a4b;
+  --color-primary-foreground: #0f0b0d;
+  --color-secondary: #201a1c;
+  --color-secondary-foreground: #e8ddd2;
+  --color-muted: #1c1618;
+  --color-muted-foreground: #8b7d72;
+  --color-accent: #201a1c;
+  --color-accent-foreground: #e8ddd2;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #e8ddd2;
+  --color-success: #4ab077;
+  --color-success-foreground: #0f0b0d;
+  --color-warning: #e08a3c;
+  --color-warning-foreground: #0f0b0d;
+  --color-info: #5b96be;
+  --color-info-foreground: #0f0b0d;
+  --color-border: #2c2428;
+  --color-input: #2c2428;
+  --color-ring: #c67a4b;
+  --color-sidebar: #120e10;
+  --color-sidebar-foreground: #e8ddd2;
+  --color-sidebar-primary: #c67a4b;
+  --color-sidebar-primary-foreground: #0f0b0d;
+  --color-sidebar-border: #2c2428;
+  --color-sidebar-accent: #201a1c;
+  --color-sidebar-accent-foreground: #e8ddd2;
+  --color-sidebar-ring: #c67a4b;
+  --color-chart-1: #c67a4b;
+  --color-chart-2: #a85a30;
+  --color-chart-3: #d4956a;
+  --color-chart-4: #8b6545;
+  --color-chart-5: #6b4f35;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.025;
+  --display-bg: #2a1408;
+  --display-text: #ff8f5c;
+  --display-ghost: rgba(255, 143, 92, 0.08);
+  --display-glow: rgba(255, 143, 92, 0.4);
+}
+
+/* ─── Midnight ───────────────────────────────────────────────────────────────
+ * Cool instrument panel. Blue-shifted surfaces, teal signal, silver text.
+ * The submarine control room.
+ */
+.theme-midnight {
+  --color-background: #0a0d12;
+  --color-foreground: #d6dce4;
+  --color-card: #0f1318;
+  --color-card-foreground: #d6dce4;
+  --color-popover: #0f1318;
+  --color-popover-foreground: #d6dce4;
+  --color-primary: #5ba8c4;
+  --color-primary-foreground: #0a0d12;
+  --color-secondary: #181e26;
+  --color-secondary-foreground: #d6dce4;
+  --color-muted: #141a22;
+  --color-muted-foreground: #707e8b;
+  --color-accent: #181e26;
+  --color-accent-foreground: #d6dce4;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #d6dce4;
+  --color-success: #46b88c;
+  --color-success-foreground: #0a0d12;
+  --color-warning: #d9a144;
+  --color-warning-foreground: #0a0d12;
+  --color-info: #6bb0d8;
+  --color-info-foreground: #0a0d12;
+  --color-border: #1e2430;
+  --color-input: #1e2430;
+  --color-ring: #5ba8c4;
+  --color-sidebar: #080b0f;
+  --color-sidebar-foreground: #d6dce4;
+  --color-sidebar-primary: #5ba8c4;
+  --color-sidebar-primary-foreground: #0a0d12;
+  --color-sidebar-border: #1e2430;
+  --color-sidebar-accent: #181e26;
+  --color-sidebar-accent-foreground: #d6dce4;
+  --color-sidebar-ring: #5ba8c4;
+  --color-chart-1: #5ba8c4;
+  --color-chart-2: #4088a8;
+  --color-chart-3: #78c0d8;
+  --color-chart-4: #3a7090;
+  --color-chart-5: #2a5570;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.022;
+  --display-bg: #0a1f28;
+  --display-text: #7fd4ec;
+  --display-ghost: rgba(127, 212, 236, 0.08);
+  --display-glow: rgba(127, 212, 236, 0.4);
+}
+
+/* ─── Rose Gold ──────────────────────────────────────────────────────────────
+ * Warm but shifted toward pink. Soft metallic pink-gold signal.
+ * Luxury instrument. Expensive, not military.
+ */
+.theme-rose-gold {
+  --color-background: #0e0b10;
+  --color-foreground: #e4ddd6;
+  --color-card: #151118;
+  --color-card-foreground: #e4ddd6;
+  --color-popover: #151118;
+  --color-popover-foreground: #e4ddd6;
+  --color-primary: #c4887a;
+  --color-primary-foreground: #0e0b10;
+  --color-secondary: #201a22;
+  --color-secondary-foreground: #e4ddd6;
+  --color-muted: #1c161e;
+  --color-muted-foreground: #8b7e82;
+  --color-accent: #201a22;
+  --color-accent-foreground: #e4ddd6;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #e4ddd6;
+  --color-success: #4cb782;
+  --color-success-foreground: #0e0b10;
+  --color-warning: #dd9a40;
+  --color-warning-foreground: #0e0b10;
+  --color-info: #5b9dc4;
+  --color-info-foreground: #0e0b10;
+  --color-border: #2a2432;
+  --color-input: #2a2432;
+  --color-ring: #c4887a;
+  --color-sidebar: #0c0a0e;
+  --color-sidebar-foreground: #e4ddd6;
+  --color-sidebar-primary: #c4887a;
+  --color-sidebar-primary-foreground: #0e0b10;
+  --color-sidebar-border: #2a2432;
+  --color-sidebar-accent: #201a22;
+  --color-sidebar-accent-foreground: #e4ddd6;
+  --color-sidebar-ring: #c4887a;
+  --color-chart-1: #c4887a;
+  --color-chart-2: #a86e60;
+  --color-chart-3: #d4a090;
+  --color-chart-4: #8b6558;
+  --color-chart-5: #6b5048;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.025;
+  --display-bg: #2a1418;
+  --display-text: #ffa898;
+  --display-ghost: rgba(255, 168, 152, 0.08);
+  --display-glow: rgba(255, 168, 152, 0.4);
+}
+
+/* ─── Jade ───────────────────────────────────────────────────────────────────
+ * Cool surfaces with a warm green signal.
+ * The plant in the server room. Organic signal, inorganic surface.
+ */
+.theme-jade {
+  --color-background: #0b0c10;
+  --color-foreground: #d8ddd8;
+  --color-card: #101316;
+  --color-card-foreground: #d8ddd8;
+  --color-popover: #101316;
+  --color-popover-foreground: #d8ddd8;
+  --color-primary: #53b88a;
+  --color-primary-foreground: #0b0c10;
+  --color-secondary: #182020;
+  --color-secondary-foreground: #d8ddd8;
+  --color-muted: #141a1a;
+  --color-muted-foreground: #6e8b7a;
+  --color-accent: #182020;
+  --color-accent-foreground: #d8ddd8;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #d8ddd8;
+  /* success ≠ primary here: brighter and cooler than the jade signal */
+  --color-success: #43c184;
+  --color-success-foreground: #0b0c10;
+  --color-warning: #dfa040;
+  --color-warning-foreground: #0b0c10;
+  --color-info: #5b9dc4;
+  --color-info-foreground: #0b0c10;
+  --color-border: #222a2a;
+  --color-input: #222a2a;
+  --color-ring: #53b88a;
+  --color-sidebar: #090a0e;
+  --color-sidebar-foreground: #d8ddd8;
+  --color-sidebar-primary: #53b88a;
+  --color-sidebar-primary-foreground: #0b0c10;
+  --color-sidebar-border: #222a2a;
+  --color-sidebar-accent: #182020;
+  --color-sidebar-accent-foreground: #d8ddd8;
+  --color-sidebar-ring: #53b88a;
+  --color-chart-1: #53b88a;
+  --color-chart-2: #3a9870;
+  --color-chart-3: #70d0a0;
+  --color-chart-4: #2a7858;
+  --color-chart-5: #1e5a42;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.022;
+  --display-bg: #0a2418;
+  --display-text: #5cffa8;
+  --display-ghost: rgba(92, 255, 168, 0.08);
+  --display-glow: rgba(92, 255, 168, 0.4);
+}
+
+/* ─── Bone ───────────────────────────────────────────────────────────────────
+ * Warm surfaces pushed toward brown. Very low signal chroma.
+ * Aged paper, old instruments, museum lighting. Quietest variant.
+ */
+.theme-bone {
+  --color-background: #0f0d0b;
+  --color-foreground: #e8e0d0;
+  --color-card: #161410;
+  --color-card-foreground: #e8e0d0;
+  --color-popover: #161410;
+  --color-popover-foreground: #e8e0d0;
+  --color-primary: #a89878;
+  --color-primary-foreground: #0f0d0b;
+  --color-secondary: #201e1a;
+  --color-secondary-foreground: #e8e0d0;
+  --color-muted: #1a1816;
+  --color-muted-foreground: #8b8570;
+  --color-accent: #201e1a;
+  --color-accent-foreground: #e8e0d0;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #e8e0d0;
+  /* Bone is the quiet theme — status colors drop chroma to match */
+  --color-success: #6fae88;
+  --color-success-foreground: #0f0d0b;
+  --color-warning: #cf9a4a;
+  --color-warning-foreground: #0f0d0b;
+  --color-info: #7f9cb0;
+  --color-info-foreground: #0f0d0b;
+  --color-border: #2a2822;
+  --color-input: #2a2822;
+  --color-ring: #a89878;
+  --color-sidebar: #0d0c0a;
+  --color-sidebar-foreground: #e8e0d0;
+  --color-sidebar-primary: #a89878;
+  --color-sidebar-primary-foreground: #0f0d0b;
+  --color-sidebar-border: #2a2822;
+  --color-sidebar-accent: #201e1a;
+  --color-sidebar-accent-foreground: #e8e0d0;
+  --color-sidebar-ring: #a89878;
+  --color-chart-1: #a89878;
+  --color-chart-2: #907e60;
+  --color-chart-3: #baa888;
+  --color-chart-4: #786850;
+  --color-chart-5: #605040;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.028;
+  --display-bg: #201c14;
+  --display-text: #e8dcc0;
+  --display-ghost: rgba(232, 220, 192, 0.08);
+  --display-glow: rgba(232, 220, 192, 0.4);
+}
+
+/* ─── Ultraviolet ────────────────────────────────────────────────────────────
+ * Purple corridor taken to its logical extreme.
+ * Surfaces lean violet. Signal stays amber. Neon in fog.
+ */
+.theme-ultraviolet {
+  --color-background: #0e0a12;
+  --color-foreground: #e2dade;
+  --color-card: #141018;
+  --color-card-foreground: #e2dade;
+  --color-popover: #141018;
+  --color-popover-foreground: #e2dade;
+  --color-primary: #d4aa48;
+  --color-primary-foreground: #0e0a12;
+  --color-secondary: #201a28;
+  --color-secondary-foreground: #e2dade;
+  --color-muted: #1a1420;
+  --color-muted-foreground: #8b7e90;
+  --color-accent: #201a28;
+  --color-accent-foreground: #e2dade;
+  --color-destructive: #e5484d;
+  --color-destructive-foreground: #e2dade;
+  --color-success: #4cb782;
+  --color-success-foreground: #0e0a12;
+  --color-warning: #e09a3c;
+  --color-warning-foreground: #0e0a12;
+  --color-info: #6b9fd4;
+  --color-info-foreground: #0e0a12;
+  --color-border: #2e2436;
+  --color-input: #2e2436;
+  --color-ring: #d4aa48;
+  --color-sidebar: #0c0810;
+  --color-sidebar-foreground: #e2dade;
+  --color-sidebar-primary: #d4aa48;
+  --color-sidebar-primary-foreground: #0e0a12;
+  --color-sidebar-border: #2e2436;
+  --color-sidebar-accent: #201a28;
+  --color-sidebar-accent-foreground: #e2dade;
+  --color-sidebar-ring: #d4aa48;
+  --color-chart-1: #d4aa48;
+  --color-chart-2: #b08a30;
+  --color-chart-3: #e4c068;
+  --color-chart-4: #907228;
+  --color-chart-5: #705820;
+  --color-chart-err: #e5484d;
+  --grain-opacity: 0.028;
+  --display-bg: #241428;
+  --display-text: #ffcf5c;
+  --display-ghost: rgba(255, 207, 92, 0.08);
+  --display-glow: rgba(255, 207, 92, 0.4);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * LIGHT MODE — per-envelope surface inversions.
+ *
+ * Each block overrides ONLY the surface stack + signal-contrast for its
+ * envelope; everything not listed (display/CRT phosphor tokens especially — a
+ * lit instrument screen stays dark in any room) inherits from the dark block on
+ * the same element (`<html class="theme-x light">` carries both classes).
+ *
+ * The recipe, held constant across all 7 envelopes:
+ *   - Surface ladder inverts: near-black → paper (background), with cards/
+ *     popovers a step lighter (raised, near-white) and secondary/accent/muted a
+ *     step darker (filled chips) — mirroring the dark ladder's elevation logic.
+ *   - Paper keeps the envelope's temperature (amber→warm cream, midnight→cool
+ *     paper, jade→faint green-white, ultraviolet→lavender, …).
+ *   - Ink (foreground) flips light-on-dark → dark-on-light, tinted to match.
+ *   - Signal (primary/ring) stays the envelope's hue but DARKENS/saturates so it
+ *     clears WCAG contrast as text/fill on paper (a signal that pops on near-
+ *     black fails on cream). destructive/success/warning/info likewise re-tuned.
+ *   - Charts darken to a legible-on-light ramp. Grain drops slightly (dark
+ *     grains read louder on light).
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+.light {
+  color-scheme: light;
+}
+
+/* ─── Amber · light ─── warm cream paper, deep amber signal */
+.theme-amber.light {
+  --color-background: #f0e9db;
+  --color-foreground: #221e16;
+  --color-card: #faf6ec;
+  --color-card-foreground: #221e16;
+  --color-popover: #faf6ec;
+  --color-popover-foreground: #221e16;
+  --color-primary: #8a5f0f;
+  --color-primary-foreground: #faf6ec;
+  --color-secondary: #e6ddca;
+  --color-secondary-foreground: #221e16;
+  --color-muted: #ebe3d2;
+  --color-muted-foreground: #6f6653;
+  --color-accent: #e6ddca;
+  --color-accent-foreground: #221e16;
+  --color-destructive: #c5303a;
+  --color-destructive-foreground: #faf6ec;
+  --color-success: #2e8a5c;
+  --color-success-foreground: #faf6ec;
+  --color-warning: #9a6410;
+  --color-warning-foreground: #faf6ec;
+  --color-info: #2f6f97;
+  --color-info-foreground: #faf6ec;
+  --color-border: #d8cdb4;
+  --color-input: #d8cdb4;
+  --color-ring: #8a5f0f;
+  --color-sidebar: #ede6d6;
+  --color-sidebar-foreground: #221e16;
+  --color-sidebar-primary: #8a5f0f;
+  --color-sidebar-primary-foreground: #faf6ec;
+  --color-sidebar-border: #d8cdb4;
+  --color-sidebar-accent: #e6ddca;
+  --color-sidebar-accent-foreground: #221e16;
+  --color-sidebar-ring: #8a5f0f;
+  --color-chart-1: #8a5f0f;
+  --color-chart-2: #b06a2a;
+  --color-chart-3: #7c5a2c;
+  --color-chart-4: #c1913f;
+  --color-chart-5: #5c4a2a;
+  --color-chart-err: #c5303a;
+  --grain-opacity: 0.02;
+}
+
+/* ─── Copper · light ─── warm patina paper, red-orange signal */
+.theme-copper.light {
+  --color-background: #f1e8e1;
+  --color-foreground: #241c17;
+  --color-card: #fbf4ef;
+  --color-card-foreground: #241c17;
+  --color-popover: #fbf4ef;
+  --color-popover-foreground: #241c17;
+  --color-primary: #9c4d26;
+  --color-primary-foreground: #fbf4ef;
+  --color-secondary: #e8dbd1;
+  --color-secondary-foreground: #241c17;
+  --color-muted: #ece1d9;
+  --color-muted-foreground: #74655c;
+  --color-accent: #e8dbd1;
+  --color-accent-foreground: #241c17;
+  --color-destructive: #c5303a;
+  --color-destructive-foreground: #fbf4ef;
+  --color-success: #2e8a5c;
+  --color-success-foreground: #fbf4ef;
+  --color-warning: #9a5c1e;
+  --color-warning-foreground: #fbf4ef;
+  --color-info: #2f6a94;
+  --color-info-foreground: #fbf4ef;
+  --color-border: #dbccc2;
+  --color-input: #dbccc2;
+  --color-ring: #9c4d26;
+  --color-sidebar: #eee4dc;
+  --color-sidebar-foreground: #241c17;
+  --color-sidebar-primary: #9c4d26;
+  --color-sidebar-primary-foreground: #fbf4ef;
+  --color-sidebar-border: #dbccc2;
+  --color-sidebar-accent: #e8dbd1;
+  --color-sidebar-accent-foreground: #241c17;
+  --color-sidebar-ring: #9c4d26;
+  --color-chart-1: #9c4d26;
+  --color-chart-2: #7f3f1e;
+  --color-chart-3: #c07440;
+  --color-chart-4: #6f4a30;
+  --color-chart-5: #a8825c;
+  --color-chart-err: #c5303a;
+  --grain-opacity: 0.02;
+}
+
+/* ─── Midnight · light ─── cool blue-grey paper, deep teal signal */
+.theme-midnight.light {
+  --color-background: #e7ecf2;
+  --color-foreground: #161c24;
+  --color-card: #f5f8fc;
+  --color-card-foreground: #161c24;
+  --color-popover: #f5f8fc;
+  --color-popover-foreground: #161c24;
+  --color-primary: #1a657f;
+  --color-primary-foreground: #f5f8fc;
+  --color-secondary: #dbe3ec;
+  --color-secondary-foreground: #161c24;
+  --color-muted: #e0e7ef;
+  --color-muted-foreground: #5a6470;
+  --color-accent: #dbe3ec;
+  --color-accent-foreground: #161c24;
+  --color-destructive: #c5303a;
+  --color-destructive-foreground: #f5f8fc;
+  --color-success: #1f8a66;
+  --color-success-foreground: #f5f8fc;
+  --color-warning: #92661c;
+  --color-warning-foreground: #f5f8fc;
+  --color-info: #2f6f97;
+  --color-info-foreground: #f5f8fc;
+  --color-border: #c8d2de;
+  --color-input: #c8d2de;
+  --color-ring: #1a657f;
+  --color-sidebar: #e2e8f0;
+  --color-sidebar-foreground: #161c24;
+  --color-sidebar-primary: #1a657f;
+  --color-sidebar-primary-foreground: #f5f8fc;
+  --color-sidebar-border: #c8d2de;
+  --color-sidebar-accent: #dbe3ec;
+  --color-sidebar-accent-foreground: #161c24;
+  --color-sidebar-ring: #1a657f;
+  --color-chart-1: #1a657f;
+  --color-chart-2: #14536a;
+  --color-chart-3: #3a8db0;
+  --color-chart-4: #0f3f52;
+  --color-chart-5: #5a90a8;
+  --color-chart-err: #c5303a;
+  --grain-opacity: 0.018;
+}
+
+/* ─── Rose Gold · light ─── soft pink paper, muted rose signal */
+.theme-rose-gold.light {
+  --color-background: #f3e9ec;
+  --color-foreground: #241a1e;
+  --color-card: #fcf4f6;
+  --color-card-foreground: #241a1e;
+  --color-popover: #fcf4f6;
+  --color-popover-foreground: #241a1e;
+  --color-primary: #9c4f43;
+  --color-primary-foreground: #fcf4f6;
+  --color-secondary: #ebdbe0;
+  --color-secondary-foreground: #241a1e;
+  --color-muted: #eee1e5;
+  --color-muted-foreground: #74636a;
+  --color-accent: #ebdbe0;
+  --color-accent-foreground: #241a1e;
+  --color-destructive: #c5303a;
+  --color-destructive-foreground: #fcf4f6;
+  --color-success: #2e8a5c;
+  --color-success-foreground: #fcf4f6;
+  --color-warning: #9a6122;
+  --color-warning-foreground: #fcf4f6;
+  --color-info: #2f6a94;
+  --color-info-foreground: #fcf4f6;
+  --color-border: #dccbd1;
+  --color-input: #dccbd1;
+  --color-ring: #9c4f43;
+  --color-sidebar: #efe4e8;
+  --color-sidebar-foreground: #241a1e;
+  --color-sidebar-primary: #9c4f43;
+  --color-sidebar-primary-foreground: #fcf4f6;
+  --color-sidebar-border: #dccbd1;
+  --color-sidebar-accent: #ebdbe0;
+  --color-sidebar-accent-foreground: #241a1e;
+  --color-sidebar-ring: #9c4f43;
+  --color-chart-1: #9c4f43;
+  --color-chart-2: #7f3d33;
+  --color-chart-3: #c07868;
+  --color-chart-4: #6f4038;
+  --color-chart-5: #a88078;
+  --color-chart-err: #c5303a;
+  --grain-opacity: 0.02;
+}
+
+/* ─── Jade · light ─── faint green-white paper, deep green signal */
+.theme-jade.light {
+  --color-background: #e8efe9;
+  --color-foreground: #16211a;
+  --color-card: #f4faf6;
+  --color-card-foreground: #16211a;
+  --color-popover: #f4faf6;
+  --color-popover-foreground: #16211a;
+  --color-primary: #177249;
+  --color-primary-foreground: #f4faf6;
+  --color-secondary: #dbe6de;
+  --color-secondary-foreground: #16211a;
+  --color-muted: #e0e9e3;
+  --color-muted-foreground: #566458;
+  --color-accent: #dbe6de;
+  --color-accent-foreground: #16211a;
+  --color-destructive: #c5303a;
+  --color-destructive-foreground: #f4faf6;
+  /* success ≠ primary here: brighter/cooler than the jade signal, as in dark */
+  --color-success: #17925f;
+  --color-success-foreground: #f4faf6;
+  --color-warning: #92661c;
+  --color-warning-foreground: #f4faf6;
+  --color-info: #2f6f97;
+  --color-info-foreground: #f4faf6;
+  --color-border: #c8d6cc;
+  --color-input: #c8d6cc;
+  --color-ring: #177249;
+  --color-sidebar: #e2ece5;
+  --color-sidebar-foreground: #16211a;
+  --color-sidebar-primary: #177249;
+  --color-sidebar-primary-foreground: #f4faf6;
+  --color-sidebar-border: #c8d6cc;
+  --color-sidebar-accent: #dbe6de;
+  --color-sidebar-accent-foreground: #16211a;
+  --color-sidebar-ring: #177249;
+  --color-chart-1: #177249;
+  --color-chart-2: #146a46;
+  --color-chart-3: #3aa878;
+  --color-chart-4: #0f4f34;
+  --color-chart-5: #5a9878;
+  --color-chart-err: #c5303a;
+  --grain-opacity: 0.018;
+}
+
+/* ─── Bone · light ─── aged-paper cream, quiet taupe signal (low chroma) */
+.theme-bone.light {
+  --color-background: #f1ede3;
+  --color-foreground: #201d16;
+  --color-card: #faf7ef;
+  --color-card-foreground: #201d16;
+  --color-popover: #faf7ef;
+  --color-popover-foreground: #201d16;
+  --color-primary: #675b42;
+  --color-primary-foreground: #faf7ef;
+  --color-secondary: #e7e1d4;
+  --color-secondary-foreground: #201d16;
+  --color-muted: #ebe6db;
+  --color-muted-foreground: #6b6454;
+  --color-accent: #e7e1d4;
+  --color-accent-foreground: #201d16;
+  /* Bone is the quiet theme — status colors drop chroma to match */
+  --color-destructive: #b83e42;
+  --color-destructive-foreground: #faf7ef;
+  --color-success: #3f7d5c;
+  --color-success-foreground: #faf7ef;
+  --color-warning: #8a6a26;
+  --color-warning-foreground: #faf7ef;
+  --color-info: #566f80;
+  --color-info-foreground: #faf7ef;
+  --color-border: #d8d1c2;
+  --color-input: #d8d1c2;
+  --color-ring: #675b42;
+  --color-sidebar: #ede9df;
+  --color-sidebar-foreground: #201d16;
+  --color-sidebar-primary: #675b42;
+  --color-sidebar-primary-foreground: #faf7ef;
+  --color-sidebar-border: #d8d1c2;
+  --color-sidebar-accent: #e7e1d4;
+  --color-sidebar-accent-foreground: #201d16;
+  --color-sidebar-ring: #675b42;
+  --color-chart-1: #675b42;
+  --color-chart-2: #524731;
+  --color-chart-3: #8a7a5c;
+  --color-chart-4: #3e3626;
+  --color-chart-5: #a0937a;
+  --color-chart-err: #b83e42;
+  --grain-opacity: 0.022;
+}
+
+/* ─── Ultraviolet · light ─── lavender paper, amber signal held loud */
+.theme-ultraviolet.light {
+  --color-background: #ece7f3;
+  --color-foreground: #1e1826;
+  --color-card: #f7f3fc;
+  --color-card-foreground: #1e1826;
+  --color-popover: #f7f3fc;
+  --color-popover-foreground: #1e1826;
+  --color-primary: #7f5c10;
+  --color-primary-foreground: #f7f3fc;
+  --color-secondary: #e2dbee;
+  --color-secondary-foreground: #1e1826;
+  --color-muted: #e7e1f0;
+  --color-muted-foreground: #665e72;
+  --color-accent: #e2dbee;
+  --color-accent-foreground: #1e1826;
+  --color-destructive: #c5303a;
+  --color-destructive-foreground: #f7f3fc;
+  --color-success: #2e8a5c;
+  --color-success-foreground: #f7f3fc;
+  --color-warning: #9a6410;
+  --color-warning-foreground: #f7f3fc;
+  --color-info: #3a55a0;
+  --color-info-foreground: #f7f3fc;
+  --color-border: #d2cae0;
+  --color-input: #d2cae0;
+  --color-ring: #7f5c10;
+  --color-sidebar: #e7e1f0;
+  --color-sidebar-foreground: #1e1826;
+  --color-sidebar-primary: #7f5c10;
+  --color-sidebar-primary-foreground: #f7f3fc;
+  --color-sidebar-border: #d2cae0;
+  --color-sidebar-accent: #e2dbee;
+  --color-sidebar-accent-foreground: #1e1826;
+  --color-sidebar-ring: #7f5c10;
+  --color-chart-1: #7f5c10;
+  --color-chart-2: #6a4fb0;
+  --color-chart-3: #b06a2a;
+  --color-chart-4: #4a3a80;
+  --color-chart-5: #7c5a2c;
+  --color-chart-err: #c5303a;
+  --grain-opacity: 0.022;
+}

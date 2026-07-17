@@ -1,0 +1,97 @@
+{
+  "kind": "compress",
+  "spec": "\u00a77.3",
+  "description": "Three flexible items on-grid (per section 2.5 all authored values are quantum multiples): a{basis 9,flex 1}, b{basis 9,flex 2}, c{basis 12,flex 1}, all min 3, quantum 3 floor. Basis span 30, target 22, deficit 8. Weights flex*basis: a 9, b 18, c 12 (sum 39). Continuous: a 9-1.846=7.154, b 9-3.692=5.308, c 12-2.462=9.538 (no floor hit). Quantize floor: a 6, b 3, c 9 = 18. Residual 22-18=4 -> one whole quantum (3) back by largest remainder (a 1.154, b 2.308, c 0.538) -> b gets it: a 6, b 6, c 9 = 21, 1s slack, underflow ok. Adjudicated 2026-07-01: previous version authored basis 10 on quantum 3 (invalid per 2.5) and the engine had exempted off-quantum-value from compress validation to tolerate it; fixture fixed, exemption removed - spec wins over corpus.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 9,
+          "min": 3,
+          "flex": 1,
+          "quantum": {
+            "unit": 3,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 9,
+          "min": 3,
+          "flex": 2,
+          "quantum": {
+            "unit": 3,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "c",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "b"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 12,
+          "min": 3,
+          "flex": 1,
+          "quantum": {
+            "unit": 3,
+            "mode": "floor"
+          }
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "root",
+    "targetSpan": 22
+  },
+  "expect": {
+    "ok": true,
+    "durations": {
+      "a": 6,
+      "b": 6,
+      "c": 9
+    },
+    "offsets": {}
+  }
+}

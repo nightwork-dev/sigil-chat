@@ -1,0 +1,36 @@
+{
+  "kind": "resolve",
+  "spec": "§7.2, §4.3",
+  "description": "After the auto container's inner flexible child is hand-compressed to 10s, the auto wrapper derives a 10s window and no longer conflicts with the fixed 10s parent.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "auto",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 20, "min": 5, "flex": 1 },
+        "boundsMode": "auto",
+        "children": [
+          {
+            "kind": "vector",
+            "id": "inner-flex",
+            "alignment": { "kind": "startOfParent" },
+            "offset": { "duration": 0, "direction": "after" },
+            "duration": { "basis": 10, "flex": 1 },
+            "boundsMode": "fixed",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "currentValues": { "wallClock": 0 },
+  "expect": { "nodes": { "auto": { "resolvedStart": 0, "resolvedEnd": 10, "boundsStatus": "bounded" } } }
+}

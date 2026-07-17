@@ -1,0 +1,36 @@
+{
+  "kind": "trim",
+  "spec": "§8",
+  "description": "When b resolves to [51,61], nearest trim on a 10-unit absolute grid snaps its absolute edges to [50,60] and writes that back as offset 7 relative to a.end=43 plus duration 10.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 33,
+    "end": 100,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": 10,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": { "kind": "endOf", "siblingId": "a" },
+        "offset": { "duration": 8, "direction": "after" },
+        "duration": 10,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "currentValues": { "wallClock": 0 },
+  "op": { "nodeId": "b", "grid": { "unit": 10, "mode": "nearest", "origin": 0 }, "policy": "nearest" },
+  "expect": { "nodes": { "b": { "resolvedStart": 50, "resolvedEnd": 60 } } }
+}

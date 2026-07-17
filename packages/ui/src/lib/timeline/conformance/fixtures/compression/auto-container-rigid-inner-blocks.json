@@ -1,0 +1,36 @@
+{
+  "kind": "compress",
+  "spec": "§7.2, §7.3",
+  "description": "Compressing a parent with an auto child recurses into the auto child's contents. A rigid 20s inner child is the real blocker for a 10s target; the auto wrapper's authored duration/min is not adjusted as a scalar.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "auto",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 20, "min": 5, "flex": 1 },
+        "boundsMode": "auto",
+        "children": [
+          {
+            "kind": "vector",
+            "id": "inner-rigid",
+            "alignment": { "kind": "startOfParent" },
+            "offset": { "duration": 0, "direction": "after" },
+            "duration": 20,
+            "boundsMode": "fixed",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "op": { "nodeId": "root", "targetSpan": 10 },
+  "expect": { "ok": false, "deficit": 10, "blockers": ["inner-rigid"] }
+}

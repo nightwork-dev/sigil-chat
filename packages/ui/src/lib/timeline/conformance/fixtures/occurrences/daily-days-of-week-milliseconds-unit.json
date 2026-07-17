@@ -1,0 +1,27 @@
+{
+  "kind": "instances",
+  "spec": "§1.8, §5.1, §5.3, §10",
+  "description": "daysOfWeek filtering must read millisecond epoch values as milliseconds. 345600000 ms = Mon Jan 5 1970 UTC (day 1); if misread as seconds it becomes Sun Dec 14 1980 (day 0), so daysOfWeek [1] would reject index 0 and fail loudly. Daily ms starts over count 7 are 345600000 + index*86400000; only index 0 is Monday in the correct UTC calendar.",
+  "tree": {
+    "kind": "absolute",
+    "id": "monday-ms",
+    "start": 345600000,
+    "end": 349200000,
+    "timeContext": { "kind": "wallClock", "unit": "milliseconds" },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "interval": 1,
+      "count": 7,
+      "daysOfWeek": [1]
+    },
+    "children": []
+  },
+  "currentValues": { "wallClock": 345600000 },
+  "op": { "rangeStart": 345600000, "rangeEnd": 950400000 },
+  "expect": {
+    "instances": [
+      { "scheduleId": "monday-ms", "occurrenceIndex": 0, "resolvedStart": 345600000, "resolvedEnd": 349200000 }
+    ]
+  }
+}

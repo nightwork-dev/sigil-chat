@@ -1,0 +1,93 @@
+{
+  "kind": "instances",
+  "spec": "\u00a75.1, \u00a75.3",
+  "description": "Daily recurrence from start 0 with count 10 generates raw starts 0,86400,...,777600. excludeValues removes starts 86400(index1),259200(index3),604800(index7). Full-span query returns the seven remaining instances with original indices 0,2,4,5,6,8,9.",
+  "tree": {
+    "kind": "absolute",
+    "id": "daily",
+    "start": 0,
+    "end": 100,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "interval": 1,
+      "count": 10,
+      "excludeValues": [
+        86400,
+        259200,
+        604800
+      ]
+    },
+    "children": []
+  },
+  "currentValues": {
+    "wallClock": 0
+  },
+  "op": {
+    "rangeStart": 0,
+    "rangeEnd": 864000
+  },
+  "expect": {
+    "instances": [
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 0,
+        "resolvedStart": 0,
+        "resolvedEnd": 100,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 2,
+        "resolvedStart": 172800,
+        "resolvedEnd": 172900,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 4,
+        "resolvedStart": 345600,
+        "resolvedEnd": 345700,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 5,
+        "resolvedStart": 432000,
+        "resolvedEnd": 432100,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 6,
+        "resolvedStart": 518400,
+        "resolvedEnd": 518500,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 8,
+        "resolvedStart": 691200,
+        "resolvedEnd": 691300,
+        "isModified": false,
+        "cancelled": false
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 9,
+        "resolvedStart": 777600,
+        "resolvedEnd": 777700,
+        "isModified": false,
+        "cancelled": false
+      }
+    ]
+  }
+}

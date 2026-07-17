@@ -1,0 +1,79 @@
+{
+  "kind": "feasibility",
+  "spec": "\u00a77.5",
+  "description": "Forward chain floors: f1 20h + f2 10h = 30h = 108000. End-anchored before-chain floors: e1 10h = 36000. Parallel branches may overlap, so minimalWindow is max(108000,36000)=108000, not sum 144000.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "f1",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 72000,
+          "min": 72000,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "f2",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "f1"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 36000,
+          "min": 36000,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "e1",
+        "alignment": {
+          "kind": "endOfParent"
+        },
+        "offset": {
+          "basis": 36000,
+          "direction": "before",
+          "flex": 0
+        },
+        "duration": {
+          "basis": 36000,
+          "min": 36000,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 200000
+  },
+  "op": {
+    "nodeId": "root"
+  },
+  "expect": {
+    "minimalWindow": 108000
+  }
+}

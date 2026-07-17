@@ -1,0 +1,36 @@
+{
+  "kind": "trim",
+  "spec": "\u00a78",
+  "description": "Expand floors start and ceils end on Monday week grid origin 345600, unit 604800. [400000,900000] touches the week cell [345600,950400], so expands to [345600,950400].",
+  "tree": {
+    "kind": "absolute",
+    "id": "trim-root",
+    "start": 400000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [],
+    "end": 900000
+  },
+  "currentValues": {
+    "wallClock": 500000
+  },
+  "op": {
+    "nodeId": "trim-root",
+    "grid": {
+      "unit": 604800,
+      "mode": "floor",
+      "origin": 345600
+    },
+    "policy": "expand"
+  },
+  "expect": {
+    "nodes": {
+      "trim-root": {
+        "resolvedStart": 345600,
+        "resolvedEnd": 950400
+      }
+    }
+  }
+}

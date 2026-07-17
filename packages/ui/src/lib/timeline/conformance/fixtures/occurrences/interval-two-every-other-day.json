@@ -1,0 +1,50 @@
+{
+  "kind": "instances",
+  "spec": "\u00a75.1, \u00a75.3",
+  "description": "Daily interval 2 steps by 2*86400=172800 seconds. Count 3 raw starts are 0,172800,345600; query returns all three.",
+  "tree": {
+    "kind": "absolute",
+    "id": "daily",
+    "start": 0,
+    "end": 100,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "recurrence": {
+      "frequency": "daily",
+      "interval": 2,
+      "count": 3
+    },
+    "children": []
+  },
+  "currentValues": {
+    "wallClock": 0
+  },
+  "op": {
+    "rangeStart": 0,
+    "rangeEnd": 400000
+  },
+  "expect": {
+    "instances": [
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 0,
+        "resolvedStart": 0,
+        "resolvedEnd": 100
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 1,
+        "resolvedStart": 172800,
+        "resolvedEnd": 172900
+      },
+      {
+        "scheduleId": "daily",
+        "occurrenceIndex": 2,
+        "resolvedStart": 345600,
+        "resolvedEnd": 345700
+      }
+    ]
+  }
+}

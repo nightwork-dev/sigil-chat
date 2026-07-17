@@ -1,0 +1,36 @@
+{
+  "kind": "trim",
+  "spec": "\u00a78",
+  "description": "Week grid origin=345600, unit=604800. Window [400000,900000]. Start distances to grid lines: 400000-345600=54400 vs next 550400 away, nearest floors to 345600. End: previous grid 345600 distance 554400, next grid 950400 distance 50400, nearest ceils to 950400.",
+  "tree": {
+    "kind": "absolute",
+    "id": "trim-root",
+    "start": 400000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [],
+    "end": 900000
+  },
+  "currentValues": {
+    "wallClock": 500000
+  },
+  "op": {
+    "nodeId": "trim-root",
+    "grid": {
+      "unit": 604800,
+      "mode": "nearest",
+      "origin": 345600
+    },
+    "policy": "nearest"
+  },
+  "expect": {
+    "nodes": {
+      "trim-root": {
+        "resolvedStart": 345600,
+        "resolvedEnd": 950400
+      }
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "kind": "validate",
+  "spec": "\u00a72.2",
+  "description": "Sibling A aligns to endOf(B), B aligns to endOf(A), forming an alignment reference cycle. \u00a72.2 requires an alignment-cycle validation error reporting both node ids.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "b"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 100,
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": 100,
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ],
+    "end": 10000
+  },
+  "expect": {
+    "errors": [
+      {
+        "code": "alignment-cycle",
+        "nodeIds": [
+          "a",
+          "b"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "kind": "instances",
+  "spec": "§5.3",
+  "description": "A range beginning exactly at a recurring instance start includes that instance. This is the fixture-level boundary expression of activeInstance's direct resolvedStart <= now < resolvedEnd check; Number.EPSILON is not a usable relative range at unix magnitudes.",
+  "tree": {
+    "kind": "absolute",
+    "id": "daily-root",
+    "start": 1700000000,
+    "end": 1700000100,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "recurrence": { "frequency": "daily", "interval": 1, "count": 2 },
+    "children": []
+  },
+  "currentValues": { "wallClock": 1700000000 },
+  "op": { "rangeStart": 1700000000, "rangeEnd": 1700000001 },
+  "expect": { "instances": [ { "occurrenceIndex": 0, "resolvedStart": 1700000000, "resolvedEnd": 1700000100 } ] }
+}

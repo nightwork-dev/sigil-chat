@@ -1,0 +1,34 @@
+{
+  "capturedAt": "2026-07-17T00:07:21.797Z",
+  "source": "live sigil-chat Eve HTTP session",
+  "sessionId": "wrun_01KXPPC6X4VSS8TX7NHV34NNAW",
+  "continuationToken": "redacted",
+  "finding": "Eve persists the complete packet-prefixed prepared message as message.received.data.message.",
+  "events": [
+    {
+      "type": "message.received",
+      "data": {
+        "message": "# Forked conversation context\n\n### User\nOriginal request\n\n## New branch request\n\nSecond generation request. Reply only TRACE_OK.",
+        "sequence": 0,
+        "turnId": "turn_0"
+      }
+    },
+    {
+      "type": "message.completed",
+      "data": {
+        "finishReason": "stop",
+        "message": "TRACE_OK",
+        "sequence": 0,
+        "stepIndex": 0,
+        "turnId": "turn_0"
+      }
+    },
+    {
+      "type": "turn.completed",
+      "data": {
+        "sequence": 0,
+        "turnId": "turn_0"
+      }
+    }
+  ]
+}

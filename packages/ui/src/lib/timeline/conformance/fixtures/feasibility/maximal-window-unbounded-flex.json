@@ -1,0 +1,58 @@
+{
+  "kind": "feasibility",
+  "spec": "\u00a77.5",
+  "description": "Node a has flex>0 and no max, so the chain has no finite stretch ceiling. \u00a77.5 says maximalWindow is null when any chain member has no max and flex>0.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "auto",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": {
+          "kind": "startOfParent"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 10,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": {
+          "kind": "endOf",
+          "siblingId": "a"
+        },
+        "offset": {
+          "duration": 0,
+          "direction": "after"
+        },
+        "duration": {
+          "basis": 20,
+          "max": 200,
+          "flex": 1
+        },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": {
+    "nodeId": "root"
+  },
+  "expect": {
+    "maximalWindow": null
+  }
+}

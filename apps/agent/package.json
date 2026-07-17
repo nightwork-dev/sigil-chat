@@ -1,0 +1,32 @@
+{
+  "name": "sigil-chat-agent",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "eve build",
+    "dev": "portless sigil-chat-agent eve dev --no-ui --host 127.0.0.1",
+    "start": "eve start --host 127.0.0.1",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gonk/auth": "0.3.1",
+    "@gonk/context": "0.3.1",
+    "@gonk/retrieval": "0.3.1",
+    "@gonk/skills": "0.3.1",
+    "ai": "^7.0.26",
+    "eve": "0.24.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "microsandbox": "^0.6.6",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.6"
+  }
+}

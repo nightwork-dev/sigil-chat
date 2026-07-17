@@ -1,0 +1,36 @@
+{
+  "kind": "trim",
+  "spec": "\u00a78",
+  "description": "Contract ceils start and floors end on week grid origin 345600, unit 604800. [300000,1000000] has start before the Monday line 345600 and end after the next Monday line 950400, so contract snaps inward to [345600,950400].",
+  "tree": {
+    "kind": "absolute",
+    "id": "trim-root",
+    "start": 300000,
+    "timeContext": {
+      "kind": "wallClock"
+    },
+    "boundsMode": "fixed",
+    "children": [],
+    "end": 1000000
+  },
+  "currentValues": {
+    "wallClock": 500000
+  },
+  "op": {
+    "nodeId": "trim-root",
+    "grid": {
+      "unit": 604800,
+      "mode": "ceil",
+      "origin": 345600
+    },
+    "policy": "contract"
+  },
+  "expect": {
+    "nodes": {
+      "trim-root": {
+        "resolvedStart": 345600,
+        "resolvedEnd": 950400
+      }
+    }
+  }
+}

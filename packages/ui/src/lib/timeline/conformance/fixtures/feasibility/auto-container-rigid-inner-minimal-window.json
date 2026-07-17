@@ -1,0 +1,36 @@
+{
+  "kind": "feasibility",
+  "spec": "§7.2, §7.5",
+  "description": "An auto chain member contributes the derived minimal window of its own contents, so the root's minimal window is the rigid inner child's 20s floor, not the wrapper's authored min 5.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "auto",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 20, "min": 5, "flex": 1 },
+        "boundsMode": "auto",
+        "children": [
+          {
+            "kind": "vector",
+            "id": "inner-rigid",
+            "alignment": { "kind": "startOfParent" },
+            "offset": { "duration": 0, "direction": "after" },
+            "duration": 20,
+            "boundsMode": "fixed",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "op": { "nodeId": "root" },
+  "expect": { "minimalWindow": 20 }
+}

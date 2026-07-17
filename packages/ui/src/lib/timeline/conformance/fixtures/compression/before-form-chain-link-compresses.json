@@ -1,0 +1,35 @@
+{
+  "kind": "compress",
+  "spec": "§7.2, §7.3",
+  "description": "Before-form linkage counts as one end-to-start chain: b is aligned startOf(a) with direction before, so b precedes a. Basis span is b offset 5 + b duration 5 + a duration 10 = 20; target 10 freezes a at min 5 and distributes the remaining span to b offset 2.5 and b duration 2.5.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "a",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 10, "min": 5, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      },
+      {
+        "kind": "vector",
+        "id": "b",
+        "alignment": { "kind": "startOf", "siblingId": "a" },
+        "offset": { "basis": 5, "direction": "before", "min": 0, "flex": 1 },
+        "duration": { "basis": 5, "min": 0, "flex": 1 },
+        "boundsMode": "fixed",
+        "children": []
+      }
+    ]
+  },
+  "op": { "nodeId": "root", "targetSpan": 10 },
+  "expect": { "ok": true, "durations": { "a": 5, "b": 2.5 }, "offsets": { "b": 2.5 } }
+}

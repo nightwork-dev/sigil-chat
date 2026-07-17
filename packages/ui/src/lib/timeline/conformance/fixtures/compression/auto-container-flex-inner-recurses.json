@@ -1,0 +1,36 @@
+{
+  "kind": "compress",
+  "spec": "§7.2",
+  "description": "When an auto chain member's contents can compress, compress recurses into those contents and leaves the auto wrapper's authored duration alone. The asserted adjustment is on the inner child.",
+  "tree": {
+    "kind": "absolute",
+    "id": "root",
+    "start": 0,
+    "end": 10,
+    "timeContext": { "kind": "wallClock" },
+    "boundsMode": "fixed",
+    "children": [
+      {
+        "kind": "vector",
+        "id": "auto",
+        "alignment": { "kind": "startOfParent" },
+        "offset": { "duration": 0, "direction": "after" },
+        "duration": { "basis": 20, "min": 5, "flex": 1 },
+        "boundsMode": "auto",
+        "children": [
+          {
+            "kind": "vector",
+            "id": "inner-flex",
+            "alignment": { "kind": "startOfParent" },
+            "offset": { "duration": 0, "direction": "after" },
+            "duration": { "basis": 20, "flex": 1 },
+            "boundsMode": "fixed",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "op": { "nodeId": "root", "targetSpan": 10 },
+  "expect": { "ok": true, "durations": { "auto": 20, "inner-flex": 10 } }
+}
