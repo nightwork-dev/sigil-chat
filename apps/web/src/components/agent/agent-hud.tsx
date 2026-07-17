@@ -2,12 +2,14 @@ import type { ComponentProps, ReactNode } from "react"
 import { BotIcon } from "lucide-react"
 
 import {
-  formatAttentionLabel,
   hasPendingApproval,
   isAgentSessionBusy,
+} from "@zigil/agent-surface"
+import {
+  formatAttentionLabel,
   useAgentRuntimeSession,
   useAttention,
-} from "@niwork/agent"
+} from "@zigil/agent-react"
 import { FloatingDock } from "@workspace/ui/components/floating-dock"
 import { StatusDot } from "@workspace/ui/components/status-dot"
 

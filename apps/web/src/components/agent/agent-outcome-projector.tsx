@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 
-import type { AgentRuntimeSession } from "@niwork/agent"
+import type { AgentRuntimeSession } from "@zigil/agent-surface"
 
 import {
   dispatchAgentClientCommand,

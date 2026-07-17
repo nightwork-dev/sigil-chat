@@ -7,7 +7,7 @@ import {
   createAgentMcpBearerHeaders,
   createAgentWebMcpHandler,
   type AgentMcpAuthorizationPolicy,
-} from "@niwork/agent-gonk";
+} from "@zigil/agent-gonk";
 
 import { authorizeSigilMcpRequest } from "../src/auth.js";
 import { sigilApprovalProvider } from "../src/registry.js";

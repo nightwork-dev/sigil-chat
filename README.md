@@ -27,8 +27,8 @@ tools go in `apps/gonk/src/registry.ts`, not into Eve directly (see below).
 Requires Node 24 and [Portless](https://www.npmjs.com/package/portless)
 (`npm i -g portless`), which turns each service's dev script into a stable
 `.localhost` URL — no per-service port juggling. All other dependencies,
-including the `@gonk/*` and `@niwork/agent*` packages, resolve from the
-public npm registry.
+including the `@gonk/*` and `@zigil/*` packages, resolve from the
+configured npm registries.
 
 ```bash
 pnpm install
@@ -127,7 +127,7 @@ this README only points at:
 - [`building-workspaces.md`](docs/guides/building-workspaces.md) — the
   route/content split, and the two loops that keep a workspace and the agent
   in sync: a tool result becoming a React Query cache update via
-  `@niwork/agent-react-query` domain outcomes, and workspace selection state
+  `@zigil/agent-react-query` domain outcomes, and workspace selection state
   reaching the agent through the attention/context tray.
 - [`trimming-the-template.md`](docs/guides/trimming-the-template.md) — the
   honest boilerplate map: which routes and workspace packages are core,

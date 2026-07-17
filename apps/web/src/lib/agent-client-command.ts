@@ -1,4 +1,4 @@
-import type { AgentDomainOutcome } from "@niwork/agent/outcomes"
+import type { AgentDomainOutcome } from "@zigil/agent-surface"
 
 export const AGENT_CLIENT_COMMAND_EVENT = "sigil:agent-client-command"
 

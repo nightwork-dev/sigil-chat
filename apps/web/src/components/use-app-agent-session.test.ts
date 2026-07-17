@@ -11,8 +11,8 @@ import {
   getTurnContextAttachments,
   resetContextDraftForTests,
   setAttentionItemExcluded,
-  type AgentRuntimeSession,
-} from "@niwork/agent"
+} from "@zigil/agent-react"
+import type { AgentRuntimeSession } from "@zigil/agent-surface"
 
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 

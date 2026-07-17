@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from "react"
 import { useQueryClient, type QueryClient } from "@tanstack/react-query"
 
-import type { AgentDomainOutcome } from "@niwork/agent/outcomes"
+import type { AgentDomainOutcome } from "@zigil/agent-surface"
 import {
   createReactQueryOutcomeDispatcher,
   type AgentOutcomeReconciliationHandler,
-} from "@niwork/agent-react-query"
+} from "@zigil/agent-react-query"
 
 import {
   AGENT_CLIENT_COMMAND_EVENT,

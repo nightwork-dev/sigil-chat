@@ -16,16 +16,18 @@ import type { EveMessageData } from "eve/react"
 import {
   AgentRuntimeSessionProvider,
   AgentThreadControlsProvider,
-  type AgentRuntimeSession,
-  type AgentSendInput,
-  type AgentThreadControls,
-} from "@niwork/agent"
-import { useEveRuntimeSession } from "@niwork/agent-eve"
+} from "@zigil/agent-react"
+import type {
+  AgentRuntimeSession,
+  AgentSendInput,
+  AgentThreadControls,
+} from "@zigil/agent-surface"
+import { useEveRuntimeSession } from "@zigil/agent-eve"
 import {
   addContextAttachment,
   removeTurnContextAttachment,
   setContextDraftScope,
-} from "@niwork/agent/context-draft"
+} from "@zigil/agent-react"
 import {
   Alert,
   AlertDescription,

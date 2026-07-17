@@ -6,11 +6,11 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { EveAgentStoreSnapshot } from "eve/client"
 import type { EveMessageData } from "eve/react"
-import {
-  useAgentRuntimeSession,
-  type AgentRuntimeSession,
-  type AgentTurnResult,
-} from "@niwork/agent"
+import { useAgentRuntimeSession } from "@zigil/agent-react"
+import type {
+  AgentRuntimeSession,
+  AgentTurnResult,
+} from "@zigil/agent-surface"
 
 import { AppAgentSessions } from "./agent-sessions"
 import {
@@ -49,7 +49,7 @@ const harness = vi.hoisted(() => ({
 
 let repository: AgentThreadRepository
 
-vi.mock("@niwork/agent-eve", () => ({
+vi.mock("@zigil/agent-eve", () => ({
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
     harness.eveCallbacks = callbacks
     return {
