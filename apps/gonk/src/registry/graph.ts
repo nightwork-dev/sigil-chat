@@ -70,13 +70,7 @@ export function registerGraphTools(
     hints: readHints,
     handler: async (input) => {
       const reducerRegistry = createBuiltinReducerRegistry();
-      const reducers = input.reducerId
-        ? [reducerRegistry.get(input.reducerId)].filter(
-            (reducer): reducer is Reducer => reducer !== undefined,
-          )
-        : input.query
-          ? reducerRegistry.search(input.query)
-          : reducerRegistry.all();
+      const reducers = selectReducers(reducerRegistry, input);
       return { data: { reducers: reducers.map(describeReducer) } };
     },
   });
@@ -201,15 +195,13 @@ export function registerGraphTools(
       if (input.label === undefined && input.inputValues === undefined) {
         throw new Error("Provide label or inputValues.");
       }
-      const patch = {
-        ...(input.label !== undefined ? { label: input.label } : {}),
-        ...(input.inputValues !== undefined
-          ? { inputValues: input.inputValues }
-          : {}),
-      };
       return {
         data: await repository.apply(
-          { type: "node.update", id: input.id, patch },
+          {
+            type: "node.update",
+            id: input.id,
+            patch: nodePatchFromInput(input),
+          },
           input.expectedRevision,
         ),
       };
@@ -391,6 +383,27 @@ export function registerGraphTools(
   });
 }
 
+function selectReducers(
+  reducerRegistry: ReturnType<typeof createBuiltinReducerRegistry>,
+  input: ReducerCatalogInput,
+): Reducer[] {
+  if (input.reducerId) {
+    const reducer = reducerRegistry.get(input.reducerId);
+    return reducer ? [reducer] : [];
+  }
+  if (input.query) return reducerRegistry.search(input.query);
+  return reducerRegistry.all();
+}
+
+function nodePatchFromInput(
+  input: Pick<UpdateNodeInput, "label" | "inputValues">,
+): Partial<Pick<ReducerNodeDocument, "label" | "inputValues">> {
+  const patch: Partial<Pick<ReducerNodeDocument, "label" | "inputValues">> = {};
+  if (input.label !== undefined) patch.label = input.label;
+  if (input.inputValues !== undefined) patch.inputValues = input.inputValues;
+  return patch;
+}
+
 function compileGraphEditActions(
   actions: GraphEditAction[],
   document: Awaited<ReturnType<GraphRepository["get"]>>,
@@ -433,12 +446,7 @@ function compileGraphEditActions(
         return {
           type: "node.update",
           id: action.id,
-          patch: {
-            ...(action.label !== undefined ? { label: action.label } : {}),
-            ...(action.inputValues !== undefined
-              ? { inputValues: action.inputValues }
-              : {}),
-          },
+          patch: nodePatchFromInput(action),
         };
       case "move-node":
         return { type: "node.move", id: action.id, position: action.position };
