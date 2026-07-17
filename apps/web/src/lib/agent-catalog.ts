@@ -92,10 +92,12 @@ interface EveAgentInfo {
 
 const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<AgentCatalog> => {
-    const origin =
-      process.env.EVE_ORIGIN ?? "http://sigil-chat-agent.localhost:1355";
+    const { joinRuntimeUrl, readRuntimeTopology } = await import(
+      "@workspace/runtime-env/topology"
+    );
+    const origin = readRuntimeTopology(process.env).eveOrigin;
     const response = await fetch(
-      new URL("/eve/v1/info", origin.endsWith("/") ? origin : `${origin}/`),
+      joinRuntimeUrl(origin, "/eve/v1/info"),
       {
         headers: { accept: "application/json" },
         cache: "no-store",

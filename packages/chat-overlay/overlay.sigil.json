@@ -1,0 +1,28 @@
+{
+  "sigilOverlayVersion": 1,
+  "name": "sigil-chat",
+  "displayName": "Sigil Chat",
+  "filesRoot": "files",
+  "compatibility": {
+    "scaffoldProtocol": 1,
+    "template": "sigil-design"
+  },
+  "replacements": [
+    "apps/web/package.json",
+    "apps/web/tsconfig.json",
+    "apps/web/vite.config.ts",
+    "apps/web/src/routes/__root.tsx"
+  ],
+  "rewrite": [
+    {
+      "file": "package.json",
+      "jsonPath": "$.engines.node",
+      "value": ">=24"
+    },
+    {
+      "file": "apps/web/package.json",
+      "jsonPath": "$.scripts.dev",
+      "value": "portless {{devHost}} vite dev --host"
+    }
+  ]
+}

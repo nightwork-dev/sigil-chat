@@ -9,7 +9,8 @@
     "lint": "turbo lint",
     "lint:design": "pnpm --filter @workspace/ui lint:design",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "overlay:stage": "pnpm --filter @sigil-design/chat-overlay stage"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.0",

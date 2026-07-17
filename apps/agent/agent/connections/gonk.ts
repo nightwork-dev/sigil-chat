@@ -1,9 +1,10 @@
 import { defineMcpClientConnection } from "eve/connections";
+import { readGonkClientEnvironment } from "@workspace/runtime-env/server";
 
-const token = process.env.GONK_MCP_KEY;
+const { apiKey: token, gonkMcpUrl } = readGonkClientEnvironment(process.env);
 
 export default defineMcpClientConnection({
-  url: process.env.GONK_MCP_URL ?? "http://sigil-chat-gonk.localhost:1355/mcp",
+  url: gonkMcpUrl,
   description:
     "Application tools generated and governed by the Gonk registry. Includes graph editing, article review inspection and annotations, and semantic UI highlighting. Prefer batched tools for related changes so they use one approval and land together.",
   // This preference is client-declared, not verified, and not a security boundary.

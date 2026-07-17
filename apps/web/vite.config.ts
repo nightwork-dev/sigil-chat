@@ -4,6 +4,9 @@ import viteReact from "@vitejs/plugin-react"
 import viteTsConfigPaths from "vite-tsconfig-paths"
 import tailwindcss from "@tailwindcss/vite"
 import { nitro } from "nitro/vite"
+import { readRuntimeTopology } from "@workspace/runtime-env/topology"
+
+const { eveOrigin } = readRuntimeTopology(process.env)
 
 const config = defineConfig({
   esbuild: {
@@ -15,7 +18,7 @@ const config = defineConfig({
     nitro({
       routeRules: {
         "/eve/**": {
-          proxy: `${process.env.EVE_ORIGIN ?? "http://sigil-chat-agent.localhost:1355"}/eve/**`,
+          proxy: `${eveOrigin}/eve/**`,
         },
       },
     }),

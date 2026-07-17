@@ -3,9 +3,10 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import type { AddressInfo } from "node:net"
 import { Buffer } from "node:buffer"
 import { createSigilMcpHandler } from "./mcp-handler.js"
+import { readGonkServerEnvironment } from "@workspace/runtime-env/server"
+import { createHealthResponse } from "./health.js"
 
-const port = Number.parseInt(process.env.PORT ?? "8808", 10)
-const apiKey = process.env.GONK_MCP_KEY
+const { port, apiKey } = readGonkServerEnvironment(process.env)
 const maxRequestBodyBytes = 1024 * 1024
 
 if (!apiKey) {
@@ -50,6 +51,12 @@ async function handleRequest(
       incoming.url ?? "/",
       `http://${incoming.headers.host ?? `127.0.0.1:${port}`}`,
     ).pathname
+    if (pathname === "/health") {
+      const health = createHealthResponse()
+      outgoing.writeHead(health.status, Object.fromEntries(health.headers))
+      outgoing.end(await health.text())
+      return
+    }
     if (pathname !== "/mcp") {
       outgoing.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
       outgoing.end("Not found")

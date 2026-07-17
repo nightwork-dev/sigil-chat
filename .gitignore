@@ -1,5 +1,6 @@
 # Dependencies
 node_modules
+packages/chat-overlay/files
 .pnp
 .pnp.js
 

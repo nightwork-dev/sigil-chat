@@ -34,6 +34,7 @@
     "@workspace/graph-store": "workspace:*",
     "@workspace/review": "workspace:*",
     "@workspace/review-store": "workspace:*",
+    "@workspace/runtime-env": "workspace:*",
     "@workspace/ui": "workspace:*",
     "@xyflow/react": "12.11.2",
     "eve": "0.24.4",

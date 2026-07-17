@@ -44,6 +44,9 @@ importers:
       '@gonk/skills':
         specifier: 0.3.1
         version: 0.3.1
+      '@workspace/runtime-env':
+        specifier: workspace:*
+        version: link:../../packages/runtime-env
       ai:
         specifier: ^7.0.26
         version: 7.0.29(zod@4.4.3)
@@ -96,6 +99,9 @@ importers:
       '@workspace/review-store':
         specifier: workspace:*
         version: link:../../packages/review-store
+      '@workspace/runtime-env':
+        specifier: workspace:*
+        version: link:../../packages/runtime-env
     devDependencies:
       '@gonk/tool-orchestrator':
         specifier: 0.3.1
@@ -172,6 +178,9 @@ importers:
       '@workspace/review-store':
         specifier: workspace:*
         version: link:../../packages/review-store
+      '@workspace/runtime-env':
+        specifier: workspace:*
+        version: link:../../packages/runtime-env
       '@workspace/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -299,6 +308,18 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/chat-overlay:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.1.0
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@25.3.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(msw@2.12.11(@types/node@25.3.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0)
 
   packages/cli:
     dependencies:
@@ -459,6 +480,18 @@ importers:
       '@workspace/file-store-core':
         specifier: workspace:*
         version: link:../file-store-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.1.0
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@25.3.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(msw@2.12.11(@types/node@25.3.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0)
+
+  packages/runtime-env:
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
