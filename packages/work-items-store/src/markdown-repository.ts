@@ -399,6 +399,7 @@ function serializeStoryMarkdown(
   frontmatter.routing = story.routing;
   frontmatter.reviewGate = story.reviewGate;
   frontmatter.deps = story.deps;
+  if (story.extraction !== undefined) frontmatter.extraction = story.extraction;
   if (story.assignee !== undefined) frontmatter.assignee = story.assignee;
   if (story.reviewDecision !== undefined)
     frontmatter.reviewDecision = story.reviewDecision;

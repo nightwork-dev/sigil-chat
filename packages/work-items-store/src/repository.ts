@@ -3,7 +3,7 @@ import {
   resolveWorkspaceDataPath,
 } from "@workspace/file-store-core";
 
-import { MarkdownWorkItemsRepository } from "./markdown-repository.js";
+import { MirkWorkItemsRepository } from "./mirk-repository.js";
 import {
   addComment,
   assertRevision,
@@ -250,15 +250,16 @@ export class FileWorkItemsRepository implements WorkItemsRepository {
 }
 
 export { MarkdownWorkItemsRepository } from "./markdown-repository.js";
+export { MirkWorkItemsRepository } from "./mirk-repository.js";
 
 /**
- * Default repository used by the app. The roadmap is persisted as one
- * markdown file per story in an external, co-located, self-versioned git repo
- * (see {@link MarkdownWorkItemsRepository}). Memory/File repositories remain
- * exported for tests and alternative wiring.
+ * Default repository used by the app. The roadmap is persisted through Mirk's
+ * MarkdownStore adapter as one markdown file per story in an external,
+ * co-located, self-versioned git repo. MarkdownWorkItemsRepository remains
+ * exported as a one-line rollback backing.
  */
 export const workItemsRepository: WorkItemsRepository =
-  new MarkdownWorkItemsRepository();
+  new MirkWorkItemsRepository();
 
 export function resolveWorkItemsStorePath(
   startDirectory = process.cwd(),
