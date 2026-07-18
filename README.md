@@ -50,6 +50,20 @@ use Vercel AI Gateway. The template defaults to `gpt-5.6-terra`; set
 same bearer on the Eve and Gonk services. The mounted adapter has no
 unauthenticated mode, including for local development.
 
+The web process owns human authentication. Before first use, apply its committed
+Better Auth schema:
+
+```bash
+pnpm auth:migrate
+```
+
+Local development defaults to `file:.data/sigil-chat.db` and maintains an
+owner-only `.data/auth-secret`. Production must provide `SIGIL_DATABASE_URL`
+and a `BETTER_AUTH_SECRET` of at least 32 characters; server startup fails closed
+while the latest committed migration is absent. Registration closes after the
+first owner unless the server is started with `SIGIL_AUTH_REGISTRATION=open`.
+See [`.env.example`](.env.example) for the complete auth environment surface.
+
 ## Add a tool
 
 New tools live in one place, [`apps/gonk/src/registry.ts`](apps/gonk/src/registry.ts).
