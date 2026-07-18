@@ -1,5 +1,9 @@
 import { ToolRegistry } from "@gonk/tool-registry";
 import {
+  getSessionArtifactStore,
+  type SessionArtifactStore,
+} from "./artifact-store.js";
+import {
   graphRepository,
   type GraphRepository,
 } from "@workspace/graph-store/repository";
@@ -7,14 +11,20 @@ import {
   reviewRepository,
   type ReviewRepository,
 } from "@workspace/review-store";
+import {
+  workItemsRepository,
+  type WorkItemsRepository,
+} from "@workspace/work-items-store";
 
 import { sigilApprovalProvider } from "./registry/approval.js";
 import { registerGraphTools } from "./registry/graph.js";
 import { registerImageTools } from "./registry/image.js";
+import { registerFileTools } from "./registry/files.js";
 import {
   createReviewDemoRepository,
   registerReviewTools,
 } from "./registry/review.js";
+import { registerStoryTools } from "./registry/story.js";
 import {
   registerRuntimeTools,
   registerUiCommandTools,
@@ -26,6 +36,8 @@ export { createReviewDemoRepository } from "./registry/review.js";
 export function createSigilRegistry(
   repository: GraphRepository = graphRepository,
   reviews: ReviewRepository = reviewRepository,
+  workItems: WorkItemsRepository = workItemsRepository,
+  artifacts: SessionArtifactStore = getSessionArtifactStore(),
 ): ToolRegistry {
   const registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
@@ -34,8 +46,10 @@ export function createSigilRegistry(
   registerRuntimeTools(registry);
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
+  registerStoryTools(registry, workItems);
   registerUiCommandTools(registry);
   registerImageTools(registry);
+  registerFileTools(registry, artifacts);
 
   return registry;
 }

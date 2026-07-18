@@ -380,6 +380,101 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-story-list",
+    description:
+      "List the current roadmap stories with their status, routing, dependencies, and review state.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: ["expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-story-inspect",
+    description:
+      "Inspect one roadmap story by stable id, including its comments and review items.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-story-upsert",
+    description:
+      "Create or replace a roadmap story. Inspect the existing story first when updating one, and pass its revision to avoid overwriting newer work.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["story"],
+      properties: ["story", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-story-transition",
+    description:
+      "Change one roadmap story's status. Inspect the story first and use its current revision when available.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "status"],
+      properties: ["id", "status", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-story-assign-review",
+    description:
+      "Assign David a pending review for one roadmap story. The new review item starts unread and incomplete until David decides it.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "gate"],
+      properties: ["id", "gate", "title", "summary", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-ui-highlight",
     description:
       "Return a structured client command that highlights stable application target ids. Targets are semantic ids, never CSS selectors.",
@@ -389,6 +484,63 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
       type: "object",
       required: ["actions"],
       properties: ["actions", "clearPrevious"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-generate-image",
+    description:
+      "Generate an image from a text prompt using the local Codex login (the same ChatGPT session the agent runs on — no separate API key). Returns the image inline in the chat. Use when the user asks to see an illustration, mockup, diagram sketch, or concept art.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["prompt"],
+      properties: ["prompt", "width", "height"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-list-session-files",
+    description:
+      "List the files attached to the current agent session. Use this to find durable documents before reading one by id.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-read-file",
+    description:
+      "Read the content of a file attached to the current agent session by id. Text files are decoded as UTF-8 with a bounded response; binary files return metadata instead of bytes.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id"],
       additionalProperties: false,
     },
     mcpAnnotations: {

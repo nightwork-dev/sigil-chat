@@ -119,9 +119,22 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
             readOnlyHint: false,
           }),
         }),
+        expect.objectContaining({
+          name: "sigil-story-list",
+          inputSchema: expect.objectContaining({
+            properties: expect.objectContaining({
+              expectedRevision: expect.anything(),
+            }),
+          }),
+        }),
+        expect.objectContaining({ name: "sigil-list-session-files" }),
+        expect.objectContaining({
+          name: "sigil-read-file",
+          inputSchema: expect.objectContaining({ required: ["id"] }),
+        }),
       ]),
     );
-    expect((listed.result as { tools: unknown[] }).tools).toHaveLength(18);
+    expect((listed.result as { tools: unknown[] }).tools).toHaveLength(26);
     expect(JSON.stringify(listed)).not.toContain("sigil-ui-highlight");
 
     const visibleCall = await rpc(handler, sessionId, 3, "tools/call", {

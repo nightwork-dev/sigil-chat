@@ -13,8 +13,14 @@
       "@workspace/agent-contracts/*": ["../../packages/agent-contracts/src/*"],
       "@workspace/graph/*": ["../../packages/graph/src/*"],
       "@workspace/graph-store/*": ["../../packages/graph-store/src/*"],
-      "@workspace/review-store": ["../../packages/review-store/src/repository.ts"],
-      "@workspace/review-store/*": ["../../packages/review-store/src/*"]
+      "@workspace/review-store": [
+        "../../packages/review-store/src/repository.ts"
+      ],
+      "@workspace/review-store/*": ["../../packages/review-store/src/*"],
+      "@workspace/work-items-store": [
+        "../../packages/work-items-store/src/repository.ts"
+      ],
+      "@workspace/work-items-store/*": ["../../packages/work-items-store/src/*"]
     }
   },
   "include": ["src/**/*.ts"]

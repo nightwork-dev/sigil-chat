@@ -3,9 +3,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { AuthContext } from "@gonk/auth";
 import { collectToolOutcome, makeBaseContext } from "@gonk/tool-registry";
+import { FileObjectStore } from "@mirk/artifact/fs";
 import { FileGraphRepository } from "@workspace/graph-store/repository";
+import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  SessionArtifactStore,
+} from "../src/artifact-store.js";
 import {
   createReviewDemoRepository,
   createSigilRegistry,
@@ -22,16 +27,25 @@ afterEach(async () => {
   );
 });
 
-async function makeRegistry() {
+async function makeRegistry(artifacts?: SessionArtifactStore) {
   const directory = await mkdtemp(join(tmpdir(), "sigil-chat-gonk-"));
   temporaryDirectories.push(directory);
   const repository = new FileGraphRepository(join(directory, "graph.json"));
   const reviewRepository = createReviewDemoRepository({
     now: () => "2026-07-16T12:00:00.000Z",
   });
+  const workItemsRepository = new MemoryWorkItemsRepository({
+    now: () => "2026-07-16T12:00:00.000Z",
+  });
   return {
-    registry: createSigilRegistry(repository, reviewRepository),
+    registry: createSigilRegistry(
+      repository,
+      reviewRepository,
+      workItemsRepository,
+      artifacts,
+    ),
     repository,
+    workItemsRepository,
   };
 }
 
@@ -61,7 +75,7 @@ describe("Sigil Chat Gonk registry", () => {
     });
 
     expect(contract).toEqual(expectedRegistryToolContracts);
-    expect(contract).toHaveLength(19);
+    expect(contract).toHaveLength(27);
   });
 
   it("runs an authenticated write through Sigil's registry approval provider", async () => {
@@ -192,6 +206,139 @@ describe("Sigil Chat Gonk registry", () => {
         /^\d{4}-\d{2}-\d{2}T/,
       );
     }
+  });
+
+  it("lists and reads only files in the caller's session scope", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-chat-files-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const stored = await artifacts.putFile({
+      bytes: new TextEncoder().encode("session notes"),
+      filename: "notes.md",
+      mediaType: "text/markdown",
+      scope: "thread-a",
+    });
+    const { registry } = await makeRegistry(artifacts);
+
+    const listed = await collectToolOutcome(
+      registry.invoke(
+        "sigil-list-session-files",
+        {},
+        makeBaseContext({ host: { sessionScope: "thread-a" } }),
+      ),
+    );
+    expect(listed).toMatchObject({
+      ok: true,
+      data: { files: [{ id: stored.id, filename: "notes.md" }] },
+    });
+
+    const read = await collectToolOutcome(
+      registry.invoke(
+        "sigil-read-file",
+        { id: stored.id },
+        makeBaseContext({ host: { sessionScope: "thread-a" } }),
+      ),
+    );
+    expect(read).toMatchObject({
+      ok: true,
+      data: { filename: "notes.md", content: "session notes" },
+    });
+
+    const otherSession = await collectToolOutcome(
+      registry.invoke(
+        "sigil-list-session-files",
+        {},
+        makeBaseContext({ host: { sessionScope: "thread-b" } }),
+      ),
+    );
+    expect(otherSession).toMatchObject({ ok: true, data: { files: [] } });
+
+    const leaked = await collectToolOutcome(
+      registry.invoke(
+        "sigil-read-file",
+        { id: stored.id },
+        makeBaseContext({ host: { sessionScope: "thread-b" } }),
+      ),
+    );
+    expect(leaked).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: `Unknown file id for the current session: ${stored.id}`,
+    });
+  });
+
+  it("reads and mutates stories through the domain-outcome path", async () => {
+    const { registry, workItemsRepository } = await makeRegistry();
+    const listed = await collectToolOutcome(
+      registry.invoke("sigil-story-list", {}, makeBaseContext()),
+    );
+
+    expect(listed).toMatchObject({
+      ok: true,
+      data: {
+        revision: 0,
+        stories: expect.arrayContaining([
+          expect.objectContaining({ id: "S1.2", status: "ready" }),
+        ]),
+      },
+    });
+
+    const transition = await collectToolOutcome(
+      registry.invoke(
+        "sigil-story-transition",
+        { id: "S1.2", status: "in-progress", expectedRevision: 0 },
+        makeBaseContext(),
+      ),
+    );
+    expect(transition).toMatchObject({
+      ok: true,
+      data: {
+        changedIds: ["S1.2"],
+        clientCommand: {
+          type: "agent.domain.outcome",
+          payload: {
+            kind: "work-items.changed",
+            resource: { kind: "work-items-board", id: "work-items" },
+            operation: "story.transition",
+            changedIds: ["S1.2"],
+          },
+        },
+      },
+    });
+
+    const assignment = await collectToolOutcome(
+      registry.invoke(
+        "sigil-story-assign-review",
+        { id: "S1.2", gate: "peer", expectedRevision: 1 },
+        makeBaseContext(),
+      ),
+    );
+    expect(assignment).toMatchObject({
+      ok: true,
+      data: {
+        changedIds: ["S1.2", "review-S1.2-1"],
+        clientCommand: {
+          payload: {
+            kind: "work-items.changed",
+            resource: { kind: "work-items-board", id: "work-items" },
+            operation: "review.assign",
+          },
+        },
+      },
+    });
+    await expect(workItemsRepository.get()).resolves.toMatchObject({
+      revision: 2,
+      reviews: [
+        expect.objectContaining({
+          id: "review-S1.2-1",
+          assignee: "David",
+          unread: true,
+          completed: false,
+        }),
+      ],
+    });
   });
 
   it("lets an agent inspect and mutate the same reducer graph repository", async () => {

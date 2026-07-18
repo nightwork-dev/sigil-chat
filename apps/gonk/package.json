@@ -21,6 +21,7 @@
     "@workspace/graph-store": "workspace:*",
     "@workspace/review-store": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
+    "@workspace/work-items-store": "workspace:*",
     "@zigil/agent-gonk": "^0.1.0"
   },
   "devDependencies": {
