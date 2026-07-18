@@ -1,6 +1,7 @@
 import { useCallback, useState, type ReactNode } from "react"
 import {
   AlertTriangleIcon,
+  FileIcon,
   GitForkIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -46,6 +47,12 @@ import { cn } from "@workspace/ui/lib/utils"
 import { AuthorizationCard } from "@/components/agent/authorization-card"
 import { ContextTray } from "@/components/agent/context-tray"
 import { ToolCall } from "@/components/agent/tool-call"
+import { GenerateImageRenderer } from "@/components/agent/image-tool-renderer"
+import {
+  registerToolRenderer,
+  setDefaultToolRenderer,
+  ToolCallSlot,
+} from "@/components/agent/tool-renderer-registry"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import type { ToolApprovalMode } from "@/lib/agent-tool-approval"
 
@@ -368,6 +375,12 @@ function AgentMessage({
   )
 }
 
+// sigil-chat's default tool renderer (the generic collapsible view). Register
+// per-tool custom UI with registerToolRenderer(name, Renderer). See the sigil
+// feature roadmap, Phase 1.
+setDefaultToolRenderer(ToolCall)
+registerToolRenderer("sigil-generate-image", GenerateImageRenderer)
+
 function AgentPart({
   canRespond,
   onAlwaysAllow,
@@ -383,7 +396,7 @@ function AgentPart({
 }) {
   if (part.type === "tool-call") {
     return (
-      <ToolCall
+      <ToolCallSlot
         canRespond={canRespond}
         onAlwaysAllow={onAlwaysAllow}
         onInputResponses={onInputResponses}
@@ -396,9 +409,33 @@ function AgentPart({
     return <AuthorizationCard part={part} />
   }
 
-  return (
-    <Card className="p-3" size="sm">
-      Attached: {part.filename ?? part.mediaType}
-    </Card>
-  )
+  if (part.type === "file") {
+    if (part.mediaType.startsWith("image/") && part.url) {
+      return (
+        <a
+          className="inline-block"
+          href={part.url}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <img
+            alt={part.filename ?? "attached image"}
+            className="max-h-96 max-w-full rounded-md border border-border object-contain"
+            loading="lazy"
+            src={part.url}
+          />
+        </a>
+      )
+    }
+    return (
+      <Card className="flex items-center gap-2 p-3" size="sm">
+        <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate">
+          {part.filename ?? part.mediaType}
+        </span>
+      </Card>
+    )
+  }
+
+  return null
 }

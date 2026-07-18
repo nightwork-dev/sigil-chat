@@ -5,6 +5,7 @@ import { Buffer } from "node:buffer"
 import { createSigilMcpHandler } from "./mcp-handler.js"
 import { readGonkServerEnvironment } from "@workspace/runtime-env/server"
 import { createHealthResponse } from "./health.js"
+import { getArtifactStore } from "./artifact-store.js"
 
 const { port, apiKey } = readGonkServerEnvironment(process.env)
 const maxRequestBodyBytes = 1024 * 1024
@@ -57,6 +58,13 @@ async function handleRequest(
       outgoing.end(await health.text())
       return
     }
+    // Serve generated/attached image bytes. Deliberately UNauthenticated (before
+    // the /mcp bearer gate): a browser <img src> can't send the MCP key, and the
+    // key is a content hash (unguessable, immutable), not a capability.
+    if (pathname.startsWith("/img/")) {
+      await serveImage(pathname.slice("/img/".length), outgoing)
+      return
+    }
     if (pathname !== "/mcp") {
       outgoing.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
       outgoing.end("Not found")
@@ -78,6 +86,40 @@ async function handleRequest(
         : "Internal server error",
     )
   }
+}
+
+async function serveImage(
+  rawKey: string,
+  outgoing: ServerResponse,
+): Promise<void> {
+  const store = getArtifactStore()
+  const key = decodeURIComponent(rawKey)
+  let info
+  let stream
+  try {
+    // head() first: gives mediaType/size and validates the key (assertObjectKey
+    // throws on traversal attempts like `..`, which we treat as not-found).
+    info = await store.head(key)
+    stream = info ? await store.get(key) : undefined
+  } catch {
+    info = undefined
+    stream = undefined
+  }
+  if (!info || !stream) {
+    outgoing.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
+    outgoing.end("Not found")
+    return
+  }
+  outgoing.writeHead(200, {
+    "content-type": info.mediaType ?? "application/octet-stream",
+    "content-length": String(info.sizeBytes),
+    // Content-addressed key → the bytes never change → cache forever.
+    "cache-control": "public, max-age=31536000, immutable",
+  })
+  for await (const chunk of stream) {
+    outgoing.write(Buffer.from(chunk))
+  }
+  outgoing.end()
 }
 
 async function toWebRequest(incoming: IncomingMessage): Promise<Request> {

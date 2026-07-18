@@ -10,6 +10,7 @@ import {
 
 import { sigilApprovalProvider } from "./registry/approval.js";
 import { registerGraphTools } from "./registry/graph.js";
+import { registerImageTools } from "./registry/image.js";
 import {
   createReviewDemoRepository,
   registerReviewTools,
@@ -34,6 +35,7 @@ export function createSigilRegistry(
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
   registerUiCommandTools(registry);
+  registerImageTools(registry);
 
   return registry;
 }
