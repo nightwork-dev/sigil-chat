@@ -410,3 +410,52 @@ This bears taste + identity, so the model is `decision:David`.
 - **S8.3 — Multi-agent in a session** · `spec` — several agents share one
   session, each keeping its own identity/persona while sharing the session
   workspace/blackboard. → S3.4 membership (agents as participants).
+
+## Track 9 — Gonk-on-Eve host integration (owner: codex — ecosystem-analysis lane)
+
+Intake from codex (2026-07-18); evidence:
+`platform/gonk/docs.local/specs/GONK-EVE-HOST-ADAPTER-SPEC.md`, Gonk GR-30
+(`gonk-core-roadmap.md:715`), `SIGIL-AGENT-SPLIT-TASKS.md`. Sigil Chat today is
+*an Eve agent that uses Gonk tools + context*; this epic makes it possible to run
+*a Gonk-defined agent whose execution host is Eve*. The distinction: **Eve
+provides the body + runtime** (execution, sessions, streaming, interruption,
+sandbox, connections); **Gonk provides identity + continuity** (persona,
+self-model, memory, knowledge, context authz, capabilities, receipts).
+**Additive** — does NOT replace Eve, move its runtime into Gonk, or add a second
+turn engine. Sigil Chat stays a consumer + conformance env, not the owner.
+
+**Ownership boundary — three separate adapters:** `@zigil/agent-eve` (Eve →
+neutral app session contract); `@zigil/agent-gonk` (app tools + consent over
+secured Gonk MCP); **proposed `@gonk/eve-host`** (Gonk persona/continuity/prepared
+context → an Eve runtime) — lands provisionally in Gonk Extensions
+(`packages/framework/eve-host`), built in an isolated worktree; a separate repo is
+premature. **Gonk Core gains NO Eve/Sigil/React/Zigil dependency.**
+
+- **S9.1 — Spike immutable Gonk-persona ↔ Eve-session binding** ·
+  `decision:David/Fable` → `spike` — prove one Gonk persona can inhabit multiple
+  isolated Eve sessions with Eve the sole execution authority. AC: a session binds
+  one principal + one persona immutably; the same persona binds multiple sessions
+  without sharing Eve runtime state; a different principal can't resume/appropriate
+  the binding; an identity floor rides Eve's native dynamic-instructions;
+  private/broken/expired/unauthorized claims never reach the prompt; persona switch
+  = new session (v0); Gonk Core gains no Eve dep; a clean fixture proves the
+  boundary independent of Sigil Chat. **Needs an explicit David/Fable decision on
+  persona-selection + binding semantics before it's settled.**
+- **S9.2 — Extract reusable Gonk context prep for Eve** · `spec` → after S9.1 —
+  generalize the seam already in `createSigilEveOnMessage()` (`apps/agent/agent/lib/sigil-context.ts:48`).
+  Consumer-specific contributors (workspace attention, product resources, graph
+  state) STAY in Sigil Chat; the adapter prepares *authorized* Gonk context via
+  Eve's native host hooks.
+- **S9.3 — Project selected Eve lifecycle events → Gonk continuity** · `spec` —
+  opt-in, idempotent projection of meaningful lifecycle events into Gonk
+  memory/traces. Must NOT mirror the whole Eve runtime, duplicate session
+  authority, or make Gonk an alternate execution log.
+
+**Links:** S8.1 (persona model), S8.2 (identity travels), S7.3 (principal
+separation), S7.4 (context receipts), Track 3 memory/continuity, Gonk GR-30.
+**Risks to keep visible:** two durable systems becoming competing authorities;
+persona/identity changing under a cacheable Eve session; Eve-version coupling
+leaking into Gonk Core; private Gonk context reaching an unauthorized prompt;
+extracting a generic framework from one consumer too early; rebuilding Eve
+capabilities inside Gonk. **Current seam (evidence it's begun):**
+`apps/agent/agent/channels/eve.ts`, `lib/sigil-context.ts:48`, `connections/gonk.ts`.
