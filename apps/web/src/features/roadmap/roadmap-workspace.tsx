@@ -5,6 +5,7 @@ import {
   CheckIcon,
   InboxIcon,
   LayoutListIcon,
+  MessageSquareIcon,
   PencilLineIcon,
   SendHorizonalIcon,
   XIcon,
@@ -12,10 +13,12 @@ import {
 import { toast } from "sonner"
 
 import {
+  useAddComment,
   useAssignReview,
   useDecideReview,
   useReviews,
   useStories,
+  useStoryComments,
   useTransitionStory,
   useUpsertStory,
 } from "@/lib/work-items"
@@ -29,6 +32,7 @@ import type {
   ReviewDecision,
   ReviewItem,
   Story as StoryData,
+  StoryComment,
   StoryStatus,
 } from "@workspace/work-items-store/types"
 import { Badge } from "@workspace/ui/components/badge"
@@ -567,6 +571,146 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
           </Button>
         </div>
       ) : null}
+
+      <StoryComments story={story} />
     </Story.Root>
+  )
+}
+
+// Persona addressees David can direct feedback at. Open-but-validated: an
+// unknown value renders as-is rather than breaking (the roster grows).
+const COMMENT_ADDRESSEES: { value: string; label: string }[] = [
+  { value: "general", label: "Everyone" },
+  { value: "garnet", label: "Garnet" },
+  { value: "fable", label: "Fable" },
+  { value: "codex", label: "codex" },
+]
+
+const COMMENT_KINDS: { value: StoryComment["kind"]; label: string }[] = [
+  { value: "suggestion", label: "Suggestion" },
+  { value: "question", label: "Question" },
+  { value: "concern", label: "Concern" },
+]
+
+function addresseeLabel(addressee: string): string {
+  return COMMENT_ADDRESSEES.find((a) => a.value === addressee)?.label ?? addressee
+}
+
+// In-app feedback ON a story (S1.7): the write-side of the review loop. A comment
+// is domain data persisted on the story's own record (roadmap store), survives
+// across worktrees/agents, and carries an addressee so David can direct a note at
+// one of the coordinating agents from his phone. (@name comms delivery is slice 2.)
+function StoryComments({ story }: { story: StoryData }) {
+  const comments = useStoryComments(story.id)
+  const addComment = useAddComment()
+  const [body, setBody] = useState("")
+  const [kind, setKind] = useState<StoryComment["kind"]>("suggestion")
+  const [addressee, setAddressee] = useState("general")
+
+  const thread = [...(comments.data ?? [])].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  )
+  const canSend = body.trim().length > 0 && !addComment.isPending
+
+  const send = () =>
+    addComment
+      .mutateAsync({
+        storyId: story.id,
+        kind,
+        author: "David",
+        body: body.trim(),
+        addressee: addressee === "general" ? undefined : addressee,
+      })
+      .then(() => {
+        setBody("")
+        toast.success("Feedback added")
+      })
+      .catch((error: unknown) =>
+        toast.error(error instanceof Error ? error.message : "Could not add feedback"),
+      )
+
+  return (
+    <div className="space-y-3 border-t border-border pt-4">
+      <div className="flex items-center gap-1.5">
+        <MessageSquareIcon className="size-3.5 text-muted-foreground" />
+        <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          Feedback
+        </span>
+        {thread.length > 0 ? (
+          <span className="font-mono text-[0.625rem] text-muted-foreground">{thread.length}</span>
+        ) : null}
+      </div>
+
+      {comments.isLoading ? (
+        <p className="text-xs text-muted-foreground">Loading feedback…</p>
+      ) : thread.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No feedback yet — leave a note on this story below.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {thread.map((comment) => (
+            <CommentRow key={comment.id} comment={comment} />
+          ))}
+        </ul>
+      )}
+
+      <div className="space-y-2">
+        <Textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="Leave feedback on this story…"
+          aria-label="New feedback"
+          className="min-h-20"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={kind} onValueChange={(value) => setKind(value as StoryComment["kind"])}>
+            <SelectTrigger className="h-8 w-auto min-w-28" aria-label="Feedback kind">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COMMENT_KINDS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={addressee} onValueChange={(value) => setAddressee(value ?? "general")}>
+            <SelectTrigger className="h-8 w-auto min-w-24" aria-label="Addressee">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COMMENT_ADDRESSEES.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.value === "general" ? option.label : `For ${option.label}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" className="ml-auto" disabled={!canSend} onClick={send}>
+            <SendHorizonalIcon />
+            Send
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CommentRow({ comment }: { comment: StoryComment }) {
+  return (
+    <li className="rounded-md border border-border bg-card/40 p-2.5 text-xs">
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{comment.author}</span>
+        <Badge variant="outline" className="h-4 px-1 text-[0.5625rem] capitalize">
+          {comment.kind}
+        </Badge>
+        {comment.addressee ? (
+          <Badge className="h-4 px-1 text-[0.5625rem]">→ {addresseeLabel(comment.addressee)}</Badge>
+        ) : null}
+      </div>
+      <p className="whitespace-pre-wrap leading-5 text-foreground/90">{comment.body}</p>
+    </li>
   )
 }

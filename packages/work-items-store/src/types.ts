@@ -77,6 +77,15 @@ export interface StoryComment {
   body: string;
   createdAt: string;
   parentCommentId?: string;
+  /**
+   * Who this comment is for — a persona id ("garnet" | "fable" | "codex") or
+   * undefined for a general comment. Open-but-validated, not a closed enum:
+   * the team roster grows (personas), and an unknown value must degrade to
+   * "general", never reject the whole store (the codex-routing lesson). The
+   * board surfaces "addressed to me"; a `@name` mention in the body is the
+   * comms-delivery path (slice 2), distinct from this addressing field.
+   */
+  addressee?: string;
 }
 
 export interface ReviewItem {

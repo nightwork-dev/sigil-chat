@@ -9,6 +9,7 @@ import type {
   ReviewDecision,
   ReviewGate,
   Story,
+  StoryComment,
   StoryFilter,
   StoryStatus,
   WorkItemsMutationResult,
@@ -103,12 +104,55 @@ const decideReviewFn = createServerFn({ method: "POST" })
     );
   });
 
+const listStoryCommentsFn = createServerFn({ method: "GET" })
+  .validator((input: { storyId: string }) => input)
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    return document.comments.filter(
+      (comment) => comment.storyId === data.storyId,
+    );
+  });
+
+const addCommentFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      storyId: string;
+      kind: StoryComment["kind"];
+      author: string;
+      body: string;
+      addressee?: string;
+      parentCommentId?: string;
+      expectedRevision?: number;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    // id + createdAt are minted server-side so two devices can't collide and
+    // the timestamp is authoritative.
+    const comment: StoryComment = {
+      id: crypto.randomUUID(),
+      storyId: data.storyId,
+      kind: data.kind,
+      author: data.author,
+      body: data.body,
+      createdAt: new Date().toISOString(),
+      ...(data.addressee ? { addressee: data.addressee } : {}),
+      ...(data.parentCommentId
+        ? { parentCommentId: data.parentCommentId }
+        : {}),
+    };
+    return workItemsRepository.addComment(comment, data.expectedRevision);
+  });
+
 export const workItemKeys = {
   all: () => ["work-items"] as const,
   list: (filter?: StoryFilter) =>
     [...workItemKeys.all(), "list", filter ?? {}] as const,
   detail: (id: string) => [...workItemKeys.all(), id] as const,
   reviews: () => [...workItemKeys.all(), "reviews"] as const,
+  comments: (storyId: string) =>
+    [...workItemKeys.all(), storyId, "comments"] as const,
 };
 
 export function useStories(filter?: StoryFilter) {
@@ -196,6 +240,39 @@ export function useDecideReview() {
       expectedRevision?: number;
     }) => decideReviewFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+export function useStoryComments(storyId: string | undefined) {
+  return useQuery({
+    queryKey: workItemKeys.comments(storyId ?? "none"),
+    queryFn: () => listStoryCommentsFn({ data: { storyId: storyId ?? "" } }),
+    enabled: Boolean(storyId),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useAddComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      storyId: string;
+      kind: StoryComment["kind"];
+      author: string;
+      body: string;
+      addressee?: string;
+      parentCommentId?: string;
+      expectedRevision?: number;
+    }) => addCommentFn({ data: input }),
+    onSuccess: (result, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workItemKeys.comments(variables.storyId),
+      });
+      return reconcileWorkItems(queryClient, result);
+    },
   });
 }
 
