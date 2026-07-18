@@ -1,4 +1,4 @@
-import type { AgentDomainOutcome } from "@niwork/agent/outcomes"
+import type { AgentDomainOutcome } from "@zigil/agent-surface/outcomes"
 
 import {
   isAgentUiHighlightAction,

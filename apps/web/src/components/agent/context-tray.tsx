@@ -23,17 +23,17 @@ import {
   type AttentionContextPreview,
   type ContextRetention,
   type TurnContextAttachment,
-} from "@niwork/agent/context-draft"
+} from "@zigil/agent-react/context-draft"
 import {
   setAttentionPrivacyLevel,
   useAttentionPrivacyLevel,
   type AttentionPrivacyLevel,
-} from "@niwork/agent/context-privacy"
+} from "@zigil/agent-react/context-privacy"
 import type {
   AttentionActivityEvent,
   AttentionContext,
   AttentionSelection,
-} from "@niwork/agent/attention"
+} from "@zigil/agent-react/attention"
 import { Button } from "@workspace/ui/components/button"
 import { CodeBlock } from "@workspace/ui/components/code-block"
 import {

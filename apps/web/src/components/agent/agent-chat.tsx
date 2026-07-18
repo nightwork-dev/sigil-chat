@@ -9,13 +9,13 @@ import {
 
 import {
   isAgentSessionBusy,
-  useAgentThreadControls,
   type AgentMessage,
   type AgentMessagePart,
   type AgentRuntimeSession,
   type AgentToolInputResponse,
-} from "@niwork/agent"
-import { useAttention } from "@niwork/agent/attention"
+} from "@zigil/agent-surface/contracts"
+import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
+import { useAttention } from "@zigil/agent-react/attention"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 import { ChatList } from "@workspace/chat/components/chat-list"
 import { ChatMessage } from "@workspace/chat/components/chat-message"

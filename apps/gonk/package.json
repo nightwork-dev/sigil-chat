@@ -15,7 +15,7 @@
     "@gonk/scope": "0.3.1",
     "@gonk/tool-registry": "0.3.1",
     "@gonk/tool-registry-mcp": "0.3.1",
-    "@niwork/agent-gonk": "0.1.2",
+    "@zigil/agent-gonk": "^0.1.0",
     "@workspace/agent-contracts": "workspace:*",
     "@workspace/graph": "workspace:*",
     "@workspace/graph-store": "workspace:*",

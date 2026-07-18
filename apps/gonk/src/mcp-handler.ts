@@ -1,4 +1,4 @@
-import { createAgentWebMcpHandler } from "@niwork/agent-gonk"
+import { createAgentWebMcpHandler } from "@zigil/agent-gonk"
 
 import { authorizeSigilMcpRequest } from "./auth.js"
 import { createSigilRegistry } from "./registry.js"

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import type { AttentionContext } from "@niwork/agent/attention"
+import type { AttentionContext } from "@zigil/agent-react/attention"
 
 import {
   commitAttentionDelivery,

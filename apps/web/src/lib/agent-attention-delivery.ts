@@ -3,11 +3,11 @@ import { useSyncExternalStore } from "react"
 import type {
   AttentionActivityEvent,
   AttentionContext,
-} from "@niwork/agent/attention"
+} from "@zigil/agent-react/attention"
 import {
   attentionHistoryKey,
   getContextDraftScope,
-} from "@niwork/agent/context-draft"
+} from "@zigil/agent-react/context-draft"
 
 const deliveredHistory = new Map<string, Set<string>>()
 const revisions = new Map<string, number>()

@@ -3,22 +3,26 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import {
   attentionSelectionKey,
   createAttentionContextPreview,
-  isAgentSessionBusy,
   removeTurnContextAttachment,
   setAttentionItemExcluded,
-  setAttentionPrivacyLevel,
-  useAgentRuntimeSession,
-  useAttention,
   useAttentionExclusions,
-  useAttentionPrivacyLevel,
   useTurnContextAttachments,
+} from "@zigil/agent-react/context-draft";
+import {
+  setAttentionPrivacyLevel,
+  useAttentionPrivacyLevel,
+  type AttentionPrivacyLevel,
+} from "@zigil/agent-react/context-privacy";
+import { useAgentRuntimeSession } from "@zigil/agent-react/session";
+import { useAttention } from "@zigil/agent-react/attention";
+import {
+  isAgentSessionBusy,
   type AgentApprovalPresentation,
   type AgentForkIntent,
   type AgentMessagePart,
   type AgentRuntimeSession,
   type AgentThreadControls,
-  type AttentionPrivacyLevel,
-} from "@niwork/agent";
+} from "@zigil/agent-surface/contracts";
 import { Button } from "@workspace/ui/components/button";
 import {
   FloatingDock,
