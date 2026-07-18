@@ -22,6 +22,32 @@
       ]
     },
     {
+      "name": "agent-hud",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent-react",
+        "@zigil/agent-surface"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/floating-dock",
+        "@sigil/select",
+        "@sigil/textarea"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/agent-hud.tsx",
+          "type": "registry:ui",
+          "target": "@ui/agent-hud.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/agent-hud-state.ts",
+          "type": "registry:lib",
+          "target": "@lib/agent-hud-state.ts"
+        }
+      ]
+    },
+    {
       "name": "alert",
       "type": "registry:ui",
       "dependencies": [
@@ -1453,6 +1479,24 @@
           "path": ".registry-staging/src/components/image/image-compare.tsx",
           "type": "registry:ui",
           "target": "@ui/image/image-compare.tsx"
+        }
+      ]
+    },
+    {
+      "name": "imperative-emphasis",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/effects/imperative-emphasis.tsx",
+          "type": "registry:ui",
+          "target": "@ui/effects/imperative-emphasis.tsx"
+        },
+        {
+          "path": ".registry-staging/src/lib/imperative-emphasis.ts",
+          "type": "registry:lib",
+          "target": "@lib/imperative-emphasis.ts"
         }
       ]
     },

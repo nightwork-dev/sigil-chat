@@ -165,6 +165,19 @@ Prerequisites and required env:
   processes — Eve's `connections/gonk.ts` reads it too. This has already
   tripped people up: a missing/mismatched key means Eve can't reach the
   Gonk tool registry, not a silent unauthenticated fallback.
+
+  **Where it lives:** a gitignored **root `.env`** is the single source of
+  truth. All three dev processes read that one file: `apps/agent/.env` is a
+  symlink to it (`eve dev` loads it natively); `apps/gonk/src/server.ts` and
+  `apps/web/vite.config.ts` each load it via `process.loadEnvFile` before
+  reading their environment (the web app needs it because the attachment-upload
+  server function proxies to Gonk's authenticated `/upload` route). Because
+  every process reads one file, the "same token on all three" invariant holds
+  by construction and survives a restart without exporting anything in your
+  shell. An explicit `export GONK_MCP_KEY=…`
+  still wins (parent-process env takes precedence over the file), matching
+  Eve's dev env-file behavior. Copy `.env.example` to `.env` and set the key on
+  a fresh checkout.
 - `GONK_MCP_URL` — optional, overrides the MCP endpoint Eve connects to
   (defaults to the Portless Gonk URL above).
 
