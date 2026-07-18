@@ -12,7 +12,7 @@ import {
   type ScopeInput,
 } from "../artifact-scope.js";
 import { objectSchema, readHints } from "./schemas.js";
-import { isEmptyObject, isRecord } from "./validators.js";
+import { isRecord } from "./validators.js";
 
 const MAX_TEXT_CHARS = 200_000;
 
@@ -135,7 +135,7 @@ function isResourceScope(value: unknown): value is ResourceScope {
     value.id.trim().length > 0 &&
     typeof value.tier === "string" &&
     (RESOURCE_SCOPE_TIERS as readonly string[]).includes(value.tier) &&
-    normalizeScope(value as ScopeInput) !== undefined
+    normalizeScope(value as unknown as ScopeInput) !== undefined
   );
 }
 

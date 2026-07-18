@@ -37,9 +37,10 @@ export function normalizeScope(
     if (!normalized || hasInvalidScopeText(normalized)) return undefined
 
     const separator = normalized.indexOf(":")
-    if (separator > 0 && isResourceScopeTier(normalized.slice(0, separator))) {
+    const tier = separator > 0 ? normalized.slice(0, separator) : undefined
+    if (tier !== undefined && isResourceScopeTier(tier)) {
       return normalizeScope({
-        tier: normalized.slice(0, separator),
+        tier,
         id: normalized.slice(separator + 1),
       })
     }
