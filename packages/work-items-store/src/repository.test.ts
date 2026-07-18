@@ -34,7 +34,7 @@ describe("MemoryWorkItemsRepository", () => {
     });
     const initial = await repository.get();
 
-    expect(await repository.list()).toHaveLength(18);
+    expect(await repository.list()).toHaveLength(49);
     expect(initial.stories.find(({ id }) => id === "S1.1")).toMatchObject({
       epicId: "track-1",
       status: "ready",
@@ -42,6 +42,7 @@ describe("MemoryWorkItemsRepository", () => {
       reviewGate: "peer",
       deps: ["S1.0"],
     });
+    expect(initial.reviews).toHaveLength(2);
 
     const story = await seedStory("S1.1");
     story.title = "work-items-store package + story schema (verified)";
@@ -65,23 +66,30 @@ describe("MemoryWorkItemsRepository", () => {
       },
       transitioned.document.revision,
     );
-    expect(assigned.changedIds).toEqual(["S1.1", "review-S1.1-1"]);
-    expect(assigned.document.reviews[0]).toMatchObject({
-      id: "review-S1.1-1",
+    // Two reviews are pre-seeded, so the third review (this story's first)
+    // is assigned id review-S1.1-3.
+    expect(assigned.changedIds).toEqual(["S1.1", "review-S1.1-3"]);
+    const assignedReview = assigned.document.reviews.find(
+      ({ id }) => id === "review-S1.1-3",
+    );
+    expect(assignedReview).toMatchObject({
+      id: "review-S1.1-3",
       storyId: "S1.1",
       assignee: "David",
       unread: true,
       completed: false,
     });
-    expect(assigned.document.reviews[0]).not.toHaveProperty("decision");
+    expect(assignedReview).not.toHaveProperty("decision");
 
     const decided = await repository.decideReview(
-      "review-S1.1-1",
+      "review-S1.1-3",
       "approved",
       "David",
       assigned.document.revision,
     );
-    expect(decided.document.reviews[0]).toMatchObject({
+    expect(
+      decided.document.reviews.find(({ id }) => id === "review-S1.1-3"),
+    ).toMatchObject({
       decision: "approved",
       unread: false,
       completed: true,
@@ -153,9 +161,11 @@ describe("FileWorkItemsRepository", () => {
         document.revision,
       )
     ).document;
+    // Two reviews are pre-seeded, so the review assigned above is
+    // review-S1.0-3 (document.reviews.length + 1 at assignment time).
     document = (
       await repository.decideReview(
-        "review-S1.0-1",
+        "review-S1.0-3",
         "changes-requested",
         "David",
         document.revision,
@@ -177,7 +187,9 @@ describe("FileWorkItemsRepository", () => {
 
     const reloaded = await new FileWorkItemsRepository(filePath).get();
     expect(reloaded.revision).toBe(document.revision);
-    expect(reloaded.reviews[0]).toMatchObject({
+    expect(
+      reloaded.reviews.find(({ id }) => id === "review-S1.0-3"),
+    ).toMatchObject({
       decision: "changes-requested",
       unread: false,
       completed: true,
@@ -208,7 +220,9 @@ describe("FileWorkItemsRepository", () => {
     ).rejects.toThrow(
       `Work-items revision conflict: expected ${initial.revision}, current ${initial.revision + 1}.`,
     );
-    expect((await repository.get()).reviews).toHaveLength(0);
+    // The rejected assignReview must not have appended a third review on top
+    // of the two pre-seeded reviews.
+    expect((await repository.get()).reviews).toHaveLength(2);
   });
 
   it("reaps a lock held by a dead process without waiting for the hard stale age", async () => {
