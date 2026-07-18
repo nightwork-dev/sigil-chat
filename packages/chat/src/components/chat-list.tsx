@@ -1,4 +1,4 @@
-import { useRef, useEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 
 /**
@@ -18,7 +18,13 @@ export function ChatList({
   className?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
+
+  const scrollToBottom = () => {
+    const element = scrollRef.current;
+    if (element && stickRef.current) element.scrollTop = element.scrollHeight;
+  };
 
   // Track whether user is near bottom
   useEffect(() => {
@@ -36,19 +42,32 @@ export function ChatList({
     return () => el.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Auto-scroll when children change
-  useEffect(() => {
-    if (stickRef.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+  // Measure after React commits so a remounted transcript starts at its actual
+  // bottom rather than the height from the previous route's paint.
+  useLayoutEffect(() => {
+    scrollToBottom();
   }, [children]);
+
+  // Streaming markdown, restored transcripts, images, and fonts can change the
+  // content height without changing the children identity. Stay pinned through
+  // those layout changes unless the user deliberately scrolled away.
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(scrollToBottom);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
       ref={scrollRef}
       className={cn("min-w-0 flex-1 overflow-y-auto", className)}
     >
-      <div className="flex min-w-0 max-w-full flex-col gap-5 p-4">
+      <div
+        ref={contentRef}
+        className="flex min-w-0 max-w-full flex-col gap-5 p-4"
+      >
         {children}
       </div>
     </div>

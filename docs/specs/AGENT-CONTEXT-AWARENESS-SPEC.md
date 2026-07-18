@@ -4,6 +4,10 @@
 > Status: Draft product spec
 > Scope: Sigil agentic workspaces, beginning with Sigil Chat
 
+Roadmap integration and context/cache telemetry are specified in Sigil Agent's
+`docs/specs/GONK-ROADMAP-INTEGRATION.md`. Sigil Chat is a consumer of those
+contracts and of the registry-distributed Sigil Design indicator.
+
 ## 1. Goal
 
 Make the agent a compact conversational layer over a real application toolset,
