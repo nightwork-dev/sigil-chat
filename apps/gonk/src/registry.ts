@@ -25,6 +25,7 @@ import {
   registerReviewTools,
 } from "./registry/review.js";
 import { registerStoryTools } from "./registry/story.js";
+import { createSkillRegistry, registerSkillTools } from "./registry/skills.js";
 import {
   registerRuntimeTools,
   registerUiCommandTools,
@@ -38,6 +39,7 @@ export function createSigilRegistry(
   reviews: ReviewRepository = reviewRepository,
   workItems: WorkItemsRepository = workItemsRepository,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
+  skills = createSkillRegistry(),
 ): ToolRegistry {
   const registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
@@ -47,6 +49,7 @@ export function createSigilRegistry(
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
   registerStoryTools(registry, workItems);
+  registerSkillTools(registry, skills);
   registerUiCommandTools(registry);
   registerImageTools(registry);
   registerFileTools(registry, artifacts);

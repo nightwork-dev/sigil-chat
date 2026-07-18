@@ -1,7 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { AuthContext } from "@gonk/auth";
+import {
+  FilesystemManagedSkillRegistry,
+  type WritableManagedSkillRegistry,
+} from "@gonk/skills";
 import { collectToolOutcome, makeBaseContext } from "@gonk/tool-registry";
 import { FileObjectStore } from "@mirk/artifact/fs";
 import { FileGraphRepository } from "@workspace/graph-store/repository";
@@ -27,7 +31,10 @@ afterEach(async () => {
   );
 });
 
-async function makeRegistry(artifacts?: SessionArtifactStore) {
+async function makeRegistry(
+  artifacts?: SessionArtifactStore,
+  skillRegistry?: WritableManagedSkillRegistry,
+) {
   const directory = await mkdtemp(join(tmpdir(), "sigil-chat-gonk-"));
   temporaryDirectories.push(directory);
   const repository = new FileGraphRepository(join(directory, "graph.json"));
@@ -43,6 +50,7 @@ async function makeRegistry(artifacts?: SessionArtifactStore) {
       reviewRepository,
       workItemsRepository,
       artifacts,
+      skillRegistry,
     ),
     repository,
     workItemsRepository,
@@ -75,7 +83,7 @@ describe("Sigil Chat Gonk registry", () => {
     });
 
     expect(contract).toEqual(expectedRegistryToolContracts);
-    expect(contract).toHaveLength(27);
+    expect(contract).toHaveLength(31);
   });
 
   it("runs an authenticated write through Sigil's registry approval provider", async () => {
@@ -308,6 +316,9 @@ describe("Sigil Chat Gonk registry", () => {
       },
     });
 
+    const nextReviewId = `review-S1.2-${
+      (await workItemsRepository.get()).reviews.length + 1
+    }`;
     const assignment = await collectToolOutcome(
       registry.invoke(
         "sigil-story-assign-review",
@@ -318,7 +329,7 @@ describe("Sigil Chat Gonk registry", () => {
     expect(assignment).toMatchObject({
       ok: true,
       data: {
-        changedIds: ["S1.2", "review-S1.2-1"],
+        changedIds: ["S1.2", nextReviewId],
         clientCommand: {
           payload: {
             kind: "work-items.changed",
@@ -330,14 +341,145 @@ describe("Sigil Chat Gonk registry", () => {
     });
     await expect(workItemsRepository.get()).resolves.toMatchObject({
       revision: 2,
-      reviews: [
+      reviews: expect.arrayContaining([
         expect.objectContaining({
-          id: "review-S1.2-1",
+          id: nextReviewId,
           assignee: "David",
           unread: true,
           completed: false,
         }),
-      ],
+      ]),
+    });
+  });
+
+  it("round-trips a managed skill through the Gonk CRUD tools", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-chat-skills-"));
+    temporaryDirectories.push(directory);
+    const workspace = join(directory, "workspace");
+    await mkdir(workspace);
+    const skillRegistry = new FilesystemManagedSkillRegistry({
+      env: {
+        cwd: workspace,
+        projectRoot: directory,
+        homeRoot: join(directory, "home"),
+        rootKinds: ["agents", ".agents", ".gonk"],
+      },
+      now: () => "2026-07-16T12:00:00.000Z",
+    });
+    const { registry } = await makeRegistry(undefined, skillRegistry);
+    const auth: AuthContext = {
+      principal: {
+        id: "service:sigil-skill-test",
+        kind: "service",
+        identity: {
+          issuer: "sigil:test",
+          subject: "skill-agent",
+          method: "service-token",
+        },
+        roles: ["agent"],
+        scopes: [],
+      },
+      authorize: () => ({ outcome: "allow", reason: "test policy" }),
+    };
+    const context = makeBaseContext({ auth });
+
+    const created = await collectToolOutcome(
+      registry.invoke(
+        "sigil-skill-upsert",
+        {
+          id: "roundtrip",
+          scope: "project",
+          description: "A skill used to verify the managed lifecycle.",
+          body: "# Round trip\n\nInspect, create, and remove this skill.",
+          idempotencyKey: "roundtrip-create",
+        },
+        context,
+      ),
+    );
+    expect(created).toMatchObject({
+      ok: true,
+      data: {
+        status: "ok",
+        id: "roundtrip",
+        clientCommand: {
+          type: "agent.domain.outcome",
+          payload: {
+            kind: "skills.changed",
+            resource: { kind: "skills-catalog", id: "skills" },
+            operation: "skill.upsert",
+            changedIds: ["roundtrip"],
+          },
+        },
+      },
+    });
+
+    const listed = await collectToolOutcome(
+      registry.invoke("sigil-skill-list", { scope: "project" }, context),
+    );
+    expect(listed).toMatchObject({
+      ok: true,
+      data: {
+        status: "ok",
+        skills: [expect.objectContaining({ id: "roundtrip" })],
+      },
+    });
+
+    const inspected = await collectToolOutcome(
+      registry.invoke(
+        "sigil-skill-get",
+        { id: "roundtrip", scope: "project" },
+        context,
+      ),
+    );
+    expect(inspected).toMatchObject({
+      ok: true,
+      data: {
+        status: "found",
+        skill: {
+          id: "roundtrip",
+          body: "# Round trip\n\nInspect, create, and remove this skill.\n",
+        },
+      },
+    });
+
+    const revision =
+      inspected.ok &&
+      typeof inspected.data === "object" &&
+      inspected.data !== null &&
+      "skill" in inspected.data &&
+      typeof inspected.data.skill === "object" &&
+      inspected.data.skill !== null &&
+      "revision" in inspected.data.skill &&
+      typeof inspected.data.skill.revision === "string"
+        ? inspected.data.skill.revision
+        : undefined;
+    expect(revision).toBeTruthy();
+    if (!revision) throw new Error("Round-trip skill did not return a revision.");
+
+    const deleted = await collectToolOutcome(
+      registry.invoke(
+        "sigil-skill-delete",
+        {
+          id: "roundtrip",
+          scope: "project",
+          expectedRevision: revision,
+          idempotencyKey: "roundtrip-delete",
+        },
+        context,
+      ),
+    );
+    expect(deleted).toMatchObject({
+      ok: true,
+      data: {
+        status: "ok",
+        id: "roundtrip",
+        clientCommand: {
+          payload: {
+            kind: "skills.changed",
+            operation: "skill.delete",
+          },
+        },
+      },
     });
   });
 

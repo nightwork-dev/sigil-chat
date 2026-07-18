@@ -51,6 +51,24 @@ describe("agent client command contracts", () => {
     ).toBe(true)
   })
 
+  it("accepts skills catalog domain outcomes", () => {
+    expect(
+      isAgentClientCommand({
+        type: "agent.domain.outcome",
+        payload: {
+          id: "skills:skill.upsert:revision:release-check",
+          kind: "skills.changed",
+          resource: {
+            kind: "skills-catalog",
+            id: "skills",
+          },
+          operation: "skill.upsert",
+          changedIds: ["release-check"],
+        },
+      }),
+    ).toBe(true)
+  })
+
   it("keeps Gonk tool input stricter than the client envelope", () => {
     expect(
       isAgentClientCommand({

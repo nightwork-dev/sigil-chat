@@ -475,6 +475,89 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-skill-list",
+    description:
+      "List the managed skills visible at a scope, including their stable revisions and lifecycle metadata.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: ["scope", "includeFreshness"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-skill-get",
+    description:
+      "Inspect one managed skill by id, including its markdown body and supporting files.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id", "scope", "includeFreshness"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-skill-upsert",
+    description:
+      "Create a managed skill or replace the markdown body of an existing skill. Inspect first and pass its revision when updating to avoid overwriting newer work.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "scope", "body"],
+      properties: [
+        "id",
+        "scope",
+        "body",
+        "description",
+        "expectedRevision",
+        "idempotencyKey",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-skill-delete",
+    description:
+      "Archive a managed skill as the reversible delete operation. Inspect first and pass its current revision so stale deletes fail safely.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "expectedRevision"],
+      properties: ["id", "expectedRevision", "scope", "idempotencyKey"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-ui-highlight",
     description:
       "Return a structured client command that highlights stable application target ids. Targets are semantic ids, never CSS selectors.",

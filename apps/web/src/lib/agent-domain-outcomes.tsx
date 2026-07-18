@@ -12,6 +12,7 @@ import {
   type AgentClientCommand,
 } from "@/lib/agent-client-command"
 import { REVIEW_DOCUMENT_ID, reviewDocumentKeys } from "./review-document"
+import { skillKeys } from "./skills"
 import { workItemKeys } from "./work-items"
 
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
@@ -38,6 +39,33 @@ const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   },
   reconcile: async (outcome, context) => {
     await context.invalidate([reviewDocumentKeys.detail(outcome.resource.id)])
+  },
+}
+
+const skillsChangedHandler: AgentOutcomeReconciliationHandler = {
+  kind: "skills.changed",
+  schema: {
+    "~standard": {
+      version: 1,
+      vendor: "sigil-chat",
+      validate(value) {
+        const outcome = value as AgentDomainOutcome
+        if (
+          !value ||
+          typeof value !== "object" ||
+          outcome.kind !== "skills.changed" ||
+          outcome.resource?.kind !== "skills-catalog" ||
+          typeof outcome.resource.id !== "string" ||
+          outcome.resource.id.length === 0
+        ) {
+          return { issues: [{ message: "Expected a skills catalog outcome" }] }
+        }
+        return { value: outcome }
+      },
+    },
+  },
+  reconcile: async (_outcome, context) => {
+    await context.invalidate([skillKeys.all()])
   },
 }
 
@@ -71,7 +99,11 @@ const workItemsChangedHandler: AgentOutcomeReconciliationHandler = {
 export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
   return createReactQueryOutcomeDispatcher({
     queryClient,
-    handlers: [reviewDocumentChangedHandler, workItemsChangedHandler],
+    handlers: [
+      reviewDocumentChangedHandler,
+      skillsChangedHandler,
+      workItemsChangedHandler,
+    ],
     duplicateKindPolicy: "reject",
     unhandledOutcomePolicy: "ignore",
   })

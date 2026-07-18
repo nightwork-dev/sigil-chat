@@ -6,6 +6,7 @@ import {
   createAgentDomainOutcomeDispatcher,
 } from "./agent-domain-outcomes"
 import { reviewDocumentKeys } from "./review-document"
+import { skillKeys } from "./skills"
 
 describe("agent domain outcome reconciliation", () => {
   it("invalidates only the affected review document query", async () => {
@@ -29,6 +30,21 @@ describe("agent domain outcome reconciliation", () => {
 
     expect(queryClient.getQueryState(affected)?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(unaffected)?.isInvalidated).toBe(false)
+  })
+
+  it("invalidates the skills catalog for skill mutations", async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(skillKeys.all(), { status: "ok", skills: [] })
+
+    await createAgentDomainOutcomeDispatcher(queryClient).dispatch({
+      id: "skill-upsert-1",
+      kind: "skills.changed",
+      resource: { kind: "skills-catalog", id: "skills" },
+      operation: "skill.upsert",
+      changedIds: ["release-check"],
+    })
+
+    expect(queryClient.getQueryState(skillKeys.all())?.isInvalidated).toBe(true)
   })
 
   it("does not route an unrelated or malformed outcome into review queries", async () => {
