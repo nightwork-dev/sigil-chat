@@ -32,6 +32,25 @@ describe("agent client command contracts", () => {
     ).toBe(false)
   })
 
+  it("accepts work-items domain outcomes from story tools", () => {
+    expect(
+      isAgentClientCommand({
+        type: "agent.domain.outcome",
+        payload: {
+          id: "work-items:story.transition:8:S1.1",
+          kind: "work-items.changed",
+          resource: {
+            kind: "work-items-board",
+            id: "work-items",
+            revision: 8,
+          },
+          operation: "story.transition",
+          changedIds: ["S1.1"],
+        },
+      }),
+    ).toBe(true)
+  })
+
   it("keeps Gonk tool input stricter than the client envelope", () => {
     expect(
       isAgentClientCommand({

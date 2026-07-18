@@ -61,9 +61,12 @@ export function isAgentClientCommand(
   if (!isRecord(outcome.resource)) return false
   return (
     typeof outcome.id === "string" &&
-    outcome.kind === "review.document.changed" &&
+    typeof outcome.kind === "string" &&
     typeof outcome.operation === "string" &&
-    outcome.resource.kind === "review-document" &&
-    typeof outcome.resource.id === "string"
+    typeof outcome.resource.id === "string" &&
+    ((outcome.kind === "review.document.changed" &&
+      outcome.resource.kind === "review-document") ||
+      (outcome.kind === "work-items.changed" &&
+        outcome.resource.kind === "work-items-board"))
   )
 }
