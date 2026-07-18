@@ -388,7 +388,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     schema: {
       type: "object",
       required: [],
-      properties: ["expectedRevision"],
+      properties: ["filter", "expectedRevision"],
       additionalProperties: false,
     },
     mcpAnnotations: {

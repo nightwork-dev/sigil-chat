@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
+    "@gonk/skills": "0.3.1",
     "@gonk/scope": "0.3.1",
     "@gonk/store": "0.3.1",
     "@tailwindcss/vite": "^4.1.18",

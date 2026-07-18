@@ -83,7 +83,8 @@ describe("Sigil Chat Gonk registry", () => {
     });
 
     expect(contract).toEqual(expectedRegistryToolContracts);
-    expect(contract).toHaveLength(31);
+    // No separate toHaveLength — the deep-equal above IS the full contract
+    // snapshot; a hardcoded count is redundant and churns on every tool add.
   });
 
   it("runs an authenticated write through Sigil's registry approval provider", async () => {
