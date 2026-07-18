@@ -39,7 +39,7 @@ const nav: NavModel = {
     { to: "/roadmap", label: "Roadmap", icon: MapIcon },
     { to: "/review", label: "Review", icon: FileCheck2Icon },
     { to: "/chat", label: "Chat", icon: MessageSquareIcon },
-    { to: "/skills", label: "Agent library", icon: BracesIcon },
+    { to: "/skills", label: "Skills", icon: BracesIcon },
     { to: "/canvas", label: "Canvas", icon: PenToolIcon },
     { to: "/data", label: "Data", icon: DatabaseIcon },
   ],
