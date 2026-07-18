@@ -52,6 +52,31 @@ lane without coordinating through the roadmap.
   (`in-progress`) and `assignee`; when done, `verify`/`shipped`. That's how
   another agent knows not to pick it up.
 
+## What belongs where (docs + coordination artifacts)
+
+Getting this wrong scatters coordination material into product branches or
+bespoke folders — both anti-patterns. Four tiers:
+
+- **Product code + shipped docs** → the repo, on `dev` (tracked). Features and
+  the `docs/` guides/specs that ship with the product.
+- **Repo-internal working notes** → *that repo's own* `docs.local/` (gitignored,
+  per-repo). Design notes and in-progress specs scoped to one repo.
+- **The roadmap** → the external, git-versioned roadmap store (`SIGIL_ROADMAP_DIR`),
+  co-located, its own repo, shared across every worktree/agent. NOT in any
+  product repo.
+- **Ecosystem-level coordination / handoff / strategy** — agent briefs, handoffs,
+  cross-agent notes; anything that spans repos or isn't product-specific →
+  **`/Users/dr/Dev/docs.local/`** (ecosystem-level, not tracked by any product
+  repo).
+- **NEVER** put roadmap/coordination/handoff artifacts in a product's `dev` tree,
+  and **NEVER invent a bespoke ad-hoc directory** — use the established homes
+  above. (If you catch yourself `mkdir`-ing a new coordination folder, stop.)
+- **Naming convention:** local-only files/dirs are named `*.local` / `*.local.*`
+  (e.g. `docs.local`, `foo.local.md`, `.env.local`) and are gitignored by that
+  pattern in **every** repo — EXCEPT repos that are themselves local-only (the
+  roadmap store), which track everything. Deliberately-tracked exceptions (e.g.
+  CLI test fixtures using `.local` names) get an explicit `!` negation.
+
 ## Worktrees + branches
 
 - **`dev` is the integration/demo branch.** Verified work commits to `dev`; the

@@ -67,3 +67,8 @@ docs.local/
 # live agent roster) — loads for Claude Code on this machine but is never
 # committed; see .claude/skills/local-coordination/SKILL.md.
 .claude/skills/local-coordination/
+
+# Local-only files/dirs (naming convention) — gitignored everywhere EXCEPT
+# repos that are themselves local-only (e.g. the .sigil roadmap store).
+*.local
+*.local.*
