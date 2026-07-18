@@ -29,6 +29,62 @@
 
 ---
 
+## Experience stories — user & agent cognition
+
+First-person, concrete, mapped to what someone actually *does* — not capability
+names. Human framing preferred; agent-perspective stories are included because
+agent cognition genuinely differs: an agent has its own skills, memory,
+self-improvement, and a persistent identity that travels — a human user doesn't
+need those the same way. The technical tracks below are how these get built.
+
+### As a user
+
+- **My agent comes with me.** I switch between workspaces/demos (chat, reducer-
+  graph studio, review…) and my agent's personality *and* our session move with
+  me — same agent, same memory, same thread. → agent identity + session mobility
+  (Track 8, Track 3).
+- **I can bring someone in.** I invite another user into my session so we work
+  with the same agent(s) and the same shared workspace. → S3.4 session membership.
+- **I stay in control.** I review and approve what my agent proposes — new
+  skills, roadmap changes, edits — before they take effect. → S1.3 review queue,
+  S2.2 skill approval.
+- **I manage what my agent is made of.** I view/edit its skills, see its memory,
+  and set which tools it may use. → Track 2.
+- **My documents stay with the work.** I attach files to a session and my agent
+  refers back to them later, even after I reload. → Track 6.
+
+### As an agent (cognition differs — special consideration)
+
+- **My own skills.** I create and use skills unique to me — my personal toolkit,
+  not shared unless I share them. → persona-scoped skills (S2.2 + S6.5 persona).
+- **Skills for this workspace.** I create a skill for my current workspace (e.g.
+  the reducer-graph demo) that other agents in that workspace can use. →
+  project/workspace-scoped skills (S2.2 + S6.5 project).
+- **Skills for everyone.** I create and *suggest* a global skill any agent could
+  use — pending a human's approval. → global skills + suggest/approve (S2.2 +
+  review).
+- **I remember.** I remember across turns and sessions and recall what's relevant
+  — my own memory, plus what a workspace/project should know. → S3.1 (persona +
+  project scope).
+- **A shared scratch space.** I have a persistent blackboard I share with the
+  user and other agents in the session to think out loud and hand off work. →
+  S3.2.
+- **I can run code.** I write and run scripts in a persistent sandbox — pull
+  data, transform it, save intermediate files — and pick up where I left off. →
+  S3.3 (eve sandbox).
+- **I improve myself.** I draft a new skill, test it in my sandbox, and keep it
+  if it works — refining my own toolkit over time. → S3.3 + S2.2 self-improvement.
+- **I keep who I am as I move.** My personality and memory persist across the
+  workspaces and sessions I join, and I collaborate with other agents in a shared
+  session without losing my identity. → Track 8 + S3.4 multi-agent.
+
+*Gap surfaced by these:* an **agent identity / personality** model (Track 8) —
+the persona *is* the "me" that owns persona-scoped skills/memory and travels
+across workspaces. Persona scope (S6.5) is its substrate; the identity itself
+needs its own story (see Track 8).
+
+---
+
 ## Track 0 — Attachments & Ingress (in flight)
 
 - **S0.1 — Vision + text-document delivery** · `shipped` / delivery `verified`
@@ -90,6 +146,22 @@ the agent a persistent document workspace (converges with Track 3 blackboard).
   content on demand ("refer back persistently"). AC: agent asked to summarize an
   attached file calls read-file and answers from real content. Routing:
   `pi:luna`. Gate `peer`.
+- **S6.5 — Tiered resource scope (session / project|workspace / agent|persona)**
+  · `ready` **(cross-cutting — the scoping model for artifacts, memory, skills,
+  blackboard)** — S6.1's store is session-HARDCODED (`x-sigil-session-id`,
+  `sessions/<id>/artifacts`). Generalize the key from a bare session id to a
+  **tier + id** reusing `@gonk/scope`'s tiers: **session** (ephemeral, shared by
+  session members), **project/workspace** (cross-session, shared in a project),
+  **agent/persona** (an agent identity's own persistent skills/memory/files —
+  self-improvement lives here). Manifest becomes `<tier>/<id>/…`; session stays
+  the default. **Scope tier ≠ authorization** (auth spec): the tier is where a
+  resource lives + how broadly shared; a SEPARATE membership check authorizes
+  who may touch it — a project store is shared-to-all unless authz gates it.
+  Persona scope has a real consumer now (S2.2 "agent's own skills", S3.1
+  memory), so build the tiered key now; populate tiers as consumers land.
+  Applies equally to S3.1 (memory: persona/project), S3.2 (blackboard:
+  session/project), S2.2 (skills: persona/project). Routing: `pi:luna`. Gate
+  `peer`.
 - **S6.4 — File-chip UI + durable reload** · `ready` → after S6.1 — attachments
   render as file chips in the user's message (already partly true) and **survive
   a refresh** because they're artifact-backed. AC: reload the page → chips + the
@@ -139,6 +211,55 @@ workspace, and a review queue.
   David reviews as a normal part of working. Closes the "assign me review tasks
   within the tool" loop.
   - Routing: `self` (instructions/skill = judgment). **Gate: `browser:David`**.
+- **S1.5 — Markdown persistence adapter (dual MCP + manual)** · `ready` **(David,
+  2026-07-18 — the persistence he wants)** — a `MarkdownWorkItemsRepository` at
+  the S7.0 `WorkItemsRepository` seam that persists each story as an **indexed
+  `.md` file with YAML frontmatter** under one external, configurable roadmap
+  directory (`SIGIL_ROADMAP_DIR`, default `~/.sigil/roadmap`) shared by every
+  worktree and branch. Frontmatter: id/worktree/epic/status/routing/reviewGate/
+  deps/assignee/reviewDecision/timestamps; body: intent + acceptance criteria +
+  comments. Same pattern as the agent memory files (`.md` + headmatter + index),
+  but not git-tracked. One backlog, three ways in — the board, the
+  `sigil-story-*` tools, OR a text editor; the app reads+writes the files and
+  picks up manual edits on refetch. Replaces the JSON `FileWorkItemsRepository`
+  as the app backing. Routing: `pi:luna`. Gate `peer`. (This is how the backlog
+  becomes self-hosting.)
+- **S1.6 — Extract generic `Board`/Kanban to sigil-design (sigil-first)** ·
+  `ready` **(David, 2026-07-18 — liked the board, "is this a sigil-design
+  example?")** — the roadmap board is app-local; the generic status-grouped
+  board (columns + cards, like `ResourceManager` became generic) belongs in
+  sigil-design as a reusable component + a `/showcase` example. Roadmap becomes
+  one domain instance composing it. Extract → sigil-design `packages/ui`
+  (canonical) + showcase, carry into sigil-chat, rewire `roadmap-workspace` to
+  consume it. Routing: `claude`. Gate `browser:David`.
+  - **S1.6a — Kanban drag & drop** (David, 2026-07-18) — the generic `Board`
+    supports dragging cards between columns (→ transition status) and reordering
+    within a column, keyboard-accessible, optimistic through the domain-outcome
+    loop. Part of the extracted `Board`, not a roadmap one-off. `claude` ·
+    `browser:David`.
+
+## Sigil-first extraction candidates (surfaced this session)
+
+App-local patterns that should graduate to sigil-design (canonical) + a
+`/showcase` example, then be consumed back — the [[stack-is-a-compass]] check:
+extract where a real consumer shares the seam; the dry-season ones are notes.
+
+- **X1 — `Board`/Kanban (+ DnD)** → S1.6 / S1.6a. `ready`.
+- **X2 — `FileChip` / attachment chip** · `ready` — the collapsible file chip
+  from the de-spam (`AttachmentTextChip`: filename + line count, expands to body)
+  is a clean reusable atom; pair with the image lightbox as an attachment-display
+  family. `claude`.
+- **X3 — Review / approval-inbox queue** · `ready` — the David review queue
+  (items assigned to a person, approve / request-changes, live via domain
+  outcome) is a reusable pattern (like `ResourceManager` → `packages/data`).
+  Extract a headless/compound `ReviewQueue`. `claude`.
+- **X4 — Markdown-frontmatter collection store** · `spec` (dry-season) — the S1.5
+  `.md`-per-record + frontmatter + index persistence is generic (also how agent
+  memory works). Extract a reusable store primitive ONLY when a 2nd consumer
+  appears (memory/blackboard/skills; possibly `@mirk`-adjacent). Note, not now.
+- **X5 — Ingress `Dropzone` compound** · `ready` — a thin `Dropzone.Root/Trigger`
+  over `use-file-upload` for non-chat surfaces (already flagged in
+  `INGRESS-CORES.md` follow-ons). `claude`.
 
 ## Track 2 — Agent operations surfaces (David, 2026-07-18)
 
@@ -197,18 +318,24 @@ first — every AC is a behavioral A/B, never "the store persists."
   self-improvement loops. This is the eve-sandbox execution surface; it does NOT
   need gonk exec (which stays denied, orthogonal). Depends on **S3.4** for cloud.
 
-- **S3.4 — Sandbox provider: local → cloud, per-user** · `spec` **(aligns to
-  `docs/specs/AUTH-AND-USER-SETTINGS-SPEC.md`)** — eve's sandbox today is one
-  microsandbox per eve *session* (local-dev only: Apple-Silicon microsandbox, no
-  Docker; not per product-channel, not per-user). Cloud needs a per-user
-  cloud-grade sandbox (microVM/container — Firecracker/gVisor/etc.). Make eve's
-  sandbox a **pluggable provider** (microsandbox local / cloud-sandbox prod).
-  **Isolation boundary = the authenticated Better Auth `User` (`user_01…`)**,
-  propagated as the trusted principal Web→Eve→sandbox — NOT the eve session and
-  NOT a `@gonk/scope` tier (the auth spec is explicit these are not ownership
-  boundaries). Verify: subagent sandbox isolation; session→User mapping.
-  **Blocks cloud deploy of any exec surface;** design with the auth spec, not
-  after it.
+- **S3.4 — Sandbox provider: local → cloud, session-scoped (shareable)** ·
+  `spec` **(aligns to `docs/specs/AUTH-AND-USER-SETTINGS-SPEC.md`; needs a
+  session-membership model)** — eve's sandbox today is one microsandbox per eve
+  session (local-dev only: Apple-Silicon microsandbox, no Docker). Cloud needs a
+  cloud-grade sandbox (microVM/container — Firecracker/gVisor). Make eve's
+  sandbox a **pluggable provider** (microsandbox local / cloud prod).
+  **Isolation boundary = the SESSION, not the user (David, 2026-07-18: sessions
+  are shareable — multi-user + multi-agent).** The sandbox / `/workspace` /
+  blackboard (S3.2) / artifacts (S6.1) are **session-scoped shared resources**;
+  within a session, members share them by design. Access = **session
+  membership** (a set of authenticated Better Auth users + agent participants),
+  authorized explicitly (satisfies the auth spec's "authorize by user, never
+  infer" rule — explicit membership IS the authz). Isolation is *between*
+  sessions. v1 membership = owner-only (matches auth v1), but scope to the
+  session from the start so sharing/multi-agent drop in without a rewrite.
+  **Prereq flagged to codex's auth spec:** it's owner-only today — it needs a
+  session-membership/sharing model + agents-as-participants. Verify: subagent
+  sandbox sharing vs. isolation; cross-session isolation. Blocks cloud exec.
 
 ## Track 4 — Demo surfaces (future; menu in DEMO-CONCEPTS)
 
@@ -263,3 +390,23 @@ audit. Solid REUSE layer (no story needed): `@gonk/tool-registry`(+`-mcp`),
 - **S7.7 — Capability channels** · `spec` — every tool is `visibility:"always"`;
   the `@gonk/channel` proposal is the real fix for the prompt-budget problem.
   Proposal-only today; schedule, don't build blind.
+
+## Track 8 — Agent identity / personality (surfaced by the experience stories)
+
+The "me" the agent stories hinge on: a persistent identity that owns its
+persona-scoped skills + memory and travels across the workspaces/sessions it
+joins. Distinct from a static `defineAgent` (authored git TS) — an identity
+*accretes* memory and skills over time and is a first-class session participant.
+This bears taste + identity, so the model is `decision:David`.
+
+- **S8.1 — Persona model** · `decision:David` — what an agent identity IS: the
+  authored base (`defineAgent`: personality/instructions) + the accreted persona
+  (durable persona-scoped memory [S3.1], persona skills [S2.2], a stable id).
+  Design first. (Cf. David's existing persona/self-model infra — align, don't
+  reinvent.)
+- **S8.2 — Identity travels** · `spec` → after S8.1 — "my agent comes with me":
+  switching workspace/demo keeps the same identity + thread + memory. Needs the
+  session model (S3.4) + persona scope (S6.5). UI `claude` · plumbing `pi:luna`.
+- **S8.3 — Multi-agent in a session** · `spec` — several agents share one
+  session, each keeping its own identity/persona while sharing the session
+  workspace/blackboard. → S3.4 membership (agents as participants).
