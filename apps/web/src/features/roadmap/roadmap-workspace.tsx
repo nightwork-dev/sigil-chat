@@ -48,6 +48,14 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { Textarea } from "@workspace/ui/components/textarea"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@workspace/ui/components/sheet"
+import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
 import { cn } from "@workspace/ui/lib/utils"
 
 type AsidePane = "queue" | "detail"
@@ -72,8 +80,10 @@ function orderReviews(reviews: ReviewItem[]): ReviewItem[] {
 export function RoadmapWorkspace() {
   const stories = useStories()
   const reviews = useReviews()
+  const isMobile = useIsMobile()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [pane, setPane] = useState<AsidePane>("queue")
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const allStories = stories.data ?? []
   const grouped = groupByStatus(allStories)
@@ -84,14 +94,47 @@ export function RoadmapWorkspace() {
   const selectedStory = allStories.find((story) => story.id === selectedId) ?? null
   const storiesById = new Map(allStories.map((story) => [story.id, story]))
 
+  // On phones the aside is a sheet; opening a story or the queue drives it.
+  // On ≥md the aside is inline and `sheetOpen` is inert.
   const openDetail = (id: string) => {
     setSelectedId(id)
     setPane("detail")
+    setSheetOpen(true)
+  }
+  const openQueue = () => {
+    setPane("queue")
+    setSheetOpen(true)
   }
 
+  const paneBody = (
+    <AsidePaneBody
+      pane={pane}
+      setPane={setPane}
+      pendingCount={pendingCount}
+      davidReviews={davidReviews}
+      storiesById={storiesById}
+      selectedStory={selectedStory}
+      onOpenStory={openDetail}
+    />
+  )
+
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 overflow-hidden bg-background lg:grid-cols-[minmax(0,1fr)_380px]">
-      <section aria-label="Story board" className="min-h-0 overflow-hidden">
+    <div className="grid h-full min-h-0 grid-cols-1 overflow-hidden bg-background md:grid-cols-[minmax(0,1fr)_380px]">
+      <section aria-label="Story board" className="flex min-h-0 flex-col overflow-hidden">
+        {/* Phone-only bar: the review queue / story detail live in a sheet here,
+            so give a way to reach the queue without selecting a card first. */}
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 md:hidden">
+          <span className="text-xs font-medium text-muted-foreground">Story board</span>
+          <Button size="sm" variant="outline" onClick={openQueue}>
+            <InboxIcon />
+            Review queue
+            {pendingCount > 0 ? (
+              <Badge className="ml-1 h-4 min-w-4 px-1 font-mono text-[0.5625rem]">
+                {pendingCount}
+              </Badge>
+            ) : null}
+          </Button>
+        </div>
         {stories.isLoading ? (
           <p className="p-4 text-sm text-muted-foreground">Loading the roadmap…</p>
         ) : stories.error ? (
@@ -106,7 +149,7 @@ export function RoadmapWorkspace() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="scroll-area flex h-full gap-3 overflow-x-auto p-3">
+          <div className="scroll-area flex min-h-0 flex-1 gap-3 overflow-x-auto p-3">
             {STORY_STATUS_ORDER.map((status) => (
               <BoardColumn
                 key={status}
@@ -120,51 +163,89 @@ export function RoadmapWorkspace() {
         )}
       </section>
 
-      <aside className="hidden min-h-0 flex-col border-l border-border bg-card/20 lg:flex">
-        <div className="flex items-center gap-1 border-b border-border p-2">
-          <Button
-            size="sm"
-            variant={pane === "queue" ? "secondary" : "ghost"}
-            aria-pressed={pane === "queue"}
-            onClick={() => setPane("queue")}
-          >
-            <InboxIcon />
-            Review queue
-            {pendingCount > 0 ? (
-              <Badge className="ml-1 h-4 min-w-4 px-1 font-mono text-[0.5625rem]">
-                {pendingCount}
-              </Badge>
-            ) : null}
-          </Button>
-          <Button
-            size="sm"
-            variant={pane === "detail" ? "secondary" : "ghost"}
-            aria-pressed={pane === "detail"}
-            onClick={() => setPane("detail")}
-          >
-            <LayoutListIcon />
-            Story
-          </Button>
-        </div>
-        <div className="scroll-area min-h-0 flex-1 overflow-y-auto">
-          {pane === "queue" ? (
-            <ReviewQueue reviews={davidReviews} storiesById={storiesById} onOpenStory={openDetail} />
-          ) : selectedStory ? (
-            <StoryDetail
-              key={selectedStory.id}
-              story={selectedStory}
-              pendingReview={davidReviews.some(
-                (review) => review.storyId === selectedStory.id && !review.completed,
-              )}
-            />
-          ) : (
-            <p className="p-4 text-sm text-muted-foreground">
-              Select a story on the board to edit it here.
-            </p>
-          )}
-        </div>
+      <aside className="hidden min-h-0 flex-col border-l border-border bg-card/20 md:flex">
+        {!isMobile ? paneBody : null}
       </aside>
+
+      {isMobile ? (
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="right" className="flex w-[88%] max-w-sm flex-col gap-0 p-0">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Roadmap review</SheetTitle>
+              <SheetDescription>Review queue and story detail</SheetDescription>
+            </SheetHeader>
+            {paneBody}
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
+  )
+}
+
+// The aside's tab bar + body (review queue | story detail). Rendered inline in
+// the desktop aside and inside the phone sheet — one implementation, both homes.
+function AsidePaneBody({
+  pane,
+  setPane,
+  pendingCount,
+  davidReviews,
+  storiesById,
+  selectedStory,
+  onOpenStory,
+}: {
+  pane: AsidePane
+  setPane: (pane: AsidePane) => void
+  pendingCount: number
+  davidReviews: ReviewItem[]
+  storiesById: Map<string, StoryData>
+  selectedStory: StoryData | null
+  onOpenStory: (id: string) => void
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-1 border-b border-border p-2">
+        <Button
+          size="sm"
+          variant={pane === "queue" ? "secondary" : "ghost"}
+          aria-pressed={pane === "queue"}
+          onClick={() => setPane("queue")}
+        >
+          <InboxIcon />
+          Review queue
+          {pendingCount > 0 ? (
+            <Badge className="ml-1 h-4 min-w-4 px-1 font-mono text-[0.5625rem]">
+              {pendingCount}
+            </Badge>
+          ) : null}
+        </Button>
+        <Button
+          size="sm"
+          variant={pane === "detail" ? "secondary" : "ghost"}
+          aria-pressed={pane === "detail"}
+          onClick={() => setPane("detail")}
+        >
+          <LayoutListIcon />
+          Story
+        </Button>
+      </div>
+      <div className="scroll-area min-h-0 flex-1 overflow-y-auto">
+        {pane === "queue" ? (
+          <ReviewQueue reviews={davidReviews} storiesById={storiesById} onOpenStory={onOpenStory} />
+        ) : selectedStory ? (
+          <StoryDetail
+            key={selectedStory.id}
+            story={selectedStory}
+            pendingReview={davidReviews.some(
+              (review) => review.storyId === selectedStory.id && !review.completed,
+            )}
+          />
+        ) : (
+          <p className="p-4 text-sm text-muted-foreground">
+            Select a story on the board to edit it here.
+          </p>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -182,11 +263,14 @@ function BoardColumn({
   const meta = STORY_STATUS[status]
   return (
     <div className="flex h-full w-72 shrink-0 flex-col">
-      <div className="flex items-center justify-between px-1 pb-2">
+      <div className="flex items-center justify-between px-2 pb-2">
         <span className="text-xs font-medium">{meta.label}</span>
         <span className="font-mono text-[0.625rem] text-muted-foreground">{stories.length}</span>
       </div>
-      <div className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pe-1.5 pb-2">
+      {/* px gives the selected card's focus ring breathing room (it was clipped
+          on the left); .scroll-area reserves the scrollbar gutter so it doesn't
+          sit flush against the cards' right edge. */}
+      <div className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2 pt-0.5 pb-2">
         {stories.length === 0 ? (
           <p className="px-1 text-[0.625rem] text-muted-foreground/70">Empty</p>
         ) : (
