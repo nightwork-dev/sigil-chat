@@ -49,6 +49,7 @@ const ROUTING_LABEL: Record<Routing, string> = {
   "claude:opus": "claude:opus",
   "claude:sonnet": "claude:sonnet",
   "pi:luna": "pi:luna",
+  codex: "codex",
 }
 
 // browser:David / decision:David are David's own gates (actionable by him);
