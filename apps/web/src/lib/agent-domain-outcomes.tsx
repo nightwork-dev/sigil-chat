@@ -12,6 +12,7 @@ import {
   type AgentClientCommand,
 } from "@/lib/agent-client-command"
 import { REVIEW_DOCUMENT_ID, reviewDocumentKeys } from "./review-document"
+import { workItemKeys } from "./work-items"
 
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "review.document.changed",
@@ -40,10 +41,37 @@ const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   },
 }
 
+const workItemsChangedHandler: AgentOutcomeReconciliationHandler = {
+  kind: "work-items.changed",
+  schema: {
+    "~standard": {
+      version: 1,
+      vendor: "sigil-chat",
+      validate(value) {
+        const outcome = value as AgentDomainOutcome
+        if (
+          !value ||
+          typeof value !== "object" ||
+          outcome.kind !== "work-items.changed" ||
+          outcome.resource?.kind !== "work-items-board" ||
+          typeof outcome.resource.id !== "string" ||
+          outcome.resource.id.length === 0
+        ) {
+          return { issues: [{ message: "Expected a work-items outcome" }] }
+        }
+        return { value: outcome }
+      },
+    },
+  },
+  reconcile: async (_outcome, context) => {
+    await context.invalidate([workItemKeys.all()])
+  },
+}
+
 export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
   return createReactQueryOutcomeDispatcher({
     queryClient,
-    handlers: [reviewDocumentChangedHandler],
+    handlers: [reviewDocumentChangedHandler, workItemsChangedHandler],
     duplicateKindPolicy: "reject",
     unhandledOutcomePolicy: "ignore",
   })

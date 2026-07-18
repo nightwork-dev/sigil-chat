@@ -1,0 +1,211 @@
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import { createServerFn } from "@tanstack/react-start";
+import type {
+  ReviewDecision,
+  ReviewGate,
+  Story,
+  StoryStatus,
+  WorkItemsMutationResult,
+} from "@workspace/work-items-store/types";
+
+const listStoriesFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { workItemsRepository } = await import("@workspace/work-items-store");
+  return workItemsRepository.list();
+});
+
+const listReviewsFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { workItemsRepository } = await import("@workspace/work-items-store");
+  const document = await workItemsRepository.get();
+  return document.reviews;
+});
+
+const getStoryFn = createServerFn({ method: "GET" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const story = document.stories.find(
+      (candidate) => candidate.id === data.id,
+    );
+    if (!story) throw new Error(`Unknown story id: ${data.id}.`);
+    return story;
+  });
+
+const upsertStoryFn = createServerFn({ method: "POST" })
+  .validator((input: { story: Story; expectedRevision?: number }) => input)
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return workItemsRepository.upsertStory(data.story, data.expectedRevision);
+  });
+
+const transitionStoryFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: { id: string; status: StoryStatus; expectedRevision?: number }) =>
+      input,
+  )
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return workItemsRepository.transitionStory(
+      data.id,
+      data.status,
+      data.expectedRevision,
+    );
+  });
+
+const assignReviewFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      id: string;
+      gate: ReviewGate;
+      title?: string;
+      summary?: string;
+      expectedRevision?: number;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return workItemsRepository.assignReview(
+      data.id,
+      {
+        assignee: "David",
+        gate: data.gate,
+        title: data.title,
+        summary: data.summary,
+      },
+      data.expectedRevision,
+    );
+  });
+
+const decideReviewFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      reviewId: string;
+      decision: ReviewDecision;
+      decidedBy?: string;
+      expectedRevision?: number;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return workItemsRepository.decideReview(
+      data.reviewId,
+      data.decision,
+      data.decidedBy ?? "David",
+      data.expectedRevision,
+    );
+  });
+
+export const workItemKeys = {
+  all: () => ["work-items"] as const,
+  detail: (id: string) => [...workItemKeys.all(), id] as const,
+  reviews: () => [...workItemKeys.all(), "reviews"] as const,
+};
+
+export function useStories() {
+  return useQuery({
+    queryKey: workItemKeys.all(),
+    queryFn: () => listStoriesFn(),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    // Temporary cross-process recovery until resource revision notifications
+    // are available. Current-browser writes reconcile immediately below.
+    refetchInterval: 15_000,
+  });
+}
+
+export function useReviews() {
+  return useQuery({
+    queryKey: workItemKeys.reviews(),
+    queryFn: () => listReviewsFn(),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    // Same cross-process recovery cadence as the stories board; current-browser
+    // writes reconcile immediately below.
+    refetchInterval: 15_000,
+  });
+}
+
+export function useStory(id: string | undefined) {
+  return useQuery({
+    queryKey: workItemKeys.detail(id ?? "none"),
+    queryFn: () => getStoryFn({ data: { id: id ?? "" } }),
+    enabled: Boolean(id),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useUpsertStory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { story: Story; expectedRevision?: number }) =>
+      upsertStoryFn({ data: input }),
+    onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+export function useTransitionStory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      status: StoryStatus;
+      expectedRevision?: number;
+    }) => transitionStoryFn({ data: input }),
+    onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+export function useAssignReview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      gate: ReviewGate;
+      title?: string;
+      summary?: string;
+      expectedRevision?: number;
+    }) => assignReviewFn({ data: input }),
+    onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+export function useDecideReview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      reviewId: string;
+      decision: ReviewDecision;
+      decidedBy?: string;
+      expectedRevision?: number;
+    }) => decideReviewFn({ data: input }),
+    onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+function reconcileWorkItems(
+  queryClient: QueryClient,
+  result: WorkItemsMutationResult,
+): Promise<void> {
+  queryClient.setQueryData(workItemKeys.all(), result.document.stories);
+  queryClient.setQueryData(workItemKeys.reviews(), result.document.reviews);
+  const changedIds = new Set(result.changedIds);
+  for (const story of result.document.stories) {
+    const storyReviewChanged = result.document.reviews.some(
+      (review) => review.storyId === story.id && changedIds.has(review.id),
+    );
+    if (changedIds.has(story.id) || storyReviewChanged) {
+      queryClient.setQueryData(workItemKeys.detail(story.id), story);
+    }
+  }
+  return queryClient.invalidateQueries({ queryKey: workItemKeys.all() });
+}
