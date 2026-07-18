@@ -49,10 +49,12 @@ reports/
 *.pem
 
 # Agent tooling scratch state — .agents/index.md is the canonical instructions
-# file (CLAUDE.md/AGENTS.md symlink to it), keep it; ignore everything else
-# under .agents (session memory, etc.)
+# file (CLAUDE.md/AGENTS.md symlink to it), keep it; .agents/skills/ is the
+# tracked, portable (codex-facing) skills tree, keep it too; ignore everything
+# else under .agents (session memory, etc.)
 .agents/*
 !.agents/index.md
+!.agents/skills/
 .omc
 .playwright-mcp
 traces/
@@ -60,3 +62,8 @@ apps/web/public/llms.txt
 
 # Internal planning/strategy docs — not shipped in the public template
 docs.local/
+
+# Machine-local agent coordination state (worktree map, roadmap store path,
+# live agent roster) — loads for Claude Code on this machine but is never
+# committed; see .claude/skills/local-coordination/SKILL.md.
+.claude/skills/local-coordination/
