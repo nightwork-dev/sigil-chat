@@ -90,7 +90,7 @@ export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
 ```
 
 `createReactQueryOutcomeDispatcher` and the `AgentOutcomeReconciliationHandler`
-type come from `@niwork/agent-react-query` — the outcome dispatch mechanism
+type come from `@zigil/agent-react-query` — the outcome dispatch mechanism
 itself is a released package, not app-owned. What's app-owned is the single
 handler registered above: it matches outcomes of `kind:
 "review.document.changed"` and invalidates the React Query key
@@ -146,12 +146,12 @@ const send = useCallback<AgentRuntimeSession["send"]>(
 )
 ```
 
-`attention` comes from `useAttention()` (`@niwork/agent`), which reads
+`attention` comes from `useAttention()` (`@zigil/agent-react`), which reads
 whatever the surrounding `AttentionProvider` publishes. A workspace opts in
 by wrapping its content in `AttentionProvider` and reporting selections
 through it — `apps/web/src/features/review/review-workspace.tsx` does this
 (`AttentionProvider`, `AttentionContext`, `AttentionSelection` all imported
-from `@niwork/agent/attention`), so as the user selects a passage or
+from `@zigil/agent-react`), so as the user selects a passage or
 annotation in the review UI, that selection becomes part of the next agent
 turn's `clientContext` automatically, with no per-call plumbing in the
 component that sends the message.
