@@ -1,3 +1,9 @@
+// Thin adapter mapping the agent contract (@workspace/agent-contracts'
+// AgentUiHighlightAction) onto the generic @workspace/ui imperative-emphasis
+// engine. Preserves the existing wire contract — the `data-agent-target`
+// attribute and the `sigil:agent-dom-command` event — so `useAgentTarget`,
+// `getAgentTargetProps`, and the outcome projector don't have to change. See
+// sigil-design docs.local/specs/INGRESS-CORES.md, "Imperative emphasis".
 import {
   agentUiHighlightEffects,
   isAgentTargetId,
@@ -5,10 +11,21 @@ import {
   type AgentUiHighlightAction,
   type AgentUiHighlightEffect,
 } from "@workspace/agent-contracts/ui-highlight"
+import {
+  clearEmphasis,
+  emphasize,
+  emphasizeBatch,
+  getEmphasisTargetProps,
+  isEmphasisCommand,
+  normalizeEmphasisCommand,
+  type EmphasisCommand,
+  type EmphasisCommandEventDetail,
+} from "@workspace/ui/lib/imperative-emphasis"
 
 export { isAgentTargetId } from "@workspace/agent-contracts/ui-highlight"
 
 export const AGENT_DOM_COMMAND_EVENT = "sigil:agent-dom-command"
+export const AGENT_TARGET_ATTRIBUTE = "data-agent-target"
 
 export const agentDomEffects = agentUiHighlightEffects
 
@@ -24,95 +41,39 @@ export interface AgentDomBatchOptions {
   clearPrevious?: boolean
 }
 
-export type AgentDomCommandEventDetail =
-  | { action: "apply"; command: AgentDomCommand }
-  | {
-      action: "apply-batch"
-      commands: AgentDomCommand[]
-      clearPrevious: boolean
-    }
-  | { action: "clear" }
-
-const MIN_DURATION_MS = 300
-const MAX_DURATION_MS = 10_000
-const DEFAULT_DURATION_MS = 2_500
+export type AgentDomCommandEventDetail = EmphasisCommandEventDetail
 
 export function isAgentDomCommand(value: unknown): value is AgentDomCommand {
-  if (!value || typeof value !== "object" || !isAgentUiHighlightAction(value))
-    return false
-
-  const command = value as unknown as Record<string, unknown>
-
   return (
-    (command.durationMs === undefined ||
-      (typeof command.durationMs === "number" &&
-        Number.isFinite(command.durationMs))) &&
-    (command.scroll === undefined ||
-      command.scroll === "none" ||
-      command.scroll === "nearest" ||
-      command.scroll === "center")
+    !!value &&
+    typeof value === "object" &&
+    isAgentUiHighlightAction(value) &&
+    isEmphasisCommand(value as unknown as EmphasisCommand)
   )
 }
 
 export function normalizeAgentDomCommand(
   command: AgentDomCommand,
 ): AgentDomCommand {
-  return {
-    ...command,
-    targetIds: [...new Set(command.targetIds)],
-    durationMs: Math.min(
-      MAX_DURATION_MS,
-      Math.max(MIN_DURATION_MS, command.durationMs ?? DEFAULT_DURATION_MS),
-    ),
-    scroll: command.scroll ?? "nearest",
-  }
+  return normalizeEmphasisCommand(command)
 }
 
 export function dispatchAgentDomCommand(command: AgentDomCommand): boolean {
-  if (typeof window === "undefined" || !isAgentDomCommand(command)) return false
-
-  window.dispatchEvent(
-    new CustomEvent<AgentDomCommandEventDetail>(AGENT_DOM_COMMAND_EVENT, {
-      detail: { action: "apply", command: normalizeAgentDomCommand(command) },
-    }),
-  )
-  return true
+  return emphasize(command, { eventName: AGENT_DOM_COMMAND_EVENT })
 }
 
 export function dispatchAgentDomCommands(
   commands: AgentDomCommand[],
   options: AgentDomBatchOptions = {},
 ): boolean {
-  if (
-    typeof window === "undefined" ||
-    commands.length === 0 ||
-    commands.length > 50 ||
-    !commands.every(isAgentDomCommand)
-  ) {
-    return false
-  }
-
-  window.dispatchEvent(
-    new CustomEvent<AgentDomCommandEventDetail>(AGENT_DOM_COMMAND_EVENT, {
-      detail: {
-        action: "apply-batch",
-        commands: commands.map(normalizeAgentDomCommand),
-        clearPrevious: options.clearPrevious ?? true,
-      },
-    }),
-  )
-  return true
+  return emphasizeBatch(commands, {
+    ...options,
+    eventName: AGENT_DOM_COMMAND_EVENT,
+  })
 }
 
 export function clearAgentDomEffects(): boolean {
-  if (typeof window === "undefined") return false
-
-  window.dispatchEvent(
-    new CustomEvent<AgentDomCommandEventDetail>(AGENT_DOM_COMMAND_EVENT, {
-      detail: { action: "clear" },
-    }),
-  )
-  return true
+  return clearEmphasis({ eventName: AGENT_DOM_COMMAND_EVENT })
 }
 
 export function getAgentTargetProps(targetId: string): {
@@ -124,5 +85,7 @@ export function getAgentTargetProps(targetId: string): {
     )
   }
 
-  return { "data-agent-target": targetId }
+  return getEmphasisTargetProps(targetId, AGENT_TARGET_ATTRIBUTE) as {
+    "data-agent-target": string
+  }
 }
