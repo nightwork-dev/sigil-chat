@@ -106,7 +106,7 @@ export function RoadmapWorkspace() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="flex h-full gap-3 overflow-x-auto p-3">
+          <div className="scroll-area flex h-full gap-3 overflow-x-auto p-3">
             {STORY_STATUS_ORDER.map((status) => (
               <BoardColumn
                 key={status}
@@ -146,7 +146,7 @@ export function RoadmapWorkspace() {
             Story
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="scroll-area min-h-0 flex-1 overflow-y-auto">
           {pane === "queue" ? (
             <ReviewQueue reviews={davidReviews} storiesById={storiesById} onOpenStory={openDetail} />
           ) : selectedStory ? (
@@ -186,7 +186,7 @@ function BoardColumn({
         <span className="text-xs font-medium">{meta.label}</span>
         <span className="font-mono text-[0.625rem] text-muted-foreground">{stories.length}</span>
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pb-2">
+      <div className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pe-1.5 pb-2">
         {stories.length === 0 ? (
           <p className="px-1 text-[0.625rem] text-muted-foreground/70">Empty</p>
         ) : (
