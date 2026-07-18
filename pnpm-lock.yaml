@@ -646,6 +646,9 @@ importers:
 
   packages/work-items-store:
     dependencies:
+      '@mirk/store-markdown':
+        specifier: 0.1.0
+        version: 0.1.0(better-sqlite3@12.10.0)
       '@workspace/file-store-core':
         specifier: workspace:*
         version: link:../file-store-core
@@ -1398,8 +1401,22 @@ packages:
   '@mirk/artifact@0.1.0':
     resolution: {integrity: sha512-44zwAmq7G2Y5BPQrETNfdUKqLiKaQq6PnRYcSnYs2kh3xqkpKDEh7ZtyXW6f6f3bLP7J9YM50AC3eEIddCox4w==}
 
+  '@mirk/store-markdown@0.1.0':
+    resolution: {integrity: sha512-KtGY9UNMNPIZmLZ3Rp5ubviWOP4SaCN3UTv9EK2SK2wFiQLjEpwC8WhQzzJ68wRt4zqW+vvsCTjaoJOcNLVMCQ==}
+
   '@mirk/store@0.6.1':
     resolution: {integrity: sha512-kvtFADcW1O7sh1JsSeLoLEK5exX03hBpBcRgRuKFbunfbv2Zc20S34/9dQSpjiHmqzs817t28xLrdZVzM1M+zg==}
+    peerDependencies:
+      better-sqlite3: ^11.0.0 || ^12.0.0
+      sqlite-vec: ^0.1.0
+    peerDependenciesMeta:
+      better-sqlite3:
+        optional: true
+      sqlite-vec:
+        optional: true
+
+  '@mirk/store@0.7.0':
+    resolution: {integrity: sha512-371W/N4G0xK2OKWmeKtm8xdTIiT/aQ3Z+kX3aIfAbehmMYUiZp1oSG5AlSGtPvoV8vg2OEV1MTqX4hHoIVSk4w==}
     peerDependencies:
       better-sqlite3: ^11.0.0 || ^12.0.0
       sqlite-vec: ^0.1.0
@@ -7046,7 +7063,19 @@ snapshots:
       - better-sqlite3
       - sqlite-vec
 
+  '@mirk/store-markdown@0.1.0(better-sqlite3@12.10.0)':
+    dependencies:
+      '@mirk/store': 0.7.0(better-sqlite3@12.10.0)
+      yaml: 2.9.0
+    transitivePeerDependencies:
+      - better-sqlite3
+      - sqlite-vec
+
   '@mirk/store@0.6.1(better-sqlite3@12.10.0)':
+    optionalDependencies:
+      better-sqlite3: 12.10.0
+
+  '@mirk/store@0.7.0(better-sqlite3@12.10.0)':
     optionalDependencies:
       better-sqlite3: 12.10.0
 
