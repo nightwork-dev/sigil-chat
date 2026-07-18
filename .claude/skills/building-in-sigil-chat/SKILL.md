@@ -36,22 +36,56 @@ Sigil Chat is an **app** in this stack, composing:
   policy, domain reconciliation, attention projection, sessions, persistence
   wiring. See this repo's `CLAUDE.md` for the full monorepo layout.
 
-Sigil-first rule: if a piece of UI/presentation work can be generalized and
-reused, it goes in `sigil-design` FIRST (via the registry, installed as
-owned source), then gets carried into Sigil Chat. Domain-semantic UI that
-encodes sigil-chat-specific meaning stays app-owned.
+## The registry loop (sigil-first, enforced — not a virtue)
+
+Sigil Design is a **registry we consume from and extract into continuously**,
+not a lineage note. The loop has two mandatory checkpoints, and a story that
+skips either is not done:
+
+**Before authoring any component or hook (step 0 of every feature):**
+1. Grep this repo's `packages/ui` — does it already exist here?
+2. Check sigil-design's `/showcase` catalog and the registry
+   (`pnpm dlx shadcn@latest add @sigil/<name>`) — if it exists there,
+   **install it as owned source; do not re-author it.**
+3. Only if it exists nowhere: classify it *at creation time* —
+   **generalizable** (any app could want this shape) → author it in
+   sigil-design first (+ showcase example), then carry it here; or
+   **app-domain** (encodes sigil-chat-specific meaning) → author it here and
+   say why in the story.
+
+**Before a story moves to `verify`/`shipped` (the extraction verdict):**
+Every story whose diff touches components, hooks, or presentation records one
+of four verdicts on the story (frontmatter `extraction:` once S1.5 lands; in
+the story body until then):
+- `consumed` — reused existing registry/ui components; nothing new to extract.
+- `extracted` — the new primitive landed in sigil-design (+ showcase) and this
+  repo consumes it.
+- `candidate:<X#>` — genuinely generalizable but deferred; an X-story exists
+  in the roadmap naming it (a verdict without a story is not a verdict).
+- `app-domain` — one sentence on what sigil-chat-specific meaning it encodes.
+
+No verdict → the orchestrator bounces the story back. "I'll extract it later"
+without an X-story is the exact failure mode this gate exists to stop.
 
 ## The feature flow (domain store → agent-callable → live UI)
 
 This is the shape every real feature in this repo follows — trace it through
 the worked examples below rather than trusting a description alone.
 
-1. **Domain store.** A `packages/*-store` package (or `file-store-core` for a
-   new one) owns the persisted shape and repository. Example:
-   `packages/review-store` (types + repository consumed by both the server
-   and the registry), `packages/work-items-store` — note its `package.json`
-   `exports` map (`.`, `./types`, `./repository`, `./sample`) as the pattern
-   for explicit subpath exports (no barrel `export *`).
+1. **Domain store — Mirk, never a bespoke store (David, 2026-07-18:
+   "Everything needs to go to mirk").** Persistence = a **Mirk store**
+   (`platform/mirk` — the charter's storage substrate) behind a thin
+   domain repository interface, with a custom Mirk **backend adapter** if
+   the physical shape is special (markdown+headmatter, git-per-mutation —
+   see `@mirk/store-markdown` direction). Do NOT create a new
+   `packages/*-store` hand-rolled store and do NOT extend
+   `file-store-core` — the existing store packages (`review-store`,
+   `work-items-store`, `graph-store`, `file-store-core`) are **legacy
+   precedent, not the pattern**; they migrate to Mirk under consumer pull.
+   If Mirk's contract can't express what you need, file a Mirk feature
+   request — a gap in Mirk is never a justification for a bespoke store.
+   What remains app-owned: the domain *types* and a repository interface
+   (explicit subpath exports, no barrel `export *`).
 2. **Gonk tool.** `apps/gonk/src/registry.ts` composes per-domain
    registration functions from `apps/gonk/src/registry/*.ts` (e.g.
    `registerReviewTools`, `registerStoryTools`, `registerSkillTools`) into
@@ -116,9 +150,20 @@ the worked examples below rather than trusting a description alone.
 - **No barrel files.** Every package declares explicit subpath `exports` in
   `package.json`. Consumers import the specific subpath
   (`@workspace/chat/components/chat-message`, not `@workspace/chat`).
-- **Sigil-first extraction.** Before writing app-local UI, check whether it
-  belongs in `sigil-design` first. If a needed atom/molecule/pattern is
-  missing there, add it there — don't work around it here.
+- **Single browser-facing origin — no direct browser→backend calls.** The
+  browser only ever talks to the web app's own origin. Eve and Gonk are
+  internal services, reached **server-side** — a Nitro `routeRules` proxy
+  (`/eve/**`, gonk's `/img/**` in `vite.config.ts`) or a `createServerFn`
+  (the authenticated `/upload` proxy) — never fetched directly from the
+  browser. **If you reach for a CORS header on gonk or eve, stop:** that's the
+  smell of a browser crossing an origin. Proxy it same-origin instead. This is
+  also the deployability posture — only the web app is browser-facing (one
+  exposed origin), and principal/authz propagate server-side. Cross-service
+  URLs the browser will load must be **same-origin relative paths** (e.g.
+  `imagePublicUrl` returns `/img/<key>`, not an absolute gonk URL).
+- **The registry loop.** Step 0 (consume-first check) before authoring any
+  component/hook; an extraction verdict before the story closes. See "The
+  registry loop" above — it is a gate, not a suggestion.
 - **Formatting matches the file you're editing**, not a blanket rule:
   `apps/web`/`apps/gonk` are semicolon-free; `apps/agent` is mixed.
 

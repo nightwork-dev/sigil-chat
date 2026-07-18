@@ -44,11 +44,14 @@ export function imageKeyFor(bytes: Uint8Array, mediaType: string): string {
   return `images/${digest}.${ext}`
 }
 
-/** Absolute URL the browser fetches the image from. gonk serves it at /img/;
- *  the host is env-configurable for deploys, defaulting to the Portless dev URL. */
+/** Same-origin path the browser fetches the image from. The web app proxies
+ *  `/img/**` to gonk (apps/web/vite.config.ts), so the browser only ever talks
+ *  to its own origin — no cross-origin request, no CORS. Set GONK_PUBLIC_URL to
+ *  force an absolute URL for a deployment that doesn't front gonk with the web
+ *  app's proxy. */
 export function imagePublicUrl(key: string): string {
-  const base = process.env.GONK_PUBLIC_URL ?? "http://sigil-chat-gonk.localhost:1355"
-  return `${base.replace(/\/$/, "")}/img/${key}`
+  const base = process.env.GONK_PUBLIC_URL
+  return base ? `${base.replace(/\/$/, "")}/img/${key}` : `/img/${key}`
 }
 
 /** Same served URL scheme as {@link imagePublicUrl}, named for the general

@@ -148,11 +148,9 @@ async function serveImage(
     "content-length": String(info.sizeBytes),
     // Content-addressed key → the bytes never change → cache forever.
     "cache-control": "public, max-age=31536000, immutable",
-    // Public, unguessable, read-only image bytes. The chat client fetches these
-    // cross-origin (sigil-chat.localhost → sigil-chat-gonk.localhost) to inline
-    // an attachment into a turn, and fetch()/arrayBuffer() is CORS-gated even
-    // though <img> display is not. `*` is safe on already-public image bytes.
-    "access-control-allow-origin": "*",
+    // No CORS header: the web app proxies /img same-origin (apps/web/
+    // vite.config.ts), so the browser fetches these bytes from its own origin.
+    // Gonk is an internal service, not a cross-origin browser endpoint.
   })
   for await (const chunk of stream) {
     outgoing.write(Buffer.from(chunk))

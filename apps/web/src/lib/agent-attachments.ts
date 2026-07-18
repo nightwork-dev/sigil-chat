@@ -14,7 +14,9 @@ import { AGENT_SCOPE_HEADER } from "./agent-session-scope";
  * via `turbo.json`'s `globalPassThroughEnv`, the same way `apps/agent`
  * does), reads the key server-side, and proxies the raw bytes to Gonk's
  * authenticated `/upload` route. `/img/<key>` reads stay unauthenticated
- * (content-addressed, unguessable) — only this write path is gated.
+ * (content-addressed, unguessable) and are proxied same-origin by the web app
+ * (vite.config.ts), so the browser never talks to Gonk directly for either the
+ * read or the write — only this write path is bearer-gated.
  */
 export interface UploadedAttachment {
   readonly url: string;
