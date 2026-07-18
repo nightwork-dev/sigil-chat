@@ -26,6 +26,15 @@ work.
       reach into another agent's lane without coordinating through the
       roadmap first.
 
+## RULE 0: Re-read the live direction doc after EVERY completed task
+
+- [ ] The strategy is LIVE at
+      `/Users/dr/Dev/platform/ecosystem/specs/fable-direction-20260718.md`.
+      After completing each task: check its mtime; if changed since your
+      last read, re-read it BEFORE starting the next task. Never start a
+      task on stale direction.
+- [ ] Every dispatch brief for a multi-task worker MUST include this rule.
+
 ## RULE 1: The shared roadmap is the ONLY coordination surface
 
 - [ ] The backlog lives in a **fs store OUTSIDE any worktree** —
@@ -95,6 +104,12 @@ work.
 
 - [ ] Commit verified work to `dev` as it lands. **Concern-grouped commits**
       — one feature/concern per commit, never a mega-commit.
+- [ ] **EXTRACTION VERDICT gates the merge.** Any story/branch touching
+      components/hooks/presentation must state its registry-loop verdict:
+      `consumed` / `extracted` / `candidate:<X#>` (X-story must exist) /
+      `app-domain` (+ why). Missing verdict = orchestrator bounces it.
+      Dispatch briefs for UI-touching work include this requirement and
+      demand the verdict in the worker's report.
 - [ ] **One repo per bash call.** Anchor every call with an absolute
       `cd`/`git -C` — cwd drifts between calls.
 - [ ] **Verify green BEFORE committing.** A subset of a green tree is only
@@ -114,10 +129,11 @@ work.
       `apps/agent/agent/connections/gonk.ts` — NEVER hand-copy tool defs into
       eve. `exec`-tier tools are denied by policy (see the
       `adding-gonk-tools` skill).
-- [ ] **Sigil-first:** generalizable UI belongs in `sigil-design` FIRST
-      (canonical) + a `/showcase` example, then carried into `sigil-chat` as
-      owned source and consumed. Don't build app-local what the design
-      system should own.
+- [ ] **Sigil-first = the registry loop, enforced:** consume-first check
+      before authoring (grep `packages/ui` → check sigil-design `/showcase`
+      + registry → install, don't re-author) + an extraction verdict before
+      any UI-touching story closes. Full contract in `building-in-sigil-chat`
+      RULE 0; verdict is checked at merge (RULE 6).
 - [ ] **`GONK_MCP_KEY`** must match on the gonk + agent processes; it lives
       in the root `.env` (single source, loaded by gonk + web; agent
       symlink). See the `adding-gonk-tools` skill for the full failure mode.

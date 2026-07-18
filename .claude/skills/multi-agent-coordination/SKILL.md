@@ -25,6 +25,13 @@ harness (Claude Code), so "Claude Code" names nothing.
   the path to a safe deployable product. (Being partly handed to Fable.)
 - **pi workers** — dispatched, ephemeral mechanical execution (not a peer).
 
+**The strategic direction doc is live:**
+`/Users/dr/Dev/platform/ecosystem/specs/fable-direction-20260718.md`.
+**Re-read it after completing every task if it has changed** since you last
+read it (check its mtime first — cheap). David updates direction mid-flight
+through Fable; finishing your next task on stale direction wastes it.
+Include this instruction in every dispatch brief for multi-task workers.
+
 Handoff shape: **Fable sets direction → Garnet implements + verifies →
 codex/Fable analysis informs both.** Tag each roadmap story with its
 `worktree`/owner so the lanes don't collide; don't reach into another agent's
@@ -157,6 +164,13 @@ bespoke folders — both anti-patterns. Four tiers:
 
 - Commit verified work to `dev` as it lands; **concern-grouped** commits (one
   feature/concern per commit), not a mega-commit.
+- **Extraction verdict gates the merge.** Any story/branch touching
+  components, hooks, or presentation must carry its registry-loop verdict
+  (`consumed` / `extracted` / `candidate:<X#>` with a real X-story /
+  `app-domain` + why — see `building-in-sigil-chat`). The orchestrator
+  checks it at merge time and bounces work that lacks one. Dispatch briefs
+  for such work MUST include the verdict requirement verbatim and demand it
+  in the worker's report.
 - **One repo per bash call**; anchor every call with an absolute `cd`/`git -C`
   (cwd drifts between calls).
 - **Verify green BEFORE committing.** A subset of a green tree is only green if
@@ -174,10 +188,12 @@ bespoke folders — both anti-patterns. Four tiers:
 - **Gonk application tools** → `apps/gonk/src/registry.ts` (+ `registry/*.ts`).
   Eve discovers them over MCP via `apps/agent/agent/connections/gonk.ts` — never
   hand-copy tool defs into eve. `exec`-tier tools are denied by policy.
-- **Sigil-first:** generalizable UI belongs in **sigil-design first** (canonical)
-  + a `/showcase` example, then carried into sigil-chat as owned source and
-  consumed. Don't build app-local what the design system should own (see the
-  `packages/data` `ResourceManager` and the ingress/emphasis extractions as the
-  pattern).
+- **Sigil-first is the registry loop, enforced:** consume-first check before
+  authoring any component/hook (grep `packages/ui` → check sigil-design
+  `/showcase` + registry → install, don't re-author), and an extraction
+  verdict before any UI-touching story closes (`consumed` / `extracted` /
+  `candidate:<X#>` / `app-domain`). Full contract in `building-in-sigil-chat`;
+  the verdict is checked at merge (see commit protocol). The `packages/data`
+  `ResourceManager` and the ingress/emphasis extractions are the pattern.
 - **`GONK_MCP_KEY`** must match on the gonk + agent processes; it lives in the
   root `.env` (single source, loaded by gonk + web; agent symlink).
