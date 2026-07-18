@@ -13,11 +13,13 @@ export default defineMcpClientConnection({
       ? "not-applicable"
       : "user-approval",
   headers: ({ session }): Readonly<Record<string, string>> => {
-    const sessionScope = session.auth.current?.attributes.sigilSessionScope
-    if (typeof sessionScope !== "string" || sessionScope.length === 0) {
+    const resourceScope =
+      session.auth.current?.attributes.sigilResourceScope ??
+      session.auth.current?.attributes.sigilSessionScope
+    if (typeof resourceScope !== "string" || resourceScope.length === 0) {
       return {}
     }
-    return { "x-sigil-session-id": sessionScope }
+    return { "x-sigil-scope": resourceScope }
   },
   ...(token
     ? {

@@ -6,6 +6,14 @@ import {
   type ObjectStore,
 } from "@mirk/artifact"
 import { FileObjectStore } from "@mirk/artifact/fs"
+import type { AuthenticatedPrincipal } from "@gonk/auth"
+
+import {
+  formatScopeHeader,
+  normalizeScope,
+  type ResourceScope,
+  type ScopeInput,
+} from "./artifact-scope.js"
 
 // Durable object store for generated/attached image bytes, backed by
 // @mirk/artifact's filesystem ObjectStore. The gonk process both WRITES (the
@@ -68,7 +76,7 @@ export interface SessionArtifactMetadata {
   readonly mediaType: string
   readonly size: number
   readonly createdAt: string
-  readonly scope: string
+  readonly scope: ResourceScope
 }
 
 export interface SessionArtifactContent {
@@ -80,25 +88,60 @@ export interface PutSessionArtifactInput {
   readonly bytes: Uint8Array
   readonly filename?: string
   readonly mediaType: string
-  readonly scope: string
+  /** Accepts the old bare session id as well as a tiered scope. */
+  readonly scope: ScopeInput
+}
+
+export type ScopePrincipal = AuthenticatedPrincipal | undefined
+
+/**
+ * Authorization is deliberately a separate seam from scope normalization.
+ * Tier + id says where an artifact lives; it never says who may touch it.
+ * Auth work supplies the real membership policy here. v1 preserves today's
+ * behavior by allowing every authenticated/legacy caller.
+ */
+export type CanAccessScope = (
+  principal: ScopePrincipal,
+  scope: ResourceScope,
+) => boolean | Promise<boolean>
+
+export function canAccessScope(
+  _principal: ScopePrincipal,
+  _scope: ResourceScope,
+): boolean {
+  return true
+}
+
+export interface SessionArtifactStoreOptions {
+  readonly canAccessScope?: CanAccessScope
 }
 
 /**
- * Session metadata is persisted as an object beside the bytes in the same
- * @mirk/artifact FileObjectStore. The manifest makes list-by-session durable;
- * the content-addressed byte object remains shared and immutable.
+ * Resource metadata is persisted beside content-addressed bytes in the same
+ * @mirk/artifact FileObjectStore. The manifest makes list-by-scope durable;
+ * the byte object remains shared and immutable.
  */
 export class SessionArtifactStore {
   private readonly writes = new Map<string, Promise<void>>()
+  private readonly canAccessScope: CanAccessScope
 
-  constructor(private readonly objects: ObjectStore) {}
+  constructor(
+    private readonly objects: ObjectStore,
+    options: SessionArtifactStoreOptions = {},
+  ) {
+    this.canAccessScope = options.canAccessScope ?? canAccessScope
+  }
 
   async putFile(
     input: PutSessionArtifactInput,
+    principal?: AuthenticatedPrincipal,
   ): Promise<SessionArtifactMetadata> {
-    return this.withScopeLock(input.scope, async () => {
+    const scope = requireScope(input.scope)
+    await this.assertScopeAccess(principal, scope)
+
+    return this.withScopeLock(scope, async () => {
       const id = uploadKeyFor(input.bytes, input.mediaType, input.filename)
-      const existing = (await this.listBySession(input.scope)).find(
+      const existing = (await this.listByScope(scope, principal)).find(
         (artifact) => artifact.id === id,
       )
       if (existing) return existing
@@ -108,13 +151,13 @@ export class SessionArtifactStore {
           mediaType: input.mediaType,
           metadata: {
             filename: input.filename ?? "attachment",
-            scope: input.scope,
+            scope: formatScopeHeader(scope) ?? scope.id,
           },
           ifAbsent: true,
         })
       } catch (error) {
-        // Content-addressed bytes may already exist from another session. The
-        // session manifest below is still written for this session.
+        // Content-addressed bytes may already exist from another scope. The
+        // selected scope manifest below is still written for this scope.
         if (!(error instanceof ObjectAlreadyExistsError)) throw error
       }
 
@@ -124,39 +167,67 @@ export class SessionArtifactStore {
         mediaType: input.mediaType,
         size: input.bytes.byteLength,
         createdAt: new Date().toISOString(),
-        scope: input.scope,
+        scope,
       }
-      const artifacts = await this.listBySession(input.scope)
-      await this.writeManifest(input.scope, [...artifacts, artifact])
+      const artifacts = await this.listByScope(scope, principal)
+      await this.writeManifest(scope, [...artifacts, artifact])
       return artifact
     })
   }
 
-  async listBySession(scope: string): Promise<SessionArtifactMetadata[]> {
+  async listByScope(
+    input: ScopeInput,
+    principal?: AuthenticatedPrincipal,
+  ): Promise<SessionArtifactMetadata[]> {
+    const scope = requireScope(input)
+    await this.assertScopeAccess(principal, scope)
     const stream = await this.objects.get(manifestKey(scope))
     if (!stream) return []
     const bytes = await collectBytes(stream)
     try {
       const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes))
       if (!Array.isArray(parsed)) return []
-      return parsed.filter(isSessionArtifactMetadata)
+      return parsed
+        .filter(isStoredArtifactMetadata)
+        .map((value) => ({
+          ...value,
+          scope: normalizeScope(value.scope) as ResourceScope,
+        }))
     } catch {
       return []
     }
   }
 
-  async readContent(id: string): Promise<SessionArtifactContent> {
+  /** Compatibility name for the session-only store API. */
+  async listBySession(
+    input: ScopeInput,
+    principal?: AuthenticatedPrincipal,
+  ): Promise<SessionArtifactMetadata[]> {
+    return this.listByScope(input, principal)
+  }
+
+  async readContent(
+    id: string,
+    input: ScopeInput,
+    principal?: AuthenticatedPrincipal,
+  ): Promise<SessionArtifactContent> {
+    const scope = requireScope(input)
+    const artifact = (await this.listByScope(scope, principal)).find(
+      (candidate) => candidate.id === id,
+    )
+    if (!artifact) throw new Error(`Artifact not found in scope: ${id}`)
+
     const info = await this.objects.head(id)
     const stream = await this.objects.get(id)
     if (!info || !stream) throw new Error(`Artifact not found: ${id}`)
     return {
       bytes: await collectBytes(stream),
-      mediaType: info.mediaType ?? "application/octet-stream",
+      mediaType: info.mediaType ?? artifact.mediaType,
     }
   }
 
   private async writeManifest(
-    scope: string,
+    scope: ResourceScope,
     artifacts: readonly SessionArtifactMetadata[],
   ): Promise<void> {
     await this.objects.put(
@@ -166,21 +237,33 @@ export class SessionArtifactStore {
     )
   }
 
+  private async assertScopeAccess(
+    principal: ScopePrincipal,
+    scope: ResourceScope,
+  ): Promise<void> {
+    // This is the authz seam. Do not replace it with tier/id heuristics: a
+    // project/persona scope's membership policy belongs to the auth layer.
+    if (!(await this.canAccessScope(principal, scope))) {
+      throw new Error(`Access denied for ${scope.tier} scope: ${scope.id}`)
+    }
+  }
+
   private async withScopeLock<T>(
-    scope: string,
+    scope: ResourceScope,
     operation: () => Promise<T>,
   ): Promise<T> {
-    const previous = this.writes.get(scope) ?? Promise.resolve()
+    const key = `${scope.tier}:${scope.id}`
+    const previous = this.writes.get(key) ?? Promise.resolve()
     const current = previous.then(operation)
     const queued = current.then(
       () => undefined,
       () => undefined,
     )
-    this.writes.set(scope, queued)
+    this.writes.set(key, queued)
     try {
       return await current
     } finally {
-      if (this.writes.get(scope) === queued) this.writes.delete(scope)
+      if (this.writes.get(key) === queued) this.writes.delete(key)
     }
   }
 }
@@ -191,14 +274,27 @@ export function getSessionArtifactStore(): SessionArtifactStore {
   return sessionArtifactStore
 }
 
-function manifestKey(scope: string): string {
-  const digest = createHash("sha256").update(scope).digest("hex")
-  return `sessions/${digest}/artifacts`
+function requireScope(input: ScopeInput): ResourceScope {
+  const scope = normalizeScope(input)
+  if (!scope) throw new Error("Artifact operations require a valid resource scope.")
+  return scope
 }
 
-function isSessionArtifactMetadata(
+function manifestKey(scope: ResourceScope): string {
+  const digest = createHash("sha256").update(scope.id).digest("hex")
+  const directory = {
+    session: "sessions",
+    project: "projects",
+    persona: "personas",
+  }[scope.tier]
+  return `${directory}/${digest}/artifacts`
+}
+
+function isStoredArtifactMetadata(
   value: unknown,
-): value is SessionArtifactMetadata {
+): value is Omit<SessionArtifactMetadata, "scope"> & {
+  scope: ScopeInput
+} {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false
   }
@@ -209,7 +305,7 @@ function isSessionArtifactMetadata(
     typeof record.mediaType === "string" &&
     typeof record.size === "number" &&
     typeof record.createdAt === "string" &&
-    typeof record.scope === "string"
+    normalizeScope(record.scope as ScopeInput | undefined) !== undefined
   )
 }
 

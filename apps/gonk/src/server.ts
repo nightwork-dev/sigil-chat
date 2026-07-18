@@ -13,7 +13,8 @@ import {
   getSessionArtifactStore,
 } from "./artifact-store.js"
 import {
-  normalizeSessionScope,
+  normalizeScopeHeaders,
+  SIGIL_SCOPE_HEADER,
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
 
@@ -215,12 +216,13 @@ async function handleUpload(
     return
   }
 
-  const sessionScope = normalizeSessionScope(
+  const resourceScope = normalizeScopeHeaders(
+    readHeader(incoming.headers[SIGIL_SCOPE_HEADER]),
     readHeader(incoming.headers[SIGIL_SESSION_SCOPE_HEADER]),
   )
-  if (!sessionScope) {
+  if (!resourceScope) {
     outgoing.writeHead(400, { "content-type": "text/plain; charset=utf-8" })
-    outgoing.end(`Missing ${SIGIL_SESSION_SCOPE_HEADER} header`)
+    outgoing.end(`Missing ${SIGIL_SCOPE_HEADER} header`)
     return
   }
 
@@ -262,7 +264,7 @@ async function handleUpload(
       bytes,
       filename,
       mediaType,
-      scope: sessionScope,
+      scope: resourceScope,
     })
   } catch (error) {
     console.error(error)

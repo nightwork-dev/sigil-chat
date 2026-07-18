@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
-import { AGENT_SESSION_SCOPE_HEADER } from "./agent-session-scope";
+import { AGENT_SCOPE_HEADER } from "./agent-session-scope";
 
 /**
  * Uploads a chat attachment (image or file) to the Gonk artifact store and
@@ -30,9 +30,9 @@ const uploadAttachmentFn = createServerFn({ method: "POST" })
   .validator((data: FormData) => data)
   .handler(async ({ data }): Promise<UploadedAttachment> => {
     const file = data.get("file");
-    const sessionScope = data.get("sessionScope");
-    if (typeof sessionScope !== "string" || sessionScope.trim().length === 0) {
-      throw new Error("Attachment upload requires a session scope.");
+    const scope = data.get("scope");
+    if (typeof scope !== "string" || scope.trim().length === 0) {
+      throw new Error("Attachment upload requires a resource scope.");
     }
     if (!(file instanceof File)) {
       throw new Error("Attachment upload requires a `file` field.");
@@ -63,7 +63,7 @@ const uploadAttachmentFn = createServerFn({ method: "POST" })
       headers: {
         "content-type": file.type || "application/octet-stream",
         "x-filename": file.name,
-        [AGENT_SESSION_SCOPE_HEADER]: sessionScope,
+        [AGENT_SCOPE_HEADER]: scope,
         authorization: `Bearer ${apiKey}`,
       },
       body: bytes,
@@ -82,11 +82,11 @@ export function useUploadAgentAttachment() {
   return useMutation({
     mutationFn: async (input: {
       file: File;
-      sessionScope: string;
+      scope: string;
     }): Promise<UploadedAttachment> => {
       const formData = new FormData();
       formData.set("file", input.file);
-      formData.set("sessionScope", input.sessionScope);
+      formData.set("scope", input.scope);
       return uploadAttachmentFn({ data: formData });
     },
   });
