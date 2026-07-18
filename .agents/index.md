@@ -180,6 +180,12 @@ Prerequisites and required env:
   a fresh checkout.
 - `GONK_MCP_URL` — optional, overrides the MCP endpoint Eve connects to
   (defaults to the Portless Gonk URL above).
+- `SIGIL_ROADMAP_DIR` — optional, configures the external Markdown roadmap
+  store shared across worktrees, branches, and agents. Defaults to a
+  `sigil-roadmap/` dir **co-located beside the sigil repos** (resolved portably
+  from the repo's git-common-dir). The store is its **own git repo** (`git init`'d
+  on first use, committing on each mutation) so the roadmap has history and is
+  restorable; it lives outside every worktree and is never tracked by this repo.
 
 `.data/` (both at the repo root and per-app) and `apps/agent/.eve/` hold local
 runtime state — sessions, snapshots, dev-runtime artifacts. Both are
@@ -227,6 +233,24 @@ trimming template boilerplate — and
 [`docs/specs/README.md`](../docs/specs/README.md) for the index of active
 contracts versus historical/evidence records versus specs inherited from the
 `sigil-design` lineage that don't apply to this product.
+
+## Where docs & coordination artifacts live
+
+Four tiers — keep them straight so coordination material never scatters into a
+product branch or a bespoke folder:
+
+- **Shipped docs + product code** → this repo, tracked (`dev`).
+- **Repo-internal working notes** → this repo's `docs.local/` (gitignored).
+- **The roadmap** → the external, git-versioned roadmap store
+  (`SIGIL_ROADMAP_DIR`), its own repo, shared across every worktree/agent —
+  never committed into this repo.
+- **Ecosystem coordination / handoffs / strategy** (agent briefs, cross-agent
+  notes, anything not product-specific) → `/Users/dr/Dev/docs.local/` — never a
+  product repo.
+
+Local-only files/dirs are named `*.local` / `*.local.*` and gitignored by that
+pattern in every repo (except repos that are themselves local-only). Never
+`mkdir` a new coordination folder — use the homes above.
 
 ## Skills
 
