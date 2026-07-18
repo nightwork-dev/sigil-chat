@@ -957,10 +957,15 @@ const seedReviews: ReviewItem[] = [
   },
 ];
 
+const DEFAULT_WORKTREE = "sigil-chat-dev";
+
 export function createWorkItemsDocument(): WorkItemsDocument {
   return {
     revision: 0,
-    stories: structuredClone(seedStories),
+    stories: structuredClone(seedStories).map((story) => ({
+      ...story,
+      worktree: story.worktree ?? DEFAULT_WORKTREE,
+    })),
     comments: [],
     reviews: structuredClone(seedReviews),
     history: [],

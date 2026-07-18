@@ -5,6 +5,7 @@ import type {
   ReviewGate,
   Routing,
   Story,
+  StoryFilter,
   StoryStatus,
 } from "@workspace/work-items-store/types";
 
@@ -15,6 +16,7 @@ const WORK_ITEMS_RESOURCE_ID = "work-items";
 const WORK_ITEMS_OUTCOME_KIND = "work-items.changed";
 
 type StoryListInput = {
+  filter?: StoryFilter;
   expectedRevision?: number;
 };
 
@@ -82,13 +84,22 @@ export function registerStoryTools(
     inputJsonSchema: {
       type: "object",
       properties: {
+        filter: {
+          type: "object",
+          properties: {
+            worktree: { type: "string", minLength: 1 },
+            epic: { type: "string", minLength: 1 },
+            status: { type: "string", enum: storyStatuses },
+          },
+          additionalProperties: false,
+        },
         expectedRevision: { type: "integer", minimum: 0 },
       },
       additionalProperties: false,
     },
     hints: readHints,
     handler: async (input) => {
-      const stories = await workItemsRepository.list(input.expectedRevision);
+      const stories = await workItemsRepository.list(input.filter);
       const document = await workItemsRepository.get(input.expectedRevision);
       return {
         data: {
@@ -277,8 +288,20 @@ function clientCommand(
 function isStoryListInput(value: unknown): value is StoryListInput {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["expectedRevision"]) &&
+    hasOnlyKeys(value, ["filter", "expectedRevision"]) &&
+    isOptionalStoryFilter(value.filter) &&
     isOptionalInteger(value, "expectedRevision")
+  );
+}
+
+function isOptionalStoryFilter(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      hasOnlyKeys(value, ["worktree", "epic", "status"]) &&
+      isOptionalNonEmptyString(value, "worktree") &&
+      isOptionalNonEmptyString(value, "epic") &&
+      (value.status === undefined || isStoryStatus(value.status)))
   );
 }
 
@@ -336,6 +359,7 @@ function isStory(value: unknown): value is Story {
     hasOnlyKeys(value, [
       "id",
       "epicId",
+      "worktree",
       "epicTitle",
       "title",
       "intent",
@@ -354,6 +378,7 @@ function isStory(value: unknown): value is Story {
     ]) &&
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.epicId) &&
+    isOptionalNonEmptyString(value, "worktree") &&
     isNonEmptyString(value.epicTitle) &&
     isNonEmptyString(value.title) &&
     isNonEmptyString(value.intent) &&
@@ -378,6 +403,7 @@ function storySchema(): Record<string, unknown> {
     properties: {
       id: { type: "string", minLength: 1 },
       epicId: { type: "string", minLength: 1 },
+      worktree: { type: "string", minLength: 1 },
       epicTitle: { type: "string", minLength: 1 },
       title: { type: "string", minLength: 1 },
       intent: { type: "string", minLength: 1 },

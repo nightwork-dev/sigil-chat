@@ -9,14 +9,17 @@ import type {
   ReviewDecision,
   ReviewGate,
   Story,
+  StoryFilter,
   StoryStatus,
   WorkItemsMutationResult,
 } from "@workspace/work-items-store/types";
 
-const listStoriesFn = createServerFn({ method: "GET" }).handler(async () => {
-  const { workItemsRepository } = await import("@workspace/work-items-store");
-  return workItemsRepository.list();
-});
+const listStoriesFn = createServerFn({ method: "GET" })
+  .validator((input?: { filter?: StoryFilter }) => input ?? {})
+  .handler(async ({ data }) => {
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return workItemsRepository.list(data.filter);
+  });
 
 const listReviewsFn = createServerFn({ method: "GET" }).handler(async () => {
   const { workItemsRepository } = await import("@workspace/work-items-store");
@@ -102,14 +105,18 @@ const decideReviewFn = createServerFn({ method: "POST" })
 
 export const workItemKeys = {
   all: () => ["work-items"] as const,
+  list: (filter?: StoryFilter) =>
+    [...workItemKeys.all(), "list", filter ?? {}] as const,
   detail: (id: string) => [...workItemKeys.all(), id] as const,
   reviews: () => [...workItemKeys.all(), "reviews"] as const,
 };
 
-export function useStories() {
+export function useStories(filter?: StoryFilter) {
   return useQuery({
-    queryKey: workItemKeys.all(),
-    queryFn: () => listStoriesFn(),
+    // Unfiltered board stays on the base key so mutation reconciliation
+    // (reconcileWorkItems) updates it in place; filtered views get a sub-key.
+    queryKey: filter ? workItemKeys.list(filter) : workItemKeys.all(),
+    queryFn: () => listStoriesFn({ data: { filter } }),
     refetchOnMount: "always",
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",

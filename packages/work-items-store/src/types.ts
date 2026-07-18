@@ -15,8 +15,26 @@ export type ReviewGate =
   | "peer"
   | "none";
 
+/**
+ * Extraction verdict (sigil-first gate, Fable 2026-07-18): every UI-touching
+ * story records this before verify/shipped — whether it consumed an existing
+ * sigil-design component, extracted a new one, flagged a candidate for a real
+ * X-story, or is app-domain. Defaults to "pending" for UI work.
+ */
+export type ExtractionVerdict =
+  | "pending"
+  | "consumed"
+  | "extracted"
+  | "app-domain"
+  | `candidate:${string}`;
+
 export interface Story {
   id: string;
+  /**
+   * Workstream this story belongs to (e.g. "sigil-chat-dev"). Used by
+   * `list({ worktree })` to scope the board to a single workstream.
+   */
+  worktree?: string;
   epicId: string;
   epicTitle: string;
   title: string;
@@ -28,11 +46,22 @@ export interface Story {
   deps: string[];
   assignee?: string;
   reviewDecision?: ReviewDecision;
+  /** Sigil-first extraction verdict (Fable gate) — required for UI-touching
+   *  stories before verify/shipped; defaults to "pending" for UI work. */
+  extraction?: ExtractionVerdict;
   authoredBy: string;
   createdAt: string;
   updatedAt: string;
   decidedBy?: string;
   decidedAt?: string;
+}
+
+/** Optional filter for {@link WorkItemsRepository.list}. */
+export interface StoryFilter {
+  worktree?: string;
+  /** Matches {@link Story.epicId}. */
+  epic?: string;
+  status?: StoryStatus;
 }
 
 export interface StoryComment {
