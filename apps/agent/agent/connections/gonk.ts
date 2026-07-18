@@ -12,6 +12,13 @@ export default defineMcpClientConnection({
     session.auth.current?.attributes.sigilToolApproval === "always"
       ? "not-applicable"
       : "user-approval",
+  headers: ({ session }): Readonly<Record<string, string>> => {
+    const sessionScope = session.auth.current?.attributes.sigilSessionScope
+    if (typeof sessionScope !== "string" || sessionScope.length === 0) {
+      return {}
+    }
+    return { "x-sigil-session-id": sessionScope }
+  },
   ...(token
     ? {
         auth: {

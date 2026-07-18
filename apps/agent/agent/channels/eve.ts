@@ -26,9 +26,14 @@ export default eveChannel({
         request.headers.get("x-sigil-tool-approval") === "always"
           ? "always"
           : "ask"
+      const sessionScope = request.headers.get("x-sigil-session-id")?.trim()
       return {
         ...auth,
-        attributes: { ...auth.attributes, sigilToolApproval: toolApproval },
+        attributes: {
+          ...auth.attributes,
+          sigilToolApproval: toolApproval,
+          ...(sessionScope ? { sigilSessionScope: sessionScope } : {}),
+        },
       }
     },
   ],
