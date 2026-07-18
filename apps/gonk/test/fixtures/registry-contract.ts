@@ -598,13 +598,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-list-session-files",
     description:
-      "List the files attached to the current agent session. Use this to find durable documents before reading one by id.",
+      "List files attached to the request's session, project, or persona resource scope. Omit scope to use the request's session scope.",
     visibility: "always",
     approval: "read",
     schema: {
       type: "object",
       required: [],
-      properties: [],
+      properties: ["scope"],
       additionalProperties: false,
     },
     mcpAnnotations: {
@@ -617,13 +617,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-read-file",
     description:
-      "Read the content of a file attached to the current agent session by id. Text files are decoded as UTF-8 with a bounded response; binary files return metadata instead of bytes.",
+      "Read a file attached to the request's session, project, or persona resource scope by id. Omit scope to use the request's session scope; text is decoded with a bounded response and binary files return metadata.",
     visibility: "always",
     approval: "read",
     schema: {
       type: "object",
       required: ["id"],
-      properties: ["id"],
+      properties: ["id", "scope"],
       additionalProperties: false,
     },
     mcpAnnotations: {

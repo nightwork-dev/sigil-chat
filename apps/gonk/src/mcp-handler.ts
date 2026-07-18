@@ -4,7 +4,9 @@ import { createAgentWebMcpHandler } from "@zigil/agent-gonk"
 
 import { authorizeSigilMcpRequest } from "./auth.js"
 import {
-  normalizeSessionScope,
+  normalizeScopeHeaders,
+  SIGIL_SCOPE_AUTH_INFO_KEY,
+  SIGIL_SCOPE_HEADER,
   SIGIL_SESSION_SCOPE_AUTH_INFO_KEY,
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
@@ -36,7 +38,8 @@ export function createSigilMcpHandler({
         /^Bearer\s+/i,
         "",
       )
-      const sessionScope = normalizeSessionScope(
+      const resourceScope = normalizeScopeHeaders(
+        request.headers.get(SIGIL_SCOPE_HEADER) ?? undefined,
         request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
       )
       return {
@@ -55,19 +58,32 @@ export function createSigilMcpHandler({
             roles: ["agent"],
             scopes: [],
           },
-          ...(sessionScope
-            ? { [SIGIL_SESSION_SCOPE_AUTH_INFO_KEY]: sessionScope }
+          ...(resourceScope
+            ? {
+                [SIGIL_SCOPE_AUTH_INFO_KEY]: resourceScope,
+                // Keep the old extra populated for adapters that still read it.
+                ...(resourceScope.tier === "session"
+                  ? { [SIGIL_SESSION_SCOPE_AUTH_INFO_KEY]: resourceScope.id }
+                  : {}),
+              }
             : {}),
         },
       }
     },
     makeContext: (extra) => {
-      const sessionScope = extra.authInfo?.extra?.[
+      const resourceScope = extra.authInfo?.extra?.[
+        SIGIL_SCOPE_AUTH_INFO_KEY
+      ]
+      const legacySessionScope = extra.authInfo?.extra?.[
         SIGIL_SESSION_SCOPE_AUTH_INFO_KEY
       ]
       return {
         host:
-          typeof sessionScope === "string" ? { sessionScope } : undefined,
+          resourceScope !== undefined
+            ? { resourceScope }
+            : typeof legacySessionScope === "string"
+              ? { sessionScope: legacySessionScope }
+              : undefined,
       }
     },
     authorize: authorizeSigilMcpRequest,

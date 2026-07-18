@@ -6,15 +6,21 @@ import {
   type SessionArtifactStore,
 } from "../artifact-store.js";
 import {
-  emptyObjectSchema,
-  objectSchema,
-  readHints,
-} from "./schemas.js";
+  normalizeScope,
+  RESOURCE_SCOPE_TIERS,
+  type ResourceScope,
+  type ScopeInput,
+} from "../artifact-scope.js";
+import { objectSchema, readHints } from "./schemas.js";
 import { isEmptyObject, isRecord } from "./validators.js";
 
 const MAX_TEXT_CHARS = 200_000;
 
-export interface ReadFileInput {
+export interface ResourceScopeInput {
+  scope?: ResourceScope;
+}
+
+export interface ReadFileInput extends ResourceScopeInput {
   id: string;
 }
 
@@ -25,45 +31,51 @@ export function registerFileTools(
   registry.register({
     name: "sigil-list-session-files",
     description:
-      "List the files attached to the current agent session. Use this to find durable documents before reading one by id.",
+      "List files attached to the request's session, project, or persona resource scope. Omit scope to use the request's session scope.",
     visibility: "always",
     approval: "read",
-    input: shape<Record<string, never>>(
-      isEmptyObject,
-      "Expected an empty object.",
+    input: shape<ResourceScopeInput>(
+      isListFilesInput,
+      "Expected an object with an optional `{ tier, id }` resource scope.",
     ),
-    inputJsonSchema: emptyObjectSchema(),
+    inputJsonSchema: objectSchema({ scope: resourceScopeSchema() }),
     hints: readHints,
-    handler: async (_input, ctx) => ({
-      data: { files: await artifacts.listBySession(requireSessionScope(ctx)) },
-    }),
+    handler: async (input, ctx) => {
+      const scope = requireResourceScope(input.scope, ctx);
+      return {
+        data: {
+          files: await artifacts.listByScope(scope, ctx.auth?.principal),
+        },
+      };
+    },
   });
 
   registry.register({
     name: "sigil-read-file",
     description:
-      "Read the content of a file attached to the current agent session by id. Text files are decoded as UTF-8 with a bounded response; binary files return metadata instead of bytes.",
+      "Read a file attached to the request's session, project, or persona resource scope by id. Omit scope to use the request's session scope; text is decoded with a bounded response and binary files return metadata.",
     visibility: "always",
     approval: "read",
     input: shape<ReadFileInput>(
       isReadFileInput,
-      "Expected an object with a non-empty string `id`.",
+      "Expected an object with a non-empty string `id` and an optional `{ tier, id }` resource scope.",
     ),
     inputJsonSchema: objectSchema(
-      { id: { type: "string", minLength: 1 } },
+      { id: { type: "string", minLength: 1 }, scope: resourceScopeSchema() },
       ["id"],
     ),
     hints: readHints,
     handler: async (input, ctx) => {
-      const scope = requireSessionScope(ctx);
-      const artifact = (await artifacts.listBySession(scope)).find(
+      const scope = requireResourceScope(input.scope, ctx);
+      const principal = ctx.auth?.principal;
+      const artifact = (await artifacts.listByScope(scope, principal)).find(
         (candidate) => candidate.id === input.id,
       );
       if (!artifact) {
-        throw new Error(`Unknown file id for the current session: ${input.id}`);
+        throw new Error(`Unknown file id for requested scope: ${input.id}`);
       }
 
-      const content = await artifacts.readContent(artifact.id);
+      const content = await artifacts.readContent(input.id, scope, principal);
       if (!isTextualFile(artifact)) {
         return {
           data: {
@@ -97,22 +109,66 @@ export function registerFileTools(
   });
 }
 
+function isListFilesInput(value: unknown): value is ResourceScopeInput {
+  return isRecord(value) && isScopeInput(value);
+}
+
 function isReadFileInput(value: unknown): value is ReadFileInput {
   return (
     isRecord(value) &&
-    Object.keys(value).every((key) => key === "id") &&
+    Object.keys(value).every((key) => key === "id" || key === "scope") &&
     typeof value.id === "string" &&
-    value.id.trim().length > 0
+    value.id.trim().length > 0 &&
+    isScopeInput(value)
   );
 }
 
-function requireSessionScope(ctx: ToolContext): string {
-  if (!isRecord(ctx.host) || typeof ctx.host.sessionScope !== "string") {
-    throw new Error("File tools require the caller's session scope.");
+function isScopeInput(value: Record<string, unknown>): boolean {
+  return value.scope === undefined || isResourceScope(value.scope);
+}
+
+function isResourceScope(value: unknown): value is ResourceScope {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) => key === "tier" || key === "id") &&
+    typeof value.id === "string" &&
+    value.id.trim().length > 0 &&
+    typeof value.tier === "string" &&
+    (RESOURCE_SCOPE_TIERS as readonly string[]).includes(value.tier) &&
+    normalizeScope(value as ScopeInput) !== undefined
+  );
+}
+
+function requireResourceScope(
+  requested: ResourceScope | undefined,
+  ctx: ToolContext,
+): ResourceScope {
+  const hostScope = requestScope(ctx);
+  const scope = normalizeScope(requested ?? hostScope);
+  if (!scope) {
+    throw new Error(
+      "File tools require a resource scope, either in the request or in the tool input.",
+    );
   }
-  const scope = ctx.host.sessionScope.trim();
-  if (!scope) throw new Error("File tools require the caller's session scope.");
   return scope;
+}
+
+function requestScope(ctx: ToolContext): ResourceScope | undefined {
+  if (!isRecord(ctx.host)) return undefined;
+  return (
+    normalizeScope(ctx.host.resourceScope as ScopeInput | undefined) ??
+    normalizeScope(ctx.host.sessionScope as string | undefined)
+  );
+}
+
+function resourceScopeSchema(): Record<string, unknown> {
+  return objectSchema(
+    {
+      tier: { type: "string", enum: RESOURCE_SCOPE_TIERS },
+      id: { type: "string", minLength: 1 },
+    },
+    ["tier", "id"],
+  );
 }
 
 function isTextualFile(artifact: SessionArtifactMetadata): boolean {

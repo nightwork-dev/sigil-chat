@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("SessionArtifactStore", () => {
-  it("round-trips a durable text artifact by session scope", async () => {
+  it("round-trips a durable text artifact with tier-isolated scopes", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-artifacts-"));
     temporaryDirectories.push(directory);
     const scope = "thread-round-trip";
@@ -33,13 +33,20 @@ describe("SessionArtifactStore", () => {
       scope,
     });
 
+    expect(stored.scope).toEqual({ tier: "session", id: scope });
     await expect(firstProcess.listBySession(scope)).resolves.toEqual([stored]);
+    await expect(
+      firstProcess.listByScope({ tier: "project", id: scope }),
+    ).resolves.toEqual([]);
+    await expect(
+      firstProcess.listByScope({ tier: "persona", id: scope }),
+    ).resolves.toEqual([]);
 
     const afterRestart = new SessionArtifactStore(
       new FileObjectStore({ root: directory }),
     );
     await expect(afterRestart.listBySession(scope)).resolves.toEqual([stored]);
-    await expect(afterRestart.readContent(stored.id)).resolves.toEqual({
+    await expect(afterRestart.readContent(stored.id, scope)).resolves.toEqual({
       bytes,
       mediaType: "text/markdown",
     });

@@ -73,7 +73,10 @@ import {
 } from "@/components/agent/tool-renderer-registry"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
-import { AGENT_SESSION_SCOPE_HEADER } from "@/lib/agent-session-scope"
+import {
+  AGENT_SCOPE_HEADER,
+  sessionResourceScope,
+} from "@/lib/agent-session-scope"
 import type { ToolApprovalMode } from "@/lib/agent-tool-approval"
 
 export interface AgentChatProps {
@@ -117,13 +120,14 @@ export function AgentChat({
   const uploadAttachment = useUploadAgentAttachment()
   const activeSessionScope =
     threadControls?.activeThreadId ?? getContextDraftScope()
+  const activeResourceScope = sessionResourceScope(activeSessionScope)
   const uploadFile = useCallback(
     (file: File): Promise<UploadedFile> =>
       uploadAttachment.mutateAsync({
         file,
-        sessionScope: activeSessionScope,
+        scope: activeResourceScope,
       }),
-    [activeSessionScope, uploadAttachment],
+    [activeResourceScope, uploadAttachment],
   )
   const {
     attachments,
@@ -161,7 +165,7 @@ export function AgentChat({
     const result = await session.send({
       message,
       attachments: outgoing,
-      headers: { [AGENT_SESSION_SCOPE_HEADER]: activeSessionScope },
+      headers: { [AGENT_SCOPE_HEADER]: activeResourceScope },
     })
     if (result.status !== "succeeded") {
       setInput(message)
@@ -170,7 +174,7 @@ export function AgentChat({
     // Sent attachments ride in the durable eve transcript as file parts and
     // render from there (see AgentMessage) — no client-side overlay needed.
   }, [
-    activeSessionScope,
+    activeResourceScope,
     attachments,
     attachmentsUploading,
     busy,

@@ -274,7 +274,7 @@ describe("Sigil Chat Gonk registry", () => {
     expect(leaked).toMatchObject({
       ok: false,
       code: "INTERNAL",
-      message: `Unknown file id for the current session: ${stored.id}`,
+      message: `Unknown file id for requested scope: ${stored.id}`,
     });
   });
 
