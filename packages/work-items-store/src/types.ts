@@ -8,7 +8,12 @@ export type StoryStatus =
   | "blocked";
 
 export type ReviewDecision = "proposed" | "approved" | "changes-requested";
-export type Routing = "self" | "claude:opus" | "claude:sonnet" | "pi:luna";
+export type Routing =
+  | "self"
+  | "claude:opus"
+  | "claude:sonnet"
+  | "pi:luna"
+  | "codex";
 export type ReviewGate =
   | "browser:David"
   | "decision:David"

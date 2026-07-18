@@ -363,7 +363,8 @@ function isRouting(value: unknown): value is Routing {
     value === "self" ||
     value === "claude:opus" ||
     value === "claude:sonnet" ||
-    value === "pi:luna"
+    value === "pi:luna" ||
+    value === "codex"
   );
 }
 
