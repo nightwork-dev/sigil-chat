@@ -21,6 +21,7 @@ export interface AgentThreadForkSeed {
 }
 
 export interface AgentThread {
+  members: string[];
   id: string;
   title: string;
   createdAt: string;
@@ -37,6 +38,7 @@ export interface AgentThread {
 }
 
 export interface AgentThreadPreference {
+  members: string[];
   activeThreadId?: string;
   updatedAt: string;
 }
@@ -77,7 +79,7 @@ export interface ForkAgentThreadInput {
 }
 
 const THREAD_KEY_PREFIX = "thread:";
-const ACTIVE_THREAD_KEY = "active-thread";
+const ACTIVE_THREAD_KEY_PREFIX = "active-thread:";
 const DEFAULT_THREAD_TITLE = "New conversation";
 const MAX_FORK_MESSAGES = 12;
 const MAX_FORK_MESSAGE_CHARS = 2_000;
@@ -118,10 +120,11 @@ export class AgentThreadRepository {
     this.createId = options.createId ?? (() => crypto.randomUUID());
   }
 
-  list(includeArchived = false): AgentThread[] {
+  list(userId: string, includeArchived = false): AgentThread[] {
     return this.threads
       .entries(THREAD_KEY_PREFIX)
       .map(({ value }) => cloneThread(value))
+      .filter((thread) => isMember(thread.members, userId))
       .filter((thread) => includeArchived || thread.status === "active")
       .sort(
         (left, right) =>
@@ -130,19 +133,22 @@ export class AgentThreadRepository {
       );
   }
 
-  ensureActive(): AgentThread[] {
-    const active = this.list(false);
-    return active.length > 0 ? active : [this.create()];
+  ensureActive(userId: string): AgentThread[] {
+    const active = this.list(userId, false);
+    return active.length > 0 ? active : [this.create(userId)];
   }
 
-  get(id: string): AgentThread | undefined {
+  get(userId: string, id: string): AgentThread | undefined {
     const thread = this.threads.get(threadKey(id));
-    return thread ? cloneThread(thread) : undefined;
+    return thread && isMember(thread.members, userId)
+      ? cloneThread(thread)
+      : undefined;
   }
 
-  create(input: { title?: string } = {}): AgentThread {
+  create(userId: string, input: { title?: string } = {}): AgentThread {
     const timestamp = this.now().toISOString();
     const thread: AgentThread = {
+      members: [userId],
       id: this.createId(),
       title: normalizeTitle(input.title),
       createdAt: timestamp,
@@ -156,12 +162,17 @@ export class AgentThreadRepository {
       },
     };
     this.write(thread);
-    this.setActive(thread.id, timestamp);
+    this.setActive(userId, thread.id, timestamp);
     return cloneThread(thread);
   }
 
-  rename(id: string, title: string, expectedRevision?: number): AgentThread {
-    return this.update(id, expectedRevision, (thread, timestamp) => ({
+  rename(
+    userId: string,
+    id: string,
+    title: string,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => ({
       ...thread,
       title: normalizeTitle(title),
       updatedAt: timestamp,
@@ -169,36 +180,42 @@ export class AgentThreadRepository {
     }));
   }
 
-  archive(id: string, expectedRevision?: number): AgentThread {
-    const archived = this.update(id, expectedRevision, (thread, timestamp) => ({
-      ...thread,
-      status: "archived",
-      updatedAt: timestamp,
-      revision: thread.revision + 1,
-    }));
-    if (this.getActivePreference().activeThreadId === id) {
-      const next = this.list(false).find((thread) => thread.id !== id);
-      this.setActive(next?.id);
+  archive(userId: string, id: string, expectedRevision?: number): AgentThread {
+    const archived = this.update(
+      userId,
+      id,
+      expectedRevision,
+      (thread, timestamp) => ({
+        ...thread,
+        status: "archived",
+        updatedAt: timestamp,
+        revision: thread.revision + 1,
+      }),
+    );
+    if (this.getActivePreference(userId).activeThreadId === id) {
+      const next = this.list(userId, false).find((thread) => thread.id !== id);
+      this.setActive(userId, next?.id);
     }
     return archived;
   }
 
-  delete(id: string, expectedRevision?: number): AgentThread {
-    const deleted = this.require(id);
+  delete(userId: string, id: string, expectedRevision?: number): AgentThread {
+    const deleted = this.require(userId, id);
     assertRevision(deleted, expectedRevision);
     this.threads.delete(threadKey(id));
-    if (this.getActivePreference().activeThreadId === id) {
-      this.setActive(this.list(false)[0]?.id);
+    if (this.getActivePreference(userId).activeThreadId === id) {
+      this.setActive(userId, this.list(userId, false)[0]?.id);
     }
     return deleted;
   }
 
   saveSnapshot(
+    userId: string,
     id: string,
     snapshot: AgentThreadSnapshot,
     expectedRevision?: number,
   ): AgentThread {
-    return this.update(id, expectedRevision, (thread, timestamp) => ({
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => ({
       ...thread,
       updatedAt: timestamp,
       revision: thread.revision + 1,
@@ -211,11 +228,12 @@ export class AgentThreadRepository {
     }));
   }
 
-  fork(input: ForkAgentThreadInput): AgentThread {
-    const source = this.require(input.sourceThreadId);
+  fork(userId: string, input: ForkAgentThreadInput): AgentThread {
+    const source = this.require(userId, input.sourceThreadId);
     assertRevision(source, input.expectedRevision);
     const timestamp = this.now().toISOString();
     const fork: AgentThread = {
+      members: [...source.members],
       id: this.createId(),
       title: normalizeTitle(input.title ?? `${source.title} — fork`),
       createdAt: timestamp,
@@ -231,12 +249,16 @@ export class AgentThreadRepository {
       forkSeed: buildForkSeed(source, timestamp),
     };
     this.write(fork);
-    this.setActive(fork.id, timestamp);
+    this.setActive(userId, fork.id, timestamp);
     return cloneThread(fork);
   }
 
-  consumeForkSeed(id: string, expectedRevision?: number): AgentThread {
-    return this.update(id, expectedRevision, (thread, timestamp) => {
+  consumeForkSeed(
+    userId: string,
+    id: string,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => {
       if (!thread.forkSeed) return thread;
       const withoutSeed = cloneThread(thread);
       delete withoutSeed.forkSeed;
@@ -248,51 +270,95 @@ export class AgentThreadRepository {
     });
   }
 
-  getActivePreference(): AgentThreadPreference {
-    const preference = this.preferences.get(ACTIVE_THREAD_KEY);
+  getActivePreference(userId: string): AgentThreadPreference {
+    const preference = this.preferences.get(activeThreadKey(userId));
     return preference
       ? structuredClone(preference)
-      : { updatedAt: this.now().toISOString() };
+      : { members: [userId], updatedAt: this.now().toISOString() };
   }
 
   setActive(
+    userId: string,
     id?: string,
     updatedAt = this.now().toISOString(),
   ): AgentThreadPreference {
     if (id) {
-      const thread = this.require(id);
+      const thread = this.require(userId, id);
       if (thread.status === "archived") {
         throw new Error(`Archived agent thread ${id} cannot be active.`);
       }
     }
     const preference: AgentThreadPreference = {
+      members: [userId],
       activeThreadId: id,
       updatedAt,
     };
-    this.preferences.set(ACTIVE_THREAD_KEY, preference);
+    this.preferences.set(activeThreadKey(userId), preference);
     return structuredClone(preference);
   }
 
   private update(
+    userId: string,
     id: string,
     expectedRevision: number | undefined,
     updater: (thread: AgentThread, timestamp: string) => AgentThread,
   ): AgentThread {
-    const current = this.require(id);
+    const current = this.require(userId, id);
     assertRevision(current, expectedRevision);
     const updated = updater(current, this.now().toISOString());
     if (updated !== current) this.write(updated);
     return cloneThread(updated);
   }
 
-  private require(id: string): AgentThread {
+  private require(userId: string, id: string): AgentThread {
     const thread = this.threads.get(threadKey(id));
-    if (!thread) throw new AgentThreadNotFoundError(id);
+    if (!thread || !isMember(thread.members, userId))
+      throw new AgentThreadNotFoundError(id);
     return cloneThread(thread);
   }
 
   private write(thread: AgentThread) {
     this.threads.set(threadKey(thread.id), cloneThread(thread));
+  }
+
+  claimLegacyRecords(userIds: readonly string[]): LegacyClaimResult {
+    if (userIds.length !== 1) {
+      throw new LegacyAgentThreadClaimRefusedError(userIds.length);
+    }
+
+    const [userId] = userIds;
+    let claimedThreads = 0;
+    let claimedPreferences = 0;
+    for (const { key, value } of this.threads.entries(THREAD_KEY_PREFIX)) {
+      if (hasMembers(value)) continue;
+      this.threads.set(key, { ...value, members: [userId] });
+      claimedThreads += 1;
+    }
+    for (const { key, value } of this.preferences.entries()) {
+      if (hasMembers(value)) continue;
+      const ownerKey = activeThreadKey(userId);
+      if (!this.preferences.get(ownerKey)) {
+        this.preferences.set(ownerKey, { ...value, members: [userId] });
+      }
+      this.preferences.delete(key);
+      claimedPreferences += 1;
+    }
+    return { claimedPreferences, claimedThreads, userId };
+  }
+}
+
+export interface LegacyClaimResult {
+  claimedPreferences: number;
+  claimedThreads: number;
+  userId: string;
+}
+
+export class LegacyAgentThreadClaimRefusedError extends Error {
+  constructor(readonly userCount: number) {
+    super(
+      `Legacy agent-thread records can only be claimed when exactly one user exists; found ${userCount}.`,
+    );
+    this.name = "LegacyAgentThreadClaimRefusedError";
   }
 }
 
@@ -376,6 +442,20 @@ function normalizeTitle(title?: string): string {
 
 function threadKey(id: string): string {
   return `${THREAD_KEY_PREFIX}${id}`;
+}
+
+function activeThreadKey(userId: string): string {
+  return `${ACTIVE_THREAD_KEY_PREFIX}${userId}`;
+}
+
+function hasMembers(
+  record: Pick<AgentThread, "members"> | Pick<AgentThreadPreference, "members">,
+): boolean {
+  return Array.isArray(record.members);
+}
+
+function isMember(members: unknown, userId: string): boolean {
+  return Array.isArray(members) && members.includes(userId);
 }
 
 function freshEveSession(): SessionState {

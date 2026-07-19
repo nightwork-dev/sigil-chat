@@ -3,10 +3,16 @@ import type { HandleMessageStreamEvent } from "eve/client";
 
 import {
   AgentThreadConflictError,
+  AgentThreadNotFoundError,
   AgentThreadRepository,
+  LegacyAgentThreadClaimRefusedError,
   projectAgentThreadSummary,
+  type AgentThread,
+  type AgentThreadPreference,
   type AgentThreadKvStore,
 } from "./agent-threads-domain";
+
+const USER_A = "user-a";
 
 class MemoryKv<T> implements AgentThreadKvStore<T> {
   private readonly values = new Map<string, T>();
@@ -56,8 +62,8 @@ function repository() {
 describe("AgentThreadRepository", () => {
   it("creates independently resumable threads and lists newest first", () => {
     const repo = repository();
-    const first = repo.create({ title: "Launch review" });
-    const second = repo.create({ title: "Incident analysis" });
+    const first = repo.create(USER_A, { title: "Launch review" });
+    const second = repo.create(USER_A, { title: "Incident analysis" });
 
     expect(first.eve).toEqual({
       session: { streamIndex: 0 },
@@ -69,17 +75,17 @@ describe("AgentThreadRepository", () => {
         compactedAt: "2026-07-16T10:00:00.000Z",
       },
     });
-    expect(repo.list().map((thread) => thread.id)).toEqual([
+    expect(repo.list(USER_A).map((thread) => thread.id)).toEqual([
       second.id,
       first.id,
     ]);
-    expect(repo.getActivePreference().activeThreadId).toBe(second.id);
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(second.id);
   });
 
   it("ensures one default active thread for first-load query paths", () => {
     const repo = repository();
 
-    const threads = repo.ensureActive();
+    const threads = repo.ensureActive(USER_A);
 
     expect(threads).toHaveLength(1);
     expect(threads[0]).toMatchObject({
@@ -87,18 +93,19 @@ describe("AgentThreadRepository", () => {
       title: "New conversation",
       status: "active",
     });
-    expect(repo.ensureActive()).toHaveLength(1);
+    expect(repo.ensureActive(USER_A)).toHaveLength(1);
   });
 
   it("persists a bounded redacted event read model with its receipt", () => {
     const repo = repository();
-    const thread = repo.create();
+    const thread = repo.create(USER_A);
     const events = [
       userEvent("What changed?", "turn-1"),
       assistantEvent("Two launch rules changed.", "turn-1"),
     ];
 
     const saved = repo.saveSnapshot(
+      USER_A,
       thread.id,
       {
         session: {
@@ -143,8 +150,9 @@ describe("AgentThreadRepository", () => {
 
   it("projects token-free thread catalog summaries", () => {
     const repo = repository();
-    const thread = repo.create({ title: "Private session" });
+    const thread = repo.create(USER_A, { title: "Private session" });
     const saved = repo.saveSnapshot(
+      USER_A,
       thread.id,
       {
         session: {
@@ -172,54 +180,57 @@ describe("AgentThreadRepository", () => {
 
   it("rejects stale optimistic writes", () => {
     const repo = repository();
-    const thread = repo.create();
-    repo.rename(thread.id, "Current title", thread.revision);
+    const thread = repo.create(USER_A);
+    repo.rename(USER_A, thread.id, "Current title", thread.revision);
 
     expect(() =>
-      repo.rename(thread.id, "Stale title", thread.revision),
+      repo.rename(USER_A, thread.id, "Stale title", thread.revision),
     ).toThrow(AgentThreadConflictError);
   });
 
   it("archives a thread and moves the active preference to another thread", () => {
     const repo = repository();
-    const first = repo.create({ title: "First" });
-    const second = repo.create({ title: "Second" });
+    const first = repo.create(USER_A, { title: "First" });
+    const second = repo.create(USER_A, { title: "Second" });
 
-    repo.archive(second.id, second.revision);
+    repo.archive(USER_A, second.id, second.revision);
 
-    expect(repo.list().map((thread) => thread.id)).toEqual([first.id]);
-    expect(repo.list(true)).toHaveLength(2);
-    expect(repo.getActivePreference().activeThreadId).toBe(first.id);
+    expect(repo.list(USER_A).map((thread) => thread.id)).toEqual([first.id]);
+    expect(repo.list(USER_A, true)).toHaveLength(2);
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(first.id);
   });
 
   it("hard-deletes the read model and moves the active preference", () => {
     const repo = repository();
-    const first = repo.create({ title: "First" });
-    const second = repo.create({ title: "Second" });
+    const first = repo.create(USER_A, { title: "First" });
+    const second = repo.create(USER_A, { title: "Second" });
 
-    const deleted = repo.delete(second.id, second.revision);
+    const deleted = repo.delete(USER_A, second.id, second.revision);
 
     expect(deleted.id).toBe(second.id);
-    expect(repo.get(second.id)).toBeUndefined();
-    expect(repo.list(true).map((thread) => thread.id)).toEqual([first.id]);
-    expect(repo.getActivePreference().activeThreadId).toBe(first.id);
+    expect(repo.get(USER_A, second.id)).toBeUndefined();
+    expect(repo.list(USER_A, true).map((thread) => thread.id)).toEqual([
+      first.id,
+    ]);
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(first.id);
   });
 
   it("rejects a stale hard-delete revision", () => {
     const repo = repository();
-    const thread = repo.create();
-    const renamed = repo.rename(thread.id, "Current", thread.revision);
+    const thread = repo.create(USER_A);
+    const renamed = repo.rename(USER_A, thread.id, "Current", thread.revision);
 
-    expect(() => repo.delete(thread.id, thread.revision)).toThrow(
+    expect(() => repo.delete(USER_A, thread.id, thread.revision)).toThrow(
       AgentThreadConflictError,
     );
-    expect(repo.get(thread.id)?.revision).toBe(renamed.revision);
+    expect(repo.get(USER_A, thread.id)?.revision).toBe(renamed.revision);
   });
 
   it("forks with provenance and a bounded semantic packet, never Eve handles", () => {
     const repo = repository();
-    const source = repo.create({ title: "Draft review" });
+    const source = repo.create(USER_A, { title: "Draft review" });
     const saved = repo.saveSnapshot(
+      USER_A,
       source.id,
       {
         session: {
@@ -235,7 +246,7 @@ describe("AgentThreadRepository", () => {
       source.revision,
     );
 
-    const fork = repo.fork({
+    const fork = repo.fork(USER_A, {
       sourceThreadId: source.id,
       expectedRevision: saved.revision,
     });
@@ -267,7 +278,7 @@ describe("AgentThreadRepository", () => {
 
   it("does not re-ingest a persisted fork packet when forking a fork", () => {
     const repo = repository();
-    const source = repo.create({ title: "Second generation" });
+    const source = repo.create(USER_A, { title: "Second generation" });
     const persistedForkTurn = [
       "# Forked conversation context",
       "",
@@ -281,6 +292,7 @@ describe("AgentThreadRepository", () => {
       "Compare the revised rollback owner.",
     ].join("\n");
     const saved = repo.saveSnapshot(
+      USER_A,
       source.id,
       {
         session: { streamIndex: 2 },
@@ -292,7 +304,7 @@ describe("AgentThreadRepository", () => {
       source.revision,
     );
 
-    const secondGeneration = repo.fork({
+    const secondGeneration = repo.fork(USER_A, {
       sourceThreadId: source.id,
       expectedRevision: saved.revision,
     });
@@ -308,14 +320,83 @@ describe("AgentThreadRepository", () => {
 
   it("consumes a fork seed after the app has used it for the first send", () => {
     const repo = repository();
-    const source = repo.create();
-    const fork = repo.fork({ sourceThreadId: source.id });
+    const source = repo.create(USER_A);
+    const fork = repo.fork(USER_A, { sourceThreadId: source.id });
 
-    const consumed = repo.consumeForkSeed(fork.id, fork.revision);
+    const consumed = repo.consumeForkSeed(USER_A, fork.id, fork.revision);
 
     expect(consumed.forkSeed).toBeUndefined();
     expect(consumed.forkedFrom).toBe(source.id);
     expect(consumed.revision).toBe(2);
+  });
+
+  it("denies every thread operation to a non-member", () => {
+    const repo = repository();
+    const owner = repo.create(USER_A, { title: "Owner-only" });
+    const userB = "user-b";
+
+    expect(repo.list(userB)).toEqual([]);
+    expect(repo.get(userB, owner.id)).toBeUndefined();
+    expect(() => repo.rename(userB, owner.id, "stolen")).toThrow(
+      AgentThreadNotFoundError,
+    );
+    expect(() => repo.archive(userB, owner.id)).toThrow(
+      AgentThreadNotFoundError,
+    );
+    expect(() => repo.delete(userB, owner.id)).toThrow(
+      AgentThreadNotFoundError,
+    );
+    expect(() =>
+      repo.saveSnapshot(userB, owner.id, {
+        session: { streamIndex: 1 },
+        events: [],
+      }),
+    ).toThrow(AgentThreadNotFoundError);
+    expect(() => repo.fork(userB, { sourceThreadId: owner.id })).toThrow(
+      AgentThreadNotFoundError,
+    );
+    expect(() => repo.consumeForkSeed(userB, owner.id)).toThrow(
+      AgentThreadNotFoundError,
+    );
+    expect(() => repo.setActive(userB, owner.id)).toThrow(
+      AgentThreadNotFoundError,
+    );
+  });
+
+  it("claims legacy records only for exactly one user and is idempotent", () => {
+    const threads = new MemoryKv<AgentThread>();
+    const preferences = new MemoryKv<AgentThreadPreference>();
+    threads.set("thread:legacy", {
+      id: "legacy",
+      title: "Legacy thread",
+      createdAt: "2026-07-16T10:00:00.000Z",
+      updatedAt: "2026-07-16T10:00:00.000Z",
+      status: "active",
+      revision: 1,
+      eve: { session: { streamIndex: 0 }, events: [], compaction: {} },
+    } as unknown as AgentThread);
+    preferences.set("active-thread", {
+      activeThreadId: "legacy",
+      updatedAt: "2026-07-16T10:00:00.000Z",
+    } as unknown as AgentThreadPreference);
+    const repo = new AgentThreadRepository({ threads, preferences });
+
+    expect(() => repo.claimLegacyRecords([USER_A, "user-b"])).toThrow(
+      LegacyAgentThreadClaimRefusedError,
+    );
+    expect(repo.get(USER_A, "legacy")).toBeUndefined();
+
+    expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
+      claimedPreferences: 1,
+      claimedThreads: 1,
+      userId: USER_A,
+    });
+    expect(repo.get(USER_A, "legacy")?.members).toEqual([USER_A]);
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe("legacy");
+    expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
+      claimedPreferences: 0,
+      claimedThreads: 0,
+    });
   });
 });
 
