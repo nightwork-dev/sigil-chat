@@ -11,25 +11,15 @@
 // route ever creates an Eve client or fetches channel data.
 
 import { createFileRoute, redirect } from "@tanstack/react-router"
-import {
-  BracesIcon,
-  DatabaseIcon,
-  FileCheck2Icon,
-  LayoutDashboardIcon,
-  LibraryBigIcon,
-  MapIcon,
-  MessageSquareIcon,
-  NetworkIcon,
-  PenToolIcon,
-} from "lucide-react"
 import { SidebarShell, Outlet } from "@workspace/ui/components/layouts/shells"
-import type { NavModel } from "@workspace/ui/components/layouts/nav"
 import { ThemePicker } from "@/components/theme-picker"
 import { AppAgentSessions } from "@/components/agent-sessions"
 import { AccountMenu } from "@/components/account-menu"
 import { fetchCurrentSession } from "@/lib/auth/route-guard"
 import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
+import { ShellOmnibar } from "@/components/agent/shell-omnibar"
+import { appNav } from "@/lib/app-nav"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -45,33 +35,12 @@ export const Route = createFileRoute("/_app")({
   component: AppLayout,
 })
 
-// The app's nav — the ONLY app-specific thing the portable shell needs.
-const nav: NavModel = {
-  brand: { label: "Sigil Chat", to: "/studio" },
-  items: [
-    {
-      to: "/dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboardIcon,
-      exact: true,
-    },
-    { to: "/studio", label: "Studio", icon: NetworkIcon },
-    { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
-    { to: "/roadmap", label: "Roadmap", icon: MapIcon },
-    { to: "/review", label: "Review", icon: FileCheck2Icon },
-    { to: "/chat", label: "Chat", icon: MessageSquareIcon },
-    { to: "/skills", label: "Skills", icon: BracesIcon },
-    { to: "/canvas", label: "Canvas", icon: PenToolIcon },
-    { to: "/data", label: "Data", icon: DatabaseIcon },
-  ],
-}
-
 function AppLayout() {
   const { user } = Route.useRouteContext()
 
   return (
     <SidebarShell
-      nav={nav}
+      nav={appNav}
       actions={<ThemePicker variant="compact" />}
       accountMenu={<AccountMenu user={user} />}
     >
@@ -79,6 +48,7 @@ function AppLayout() {
         <AppAgentSessions>
           <Outlet />
           <ShellAgentHud />
+          <ShellOmnibar />
         </AppAgentSessions>
       </WorkspaceAttentionProvider>
     </SidebarShell>
