@@ -153,11 +153,18 @@
 html {
   -webkit-font-smoothing: antialiased;
   color-scheme: dark;
+  height: 100%;
 }
 
+/* App shell owns its own scroll regions; the page itself never scrolls or
+   rubber-bands. Without this the body grows past the viewport (mobile: the
+   whole page scrolls, headers scroll away, and horizontal overflow lets iOS
+   zoom). In-app scrolling lives in the shell's `flex-1 overflow-auto` region. */
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* Noise texture */
