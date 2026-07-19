@@ -28,6 +28,12 @@ import {
   STORY_STATUS,
   STORY_STATUS_ORDER,
 } from "@/components/roadmap/story"
+import {
+  type AttentionContext,
+  type AttentionSelection,
+} from "@zigil/agent-react/attention"
+import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import type {
   ReviewDecision,
   ReviewItem,
@@ -81,6 +87,14 @@ function orderReviews(reviews: ReviewItem[]): ReviewItem[] {
   })
 }
 
+function storyTarget(story: StoryData): AttentionSelection {
+  return {
+    kind: "story",
+    id: story.id,
+    label: story.title,
+  }
+}
+
 export function RoadmapWorkspace() {
   const stories = useStories()
   const reviews = useReviews()
@@ -98,12 +112,32 @@ export function RoadmapWorkspace() {
   const selectedStory = allStories.find((story) => story.id === selectedId) ?? null
   const storiesById = new Map(allStories.map((story) => [story.id, story]))
 
+  // Attention coverage (David): the story you're viewing flows into the agent's
+  // context, so "what does this story need?" / "summarize this" resolve against
+  // it without naming it — same loop as studio/evidence/review.
+  const telemetry = useAttentionTelemetry()
+  const attention: AttentionContext = {
+    application: "sigil-chat",
+    route: "/roadmap",
+    workspace: { kind: "roadmap", id: "roadmap", label: "Roadmap" },
+    selection: selectedStory ? storyTarget(selectedStory) : undefined,
+    selections: selectedStory ? [storyTarget(selectedStory)] : undefined,
+    history: telemetry.history,
+  }
+  usePublishWorkspaceAttention(attention)
+
   // On phones the aside is a sheet; opening a story or the queue drives it.
   // On ≥md the aside is inline and `sheetOpen` is inert.
   const openDetail = (id: string) => {
     setSelectedId(id)
     setPane("detail")
     setSheetOpen(true)
+    const story = allStories.find((candidate) => candidate.id === id)
+    if (story) {
+      telemetry.recordActivity("focus", storyTarget(story), {
+        summary: `Opened ${story.id} — ${story.title}`,
+      })
+    }
   }
   const openQueue = () => {
     setPane("queue")
