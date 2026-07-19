@@ -14,6 +14,7 @@ import { useState } from "react"
 import { Link, useRouterState } from "@tanstack/react-router"
 
 import { AgentHud } from "@/components/agent/agent-hud"
+import { setAgentHudDock, useAgentHudDock } from "@/lib/agent-hud-dock"
 import {
   setToolApprovalMode,
   useToolApprovalMode,
@@ -22,6 +23,7 @@ import {
 export function ShellAgentHud() {
   const [open, setOpen] = useState(false)
   const approvalMode = useToolApprovalMode()
+  const dock = useAgentHudDock()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
 
   // Redundant on /chat — that route IS the full agent conversation, so the
@@ -31,6 +33,8 @@ export function ShellAgentHud() {
   return (
     <AgentHud.Root
       className="fixed bottom-4 right-4 z-40 max-sm:inset-x-2 max-sm:bottom-2 max-sm:right-auto"
+      dock={dock}
+      onDockChange={setAgentHudDock}
       onOpenChange={setOpen}
       open={open}
     >
