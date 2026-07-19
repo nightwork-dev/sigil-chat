@@ -13,7 +13,10 @@ import {
   type AttentionSelection,
 } from "@zigil/agent-react/attention"
 import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
 import { useFileUpload } from "@workspace/ui/hooks/use-file-upload"
@@ -24,6 +27,7 @@ import {
   type DistilledArtifact,
 } from "@/components/agent/distilled-artifact-card"
 import {
+  EVIDENCE_ROOM_SCOPE,
   useDeleteEvidenceDocument,
   useEvidenceDocuments,
   useUploadEvidenceDocument,
@@ -89,6 +93,9 @@ export function EvidenceRoom() {
   // S1.9: publish to the shell HUD (see workspace-attention) — no local
   // AttentionProvider; the persistent HUD in _app reads this.
   usePublishWorkspaceAttention(attention)
+  // Pin the agent's tools to this room's durable corpus (codex's companion fix):
+  // "distill this" / "ask" operate on project:evidence-room, not the session scope.
+  usePublishWorkspaceResourceScope(EVIDENCE_ROOM_SCOPE)
 
   const library = (
     <LibraryRegion

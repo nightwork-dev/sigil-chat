@@ -79,6 +79,7 @@ import {
   AGENT_SCOPE_HEADER,
   sessionResourceScope,
 } from "@/lib/agent-session-scope"
+import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import type { ToolApprovalMode } from "@/lib/agent-tool-approval"
 
 export interface AgentChatProps {
@@ -122,7 +123,12 @@ export function AgentChat({
   const uploadAttachment = useUploadAgentAttachment()
   const activeSessionScope =
     threadControls?.activeThreadId ?? getContextDraftScope()
-  const activeResourceScope = sessionResourceScope(activeSessionScope)
+  // The active workspace can pin an explicit resource scope (the Evidence Room
+  // publishes `project:evidence-room`) so the agent's tools act on that corpus;
+  // elsewhere we fall back to the per-thread session scope.
+  const workspaceResourceScope = useWorkspaceResourceScope()
+  const activeResourceScope =
+    workspaceResourceScope ?? sessionResourceScope(activeSessionScope)
   const uploadFile = useCallback(
     (file: File): Promise<UploadedFile> =>
       uploadAttachment.mutateAsync({

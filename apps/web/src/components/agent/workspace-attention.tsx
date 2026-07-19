@@ -33,12 +33,26 @@ type PublishFn = (context: AttentionContext | null) => void
 
 const PublishContext = createContext<PublishFn | null>(null)
 
+// A parallel channel for the OPTIONAL explicit resource scope a workspace wants
+// the agent's tools to act on (codex's D4.4 companion fix). The Evidence Room
+// publishes `project:evidence-room` so "distill this" / "ask" reach the room's
+// durable corpus, not the per-thread session scope AgentChat otherwise defaults
+// to. Workspaces that publish nothing leave this null and AgentChat falls back
+// to the session scope — this is the "what workspace am I in → which resources
+// may the agent use" link.
+type ResourceScopeChannel = {
+  scope: string | null
+  publishScope: (scope: string | null) => void
+}
+const ResourceScopeContext = createContext<ResourceScopeChannel | null>(null)
+
 export function WorkspaceAttentionProvider({
   children,
 }: {
   children: ReactNode
 }) {
   const [published, setPublished] = useState<AttentionContext | null>(null)
+  const [resourceScope, setResourceScope] = useState<string | null>(null)
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -54,9 +68,16 @@ export function WorkspaceAttentionProvider({
     [published, pathname],
   )
 
+  const resourceScopeChannel = useMemo<ResourceScopeChannel>(
+    () => ({ scope: resourceScope, publishScope: setResourceScope }),
+    [resourceScope],
+  )
+
   return (
     <PublishContext.Provider value={publish}>
-      <AttentionProvider context={context}>{children}</AttentionProvider>
+      <ResourceScopeContext.Provider value={resourceScopeChannel}>
+        <AttentionProvider context={context}>{children}</AttentionProvider>
+      </ResourceScopeContext.Provider>
     </PublishContext.Provider>
   )
 }
@@ -85,6 +106,34 @@ export function usePublishWorkspaceAttention(
     // key captures the meaningful content of context; publish is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publish, key])
+}
+
+/**
+ * Publish the resource scope the agent's tools should act on for this workspace
+ * (e.g. the Evidence Room's `project:evidence-room` corpus). Clears on unmount so
+ * a left workspace never leaks its scope. Pass null to publish nothing.
+ */
+export function usePublishWorkspaceResourceScope(scope: string | null): void {
+  const channel = useContext(ResourceScopeContext)
+  if (!channel) {
+    throw new Error(
+      "usePublishWorkspaceResourceScope must be used within WorkspaceAttentionProvider",
+    )
+  }
+  const { publishScope } = channel
+  useEffect(() => {
+    publishScope(scope)
+    return () => publishScope(null)
+  }, [publishScope, scope])
+}
+
+/**
+ * The active workspace's explicit resource scope, or null when the current
+ * workspace publishes none. AgentChat reads this to scope the agent turn to the
+ * right corpus, falling back to the session scope when it is null.
+ */
+export function useWorkspaceResourceScope(): string | null {
+  return useContext(ResourceScopeContext)?.scope ?? null
 }
 
 /** The active workspace attention (shell-level). Re-exported for convenience. */
