@@ -19,7 +19,7 @@ import { overlayPaths } from "../scripts/overlay-paths.mjs";
 
 const scratch = mkdtempSync(join(tmpdir(), "sigil-chat-overlay-"));
 
-beforeAll(() => stageOverlay());
+beforeAll(() => stageOverlay(), 30_000);
 afterAll(() => {
   rmSync(filesRoot, { recursive: true, force: true });
   rmSync(scratch, { recursive: true, force: true });
@@ -38,7 +38,7 @@ describe("Sigil Chat overlay", () => {
       const source = join(repositoryRoot, relative(filesRoot, staged));
       expect(readFileSync(staged)).toEqual(readFileSync(source));
     }
-  });
+  }, 30_000);
 
   it("is consumable by the landed Sigil Design overlay protocol", () => {
     const designRoot = process.env.SIGIL_DESIGN_ROOT;

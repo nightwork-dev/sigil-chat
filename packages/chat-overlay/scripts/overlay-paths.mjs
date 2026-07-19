@@ -34,7 +34,7 @@ export const overlayPaths = Object.freeze([
   "apps/web/src/components/app-chat.tsx",
   "apps/web/src/components/use-app-agent-session.test.ts",
   "apps/web/src/features/review",
-  "apps/web/src/features/skills",
+  "apps/web/src/features/skills-manager",
   "apps/web/src/features/studio",
   "apps/web/src/hooks/use-agent-target.ts",
   "apps/web/src/hooks/use-app-agent-session.ts",
