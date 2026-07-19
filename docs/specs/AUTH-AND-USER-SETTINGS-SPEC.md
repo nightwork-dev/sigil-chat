@@ -93,10 +93,9 @@ is created.
 
 Consequently:
 
-- sign-in presents username and password only;
-- first-user setup and registration collect username, display name, email, and
-  password;
-- email is private account metadata in v1 and is not the visible login key;
+- sign-in presents EMAIL and password (revised, David 2026-07-18: email is the login identifier — Better Auth core default; the username plugin remains for the mention-handle, not for sign-in);
+- first-user setup and registration collect EMAIL and PASSWORD ONLY — username defaults to the email local-part and display name defaults from it, both editable later in Settings → Account ("Shouldn't it just be email/password with the ability to edit profile in settings?");
+- email IS the login key (superseding the earlier private-metadata stance); username is the mention-handle and profile identity, edited in settings;
 - the implementation must not fabricate synthetic email addresses to evade
   Better Auth's account model;
 - username is normalized to lowercase and is the unique stable login handle;
@@ -104,7 +103,7 @@ Consequently:
 
 Username policy:
 
-- 3–32 characters;
+- 1–32 characters (self-hosted install: no squatting/enumeration concerns; a 2-char owner name like "dr" is fine — the 3-char floor was public-platform convention, removed per David 2026-07-18);
 - lowercase ASCII letters, numbers, dots, underscores, and hyphens;
 - must begin and end with a letter or number;
 - case-insensitive uniqueness after normalization;
@@ -114,7 +113,7 @@ Username policy:
 
 Password policy:
 
-- 12–128 characters;
+- 8–128 characters (Better Auth default floor; the 12 minimum was our own cargo-cult addition — removed per David 2026-07-18), ALL characters allowed incl. spaces/symbols, no composition rules;
 - Better Auth's default password hashing implementation;
 - generic sign-in failure messages;
 - changing a password requires the current password and revokes other
