@@ -1,0 +1,31 @@
+{
+  "name": "sigil-external-consumer-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "agent": "eve dev --no-ui --host 127.0.0.1",
+    "gonk": "tsx gonk/server.ts",
+    "dev": "node scripts/dev.mjs",
+    "smoke": "tsx scripts/smoke.ts",
+    "verify:contract": "node scripts/verify-contract.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gonk/auth": "0.3.1",
+    "@gonk/context": "0.3.1",
+    "@gonk/scope": "0.3.1",
+    "@gonk/tool-registry": "0.3.1",
+    "@gonk/tool-registry-mcp": "0.3.1",
+    "@zigil/agent-gonk": "0.1.0",
+    "eve": "0.24.4",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "25.3.0"
+  }
+}
