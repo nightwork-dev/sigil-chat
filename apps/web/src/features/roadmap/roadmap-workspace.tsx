@@ -333,15 +333,19 @@ function ReviewQueue({
 }) {
   if (reviews.length === 0) {
     return (
-      <Empty className="m-4 border">
-        <EmptyHeader>
-          <EmptyTitle>Queue is clear</EmptyTitle>
-          <EmptyDescription>
-            Reviews assigned to David appear here. Open a David-gated story and send it
-            to your queue, or let the agent assign one.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      // Padded wrapper, not m-4 on the Empty itself: Empty is `w-full`, so a
+      // horizontal margin makes it 100% + 32px and overflows off the right edge.
+      <div className="p-4">
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>Queue is clear</EmptyTitle>
+            <EmptyDescription>
+              Reviews assigned to you appear here. Open a story that needs your
+              review and send it to your queue, or let the agent assign one.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
     )
   }
   return (
@@ -478,7 +482,7 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
   const requestReview = () =>
     assign
       .mutateAsync({ id: story.id, gate: story.reviewGate })
-      .then(() => toast.success("Sent to David's review queue"))
+      .then(() => toast.success("Sent to your review queue"))
       .catch((error: unknown) =>
         toast.error(error instanceof Error ? error.message : "Could not assign review"),
       )
