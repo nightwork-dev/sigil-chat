@@ -331,10 +331,22 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       const record = store.getById<StoryRecord>(STORIES_COLLECTION, id);
       if (record === null) continue;
       const { comments: rawComments = [], ...candidate } = record;
-      if (!isStory(candidate))
-        throw new Error(
-          `Roadmap store is corrupt: ${name} is not a valid story markdown file.`,
+      // Idea/spec-stage stories legitimately have no "## Acceptance criteria"
+      // section yet — the store yields undefined for the missing section.
+      // Treat it as an empty list so they're valid stories, not corruption.
+      if (!Array.isArray(candidate.acceptanceCriteria)) {
+        candidate.acceptanceCriteria = [];
+      }
+      if (!isStory(candidate)) {
+        // Resilience: one malformed story file must NOT take down the whole
+        // board (this regressed from the markdown backing — David: "I thought
+        // we fixed that"). Skip it with a loud warning; the rest of the
+        // roadmap still loads.
+        console.warn(
+          `[work-items] Skipping ${name}: not a valid story markdown file.`,
         );
+        continue;
+      }
       const comments = Array.isArray(rawComments)
         ? rawComments.map((comment, index) => {
             if (

@@ -260,8 +260,11 @@ export function isStory(value: unknown): value is Story {
     value.title.length > 0 &&
     typeof value.intent === "string" &&
     value.intent.length > 0 &&
+    // Acceptance criteria may be empty: idea/spec-stage stories (e.g. a "## Shape
+    // sketch") legitimately have none yet — ACs are added at the spec/ready
+    // stage. Requiring them here made the whole board fail to load on the first
+    // idea story (D4.6).
     Array.isArray(value.acceptanceCriteria) &&
-    value.acceptanceCriteria.length > 0 &&
     value.acceptanceCriteria.every(
       (criterion) => typeof criterion === "string" && criterion.length > 0,
     ) &&

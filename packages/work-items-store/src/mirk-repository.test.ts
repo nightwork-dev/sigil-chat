@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { cp, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   MarkdownWorkItemsRepository,
@@ -201,5 +201,65 @@ describe("MirkWorkItemsRepository", () => {
         latestCommit: gitLog(mirkDirectory)[0],
       }),
     );
+  });
+
+  it("loads idea-stage stories (no acceptance criteria) and skips a corrupt file", async () => {
+    const directory = await makeDirectory();
+    // Seed the store so the collection + index exist.
+    await new MirkWorkItemsRepository({ dir: directory, now: () => NOW }).get();
+
+    const frontmatter = (
+      id: string,
+      status: string,
+      extraBody: string[],
+    ): string =>
+      [
+        "---",
+        `id: ${id}`,
+        "epicId: track-x",
+        "epicTitle: Ideas",
+        `title: ${id} title`,
+        `status: ${status}`,
+        "routing: claude:opus",
+        "reviewGate: decision:David",
+        "deps: []",
+        "authoredBy: David",
+        `createdAt: ${NOW}`,
+        `updatedAt: ${NOW}`,
+        "---",
+        "",
+        "A body preamble that becomes the intent.",
+        "",
+        ...extraBody,
+      ].join("\n");
+
+    // Idea-stage story: a sketch, NO "## Acceptance criteria" section. This is
+    // the D4.6 case that used to fail-close the entire board.
+    await writeFile(
+      join(directory, "IDEA9.md"),
+      frontmatter("IDEA9", "idea", ["## Shape sketch", "", "- explore later"]),
+    );
+    // A genuinely-corrupt story (invalid status enum) must be skipped, not
+    // fatal — one bad file cannot take down the whole board.
+    await writeFile(
+      join(directory, "BROKEN9.md"),
+      frontmatter("BROKEN9", "not-a-real-status", [
+        "## Acceptance criteria",
+        "",
+        "- x",
+      ]),
+    );
+
+    // The board must survive a corrupt file (David: "I thought we fixed that")
+    // — list() resolves instead of throwing, the idea story loads, and the
+    // corrupt one is dropped rather than taking everything down with it.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ids = (
+      await new MirkWorkItemsRepository({ dir: directory, now: () => NOW }).list()
+    ).map((story) => story.id);
+    warn.mockRestore();
+
+    expect(ids).toContain("IDEA9"); // idea story with no ACs is valid
+    expect(ids).not.toContain("BROKEN9"); // corrupt file dropped, board survives
   });
 });
