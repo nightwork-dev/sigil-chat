@@ -18,6 +18,9 @@ import { AccountSection } from "./account-section"
 import { AgentSection } from "./agent-section"
 import { AppearanceSection } from "./appearance-section"
 import { SecuritySection } from "./security-section"
+import { type AttentionContext } from "@zigil/agent-react/attention"
+import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 
 export type SettingsSection = "account" | "security" | "appearance" | "agent"
 
@@ -37,6 +40,22 @@ export function SettingsPage({
   section: SettingsSection
   onSectionChange: (section: SettingsSection) => void
 }) {
+  // Attention coverage (David): which settings section you're on flows into
+  // agent context, so "change my theme" / "explain this setting" have a target.
+  const telemetry = useAttentionTelemetry()
+  const attention: AttentionContext = {
+    application: "sigil-chat",
+    route: "/settings",
+    workspace: { kind: "settings", id: "settings", label: "Settings" },
+    selection: {
+      kind: "settings-section",
+      id: section,
+      label: SETTINGS_TABS.find((tab) => tab.value === section)?.label ?? section,
+    },
+    history: telemetry.history,
+  }
+  usePublishWorkspaceAttention(attention)
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-border px-4 py-3">
