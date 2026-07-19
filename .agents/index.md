@@ -138,6 +138,7 @@ Requires Node 24. All dependencies — including the `@gonk/*` and
 
 ```bash
 pnpm install
+pnpm auth:migrate   # first run (and after any auth schema change)
 pnpm dev
 ```
 
@@ -155,6 +156,13 @@ Prerequisites and required env:
 - [Portless](https://www.npmjs.com/package/portless) (`npm i -g portless`) —
   provides the shared daemon behind the `.localhost` URLs above. `PORTLESS=0`
   bypasses it and runs the three services on plain, unproxied ports.
+- `pnpm auth:migrate` — **required before first `pnpm dev`.** Better Auth
+  stores accounts/sessions in a local libsql DB (`apps/web/.data/sigil-chat.db`,
+  gitignored); the tables must be created first. Skipping it makes every route
+  (including `/login`) return a 500 that the dev server surfaces as a cryptic
+  `socket hang up` — the real error (`run pnpm auth:migrate`) is masked at the
+  server-fn RPC layer. Re-run after any change under `apps/web/src/lib/auth`
+  that adds a migration.
 - Run `codex login` before starting the app — Eve's `experimental_chatgpt()`
   model reads that local login and calls the Codex backend directly.
 - `CODEX_MODEL` — optional, overrides Eve's default subscription-backed model
