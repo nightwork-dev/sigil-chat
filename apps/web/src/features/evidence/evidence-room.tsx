@@ -3,11 +3,11 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { FileTextIcon, LibraryBigIcon, SparklesIcon } from "lucide-react"
 import {
-  AttentionProvider,
   type AttentionContext,
   type AttentionSelection,
 } from "@zigil/agent-react/attention"
 import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
 import { Button } from "@workspace/ui/components/button"
@@ -73,6 +73,10 @@ export function EvidenceRoom() {
     [selectedDoc, telemetry.history],
   )
 
+  // S1.9: publish to the shell HUD (see workspace-attention) — no local
+  // AttentionProvider; the persistent HUD in _app reads this.
+  usePublishWorkspaceAttention(attention)
+
   const library = (
     <LibraryRegion
       documents={documents}
@@ -84,8 +88,7 @@ export function EvidenceRoom() {
   const ask = <AskRegion selectedDoc={selectedDoc} />
 
   return (
-    <AttentionProvider context={attention}>
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
         <header className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-1.5">
           <LibraryBigIcon className="size-4 shrink-0 text-primary" />
           <h1 className="text-sm font-semibold">Evidence Room</h1>
@@ -124,7 +127,6 @@ export function EvidenceRoom() {
           </div>
         )}
       </div>
-    </AttentionProvider>
   )
 }
 

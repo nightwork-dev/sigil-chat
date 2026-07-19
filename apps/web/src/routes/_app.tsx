@@ -28,6 +28,8 @@ import { ThemePicker } from "@/components/theme-picker"
 import { AppAgentSessions } from "@/components/agent-sessions"
 import { AccountMenu } from "@/components/account-menu"
 import { fetchCurrentSession } from "@/lib/auth/route-guard"
+import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
+import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -73,9 +75,12 @@ function AppLayout() {
       actions={<ThemePicker variant="compact" />}
       accountMenu={<AccountMenu user={user} />}
     >
-      <AppAgentSessions>
-        <Outlet />
-      </AppAgentSessions>
+      <WorkspaceAttentionProvider>
+        <AppAgentSessions>
+          <Outlet />
+          <ShellAgentHud />
+        </AppAgentSessions>
+      </WorkspaceAttentionProvider>
     </SidebarShell>
   )
 }

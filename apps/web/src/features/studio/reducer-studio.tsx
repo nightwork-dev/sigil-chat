@@ -21,7 +21,6 @@ import {
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react"
-import { Link } from "@tanstack/react-router"
 import {
   CircleAlertIcon,
   FocusIcon,
@@ -43,14 +42,9 @@ import {
   useReducerGraphUndo,
 } from "@/features/studio/reducer-data"
 import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
-import { AgentHud } from "@/components/agent/agent-hud"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
+import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import {
-  setToolApprovalMode,
-  useToolApprovalMode,
-} from "@/lib/agent-tool-approval"
-import {
-  AttentionProvider,
   type AttentionContext,
   type AttentionSelection,
 } from "@zigil/agent-react/attention"
@@ -139,13 +133,11 @@ const REDUCER_GROUPS = [...registry.categories()].map(([label, reducers]) => ({
 const REDUCER_OPTIONS = REDUCER_GROUPS.flatMap((group) => group.items)
 
 export function ReducerStudio() {
-  const approvalMode = useToolApprovalMode()
   const documentQuery = useReducerGraph()
   const commandMutation = useReducerGraphCommand()
   const undoMutation = useReducerGraphUndo()
   const runQuery = useReducerGraphRun(documentQuery.data)
   const [selection, setSelection] = useState<ReducerGraphSelection | null>(null)
-  const [agentOpen, setAgentOpen] = useState(false)
   const [reducerId, setReducerId] = useState(registry.all()[0]?.id ?? "")
   const telemetry = useAttentionTelemetry({ historyLimit: 24 })
   const selectedReducerOption =
@@ -232,9 +224,12 @@ export function ReducerStudio() {
     history: telemetry.history,
   }
 
+  // S1.9: publish this workspace's attention to the shell so the persistent
+  // agent HUD (mounted in _app) reads it — no local AttentionProvider/HUD.
+  usePublishWorkspaceAttention(attention)
+
   return (
-    <AttentionProvider context={attention}>
-      <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
         <div className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-2 py-1.5 sm:px-3">
           <div className="flex min-w-0 items-center gap-1.5">
             <Combobox
@@ -326,7 +321,7 @@ export function ReducerStudio() {
               "absolute inset-x-2 bottom-2 z-20 max-h-[55dvh] overflow-y-auto rounded-lg border border-border bg-card shadow-xl",
               "sm:inset-x-auto sm:bottom-0 sm:right-0 sm:top-0 sm:max-h-none sm:w-[280px] sm:rounded-none sm:border-y-0 sm:border-r-0",
               "xl:static xl:min-h-0 xl:w-auto xl:shadow-none",
-              (!selection || agentOpen) && "max-xl:hidden",
+              !selection && "max-xl:hidden",
             )}
           >
             <Inspector
@@ -339,22 +334,6 @@ export function ReducerStudio() {
           </aside>
         </div>
 
-        <AgentHud.Root
-          className="absolute bottom-4 right-4 z-30 xl:right-[276px] max-sm:inset-x-2 max-sm:bottom-2 max-sm:right-auto"
-          onOpenChange={setAgentOpen}
-          open={agentOpen}
-        >
-          <AgentHud.Trigger />
-          <AgentHud.Panel
-            navigationTarget={<Link to="/chat" />}
-            chatProps={{
-              approvalMode,
-              onApprovalModeChange: setToolApprovalMode,
-              placeholder: "Ask the agent, or tell it to use a Gonk tool…",
-            }}
-          />
-        </AgentHud.Root>
-
         {commandMutation.isError ? (
           <Alert
             className="absolute bottom-4 left-1/2 z-40 w-auto max-w-[calc(100%-2rem)] -translate-x-1/2 shadow-lg"
@@ -365,7 +344,6 @@ export function ReducerStudio() {
           </Alert>
         ) : null}
       </div>
-    </AttentionProvider>
   )
 }
 
