@@ -12,10 +12,14 @@ import {
 import { Button } from "@workspace/ui/components/button"
 
 import {
+  createCalibrationTargets,
   fitGazeCalibration,
+  leaveOneTargetOutResiduals,
   predictGaze,
+  summarizeCalibrationTarget,
   type CalibrationSample,
   type GazeCalibration,
+  type NormalizedCalibrationTarget,
   type ScreenPoint,
 } from "./calibration"
 import {
@@ -23,6 +27,10 @@ import {
   type GazeConfidence,
   type GazeEstimator,
 } from "./estimator"
+import {
+  GAZE_X_FEATURE_INDICES,
+  GAZE_Y_FEATURE_INDICES,
+} from "./features"
 import { OneEuroFilter, type OneEuroOptions } from "./one-euro"
 import {
   advanceProtocol,
@@ -61,19 +69,8 @@ interface ObservationFields {
   failureModes: string
 }
 
-const CALIBRATION_POSITIONS = [
-  [0.1, 0.1],
-  [0.5, 0.1],
-  [0.9, 0.1],
-  [0.1, 0.5],
-  [0.5, 0.5],
-  [0.9, 0.5],
-  [0.1, 0.9],
-  [0.5, 0.9],
-  [0.9, 0.9],
-] as const
 const CALIBRATION_SETTLE_MS = 600
-const CALIBRATION_FRAMES = 45
+const CALIBRATION_FRAMES = 24
 const FRAME_INTERVAL_MS = 1000 / 30
 
 function clampPoint(point: ScreenPoint): ScreenPoint {
@@ -104,13 +101,12 @@ export function GazeLab() {
   const trackingStartedAtRef = useRef(0)
   const calibrationRef = useRef<GazeCalibration | null>(null)
   const calibrationSamplesRef = useRef<CalibrationSample[]>([])
+  const calibrationTargetsRef = useRef<NormalizedCalibrationTarget[]>([])
   const calibrationTargetStartedAtRef = useRef(0)
   const calibrationTargetIndexRef = useRef(0)
   const calibrationTargetFramesRef = useRef(0)
   const xFilterRef = useRef(new OneEuroFilter())
   const yFilterRef = useRef(new OneEuroFilter())
-  const displayedPointRef = useRef<ScreenPoint | null>(null)
-  const displayedPointAtRef = useRef(0)
   const gridQuantizerRef = useRef(new HysteresisQuantizer())
   const panelQuantizerRef = useRef(new HysteresisQuantizer())
   const protocolRef = useRef<ProtocolState>(createIdleProtocolState())
@@ -161,9 +157,9 @@ export function GazeLab() {
   const resetTrackingState = useCallback(() => {
     calibrationRef.current = null
     calibrationSamplesRef.current = []
+    calibrationTargetsRef.current = []
     xFilterRef.current.reset()
     yFilterRef.current.reset()
-    displayedPointRef.current = null
     gridQuantizerRef.current.reset()
     panelQuantizerRef.current.reset()
     protocolRef.current = createIdleProtocolState()
@@ -195,7 +191,12 @@ export function GazeLab() {
         throw new Error("This browser does not expose camera access.")
       }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, facingMode: "user" },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: "user",
+        },
         audio: false,
       })
       streamRef.current = stream
@@ -219,6 +220,7 @@ export function GazeLab() {
   const beginCalibration = useCallback(() => {
     calibrationRef.current = null
     calibrationSamplesRef.current = []
+    calibrationTargetsRef.current = createCalibrationTargets()
     calibrationTargetIndexRef.current = 0
     calibrationTargetFramesRef.current = 0
     calibrationTargetStartedAtRef.current = performance.now()
@@ -229,33 +231,28 @@ export function GazeLab() {
 
   const finishCalibration = useCallback(() => {
     try {
-      const calibration = fitGazeCalibration(calibrationSamplesRef.current)
-      calibrationRef.current = calibration
-      const residuals = CALIBRATION_POSITIONS.map((_, targetIndex) => {
-        const start = targetIndex * CALIBRATION_FRAMES
-        const samples = calibrationSamplesRef.current.slice(
-          start,
-          start + CALIBRATION_FRAMES,
-        )
-        const total = samples.reduce((sum, sample) => {
-          const predicted = predictGaze(calibration, sample.features)
-          return (
-            sum +
-            Math.hypot(
-              predicted.x - sample.target.x,
-              predicted.y - sample.target.y,
-            )
-          )
-        }, 0)
-        return samples.length ? total / samples.length : 0
+      const targetSamples = calibrationTargetsRef.current.map(
+        (_, targetIndex) =>
+          summarizeCalibrationTarget(
+            calibrationSamplesRef.current.slice(
+              targetIndex * CALIBRATION_FRAMES,
+              (targetIndex + 1) * CALIBRATION_FRAMES,
+            ),
+          ).sample,
+      )
+      const calibration = fitGazeCalibration(targetSamples, {
+        xFeatureIndices: [...GAZE_X_FEATURE_INDICES],
+        yFeatureIndices: [...GAZE_Y_FEATURE_INDICES],
       })
-      setCalibrationResiduals(residuals)
+      calibrationRef.current = calibration
+      setCalibrationResiduals(
+        leaveOneTargetOutResiduals(targetSamples, calibration),
+      )
       setCalibrationProgress(null)
       xFilterRef.current.reset()
       yFilterRef.current.reset()
       gridQuantizerRef.current.reset()
       panelQuantizerRef.current.reset()
-      displayedPointRef.current = null
       setPhase("tracking")
     } catch (cause) {
       setError(
@@ -301,7 +298,7 @@ export function GazeLab() {
         const settling =
           now - calibrationTargetStartedAtRef.current < CALIBRATION_SETTLE_MS
         if (!settling && sample.confidence === "high" && sample.features) {
-          const position = CALIBRATION_POSITIONS[targetIndex]
+          const position = calibrationTargetsRef.current[targetIndex]
           if (!position) return
           calibrationSamplesRef.current.push({
             features: sample.features.values,
@@ -313,7 +310,7 @@ export function GazeLab() {
           calibrationTargetFramesRef.current += 1
 
           if (calibrationTargetFramesRef.current >= CALIBRATION_FRAMES) {
-            if (targetIndex + 1 >= CALIBRATION_POSITIONS.length) {
+            if (targetIndex + 1 >= calibrationTargetsRef.current.length) {
               finishCalibration()
               return
             }
@@ -343,16 +340,7 @@ export function GazeLab() {
           x: xFilterRef.current.filter(raw.x, now),
           y: yFilterRef.current.filter(raw.y, now),
         }
-        const previous = displayedPointRef.current ?? smoothed
-        const elapsed = Math.max(now - displayedPointAtRef.current, 0)
-        const alpha = 1 - Math.exp(-elapsed / 100)
-        const displayed = {
-          x: previous.x + (smoothed.x - previous.x) * alpha,
-          y: previous.y + (smoothed.y - previous.y) * alpha,
-        }
-        displayedPointRef.current = displayed
-        displayedPointAtRef.current = now
-        setPoint(displayed)
+        setPoint(smoothed)
 
         const viewport = {
           width: window.innerWidth,
@@ -360,14 +348,14 @@ export function GazeLab() {
         }
         const confident = sample.confidence === "high"
         const gridUpdate = gridQuantizerRef.current.update(
-          displayed,
+          smoothed,
           now,
           grid3x3Regions(viewport.width, viewport.height),
           viewport,
           confident,
         )
         const panelUpdate = panelQuantizerRef.current.update(
-          displayed,
+          smoothed,
           now,
           panelRegions(viewport.width, viewport.height),
           viewport,
@@ -416,7 +404,7 @@ export function GazeLab() {
   }, [])
 
   const calibrationTarget = calibrationProgress
-    ? CALIBRATION_POSITIONS[calibrationProgress.targetIndex]
+    ? calibrationTargetsRef.current[calibrationProgress.targetIndex]
     : null
   const protocolTarget = currentProtocolTarget(protocol)
   const driftWaitRemaining = Math.max(
@@ -534,7 +522,7 @@ export function GazeLab() {
 
             {calibrationResiduals.length > 0 && (
               <div className="text-xs">
-                <h2 className="font-medium">Calibration residuals</h2>
+                <h2 className="font-medium">Held-out calibration error</h2>
                 <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-[10px]">
                   {calibrationResiduals.map((residual, index) => (
                     <span
@@ -581,9 +569,10 @@ export function GazeLab() {
                   Ready to calibrate
                 </h2>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Keep your head comfortable and follow nine targets. Each
-                  target settles for 600ms, then collects 45 usable frames.
-                  Usually 19–25s.
+                  Keep your head comfortable and follow sixteen randomized
+                  targets. Each target settles for 600ms, then collects 24
+                  usable frames. Stay at one distance with even light on your
+                  face. Usually 22–28s.
                 </p>
                 <Button className="mt-4" onClick={beginCalibration}>
                   Begin calibration
@@ -749,6 +738,8 @@ export function GazeLab() {
             <div className="size-2 rounded-full bg-cyan-200" />
           </div>
           <p className="mt-2 -translate-x-1/4 whitespace-nowrap rounded bg-background/90 px-2 py-1 font-mono text-[10px]">
+            Target {(calibrationProgress?.targetIndex ?? 0) + 1}/
+            {calibrationTargetsRef.current.length} ·{" "}
             {calibrationProgress?.settling
               ? "settle"
               : `${calibrationProgress?.collected ?? 0}/${CALIBRATION_FRAMES}`}

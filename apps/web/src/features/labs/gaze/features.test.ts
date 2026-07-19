@@ -19,6 +19,19 @@ function identityMatrix(): Matrix {
   }
 }
 
+function rotateLandmark(
+  value: NormalizedLandmark,
+  center: NormalizedLandmark,
+  angle: number,
+): NormalizedLandmark {
+  const x = value.x - center.x
+  const y = value.y - center.y
+  return landmark(
+    center.x + x * Math.cos(angle) - y * Math.sin(angle),
+    center.y + x * Math.sin(angle) + y * Math.cos(angle),
+  )
+}
+
 describe("gaze feature extraction", () => {
   it("extracts normalized iris offsets and openness from the documented indices", () => {
     const landmarks = Array.from({ length: 478 }, () => landmark())
@@ -34,9 +47,9 @@ describe("gaze feature extraction", () => {
     expect(result.values).toHaveLength(12)
     expect(result.values.slice(0, 4)).toEqual([
       expect.closeTo(0.25),
-      expect.closeTo(0.1),
+      expect.closeTo(0.05),
       expect.closeTo(0.25),
-      expect.closeTo(0.1),
+      expect.closeTo(0.05),
     ])
     expect(result.eyeOpenness).toEqual([
       expect.closeTo(0.3),
@@ -71,5 +84,46 @@ describe("gaze feature extraction", () => {
     expect(pose.yaw).toBeCloseTo(30)
     expect(pose.translationX).toBeCloseTo(0.6)
     expect(pose.translationY).toBeCloseTo(0.8)
+  })
+
+  it("keeps iris offsets stable when the eye rolls in the image", () => {
+    const landmarks = Array.from({ length: 478 }, () => landmark())
+    const center = landmark(0.3, 0.5)
+    const angle = Math.PI / 6
+    for (const eye of Object.values(GAZE_LANDMARKS)) {
+      landmarks[eye.outerCorner] = rotateLandmark(
+        landmark(0.2, 0.5),
+        center,
+        angle,
+      )
+      landmarks[eye.innerCorner] = rotateLandmark(
+        landmark(0.4, 0.5),
+        center,
+        angle,
+      )
+      landmarks[eye.irisCenter] = rotateLandmark(
+        landmark(0.35, 0.52),
+        center,
+        angle,
+      )
+      landmarks[eye.upperLid] = rotateLandmark(
+        landmark(0.3, 0.48),
+        center,
+        angle,
+      )
+      landmarks[eye.lowerLid] = rotateLandmark(
+        landmark(0.3, 0.54),
+        center,
+        angle,
+      )
+    }
+
+    const result = extractGazeFeatures(landmarks, identityMatrix())
+    expect(result.values.slice(0, 4)).toEqual([
+      expect.closeTo(0.25),
+      expect.closeTo(0.05),
+      expect.closeTo(0.25),
+      expect.closeTo(0.05),
+    ])
   })
 })

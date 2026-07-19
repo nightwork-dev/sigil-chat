@@ -24,6 +24,10 @@ export const GAZE_LANDMARKS = {
   },
 } as const
 
+/** Compact, axis-specific regressors; openness remains confidence-only. */
+export const GAZE_X_FEATURE_INDICES = [0, 2, 6, 8, 9] as const
+export const GAZE_Y_FEATURE_INDICES = [1, 3, 7, 8, 10] as const
+
 export interface HeadPose {
   yaw: number
   pitch: number
@@ -58,11 +62,35 @@ function eyeFeatures(
   }
 
   const width = Math.max(distance(outer, inner), 1e-6)
-  const midpointX = (outer.x + inner.x) / 2
-  const midpointY = (outer.y + inner.y) / 2
+  const cornerMidpoint = {
+    x: (outer.x + inner.x) / 2,
+    y: (outer.y + inner.y) / 2,
+  }
+  const lidMidpoint = {
+    x: (upper.x + lower.x) / 2,
+    y: (upper.y + lower.y) / 2,
+  }
+  let axisX = (inner.x - outer.x) / width
+  let axisY = (inner.y - outer.y) / width
+  if (axisX < 0) {
+    axisX *= -1
+    axisY *= -1
+  }
+  let verticalX = -axisY
+  let verticalY = axisX
+  if (verticalY < 0) {
+    verticalX *= -1
+    verticalY *= -1
+  }
   return {
-    x: (iris.x - midpointX) / width,
-    y: (iris.y - midpointY) / width,
+    x:
+      ((iris.x - cornerMidpoint.x) * axisX +
+        (iris.y - cornerMidpoint.y) * axisY) /
+      width,
+    y:
+      ((iris.x - lidMidpoint.x) * verticalX +
+        (iris.y - lidMidpoint.y) * verticalY) /
+      width,
     openness: distance(upper, lower) / width,
   }
 }
