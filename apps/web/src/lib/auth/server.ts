@@ -37,6 +37,7 @@ export interface SigilAuthSession {
 export interface SigilAuthInstance {
   api: {
     getSession(input: { headers: Headers }): Promise<SigilAuthSession | null>
+    getToken(input: { headers: Headers }): Promise<{ token: string }>
   }
   handler(request: Request): Promise<Response>
 }

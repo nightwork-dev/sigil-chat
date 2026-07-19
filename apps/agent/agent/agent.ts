@@ -12,4 +12,7 @@ const { model } = readAgentEnvironment(process.env)
 export default defineAgent({
   model: experimental_chatgpt(model),
   modelContextWindowTokens: 200_000,
+  build: {
+    externalDependencies: ["better-sqlite3"],
+  },
 })

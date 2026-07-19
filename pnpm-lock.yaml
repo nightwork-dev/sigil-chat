@@ -59,6 +59,9 @@ importers:
       ai:
         specifier: ^7.0.26
         version: 7.0.29(zod@4.4.3)
+      better-sqlite3:
+        specifier: 12.10.0
+        version: 12.10.0
       eve:
         specifier: 0.24.4
         version: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))

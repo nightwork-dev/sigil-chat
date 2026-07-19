@@ -24,6 +24,7 @@
     "@workspace/blackboard-store": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
     "ai": "^7.0.26",
+    "better-sqlite3": "12.10.0",
     "eve": "0.24.4",
     "jose": "^6.1.3",
     "zod": "^4.4.3"

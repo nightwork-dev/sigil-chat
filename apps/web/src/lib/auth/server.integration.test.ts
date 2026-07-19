@@ -126,4 +126,13 @@ describe("Better Auth registration boundary", () => {
     expect(typeof payload.sub).toBe("string")
     expect((payload.exp as number) - (payload.iat as number)).toBe(300)
   })
+
+  it("rejects an anonymous Eve token request", async () => {
+    const auth = await createTestAuth()
+    const response = await auth.handler(
+      new Request("http://sigil-chat.localhost:1355/api/auth/token"),
+    )
+
+    expect(response.status).toBe(401)
+  })
 })

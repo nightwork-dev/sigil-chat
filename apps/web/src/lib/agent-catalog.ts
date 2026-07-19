@@ -95,24 +95,36 @@ const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
     const { joinRuntimeUrl, readRuntimeTopology } = await import(
       "@workspace/runtime-env/topology"
     );
+    const { getEveBearerToken } = await import("./auth/session");
     const origin = readRuntimeTopology(process.env).eveOrigin;
-    const response = await fetch(
+    return fetchAgentCatalogFromEve(
       joinRuntimeUrl(origin, "/eve/v1/info"),
-      {
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      },
+      await getEveBearerToken(),
     );
-
-    if (!response.ok) {
-      throw new Error(
-        `Eve agent inspection failed (${response.status} ${response.statusText})`,
-      );
-    }
-
-    return projectAgentCatalog((await response.json()) as EveAgentInfo);
   },
 );
+
+export async function fetchAgentCatalogFromEve(
+  url: string,
+  bearer: string,
+  fetcher: typeof fetch = fetch,
+): Promise<AgentCatalog> {
+  const response = await fetcher(url, {
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${bearer}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Eve agent inspection failed (${response.status} ${response.statusText})`,
+    );
+  }
+
+  return projectAgentCatalog((await response.json()) as EveAgentInfo);
+}
 
 function stringValue(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim().length > 0

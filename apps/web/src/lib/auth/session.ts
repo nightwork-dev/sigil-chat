@@ -24,6 +24,17 @@ export async function getSession(headers: Headers = getRequestHeaders()) {
   return (await getAuth()).api.getSession({ headers })
 }
 
+export async function getEveBearerToken(
+  headers: Headers = getRequestHeaders(),
+): Promise<string> {
+  const auth = await getAuth()
+  const session = await auth.api.getSession({ headers })
+  requireSession(session)
+  const result = await auth.api.getToken({ headers })
+  if (!result.token) throw new AuthenticationRequiredError()
+  return result.token
+}
+
 export function requireSession(
   session: SigilAuthSession | null,
 ): asserts session is SigilAuthSession {

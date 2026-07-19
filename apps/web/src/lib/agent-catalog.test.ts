@@ -1,8 +1,41 @@
 import { describe, expect, it } from "vitest";
 
-import { projectAgentCatalog } from "./agent-catalog";
+import {
+  fetchAgentCatalogFromEve,
+  projectAgentCatalog,
+} from "./agent-catalog";
 
 describe("agent catalog projection", () => {
+  it("authenticates Eve inspection with the verified session token", async () => {
+    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        "Bearer verified-eve-token",
+      );
+      return Response.json({ agent: { name: "Sigil Chat" } });
+    };
+
+    await expect(
+      fetchAgentCatalogFromEve(
+        "http://sigil-chat-agent.localhost:1355/eve/v1/info",
+        "verified-eve-token",
+        fetcher as typeof fetch,
+      ),
+    ).resolves.toMatchObject({ agent: { name: "Sigil Chat" } });
+  });
+
+  it("fails closed when Eve rejects inspection credentials", async () => {
+    const fetcher = async () =>
+      new Response(null, { status: 401, statusText: "Unauthorized" });
+
+    await expect(
+      fetchAgentCatalogFromEve(
+        "http://sigil-chat-agent.localhost:1355/eve/v1/info",
+        "rejected-token",
+        fetcher as typeof fetch,
+      ),
+    ).rejects.toThrow("Eve agent inspection failed (401 Unauthorized)");
+  });
+
   it("distinguishes model-discoverable skills from delegatable subagents", () => {
     const catalog = projectAgentCatalog({
       agent: { name: "Sigil Chat", model: { id: "local-codex" } },
