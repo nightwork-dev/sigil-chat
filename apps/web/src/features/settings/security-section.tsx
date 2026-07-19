@@ -31,6 +31,22 @@ function deviceLabel(userAgent?: string | null): string {
   return "Unknown device"
 }
 
+function formatIpAddress(ip?: string | null): string | null {
+  if (!ip) return null
+  const trimmed = ip.trim()
+  // Local dev / loopback surfaces as ::1, 127.0.0.1, or an all-zeros IPv6
+  // (0000:0000:…). Don't render a wall of zeros in the session list.
+  if (
+    trimmed === "::" ||
+    trimmed === "::1" ||
+    trimmed === "127.0.0.1" ||
+    /^0+(?::0+)*$/.test(trimmed)
+  ) {
+    return "Local"
+  }
+  return trimmed
+}
+
 function ChangePasswordForm() {
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -164,9 +180,9 @@ function SessionsList({ userId }: { userId: string }) {
             <div className="flex flex-col gap-0.5 min-w-0">
               <span className="flex items-center gap-1.5 text-xs font-medium">
                 {deviceLabel(session.userAgent)}
-                {session.ipAddress ? (
+                {formatIpAddress(session.ipAddress) ? (
                   <span className="font-mono text-muted-foreground">
-                    {session.ipAddress}
+                    {formatIpAddress(session.ipAddress)}
                   </span>
                 ) : null}
               </span>

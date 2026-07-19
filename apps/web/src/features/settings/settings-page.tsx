@@ -69,12 +69,19 @@ export function SettingsPage({
       >
         <TabsList
           variant="line"
-          className="h-fit w-40 shrink-0 flex-col items-stretch bg-transparent p-0"
+          className="h-fit w-auto shrink-0 flex-col items-stretch bg-transparent p-0 sm:w-40"
         >
           {SETTINGS_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="justify-start gap-2 px-2">
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              title={tab.label}
+              className="justify-center gap-2 px-2 sm:justify-start"
+            >
               <tab.icon />
-              {tab.label}
+              {/* Labels would starve the content column at phone widths; the
+                  rail is icon-only on mobile (title keeps them discoverable). */}
+              <span className="hidden sm:inline">{tab.label}</span>
             </TabsTrigger>
           ))}
         </TabsList>
