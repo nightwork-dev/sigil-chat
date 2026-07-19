@@ -163,6 +163,9 @@ importers:
       '@libsql/client':
         specifier: ^0.15.15
         version: 0.15.15
+      '@mediapipe/tasks-vision':
+        specifier: 0.10.35
+        version: 0.10.35
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.2.1(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -1589,6 +1592,9 @@ packages:
     resolution: {integrity: sha512-4/0CvEdhi6+KjMxMaVbFM2n2Z44escBRoEYpR+gZg64DdetzGnYm8mcNLcoySaDJZNaBd6wz5DNdgRmcI4hXcg==}
     cpu: [x64]
     os: [win32]
+
+  '@mediapipe/tasks-vision@0.10.35':
+    resolution: {integrity: sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==}
 
   '@mirk/artifact@0.1.0':
     resolution: {integrity: sha512-44zwAmq7G2Y5BPQrETNfdUKqLiKaQq6PnRYcSnYs2kh3xqkpKDEh7ZtyXW6f6f3bLP7J9YM50AC3eEIddCox4w==}
@@ -7492,6 +7498,8 @@ snapshots:
 
   '@libsql/win32-x64-msvc@0.5.29':
     optional: true
+
+  '@mediapipe/tasks-vision@0.10.35': {}
 
   '@mirk/artifact@0.1.0(better-sqlite3@12.10.0)':
     dependencies:

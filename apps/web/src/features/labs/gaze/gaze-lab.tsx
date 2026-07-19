@@ -1,0 +1,893 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  CameraIcon,
+  CopyIcon,
+  CrosshairIcon,
+  EyeIcon,
+  EyeOffIcon,
+  RotateCcwIcon,
+  SquareIcon,
+} from "lucide-react"
+
+import { Button } from "@workspace/ui/components/button"
+
+import {
+  fitGazeCalibration,
+  predictGaze,
+  type CalibrationSample,
+  type GazeCalibration,
+  type ScreenPoint,
+} from "./calibration"
+import {
+  createGazeEstimator,
+  type GazeConfidence,
+  type GazeEstimator,
+} from "./estimator"
+import { OneEuroFilter, type OneEuroOptions } from "./one-euro"
+import {
+  advanceProtocol,
+  createIdleProtocolState,
+  currentProtocolTarget,
+  PROTOCOL_DRIFT_WAIT_MS,
+  recommendProtocol,
+  startProtocol,
+  type ProtocolState,
+} from "./protocol"
+import {
+  grid3x3Regions,
+  HysteresisQuantizer,
+  panelRegions,
+  type RegionEvent,
+} from "./regions"
+
+type LabPhase =
+  | "off"
+  | "starting"
+  | "ready"
+  | "calibrating"
+  | "tracking"
+  | "error"
+
+interface CalibrationProgress {
+  targetIndex: number
+  collected: number
+  settling: boolean
+}
+
+interface ObservationFields {
+  lighting: string
+  glasses: string
+  indicatorPreference: "cursor" | "region-glow" | "both"
+  failureModes: string
+}
+
+const CALIBRATION_POSITIONS = [
+  [0.1, 0.1],
+  [0.5, 0.1],
+  [0.9, 0.1],
+  [0.1, 0.5],
+  [0.5, 0.5],
+  [0.9, 0.5],
+  [0.1, 0.9],
+  [0.5, 0.9],
+  [0.9, 0.9],
+] as const
+const CALIBRATION_SETTLE_MS = 600
+const CALIBRATION_FRAMES = 45
+const FRAME_INTERVAL_MS = 1000 / 30
+
+function clampPoint(point: ScreenPoint): ScreenPoint {
+  return {
+    x: Math.max(0, Math.min(window.innerWidth, point.x)),
+    y: Math.max(0, Math.min(window.innerHeight, point.y)),
+  }
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`
+}
+
+function panelGlow(active: boolean, enabled: boolean, confident: boolean) {
+  return active && enabled
+    ? confident
+      ? "border-cyan-400/70 bg-cyan-400/[0.08] shadow-[inset_0_0_48px_rgba(34,211,238,0.08)]"
+      : "border-cyan-400/25 bg-cyan-400/[0.025]"
+    : "border-border/50 bg-background/30"
+}
+
+export function GazeLab() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const estimatorRef = useRef<GazeEstimator | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const lastFrameAtRef = useRef(0)
+  const trackingStartedAtRef = useRef(0)
+  const calibrationRef = useRef<GazeCalibration | null>(null)
+  const calibrationSamplesRef = useRef<CalibrationSample[]>([])
+  const calibrationTargetStartedAtRef = useRef(0)
+  const calibrationTargetIndexRef = useRef(0)
+  const calibrationTargetFramesRef = useRef(0)
+  const xFilterRef = useRef(new OneEuroFilter())
+  const yFilterRef = useRef(new OneEuroFilter())
+  const displayedPointRef = useRef<ScreenPoint | null>(null)
+  const displayedPointAtRef = useRef(0)
+  const gridQuantizerRef = useRef(new HysteresisQuantizer())
+  const panelQuantizerRef = useRef(new HysteresisQuantizer())
+  const protocolRef = useRef<ProtocolState>(createIdleProtocolState())
+
+  const [phase, setPhase] = useState<LabPhase>("off")
+  const [error, setError] = useState<string | null>(null)
+  const [confidence, setConfidence] = useState<GazeConfidence>("low")
+  const [confidenceReason, setConfidenceReason] = useState("Camera is off")
+  const [point, setPoint] = useState<ScreenPoint | null>(null)
+  const [activeGridRegion, setActiveGridRegion] = useState<string | null>(null)
+  const [activePanelRegion, setActivePanelRegion] = useState<string | null>(
+    null,
+  )
+  const [events, setEvents] = useState<RegionEvent[]>([])
+  const [calibrationProgress, setCalibrationProgress] =
+    useState<CalibrationProgress | null>(null)
+  const [calibrationResiduals, setCalibrationResiduals] = useState<number[]>([])
+  const [showCursor, setShowCursor] = useState(true)
+  const [showRegionGlow, setShowRegionGlow] = useState(true)
+  const [filterOptions, setFilterOptions] = useState<OneEuroOptions>({
+    minCutoff: 1,
+    beta: 0.007,
+    dCutoff: 1,
+  })
+  const [protocol, setProtocol] = useState<ProtocolState>(() =>
+    createIdleProtocolState(),
+  )
+  const [trackingUptimeMs, setTrackingUptimeMs] = useState(0)
+  const [observations, setObservations] = useState<ObservationFields>({
+    lighting: "",
+    glasses: "not tested",
+    indicatorPreference: "both",
+    failureModes: "",
+  })
+
+  const releaseCamera = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    estimatorRef.current?.close()
+    estimatorRef.current = null
+    for (const track of streamRef.current?.getTracks() ?? []) track.stop()
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+  }, [])
+
+  const resetTrackingState = useCallback(() => {
+    calibrationRef.current = null
+    calibrationSamplesRef.current = []
+    xFilterRef.current.reset()
+    yFilterRef.current.reset()
+    displayedPointRef.current = null
+    gridQuantizerRef.current.reset()
+    panelQuantizerRef.current.reset()
+    protocolRef.current = createIdleProtocolState()
+    setProtocol(protocolRef.current)
+    setPoint(null)
+    setActiveGridRegion(null)
+    setActivePanelRegion(null)
+    setEvents([])
+    setCalibrationProgress(null)
+    setCalibrationResiduals([])
+  }, [])
+
+  const stopCamera = useCallback(() => {
+    releaseCamera()
+    resetTrackingState()
+    setPhase("off")
+    setConfidence("low")
+    setConfidenceReason("Camera is off")
+    setTrackingUptimeMs(0)
+  }, [releaseCamera, resetTrackingState])
+
+  useEffect(() => releaseCamera, [releaseCamera])
+
+  const startCamera = useCallback(async () => {
+    setPhase("starting")
+    setError(null)
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("This browser does not expose camera access.")
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, facingMode: "user" },
+        audio: false,
+      })
+      streamRef.current = stream
+      const video = videoRef.current
+      if (!video) throw new Error("Camera preview was not mounted.")
+      video.srcObject = stream
+      await video.play()
+      estimatorRef.current = await createGazeEstimator()
+      trackingStartedAtRef.current = performance.now()
+      setConfidenceReason("Ready to calibrate")
+      setPhase("ready")
+    } catch (cause) {
+      releaseCamera()
+      setError(
+        cause instanceof Error ? cause.message : "Could not start the camera.",
+      )
+      setPhase("error")
+    }
+  }, [releaseCamera])
+
+  const beginCalibration = useCallback(() => {
+    calibrationRef.current = null
+    calibrationSamplesRef.current = []
+    calibrationTargetIndexRef.current = 0
+    calibrationTargetFramesRef.current = 0
+    calibrationTargetStartedAtRef.current = performance.now()
+    setCalibrationProgress({ targetIndex: 0, collected: 0, settling: true })
+    setCalibrationResiduals([])
+    setPhase("calibrating")
+  }, [])
+
+  const finishCalibration = useCallback(() => {
+    try {
+      const calibration = fitGazeCalibration(calibrationSamplesRef.current)
+      calibrationRef.current = calibration
+      const residuals = CALIBRATION_POSITIONS.map((_, targetIndex) => {
+        const start = targetIndex * CALIBRATION_FRAMES
+        const samples = calibrationSamplesRef.current.slice(
+          start,
+          start + CALIBRATION_FRAMES,
+        )
+        const total = samples.reduce((sum, sample) => {
+          const predicted = predictGaze(calibration, sample.features)
+          return (
+            sum +
+            Math.hypot(
+              predicted.x - sample.target.x,
+              predicted.y - sample.target.y,
+            )
+          )
+        }, 0)
+        return samples.length ? total / samples.length : 0
+      })
+      setCalibrationResiduals(residuals)
+      setCalibrationProgress(null)
+      xFilterRef.current.reset()
+      yFilterRef.current.reset()
+      gridQuantizerRef.current.reset()
+      panelQuantizerRef.current.reset()
+      displayedPointRef.current = null
+      setPhase("tracking")
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Calibration fit failed.",
+      )
+      setPhase("ready")
+    }
+  }, [])
+
+  useEffect(() => {
+    if (
+      !estimatorRef.current ||
+      !["ready", "calibrating", "tracking"].includes(phase)
+    ) {
+      return
+    }
+
+    let cancelled = false
+    const frame = (now: number) => {
+      if (cancelled) return
+      animationFrameRef.current = requestAnimationFrame(frame)
+      if (now - lastFrameAtRef.current < FRAME_INTERVAL_MS) return
+      lastFrameAtRef.current = now
+
+      const video = videoRef.current
+      const estimator = estimatorRef.current
+      if (
+        !video ||
+        !estimator ||
+        video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+      ) {
+        return
+      }
+
+      const frameStartedAt = performance.now()
+      const sample = estimator.sample(video, now)
+      setConfidence(sample.confidence)
+      setConfidenceReason(sample.confidenceReason ?? "Signal usable")
+      setTrackingUptimeMs(now - trackingStartedAtRef.current)
+
+      if (phase === "calibrating") {
+        const targetIndex = calibrationTargetIndexRef.current
+        const settling =
+          now - calibrationTargetStartedAtRef.current < CALIBRATION_SETTLE_MS
+        if (!settling && sample.confidence === "high" && sample.features) {
+          const position = CALIBRATION_POSITIONS[targetIndex]
+          if (!position) return
+          calibrationSamplesRef.current.push({
+            features: sample.features.values,
+            target: {
+              x: position[0] * window.innerWidth,
+              y: position[1] * window.innerHeight,
+            },
+          })
+          calibrationTargetFramesRef.current += 1
+
+          if (calibrationTargetFramesRef.current >= CALIBRATION_FRAMES) {
+            if (targetIndex + 1 >= CALIBRATION_POSITIONS.length) {
+              finishCalibration()
+              return
+            }
+            calibrationTargetIndexRef.current += 1
+            calibrationTargetFramesRef.current = 0
+            calibrationTargetStartedAtRef.current = now
+          }
+        }
+        setCalibrationProgress({
+          targetIndex: calibrationTargetIndexRef.current,
+          collected: calibrationTargetFramesRef.current,
+          settling,
+        })
+        return
+      }
+
+      if (phase !== "tracking" || !calibrationRef.current) return
+
+      let activeGrid = activeGridRegion
+      if (sample.features) {
+        xFilterRef.current.setOptions(filterOptions)
+        yFilterRef.current.setOptions(filterOptions)
+        const raw = clampPoint(
+          predictGaze(calibrationRef.current, sample.features.values),
+        )
+        const smoothed = {
+          x: xFilterRef.current.filter(raw.x, now),
+          y: yFilterRef.current.filter(raw.y, now),
+        }
+        const previous = displayedPointRef.current ?? smoothed
+        const elapsed = Math.max(now - displayedPointAtRef.current, 0)
+        const alpha = 1 - Math.exp(-elapsed / 100)
+        const displayed = {
+          x: previous.x + (smoothed.x - previous.x) * alpha,
+          y: previous.y + (smoothed.y - previous.y) * alpha,
+        }
+        displayedPointRef.current = displayed
+        displayedPointAtRef.current = now
+        setPoint(displayed)
+
+        const viewport = {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }
+        const confident = sample.confidence === "high"
+        const gridUpdate = gridQuantizerRef.current.update(
+          displayed,
+          now,
+          grid3x3Regions(viewport.width, viewport.height),
+          viewport,
+          confident,
+        )
+        const panelUpdate = panelQuantizerRef.current.update(
+          displayed,
+          now,
+          panelRegions(viewport.width, viewport.height),
+          viewport,
+          confident,
+        )
+        activeGrid = gridUpdate.activeRegion
+        setActiveGridRegion(gridUpdate.activeRegion)
+        setActivePanelRegion(panelUpdate.activeRegion)
+        const nextEvents = [...gridUpdate.events, ...panelUpdate.events]
+        if (nextEvents.length) {
+          setEvents((current) => [...nextEvents, ...current].slice(0, 50))
+        }
+      }
+
+      if (protocolRef.current.phase !== "idle") {
+        const nextProtocol = advanceProtocol(protocolRef.current, {
+          t: now,
+          activeGridRegion: sample.confidence === "high" ? activeGrid : null,
+          processingMs: performance.now() - frameStartedAt,
+        })
+        if (nextProtocol !== protocolRef.current) {
+          protocolRef.current = nextProtocol
+          setProtocol(nextProtocol)
+        }
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(frame)
+    return () => {
+      cancelled = true
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+    }
+  }, [activeGridRegion, filterOptions, finishCalibration, phase])
+
+  const runProtocol = useCallback(() => {
+    const now = performance.now()
+    const next = startProtocol(now, trackingStartedAtRef.current, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    })
+    protocolRef.current = next
+    setProtocol(next)
+  }, [])
+
+  const calibrationTarget = calibrationProgress
+    ? CALIBRATION_POSITIONS[calibrationProgress.targetIndex]
+    : null
+  const protocolTarget = currentProtocolTarget(protocol)
+  const driftWaitRemaining = Math.max(
+    0,
+    PROTOCOL_DRIFT_WAIT_MS - trackingUptimeMs,
+  )
+
+  const findings = useMemo(() => {
+    if (!protocol.report) return null
+    const recommendation = recommendProtocol(protocol.report)
+    return {
+      storyId: "GZ.1",
+      protocolVersion: 1,
+      capturedAt: new Date().toISOString(),
+      baseline: protocol.report.baseline,
+      drift: protocol.report.drift,
+      driftDeltaPercentagePoints: protocol.report.driftDeltaPercentagePoints,
+      performance: protocol.report.performance,
+      observations,
+      recommendation,
+      recommendationLine: `${recommendation} — thresholds: wire ≥80% baseline, ≥75% drift, ≤10pp drift, ≤8ms mean; iterate ≥55% baseline, ≥50% drift, ≤16ms mean; otherwise drop.`,
+    }
+  }, [observations, protocol.report])
+  const findingsJson = findings ? JSON.stringify(findings, null, 2) : ""
+
+  return (
+    <main className="relative min-h-svh overflow-hidden bg-background text-foreground">
+      <video
+        ref={videoRef}
+        className="pointer-events-none fixed size-px opacity-0"
+        muted
+        playsInline
+      />
+
+      <div className="absolute inset-0 grid grid-cols-[22vw_1fr_22vw] grid-rows-[1fr_22vh] gap-px bg-border/50">
+        <section
+          className={`relative row-span-2 overflow-auto border transition-colors ${panelGlow(activePanelRegion === "panel-left", showRegionGlow, confidence === "high")}`}
+        >
+          <div className="space-y-5 p-4 pt-20">
+            <div>
+              <h1 className="flex items-center gap-2 text-sm font-semibold">
+                <EyeIcon className="size-4" /> Gaze lab
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Experimental · local-only · GZ.1
+              </p>
+            </div>
+
+            <fieldset
+              className="space-y-3 text-xs"
+              disabled={phase !== "tracking"}
+            >
+              <legend className="mb-2 font-medium">Perceptible sensing</legend>
+              <label className="flex items-center justify-between gap-3">
+                Soft cursor
+                <input
+                  type="checkbox"
+                  checked={showCursor}
+                  onChange={(event) => {
+                    if (!event.target.checked && !showRegionGlow) return
+                    setShowCursor(event.target.checked)
+                  }}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                Region glow
+                <input
+                  type="checkbox"
+                  checked={showRegionGlow}
+                  onChange={(event) => {
+                    if (!event.target.checked && !showCursor) return
+                    setShowRegionGlow(event.target.checked)
+                  }}
+                />
+              </label>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                At least one indicator remains on. There is no silent tracking
+                mode.
+              </p>
+            </fieldset>
+
+            <fieldset
+              className="space-y-3 text-xs"
+              disabled={phase !== "tracking"}
+            >
+              <legend className="mb-2 font-medium">One Euro tuning</legend>
+              {(
+                [
+                  ["minCutoff", 0.1, 5, 0.1],
+                  ["beta", 0, 0.1, 0.001],
+                  ["dCutoff", 0.1, 5, 0.1],
+                ] as const
+              ).map(([key, min, max, step]) => (
+                <label key={key} className="block space-y-1">
+                  <span className="flex justify-between">
+                    {key} <code>{filterOptions[key].toFixed(3)}</code>
+                  </span>
+                  <input
+                    className="w-full accent-cyan-400"
+                    type="range"
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={filterOptions[key]}
+                    onChange={(event) =>
+                      setFilterOptions((current) => ({
+                        ...current,
+                        [key]: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </fieldset>
+
+            {calibrationResiduals.length > 0 && (
+              <div className="text-xs">
+                <h2 className="font-medium">Calibration residuals</h2>
+                <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-[10px]">
+                  {calibrationResiduals.map((residual, index) => (
+                    <span
+                      key={index}
+                      className="rounded bg-muted px-1.5 py-1 text-center"
+                    >
+                      {residual.toFixed(0)}px
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section
+          className={`relative border transition-colors ${panelGlow(activePanelRegion === "panel-main", showRegionGlow, confidence === "high")}`}
+        >
+          <div className="grid h-full place-items-center p-8 text-center">
+            {phase === "off" || phase === "error" ? (
+              <div className="max-w-md rounded-xl border bg-card/95 p-6 shadow-xl">
+                <CameraIcon className="mx-auto size-7 text-cyan-400" />
+                <h2 className="mt-4 text-base font-semibold">Camera consent</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Video is processed entirely in this tab. Nothing is recorded
+                  or sent anywhere. Tracking stops the moment you click Stop,
+                  including the camera hardware track.
+                </p>
+                {error && (
+                  <p className="mt-3 text-xs text-destructive">{error}</p>
+                )}
+                <Button className="mt-5" onClick={startCamera}>
+                  <CameraIcon className="size-4" /> Allow camera and start
+                </Button>
+              </div>
+            ) : phase === "starting" ? (
+              <p className="text-sm text-muted-foreground">
+                Loading local gaze model…
+              </p>
+            ) : phase === "ready" ? (
+              <div className="max-w-sm rounded-xl border bg-card/90 p-6">
+                <CrosshairIcon className="mx-auto size-6 text-cyan-400" />
+                <h2 className="mt-3 text-sm font-semibold">
+                  Ready to calibrate
+                </h2>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Keep your head comfortable and follow nine targets. Each
+                  target settles for 600ms, then collects 45 usable frames.
+                  Usually 19–25s.
+                </p>
+                <Button className="mt-4" onClick={beginCalibration}>
+                  Begin calibration
+                </Button>
+              </div>
+            ) : (
+              <div className="max-w-md space-y-3 text-sm text-muted-foreground">
+                <p>
+                  {phase === "calibrating"
+                    ? "Look at the target until it moves."
+                    : protocol.phase === "idle"
+                      ? "Calibration complete. The visible estimate and both coarse region layouts are live."
+                      : protocol.phase === "waiting-drift"
+                        ? `Baseline complete. Drift run starts automatically in ${Math.ceil(driftWaitRemaining / 1000)}s.`
+                        : protocol.phase === "complete"
+                          ? "Protocol complete. Add observations and copy the JSON findings."
+                          : "Follow the accuracy target."}
+                </p>
+                {phase === "tracking" && protocol.phase === "idle" && (
+                  <Button onClick={runProtocol}>
+                    Run full accuracy protocol
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section
+          className={`relative row-span-2 overflow-auto border transition-colors ${panelGlow(activePanelRegion === "panel-right", showRegionGlow, confidence === "high")}`}
+        >
+          <div className="space-y-5 p-4 pt-20 text-xs">
+            <div>
+              <h2 className="font-medium">Live signal</h2>
+              <dl className="mt-2 space-y-1.5 text-muted-foreground">
+                <div className="flex justify-between gap-2">
+                  <dt>Confidence</dt>
+                  <dd
+                    className={
+                      confidence === "high"
+                        ? "text-emerald-400"
+                        : "text-amber-400"
+                    }
+                  >
+                    {confidence}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>Grid</dt>
+                  <dd className="font-mono text-foreground">
+                    {activeGridRegion ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>Panel</dt>
+                  <dd className="font-mono text-foreground">
+                    {activePanelRegion ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>Uptime</dt>
+                  <dd>{Math.floor(trackingUptimeMs / 1000)}s</dd>
+                </div>
+              </dl>
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                {confidenceReason}
+              </p>
+            </div>
+
+            <div>
+              <h2 className="font-medium">Region events</h2>
+              <ol className="mt-2 max-h-56 space-y-1 overflow-auto font-mono text-[9px] text-muted-foreground">
+                {events.length ? (
+                  events.map((event, index) => (
+                    <li key={`${event.t}-${event.region}-${index}`}>
+                      {event.type.padEnd(5)} {event.region} @
+                      {Math.round(event.t)}
+                    </li>
+                  ))
+                ) : (
+                  <li>No confident transition yet.</li>
+                )}
+              </ol>
+            </div>
+
+            {protocol.report && (
+              <div className="space-y-2">
+                <h2 className="font-medium">Accuracy</h2>
+                <p>
+                  Baseline:{" "}
+                  {formatPercent(
+                    protocol.report.baseline.overall.accuracyPercent,
+                  )}
+                </p>
+                <p>
+                  Drift:{" "}
+                  {formatPercent(protocol.report.drift.overall.accuracyPercent)}
+                </p>
+                <p>
+                  Delta: {protocol.report.driftDeltaPercentagePoints.toFixed(1)}
+                  pp
+                </p>
+                <p>
+                  Mean / max:{" "}
+                  {protocol.report.performance.meanFrameMs.toFixed(2)} /{" "}
+                  {protocol.report.performance.maxFrameMs.toFixed(2)}ms
+                </p>
+                <p>
+                  Main thread:{" "}
+                  {formatPercent(
+                    protocol.report.performance.mainThreadUtilizationPercent,
+                  )}
+                </p>
+                <p className="font-semibold uppercase text-cyan-300">
+                  Recommendation: {recommendProtocol(protocol.report)}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section
+          className={`relative border transition-colors ${panelGlow(activePanelRegion === "panel-composer", showRegionGlow, confidence === "high")}`}
+        >
+          <div className="flex h-full items-center justify-center px-6 text-xs text-muted-foreground">
+            Composer-shaped region · included in simultaneous panel quantization
+          </div>
+        </section>
+      </div>
+
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b bg-background/90 px-4 backdrop-blur">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="rounded bg-amber-400/15 px-2 py-1 font-medium text-amber-300">
+            Experimental
+          </span>
+          <span className="text-muted-foreground">
+            No persistence · no attention wiring
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {(phase === "tracking" || phase === "ready") && (
+            <Button variant="outline" size="sm" onClick={beginCalibration}>
+              <RotateCcwIcon className="size-3.5" /> Recalibrate
+            </Button>
+          )}
+          {phase !== "off" && phase !== "error" && (
+            <Button variant="destructive" size="sm" onClick={stopCamera}>
+              <SquareIcon className="size-3" /> Stop camera
+            </Button>
+          )}
+        </div>
+      </header>
+
+      {calibrationTarget && (
+        <div
+          className="pointer-events-none fixed z-40 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: `${calibrationTarget[0] * 100}%`,
+            top: `${calibrationTarget[1] * 100}%`,
+          }}
+        >
+          <div className="grid size-12 place-items-center rounded-full border-2 border-cyan-300 bg-cyan-300/15 shadow-[0_0_32px_rgba(103,232,249,0.55)]">
+            <div className="size-2 rounded-full bg-cyan-200" />
+          </div>
+          <p className="mt-2 -translate-x-1/4 whitespace-nowrap rounded bg-background/90 px-2 py-1 font-mono text-[10px]">
+            {calibrationProgress?.settling
+              ? "settle"
+              : `${calibrationProgress?.collected ?? 0}/${CALIBRATION_FRAMES}`}
+          </p>
+        </div>
+      )}
+
+      {protocolTarget && (
+        <div
+          className="pointer-events-none fixed z-40 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-fuchsia-300 bg-fuchsia-300/15 shadow-[0_0_36px_rgba(240,171,252,0.5)]"
+          style={{
+            left: protocolTarget.target.x,
+            top: protocolTarget.target.y,
+          }}
+        >
+          <CrosshairIcon className="size-6 text-fuchsia-200" />
+        </div>
+      )}
+
+      {phase === "tracking" && point && showCursor && (
+        <div
+          className={`pointer-events-none fixed z-50 size-12 -translate-x-1/2 -translate-y-1/2 rounded-full transition-opacity ${confidence === "high" ? "bg-[radial-gradient(circle,rgba(34,211,238,0.58)_0%,rgba(34,211,238,0.18)_45%,transparent_72%)] opacity-100" : "border border-cyan-300/60 bg-transparent opacity-45"}`}
+          style={{ left: point.x, top: point.y }}
+          aria-hidden="true"
+        />
+      )}
+
+      {protocol.report && (
+        <aside className="fixed inset-x-[12%] bottom-4 z-50 max-h-[46vh] overflow-auto rounded-xl border bg-background/95 p-4 shadow-2xl backdrop-blur">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold">GZ.1 findings payload</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Add environmental observations before copying this into the
+                story comment.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigator.clipboard.writeText(findingsJson)}
+            >
+              <CopyIcon className="size-3.5" /> Copy JSON
+            </Button>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-3 text-xs">
+            <label className="space-y-1">
+              <span>Lighting</span>
+              <input
+                className="w-full rounded border bg-background px-2 py-1.5"
+                value={observations.lighting}
+                onChange={(event) =>
+                  setObservations((current) => ({
+                    ...current,
+                    lighting: event.target.value,
+                  }))
+                }
+                placeholder="daylight, dim…"
+              />
+            </label>
+            <label className="space-y-1">
+              <span>Glasses</span>
+              <input
+                className="w-full rounded border bg-background px-2 py-1.5"
+                value={observations.glasses}
+                onChange={(event) =>
+                  setObservations((current) => ({
+                    ...current,
+                    glasses: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className="space-y-1">
+              <span>Indicator preference</span>
+              <select
+                className="w-full rounded border bg-background px-2 py-1.5"
+                value={observations.indicatorPreference}
+                onChange={(event) =>
+                  setObservations((current) => ({
+                    ...current,
+                    indicatorPreference: event.target
+                      .value as ObservationFields["indicatorPreference"],
+                  }))
+                }
+              >
+                <option value="cursor">cursor</option>
+                <option value="region-glow">region glow</option>
+                <option value="both">both</option>
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span>Failure modes</span>
+              <input
+                className="w-full rounded border bg-background px-2 py-1.5"
+                value={observations.failureModes}
+                onChange={(event) =>
+                  setObservations((current) => ({
+                    ...current,
+                    failureModes: event.target.value,
+                  }))
+                }
+                placeholder="lost face, edge bias…"
+              />
+            </label>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-1 text-[10px]">
+            {Object.entries(protocol.report.baseline.perRegion).map(
+              ([region, baseline]) => {
+                const drift = protocol.report?.drift.perRegion[region]
+                return (
+                  <div
+                    key={region}
+                    className="rounded border bg-muted/20 px-2 py-1.5"
+                  >
+                    <div className="font-mono text-muted-foreground">
+                      {region}
+                    </div>
+                    <div>
+                      {formatPercent(baseline.accuracyPercent)} →{" "}
+                      {formatPercent(drift?.accuracyPercent ?? 0)}
+                    </div>
+                  </div>
+                )
+              },
+            )}
+          </div>
+          <textarea
+            className="mt-3 h-32 w-full resize-y rounded border bg-muted/30 p-2 font-mono text-[9px]"
+            readOnly
+            value={findingsJson}
+          />
+        </aside>
+      )}
+
+      <div className="sr-only" aria-live="polite">
+        {confidence === "high" ? <EyeIcon /> : <EyeOffIcon />}
+        {confidenceReason}
+      </div>
+    </main>
+  )
+}

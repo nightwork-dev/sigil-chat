@@ -4,7 +4,11 @@ import viteTsConfigPaths from "vite-tsconfig-paths"
 export default defineConfig({
   plugins: [viteTsConfigPaths({ projects: ["./tsconfig.json"] })],
   test: {
-    include: ["src/lib/**/*.test.ts", "src/components/**/*.test.ts"],
+    include: [
+      "src/lib/**/*.test.ts",
+      "src/components/**/*.test.ts",
+      "src/features/**/*.test.ts",
+    ],
     environment: "node",
   },
 })
