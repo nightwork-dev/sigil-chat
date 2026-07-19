@@ -475,6 +475,33 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-story-comment",
+    description:
+      "Add a comment to one roadmap story's thread — respond to David's in-app feedback, ask a question, or flag a concern. Inspect the story first to read existing feedback (and use its revision). Set `addressee` to direct the note at a teammate (garnet / fable / codex) or omit it for a general comment.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["storyId", "kind", "author", "body"],
+      properties: [
+        "storyId",
+        "kind",
+        "author",
+        "body",
+        "addressee",
+        "parentCommentId",
+        "expectedRevision",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-skill-list",
     description:
       "List the managed skills visible at a scope, including their stable revisions and lifecycle metadata.",
