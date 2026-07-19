@@ -48,7 +48,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       },
       {
         name: "viewport",
-        content: "width=device-width, initial-scale=1",
+        // viewport-fit=cover enables env(safe-area-inset-*) so top chrome can
+        // clear the iOS status bar (the shell header pads for it).
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
       {
         title: SITE.title,

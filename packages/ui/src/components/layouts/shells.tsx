@@ -163,7 +163,7 @@ export function SidebarShell({ nav, actions, children }: ShellSlots) {
       </Sidebar>
 
       <SidebarInset className="min-h-0">
-        <header className="flex h-9 items-center gap-2 border-b border-border px-3">
+        <header className="flex min-h-9 items-center gap-2 border-b border-border px-3 pt-[env(safe-area-inset-top)]">
           <SidebarTrigger className="md:hidden" />
           <Separator orientation="vertical" className="h-4 md:hidden" />
           <Breadcrumb>
