@@ -33,11 +33,13 @@ describe("Sigil Chat overlay", () => {
       expect(statSync(staged).isDirectory()).toBe(
         statSync(source).isDirectory(),
       );
-    }
-    for (const staged of walk(filesRoot)) {
-      const sourceRelativePath = relative(filesRoot, staged);
-      expect(sourceRelativePath.split("/")).not.toContain(".env");
-      const source = join(repositoryRoot, sourceRelativePath);
+      }
+      for (const staged of walk(filesRoot)) {
+        const sourceRelativePath = relative(filesRoot, staged);
+        for (const privateSegment of [".env", ".agents", ".data", ".omc"]) {
+          expect(sourceRelativePath.split("/")).not.toContain(privateSegment);
+        }
+        const source = join(repositoryRoot, sourceRelativePath);
       expect(readFileSync(staged)).toEqual(readFileSync(source));
     }
   }, 30_000);

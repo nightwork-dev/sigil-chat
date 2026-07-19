@@ -33,9 +33,12 @@ function isGeneratedPath(path) {
   return relative
     .split("/")
     .some((segment) =>
-      [
-        ".env",
-        "node_modules",
+        [
+          ".env",
+          ".agents",
+          ".data",
+          ".omc",
+          "node_modules",
         "dist",
         ".turbo",
         ".output",
