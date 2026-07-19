@@ -127,8 +127,7 @@ export function RoadmapWorkspace() {
       <section aria-label="Story board" className="flex min-h-0 flex-col overflow-hidden">
         {/* Phone-only bar: the review queue / story detail live in a sheet here,
             so give a way to reach the queue without selecting a card first. */}
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 md:hidden">
-          <span className="text-xs font-medium text-muted-foreground">Story board</span>
+        <div className="flex items-center justify-end gap-2 border-b border-border px-3 py-2 md:hidden">
           <Button size="sm" variant="outline" onClick={openQueue}>
             <InboxIcon />
             Review queue

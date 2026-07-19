@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PlusIcon, SearchIcon, ShieldCheckIcon } from "lucide-react";
+import { PlusIcon, SearchIcon } from "lucide-react";
 import type { ManagedSkillSummary } from "@/lib/skills";
 import { useSkills } from "@/lib/skills";
 import {
@@ -7,14 +7,8 @@ import {
   useResourceManager,
 } from "@workspace/data/components/resource-manager";
 import type { Column } from "@workspace/data/components/entity-table";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
-import { SectionHeader } from "@workspace/ui/components/section-header";
 import { SkillListRow } from "@/features/skills-manager/skill-list-row";
 import { SkillCreateForm } from "@/features/skills-manager/skill-create-form";
 import { SkillDetailView } from "@/features/skills-manager/skill-detail-view";
@@ -44,18 +38,6 @@ export function SkillsManager() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6">
-      <SectionHeader>Skills</SectionHeader>
-
-      <Alert>
-        <ShieldCheckIcon />
-        <AlertTitle>Managed skill registry</AlertTitle>
-        <AlertDescription>
-          Create, edit, and delete skills the agent can discover at runtime.
-          Deleting archives a skill rather than erasing it — archives are
-          reversible.
-        </AlertDescription>
-      </Alert>
-
       <ResourceManager.Root
         items={items}
         isLoading={skillsQuery.isPending}

@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -161,9 +160,6 @@ function SkillDetailForm({
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <SkillSummary.ScopeBadge />
-            <Badge variant="outline" className="font-mono text-[10px]">
-              {skill.origin.kind}
-            </Badge>
           </div>
           <SkillSummary.Description />
         </SkillSummary.Root>
@@ -190,6 +186,10 @@ function SkillDetailForm({
                 ? new Date(skill.updatedAt).toLocaleDateString()
                 : "—"}
             </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Origin</dt>
+            <dd className="font-mono">{skill.origin.kind}</dd>
           </div>
         </dl>
       </DetailPanel.Section>

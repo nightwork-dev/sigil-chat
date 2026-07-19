@@ -7,7 +7,7 @@
 // the board's column headers and the queue rows share the same vocabulary.
 
 import { createContext, useContext, type ReactNode } from "react"
-import { BotIcon, CheckIcon, GavelIcon, MonitorIcon, UsersIcon, UserIcon } from "lucide-react"
+import { CheckIcon, GavelIcon, MonitorIcon, UsersIcon } from "lucide-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ReviewGate, Routing, Story as StoryData, StoryStatus } from "@workspace/work-items-store/types"
@@ -112,10 +112,11 @@ function Status({ className }: { className?: string }) {
 
 function RoutingBadge({ className }: { className?: string }) {
   const { routing } = useStoryContext()
-  const Icon = routing === "self" ? UserIcon : BotIcon
+  // One encoding per fact (David's persistence-ladder): the label already
+  // carries the routing (e.g. "claude:opus"), so the bot/person icon is a
+  // redundant second encoding — dropped.
   return (
     <Badge variant="outline" className={cn("font-mono", className)}>
-      <Icon aria-hidden="true" />
       {ROUTING_LABEL[routing]}
     </Badge>
   )
