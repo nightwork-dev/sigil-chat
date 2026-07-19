@@ -51,33 +51,22 @@ narrowing or extending agent behavior for a new domain, this file — not
 wires the actual message-handling entrypoint:
 
 ```ts
-export default eveChannel({
-  auth: [
-    async (request) => {
-      const auth = await authenticateLocal(request)
-      if (!auth) return auth
-      const toolApproval =
-        request.headers.get("x-sigil-tool-approval") === "always"
-          ? "always"
-          : "ask"
-      return {
-        ...auth,
-        attributes: { ...auth.attributes, sigilToolApproval: toolApproval },
-      }
-    },
-  ],
+export default createOwnedEveChannel({
+  auth: authenticatePrincipal,
   onMessage,
+  ownerStore: eveSessionOwnerStore,
 })
 ```
 
 Two things happen here that matter if you're customizing the agent:
 
-- **`auth`** is a chain of request authenticators; the current one is
-  `localDev()` from `eve/channels/auth`, extended to read the
-  `x-sigil-tool-approval` header and stash it on `auth.attributes` — this is
-  the value the `gonk` connection's `approval` function reads (see
-  `adding-a-tool.md`). Adding a real auth provider for a non-local deployment
-  replaces `localDev()` here.
+- **`auth`** verifies the web-issued five-minute JWT through Better Auth's
+  JWKS before constructing Eve's caller principal. The surrounding owned
+  channel binds new sessions to that verified subject and guards continuation,
+  input responses, and stream reads. `localDev()` is available only when
+  `SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH=1` outside production. The wrapper also adds
+  the client-declared `x-sigil-tool-approval` preference to auth attributes;
+  that preference remains non-authoritative (see `adding-a-tool.md`).
 - **`onMessage`** is built by `createSigilEveOnMessage()` from
   `apps/agent/agent/lib/sigil-context.ts` — this compiles server-side skill
   and retrieval context (via `@gonk/context`, `@gonk/skills`,

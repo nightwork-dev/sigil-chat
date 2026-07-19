@@ -9,6 +9,7 @@ import { createSigilAuthOptions } from "./server"
 const environment: AuthEnvironment = {
   baseUrl: "http://sigil-chat.localhost:1355",
   databaseUrl: ":memory:",
+  installationId: "test-installation",
   isProduction: false,
   registrationOpen: false,
   secret: "test-secret-with-at-least-thirty-two-characters",
@@ -26,6 +27,15 @@ describe("createSigilAuthOptions", () => {
     expect(options.rateLimit?.enabled).toBe(true)
     expect(options.disabledPaths).toContain("/is-username-available")
     expect(options.plugins?.at(-1)?.id).toBe("tanstack-start-cookies")
+
+    const jwtPlugin = options.plugins?.find((plugin) => plugin.id === "jwt")
+    expect(jwtPlugin?.options).toMatchObject({
+      jwt: {
+        audience: "sigil-chat-agent",
+        expirationTime: "5m",
+        issuer: environment.baseUrl,
+      },
+    })
 
     client.close()
     void kysely.destroy()

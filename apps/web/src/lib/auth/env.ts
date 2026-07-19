@@ -12,6 +12,7 @@ export interface AuthEnvironment {
   baseUrl: string
   databaseAuthToken?: string
   databaseUrl: string
+  installationId: string
   isProduction: boolean
   registrationOpen: boolean
   secret: string
@@ -80,6 +81,9 @@ export function readAuthEnvironment(
   const secret =
     source.BETTER_AUTH_SECRET ??
     (isProduction ? undefined : getOrCreateLocalSecret(options.localSecretPath))
+  const installationId =
+    source.SIGIL_INSTALLATION_ID ??
+    (isProduction ? undefined : "sigil-chat-local")
 
   if (!baseUrl) {
     throw new Error("BETTER_AUTH_URL is required in production")
@@ -90,6 +94,9 @@ export function readAuthEnvironment(
   if (!secret) {
     throw new Error("BETTER_AUTH_SECRET is required in production")
   }
+  if (!installationId) {
+    throw new Error("SIGIL_INSTALLATION_ID is required in production")
+  }
   if (secret.length < 32) {
     throw new Error("BETTER_AUTH_SECRET must be at least 32 characters")
   }
@@ -98,6 +105,7 @@ export function readAuthEnvironment(
     baseUrl,
     databaseAuthToken: source.SIGIL_DATABASE_AUTH_TOKEN,
     databaseUrl,
+    installationId,
     isProduction,
     registrationOpen: source.SIGIL_AUTH_REGISTRATION === "open",
     secret,

@@ -47,6 +47,7 @@ import {
   type AgentThreadForkSeed,
   type AgentThreadSummary,
 } from "@/lib/agent-threads"
+import { getEveBearerToken } from "@/lib/auth/client"
 import { agentEventsForReplay } from "@/lib/agent-event-retention"
 import {
   AgentSessionPersistenceCoordinator,
@@ -273,6 +274,7 @@ function ActiveAgentSession({
 
   const eveSession = useEveRuntimeSession({
     ...persistenceCallbacks,
+    auth: { bearer: getEveBearerToken },
     initialEvents: agentEventsForReplay(thread.eve.events),
     initialSession: thread.eve.session,
     onEvent: handleEvent,

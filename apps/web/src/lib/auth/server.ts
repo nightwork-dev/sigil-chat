@@ -107,6 +107,10 @@ export function createSigilAuthOptions(
       jwt({
         jwt: {
           audience: "sigil-chat-agent",
+          definePayload: ({ user }) => ({
+            installationId: environment.installationId,
+            role: user.role,
+          }),
           expirationTime: "5m",
           issuer: environment.baseUrl,
         },

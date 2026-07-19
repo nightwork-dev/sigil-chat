@@ -59,10 +59,17 @@ pnpm auth:migrate
 
 Local development defaults to `file:.data/sigil-chat.db` and maintains an
 owner-only `.data/auth-secret`. Production must provide `SIGIL_DATABASE_URL`
-and a `BETTER_AUTH_SECRET` of at least 32 characters; server startup fails closed
-while the latest committed migration is absent. Registration closes after the
-first owner unless the server is started with `SIGIL_AUTH_REGISTRATION=open`.
-See [`.env.example`](.env.example) for the complete auth environment surface.
+and a `BETTER_AUTH_SECRET` of at least 32 characters plus a stable
+`SIGIL_INSTALLATION_ID`; server startup fails closed while the latest committed
+migration is absent. Registration closes after the first owner unless the server
+is started with `SIGIL_AUTH_REGISTRATION=open`.
+
+The browser obtains a five-minute, Eve-audience JWT from the authenticated web
+session. Eve verifies it against the web app's JWKS and binds every created Eve
+session to the verified subject before returning its session id. Until the
+login/setup surface lands, local development can explicitly set
+`SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH=1`; production rejects that bypass. See
+[`.env.example`](.env.example) for the complete auth environment surface.
 
 ## Add a tool
 
@@ -164,10 +171,10 @@ principal and enforce thread ownership before exposing the session catalog.
 
 Session and capability-catalog access is application authorization, not tool
 approval state. `GONK_MCP_KEY` protects the Gonk MCP transport; it does not
-authorize Sigil Chat routes, Eve inspection, thread records, or continuation
-tokens. The current Eve catalog projection is read-only and removes host
-filesystem paths, but any caller admitted to the local application can still
-read it.
+authorize Sigil Chat routes or thread records. Eve separately verifies the
+web-issued principal and rejects continuation or stream access when the
+persisted session owner differs from the verified subject. The current Eve
+catalog projection is read-only and removes host filesystem paths.
 
 Persisted Eve snapshots currently include the event projection and a resumable
 continuation token. They are acceptable only under this local trust model. The

@@ -30,6 +30,7 @@ async function createTestAuth(registrationOpen = false) {
   const environment: AuthEnvironment = {
     baseUrl: "http://sigil-chat.localhost:1355",
     databaseUrl: url,
+    installationId: "test-installation",
     isProduction: false,
     registrationOpen,
     secret: "test-secret-with-at-least-thirty-two-characters",
@@ -38,7 +39,7 @@ async function createTestAuth(registrationOpen = false) {
   return createSigilAuth({ client, environment, kysely })
 }
 
-function signUpRequest(username: string) {
+function signUpRequest(username: string, ipAddress = "192.0.2.1") {
   return new Request(
     "http://sigil-chat.localhost:1355/api/auth/sign-up/email",
     {
@@ -51,6 +52,7 @@ function signUpRequest(username: string) {
       headers: {
         "content-type": "application/json",
         origin: "http://sigil-chat.localhost:1355",
+        "x-forwarded-for": ipAddress,
       },
       method: "POST",
     },
@@ -83,11 +85,45 @@ describe("Better Auth registration boundary", () => {
     const auth = await createTestAuth()
 
     const responses = await Promise.all([
-      auth.handler(signUpRequest("first-owner")),
-      auth.handler(signUpRequest("other-owner")),
+      auth.handler(signUpRequest("first-owner", "192.0.2.2")),
+      auth.handler(signUpRequest("other-owner", "192.0.2.2")),
     ])
     expect(
       responses.filter((response) => response.status === 200),
     ).toHaveLength(1)
+  })
+
+  it("mints an Eve-audience token with only verified service claims and a five-minute lifetime", async () => {
+    const auth = await createTestAuth()
+    const ownerResponse = await auth.handler(
+      signUpRequest("first-owner", "192.0.2.3"),
+    )
+    expect(ownerResponse.status).toBe(200)
+    const cookie = ownerResponse.headers
+      .getSetCookie()
+      .map((value) => value.split(";", 1)[0])
+      .join("; ")
+
+    const tokenResponse = await auth.handler(
+      new Request("http://sigil-chat.localhost:1355/api/auth/token", {
+        headers: { cookie },
+      }),
+    )
+    expect(tokenResponse.status).toBe(200)
+    const { token } = (await tokenResponse.json()) as { token: string }
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"),
+    ) as Record<string, unknown>
+
+    expect(payload).toMatchObject({
+      aud: "sigil-chat-agent",
+      installationId: "test-installation",
+      iss: "http://sigil-chat.localhost:1355",
+      role: "owner",
+    })
+    expect(payload).not.toHaveProperty("email")
+    expect(payload).not.toHaveProperty("name")
+    expect(typeof payload.sub).toBe("string")
+    expect((payload.exp as number) - (payload.iat as number)).toBe(300)
   })
 })
