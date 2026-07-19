@@ -229,6 +229,30 @@ export class SessionArtifactStore {
     }
   }
 
+  /**
+   * Remove an artifact from a scope's manifest. The content-addressed blob is
+   * deliberately left in place — identical bytes may belong to another scope,
+   * so blob garbage collection is separate future work. Returns false when the
+   * id was not present in this scope (idempotent, not an error). Serialized
+   * against concurrent writes to the same scope via the scope lock.
+   */
+  async removeFromScope(
+    id: string,
+    input: ScopeInput,
+    principal?: AuthenticatedPrincipal,
+  ): Promise<boolean> {
+    const scope = requireScope(input)
+    await this.assertScopeAccess(principal, scope)
+
+    return this.withScopeLock(scope, async () => {
+      const artifacts = await this.listByScope(scope, principal)
+      const next = artifacts.filter((artifact) => artifact.id !== id)
+      if (next.length === artifacts.length) return false
+      await this.writeManifest(scope, next)
+      return true
+    })
+  }
+
   private async writeManifest(
     scope: ResourceScope,
     artifacts: readonly SessionArtifactMetadata[],

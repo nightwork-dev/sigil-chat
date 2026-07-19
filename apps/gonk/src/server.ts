@@ -5,6 +5,7 @@ import { Buffer } from "node:buffer"
 import { existsSync } from "node:fs"
 import { resolve } from "node:path"
 import { createSigilMcpHandler } from "./mcp-handler.js"
+import { handleArtifactRoute } from "./artifact-routes.js"
 import { readGonkServerEnvironment } from "@workspace/runtime-env/server"
 import { createHealthResponse } from "./health.js"
 import {
@@ -46,6 +47,9 @@ if (!apiKey) {
   process.exit(1)
 }
 
+// apiKey is narrowed to a string here by the guard above (the process exits
+// otherwise); capture it so nested request handlers keep that non-undefined type.
+const serviceBearerKey: string = apiKey
 const handler = createSigilMcpHandler({ apiKey, port })
 
 const server = createServer((request, response) => {
@@ -96,6 +100,12 @@ async function handleRequest(
     // file drop. Require the same bearer key that gates /mcp.
     if (pathname === "/upload") {
       await handleUpload(incoming, outgoing)
+      return
+    }
+    // Authenticated artifact-resource API (list/delete). Consumed only by the
+    // web app's server functions with the service bearer — never the browser.
+    if (pathname === "/artifacts" || pathname.startsWith("/artifacts/")) {
+      await handleArtifacts(incoming, outgoing, pathname)
       return
     }
     if (pathname !== "/mcp") {
@@ -280,6 +290,37 @@ async function handleUpload(
   })
   outgoing.writeHead(200, { "content-type": "application/json; charset=utf-8" })
   outgoing.end(body)
+}
+
+async function handleArtifacts(
+  incoming: IncomingMessage,
+  outgoing: ServerResponse,
+  pathname: string,
+): Promise<void> {
+  const id = pathname.startsWith("/artifacts/")
+    ? decodeURIComponent(pathname.slice("/artifacts/".length))
+    : undefined
+  const result = await handleArtifactRoute(
+    {
+      method: incoming.method ?? "GET",
+      authorization: incoming.headers.authorization,
+      scopeHeader: readHeader(incoming.headers[SIGIL_SCOPE_HEADER]),
+      legacyScopeHeader: readHeader(incoming.headers[SIGIL_SESSION_SCOPE_HEADER]),
+      id,
+    },
+    { apiKey: serviceBearerKey, store: getSessionArtifactStore() },
+  )
+  if (result.json !== undefined) {
+    outgoing.writeHead(result.status, {
+      "content-type": "application/json; charset=utf-8",
+    })
+    outgoing.end(JSON.stringify(result.json))
+    return
+  }
+  outgoing.writeHead(result.status, {
+    "content-type": "text/plain; charset=utf-8",
+  })
+  outgoing.end(result.text ?? "")
 }
 
 function readHeader(value: string | string[] | undefined): string | undefined {
