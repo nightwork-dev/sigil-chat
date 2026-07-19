@@ -22,6 +22,7 @@ import { registerGraphTools } from "./registry/graph.js";
 import { registerImageTools } from "./registry/image.js";
 import { registerFileTools } from "./registry/files.js";
 import { registerEvidenceTools } from "./registry/evidence.js";
+import { registerDistillTools } from "./registry/distill.js";
 import {
   createReviewDemoRepository,
   registerReviewTools,
@@ -56,6 +57,7 @@ export function createSigilRegistry(
   registerImageTools(registry);
   registerFileTools(registry, artifacts);
   registerEvidenceTools(registry, artifacts);
+  registerDistillTools(registry, artifacts);
   registerBlackboardTools(registry);
 
   return registry;

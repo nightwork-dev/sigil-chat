@@ -66,6 +66,7 @@ import { AuthorizationCard } from "@/components/agent/authorization-card"
 import { ContextTray } from "@/components/agent/context-tray"
 import { ToolCall } from "@/components/agent/tool-call"
 import { GenerateImageRenderer } from "@/components/agent/image-tool-renderer"
+import { DistilledArtifactCard } from "@/components/agent/distilled-artifact-card"
 import {
   registerToolRenderer,
   setDefaultToolRenderer,
@@ -564,6 +565,7 @@ function AgentMessage({
 // feature roadmap, Phase 1.
 setDefaultToolRenderer(ToolCall)
 registerToolRenderer("sigil-generate-image", GenerateImageRenderer)
+registerToolRenderer("sigil-distill", DistilledArtifactCard)
 
 function AgentPart({
   canRespond,

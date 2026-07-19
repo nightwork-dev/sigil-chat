@@ -680,6 +680,33 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-distill",
+    description:
+      "Persist a distilled structured artifact (question / summary / resolution / references) from a source document or thread. Read the source first (sigil-read-file, or the attachment), do the distillation yourself, then call this to store it as a session-scoped artifact the chat renders as a card and drops a pointer to on the blackboard. Set sourceArtifactId + sourceLabel when distilling an attached file so the card links back.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["title", "question", "summary", "resolution", "references"],
+      properties: [
+        "title",
+        "question",
+        "summary",
+        "resolution",
+        "references",
+        "sourceArtifactId",
+        "sourceLabel",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-blackboard-read",
     description: "Read the shared markdown blackboard for the current session.",
     visibility: "always",
