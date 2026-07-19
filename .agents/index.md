@@ -37,7 +37,7 @@ file does not repeat it.
 │   │   │   │                  agent-session-persistence, agent-event-retention,
 │   │   │   │                  agent-domain-outcomes, review-document, theme,
 │   │   │   │                  passage-draft, site, api.ts (external fetch only)
-│   │   │   └── components/ → agent/, examples/, showcase/
+│   │   │   └── components/ → agent/, roadmap/ (product only; demo showcase/examples removed — DS.1)
 │   │   └── vite.config.ts  → Vite + tanstackStart + Nitro + Tailwind
 │   ├── agent/               → Eve host (sigil-chat-agent)
 │   │   └── agent/
@@ -90,12 +90,13 @@ which wraps:
 `__root.tsx` (no visible chrome) provides ThemeProvider, QueryClientProvider,
 AgentSessionProvider, and loads global styles/fonts.
 
-The rest of the route tree (`showcase/*`, `gallery/*`, `examples/*`,
-`sidebar.*`, `footer/*`, `menubar/*`, `split/*`, `settings/*`, `inspector/*`)
-is scaffold/demo surface inherited from the `sigil-design` template lineage —
-component catalog and layout-shell demonstrations, not part of the chat
-product. Treat it as reference material for the shell patterns, not as
-something to extend for chat features.
+The inherited demo route tree (`showcase/*`, `gallery/*`, `examples/*`,
+`sidebar.*`, `footer/*`, `menubar/*`, `split/*`, `settings/*`, `inspector/*` —
+54 files) was **removed in DS.1** (2026-07-19): all 54 had zero product-code
+imports (evidence: the de-scaffold inventory). Sigil Design's own showcase is
+the component catalog now — look there for shell-pattern and component
+reference, not here. `settings/*` was demo-only; S10.4 rebuilds real settings
+from scratch. The product surface is the `_app/*` workspaces listed above.
 
 Every route file carries the mandatory ancestor-path + chrome-description
 header comment (see any file above for the format) — this prevents
