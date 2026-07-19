@@ -167,6 +167,21 @@ body {
   overscroll-behavior: none;
 }
 
+/* iOS Safari zooms any focused input whose computed font-size is < 16px,
+   wrecking mobile visibility on focus (S5.3). Guarantee ≥16px on touch
+   (coarse-pointer) devices so focusing an input never triggers zoom — the
+   accessible root fix, NOT a `maximum-scale` viewport clamp (which breaks
+   pinch-zoom). Desktop (fine pointer) keeps its denser type. Unlayered on
+   purpose: this must win over Tailwind's layered `text-sm`/`text-xs`
+   utilities on inputs. Canonical in sigil-design's globals.css. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 /* Noise texture */
 body::before {
   content: "";
