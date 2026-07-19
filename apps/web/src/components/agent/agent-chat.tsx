@@ -67,6 +67,7 @@ import { ContextTray } from "@/components/agent/context-tray"
 import { ToolCall } from "@/components/agent/tool-call"
 import { GenerateImageRenderer } from "@/components/agent/image-tool-renderer"
 import { DistilledArtifactCard } from "@/components/agent/distilled-artifact-card"
+import { EvidenceCitationsRenderer } from "@/components/agent/evidence-citations-renderer"
 import {
   registerToolRenderer,
   setDefaultToolRenderer,
@@ -566,6 +567,7 @@ function AgentMessage({
 setDefaultToolRenderer(ToolCall)
 registerToolRenderer("sigil-generate-image", GenerateImageRenderer)
 registerToolRenderer("sigil-distill", DistilledArtifactCard)
+registerToolRenderer("sigil-evidence-ask", EvidenceCitationsRenderer)
 
 function AgentPart({
   canRespond,
