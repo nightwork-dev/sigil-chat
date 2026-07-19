@@ -155,7 +155,9 @@ function List<T extends { id: string }>({
   renderRow,
   className,
 }: {
-  columns: Column<T>[]
+  /** Table columns. Optional when `renderRow` is provided (it bypasses column
+   *  rendering entirely) — pass one of `columns` or `renderRow`. */
+  columns?: Column<T>[]
   emptyMessage?: string
   renderRow?: (item: T) => ReactNode
   className?: string
@@ -215,7 +217,7 @@ function List<T extends { id: string }>({
 
   return (
     <EntityTable
-      columns={columns}
+      columns={columns ?? []}
       data={items}
       onView={(row) => select(row.id)}
       emptyMessage={emptyMessage}

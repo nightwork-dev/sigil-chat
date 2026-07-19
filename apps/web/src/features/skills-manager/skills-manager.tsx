@@ -6,20 +6,11 @@ import {
   ResourceManager,
   useResourceManager,
 } from "@workspace/data/components/resource-manager";
-import type { Column } from "@workspace/data/components/entity-table";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { SkillListRow } from "@/features/skills-manager/skill-list-row";
 import { SkillCreateForm } from "@/features/skills-manager/skill-create-form";
 import { SkillDetailView } from "@/features/skills-manager/skill-detail-view";
-
-// EntityTable's Column type is required by ResourceManager.List's signature
-// even when `renderRow` (used below) bypasses column rendering entirely —
-// skills need scope/pin badges a generic table can't express.
-const unusedColumns: Column<ManagedSkillSummary>[] = [
-  { key: "name", label: "Name" },
-  { key: "description", label: "Description" },
-];
 
 function matchesQuery(skill: ManagedSkillSummary, query: string): boolean {
   if (query.length === 0) return true;
@@ -97,8 +88,7 @@ function SkillsManagerBody({
       </ResourceManager.Toolbar>
 
       <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <ResourceManager.List
-          columns={unusedColumns}
+        <ResourceManager.List<ManagedSkillSummary>
           renderRow={(skill) => <SkillListRow skill={skill} />}
           emptyMessage={
             resultCount === 0 && query.length > 0
