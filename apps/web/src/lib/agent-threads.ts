@@ -13,6 +13,7 @@ import type {
   AgentThreadSummary,
   ForkAgentThreadInput,
 } from "@/lib/agent-threads-domain";
+import type { SigilAuthSession } from "@/lib/auth/server";
 
 export type {
   AgentThread,
@@ -30,10 +31,7 @@ const listAgentThreadsFn = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     const threads = data.includeArchived
       ? agentThreadRepository.list(session.user.id, true)
       : agentThreadRepository.ensureActive(session.user.id);
@@ -47,10 +45,7 @@ const getAgentThreadFn = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     const thread = agentThreadRepository.get(session.user.id, data.id);
     if (!thread) throw new Error(`Agent thread ${data.id} was not found.`);
     return thread;
@@ -61,10 +56,7 @@ const createAgentThreadFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.create(session.user.id, data);
   });
 
@@ -75,10 +67,7 @@ const renameAgentThreadFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.rename(
       session.user.id,
       data.id,
@@ -92,10 +81,7 @@ const archiveAgentThreadFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.archive(
       session.user.id,
       data.id,
@@ -108,10 +94,7 @@ const deleteAgentThreadFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.delete(
       session.user.id,
       data.id,
@@ -130,10 +113,7 @@ const saveAgentThreadSnapshotFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.saveSnapshot(
       session.user.id,
       data.id,
@@ -147,10 +127,7 @@ const forkAgentThreadFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.fork(session.user.id, data);
   });
 
@@ -159,10 +136,7 @@ const consumeAgentThreadForkSeedFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.consumeForkSeed(
       session.user.id,
       data.id,
@@ -174,10 +148,7 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
   method: "GET",
 }).handler(async () => {
   const { agentThreadRepository } = await import("@/lib/agent-threads.server");
-  const { getSession, AuthenticationRequiredError } =
-    await import("@/lib/auth/session");
-  const session = await getSession();
-  if (!session) throw new AuthenticationRequiredError();
+  const session = await requireThreadSession();
   return agentThreadRepository.getActivePreference(session.user.id);
 });
 
@@ -186,10 +157,7 @@ const setActiveAgentThreadFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { getSession, AuthenticationRequiredError } =
-      await import("@/lib/auth/session");
-    const session = await getSession();
-    if (!session) throw new AuthenticationRequiredError();
+    const session = await requireThreadSession();
     return agentThreadRepository.setActive(session.user.id, data.id);
   });
 
@@ -385,4 +353,14 @@ function projectCachedThreadSummary(thread: AgentThread): AgentThreadSummary {
     revision: thread.revision,
     ...(thread.forkedFrom ? { forkedFrom: thread.forkedFrom } : {}),
   };
+}
+
+async function requireThreadSession(): Promise<SigilAuthSession> {
+  const { getSession, requireSession } = await import("@/lib/auth/session");
+  const session = await getSession();
+  const assertSession: (
+    candidate: SigilAuthSession | null,
+  ) => asserts candidate is SigilAuthSession = requireSession;
+  assertSession(session);
+  return session;
 }
