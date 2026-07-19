@@ -633,4 +633,41 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
       openWorld: false,
     },
   },
+  {
+    name: "sigil-blackboard-read",
+    description: "Read the shared markdown blackboard for the current session.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-blackboard-write",
+    description:
+      "Replace the shared markdown blackboard for the current session. Use an empty content string to clear it.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["content"],
+      properties: ["content"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
 ];
