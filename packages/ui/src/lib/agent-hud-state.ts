@@ -24,13 +24,16 @@ export function shouldClearAgentComposer(result: AgentTurnResult): boolean {
 
 export function getAgentHudTriggerLabel(
   session: AgentRuntimeSession,
-  attention: AttentionContext | null,
 ): string {
+  // A persistent, workspace-independent affordance to talk to the agent
+  // (David: "I want a persistent affordance that allows me to talk to my
+  // agent" — not an attention-derived "Ask about X"). The agent still receives
+  // the workspace's attention; the trigger just invites conversation, and only
+  // reflects transient agent STATE (busy / approval), never the current room.
   const state = getAgentHudTriggerState(session);
-  const label = formatAttentionLabel(attention);
   if (state === "approval") return "Approval needed";
-  if (state === "busy") return `Working on ${label}`;
-  return `Ask about ${label}`;
+  if (state === "busy") return "Working…";
+  return "Ask your agent";
 }
 
 export function getAgentHudPanelDescription(

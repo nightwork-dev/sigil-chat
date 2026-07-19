@@ -63,9 +63,8 @@ interface AgentHudTriggerProps extends Omit<
 
 function Trigger({ children, ...props }: AgentHudTriggerProps) {
   const session = useAgentRuntimeSession();
-  const attention = useAttention();
   const state = getAgentHudTriggerState(session);
-  const content = children ?? getAgentHudTriggerLabel(session, attention);
+  const content = children ?? getAgentHudTriggerLabel(session);
 
   return (
     <FloatingDock.Trigger
