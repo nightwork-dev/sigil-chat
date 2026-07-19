@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "demo:evidence": "tsx scripts/evidence-demo.ts",
     "dev": "portless sigil-chat-gonk tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "test": "vitest run",
@@ -12,11 +13,12 @@
   },
   "dependencies": {
     "@gonk/auth": "0.3.1",
-    "@gonk/skills": "0.3.1",
     "@gonk/scope": "0.3.1",
+    "@gonk/skills": "0.3.1",
     "@gonk/tool-registry": "0.3.1",
     "@gonk/tool-registry-mcp": "0.3.1",
     "@mirk/artifact": "^0.1.0",
+    "@mirk/store": "^0.7.0",
     "@workspace/agent-contracts": "workspace:*",
     "@workspace/blackboard-store": "workspace:*",
     "@workspace/graph": "workspace:*",

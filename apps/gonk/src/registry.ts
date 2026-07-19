@@ -21,6 +21,9 @@ import { registerBlackboardTools } from "./registry/blackboard.js";
 import { registerGraphTools } from "./registry/graph.js";
 import { registerImageTools } from "./registry/image.js";
 import { registerFileTools } from "./registry/files.js";
+import { registerEvidenceTools } from "./registry/evidence.js";
+import { registerDistillTools } from "./registry/distill.js";
+import { registerDemoSeedTools } from "./registry/demo-seed.js";
 import {
   createReviewDemoRepository,
   registerReviewTools,
@@ -54,6 +57,9 @@ export function createSigilRegistry(
   registerUiCommandTools(registry);
   registerImageTools(registry);
   registerFileTools(registry, artifacts);
+  registerEvidenceTools(registry, artifacts);
+  registerDistillTools(registry, artifacts);
+  registerDemoSeedTools(registry, artifacts);
   registerBlackboardTools(registry);
 
   return registry;

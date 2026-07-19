@@ -12,9 +12,7 @@ import { FileGraphRepository } from "@workspace/graph-store/repository";
 import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  SessionArtifactStore,
-} from "../src/artifact-store.js";
+import { SessionArtifactStore } from "../src/artifact-store.js";
 import {
   createReviewDemoRepository,
   createSigilRegistry,
@@ -278,6 +276,95 @@ describe("Sigil Chat Gonk registry", () => {
     });
   });
 
+  it("retrieves exact cited passages from session artifacts and fails closed without evidence", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-evidence-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const source = [
+      "Cerebras re-fetches a complete Slack thread before it updates the knowledge base.",
+      "",
+      "Their biggest stated accuracy win was embedding a distilled JSON artifact with question, summary, resolution, and references rather than embedding the raw transcript. Accuracy increased significantly after normalization into this consistent format.",
+      "",
+      "Retrieval then combines lexical and vector lists before synthesis.",
+    ].join("\n");
+    const stored = await artifacts.putFile({
+      bytes: new TextEncoder().encode(source),
+      filename: "cerebras-knowledge-base.md",
+      mediaType: "text/markdown",
+      scope: "evidence-room-demo",
+    });
+    const { registry } = await makeRegistry(artifacts);
+    const context = makeBaseContext({
+      host: { sessionScope: "evidence-room-demo" },
+    });
+
+    const grounded = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "What was their biggest accuracy win?" },
+        context,
+      ),
+    );
+    expect(grounded).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "grounded",
+        citations: [
+          {
+            citationId: "c1",
+            artifactId: stored.id,
+            filename: "cerebras-knowledge-base.md",
+            quote: expect.stringContaining("biggest stated accuracy win"),
+            locator: { type: "text-offset" },
+          },
+        ],
+      },
+    });
+    if (grounded.ok) {
+      const citation = (
+        grounded.data as {
+          citations: Array<{
+            quote: string;
+            locator: { startOffset: number; endOffset: number };
+          }>;
+        }
+      ).citations[0]!;
+      expect(
+        source.slice(citation.locator.startOffset, citation.locator.endOffset),
+      ).toBe(citation.quote);
+    }
+
+    const missing = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "Which quantum compiler flag fixed the quasar?" },
+        context,
+      ),
+    );
+    expect(missing).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "no-evidence",
+        citations: [],
+        answerInstruction: expect.stringContaining("do not invent"),
+      },
+    });
+
+    const otherScope = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "biggest accuracy win" },
+        makeBaseContext({ host: { sessionScope: "another-session" } }),
+      ),
+    );
+    expect(otherScope).toMatchObject({
+      ok: true,
+      data: { grounding: "no-evidence", citations: [] },
+    });
+  });
+
   it("reads and mutates stories through the domain-outcome path", async () => {
     const { registry, workItemsRepository } = await makeRegistry();
     const listed = await collectToolOutcome(
@@ -455,7 +542,8 @@ describe("Sigil Chat Gonk registry", () => {
         ? inspected.data.skill.revision
         : undefined;
     expect(revision).toBeTruthy();
-    if (!revision) throw new Error("Round-trip skill did not return a revision.");
+    if (!revision)
+      throw new Error("Round-trip skill did not return a revision.");
 
     const deleted = await collectToolOutcome(
       registry.invoke(

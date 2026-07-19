@@ -48,7 +48,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       },
       {
         name: "viewport",
-        content: "width=device-width, initial-scale=1",
+        // App-shell behavior on mobile: lock zoom (maximum-scale/user-scalable)
+        // so it feels like an app, and viewport-fit=cover so env(safe-area-inset-*)
+        // resolves for the top chrome to clear the iOS status bar.
+        content:
+          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
       },
       {
         title: SITE.title,

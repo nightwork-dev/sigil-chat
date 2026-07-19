@@ -5,6 +5,7 @@ import type {
   ReviewGate,
   Routing,
   Story,
+  StoryComment,
   StoryFilter,
   StoryStatus,
 } from "@workspace/work-items-store/types";
@@ -44,6 +45,16 @@ type StoryAssignReviewInput = {
   expectedRevision?: number;
 };
 
+type StoryCommentInput = {
+  storyId: string;
+  kind: StoryComment["kind"];
+  author: string;
+  body: string;
+  addressee?: string;
+  parentCommentId?: string;
+  expectedRevision?: number;
+};
+
 const storyStatuses: StoryStatus[] = [
   "idea",
   "spec",
@@ -54,7 +65,20 @@ const storyStatuses: StoryStatus[] = [
   "blocked",
 ];
 
-const routings: Routing[] = ["self", "claude:opus", "claude:sonnet", "pi:luna"];
+const routings: Routing[] = [
+  "self",
+  "claude:opus",
+  "claude:sonnet",
+  "pi:luna",
+  "codex",
+];
+const commentKinds: StoryComment["kind"][] = [
+  "question",
+  "suggestion",
+  "concern",
+  "reference",
+  "approval",
+];
 const reviewGates: ReviewGate[] = [
   "browser:David",
   "decision:David",
@@ -263,6 +287,59 @@ export function registerStoryTools(
       };
     },
   });
+
+  registry.register({
+    name: "sigil-story-comment",
+    description:
+      "Add a comment to one roadmap story's thread — respond to David's in-app feedback, ask a question, or flag a concern. Inspect the story first to read existing feedback (and use its revision). Set `addressee` to direct the note at a teammate (garnet / fable / codex) or omit it for a general comment.",
+    visibility: "always",
+    approval: "write",
+    input: shape<StoryCommentInput>(
+      isStoryCommentInput,
+      "Expected a non-empty story id, a supported kind, a non-empty author and body, and optional addressee, parentCommentId, and integer expectedRevision.",
+    ),
+    inputJsonSchema: {
+      type: "object",
+      properties: {
+        storyId: { type: "string", minLength: 1 },
+        kind: { type: "string", enum: commentKinds },
+        author: { type: "string", minLength: 1 },
+        body: { type: "string", minLength: 1 },
+        addressee: { type: "string", minLength: 1 },
+        parentCommentId: { type: "string", minLength: 1 },
+        expectedRevision: { type: "integer", minimum: 0 },
+      },
+      required: ["storyId", "kind", "author", "body"],
+      additionalProperties: false,
+    },
+    hints: writeHints,
+    handler: async (input) => {
+      // id + createdAt are minted server-side; the caller supplies its own
+      // author (v1 — real principal binding arrives with auth).
+      const comment: StoryComment = {
+        id: crypto.randomUUID(),
+        storyId: input.storyId,
+        kind: input.kind,
+        author: input.author,
+        body: input.body,
+        createdAt: new Date().toISOString(),
+        ...(input.addressee ? { addressee: input.addressee } : {}),
+        ...(input.parentCommentId
+          ? { parentCommentId: input.parentCommentId }
+          : {}),
+      };
+      const result = await workItemsRepository.addComment(
+        comment,
+        input.expectedRevision,
+      );
+      return {
+        data: {
+          ...result,
+          clientCommand: clientCommand(result, "story.comment"),
+        },
+      };
+    },
+  });
 }
 
 function clientCommand(
@@ -310,6 +387,30 @@ function isStoryInspectInput(value: unknown): value is StoryInspectInput {
     isRecord(value) &&
     hasOnlyKeys(value, ["id", "expectedRevision"]) &&
     isNonEmptyString(value.id) &&
+    isOptionalInteger(value, "expectedRevision")
+  );
+}
+
+function isStoryCommentInput(value: unknown): value is StoryCommentInput {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "storyId",
+      "kind",
+      "author",
+      "body",
+      "addressee",
+      "parentCommentId",
+      "expectedRevision",
+    ]) &&
+    isNonEmptyString(value.storyId) &&
+    isNonEmptyString(value.author) &&
+    isNonEmptyString(value.body) &&
+    typeof value.kind === "string" &&
+    (commentKinds as string[]).includes(value.kind) &&
+    (value.addressee === undefined || isNonEmptyString(value.addressee)) &&
+    (value.parentCommentId === undefined ||
+      isNonEmptyString(value.parentCommentId)) &&
     isOptionalInteger(value, "expectedRevision")
   );
 }

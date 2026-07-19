@@ -1,0 +1,217 @@
+"use client"
+
+import { useMemo, useState, type ReactNode } from "react"
+import { FileTextIcon, LibraryBigIcon, SparklesIcon } from "lucide-react"
+import {
+  AttentionProvider,
+  type AttentionContext,
+  type AttentionSelection,
+} from "@zigil/agent-react/attention"
+import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+
+import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
+import { Button } from "@workspace/ui/components/button"
+import { cn } from "@workspace/ui/lib/utils"
+import {
+  DistilledCard,
+  type DistilledArtifact,
+} from "@/components/agent/distilled-artifact-card"
+
+/** A document loaded into the session (the demo seed or an upload). */
+export interface EvidenceDocument {
+  id: string
+  filename: string
+}
+
+/** A distilled artifact produced this session. */
+export interface EvidenceDistill {
+  artifactId: string
+  distilled: DistilledArtifact
+}
+
+type MobileTab = "library" | "distills" | "ask"
+
+/**
+ * The Evidence Room workspace (D4.4): a document library, a distilled-cards
+ * gallery, and an ask panel — composing the D4.1/D4.2 pieces into a
+ * discoverable, generalizable surface. Its point is the attention loop: what
+ * the user has open/focused flows into the agent's context (AttentionProvider),
+ * so "distill this" resolves to the focused document without naming it.
+ *
+ * This shell owns the layout + selection→attention wiring; the live data
+ * (documents, distills, ask/citations) is wired through the shared agent
+ * session in the following increments.
+ */
+export function EvidenceRoom() {
+  const isMobile = useIsMobile()
+  const telemetry = useAttentionTelemetry()
+  const [documents] = useState<EvidenceDocument[]>([])
+  const [distills] = useState<EvidenceDistill[]>([])
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
+  const [tab, setTab] = useState<MobileTab>("library")
+
+  const selectedDoc = documents.find((doc) => doc.id === selectedDocId) ?? null
+
+  const selectDocument = (doc: EvidenceDocument) => {
+    setSelectedDocId(doc.id)
+    telemetry.recordActivity("focus", documentTarget(doc), {
+      summary: `Focused ${doc.filename}`,
+    })
+  }
+
+  // What the user is looking at → the agent's context. "distill this" / "what
+  // does this say about X" resolve against this without naming the document.
+  const attention: AttentionContext = useMemo(
+    () => ({
+      application: "sigil-chat",
+      route: "/evidence",
+      workspace: { kind: "evidence-room", id: "evidence", label: "Evidence Room" },
+      selection: selectedDoc ? documentTarget(selectedDoc) : undefined,
+      selections: selectedDoc ? [documentTarget(selectedDoc)] : undefined,
+      history: telemetry.history,
+    }),
+    [selectedDoc, telemetry.history],
+  )
+
+  const library = (
+    <LibraryRegion
+      documents={documents}
+      selectedDocId={selectedDocId}
+      onSelect={selectDocument}
+    />
+  )
+  const gallery = <GalleryRegion distills={distills} />
+  const ask = <AskRegion selectedDoc={selectedDoc} />
+
+  return (
+    <AttentionProvider context={attention}>
+      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+        <header className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-1.5">
+          <LibraryBigIcon className="size-4 shrink-0 text-primary" />
+          <h1 className="text-sm font-semibold">Evidence Room</h1>
+          {selectedDoc ? (
+            <span className="ml-1 truncate text-xs text-muted-foreground">
+              · {selectedDoc.filename} in focus
+            </span>
+          ) : null}
+        </header>
+
+        {isMobile ? (
+          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+            <nav className="flex gap-1 border-b border-border px-2 py-1.5">
+              {(["library", "distills", "ask"] as const).map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={tab === value ? "secondary" : "ghost"}
+                  aria-pressed={tab === value}
+                  onClick={() => setTab(value)}
+                  className="flex-1 capitalize"
+                >
+                  {value}
+                </Button>
+              ))}
+            </nav>
+            <div className="scroll-area min-h-0 overflow-y-auto">
+              {tab === "library" ? library : tab === "distills" ? gallery : ask}
+            </div>
+          </div>
+        ) : (
+          <div className="grid min-h-0 grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,22rem)] divide-x divide-border">
+            <div className="scroll-area min-h-0 overflow-y-auto">{library}</div>
+            <div className="scroll-area min-h-0 overflow-y-auto">{gallery}</div>
+            <div className="scroll-area min-h-0 overflow-y-auto">{ask}</div>
+          </div>
+        )}
+      </div>
+    </AttentionProvider>
+  )
+}
+
+function documentTarget(doc: EvidenceDocument): AttentionSelection {
+  return { kind: "document", id: doc.id, label: doc.filename }
+}
+
+function RegionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[0.625rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+      {children}
+    </p>
+  )
+}
+
+function LibraryRegion({
+  documents,
+  selectedDocId,
+  onSelect,
+}: {
+  documents: EvidenceDocument[]
+  selectedDocId: string | null
+  onSelect: (doc: EvidenceDocument) => void
+}) {
+  return (
+    <div className="space-y-2 p-3">
+      <RegionLabel>Documents</RegionLabel>
+      {documents.length === 0 ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          No documents yet. Ask the agent to “load the demo doc”, or attach a file
+          in chat — it’ll appear here to select, distill, and question.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {documents.map((doc) => (
+            <li key={doc.id}>
+              <button
+                type="button"
+                aria-pressed={doc.id === selectedDocId}
+                onClick={() => onSelect(doc)}
+                className={cn(
+                  "flex w-full items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
+                  doc.id === selectedDocId
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-foreground/80 hover:border-border/80 hover:bg-muted/40",
+                )}
+              >
+                <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 truncate">{doc.filename}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function GalleryRegion({ distills }: { distills: EvidenceDistill[] }) {
+  return (
+    <div className="space-y-2 p-3">
+      <RegionLabel>Distilled</RegionLabel>
+      {distills.length === 0 ? (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <SparklesIcon className="size-3.5" /> Distilled cards land here. Select a
+          document and say “distill this”.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {distills.map((entry) => (
+            <DistilledCard key={entry.artifactId} distilled={entry.distilled} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AskRegion({ selectedDoc }: { selectedDoc: EvidenceDocument | null }) {
+  return (
+    <div className="space-y-2 p-3">
+      <RegionLabel>Ask with citations</RegionLabel>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {selectedDoc
+          ? `Ask a question about "${selectedDoc.filename}" — answers cite the exact passage.`
+          : "Select a document, then ask a question — answers cite the exact source passage."}
+      </p>
+    </div>
+  )
+}

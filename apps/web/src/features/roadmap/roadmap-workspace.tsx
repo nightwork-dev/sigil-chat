@@ -123,7 +123,7 @@ export function RoadmapWorkspace() {
   )
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 overflow-hidden bg-background md:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] grid-cols-1 overflow-hidden bg-background md:grid-cols-[minmax(0,1fr)_380px]">
       <section aria-label="Story board" className="flex min-h-0 flex-col overflow-hidden">
         {/* Phone-only bar: the review queue / story detail live in a sheet here,
             so give a way to reach the queue without selecting a card first. */}
@@ -153,7 +153,7 @@ export function RoadmapWorkspace() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="scroll-area flex min-h-0 flex-1 gap-3 overflow-x-auto p-3">
+          <div className="scroll-area flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-3 p-3">
             {STORY_STATUS_ORDER.map((status) => (
               <BoardColumn
                 key={status}
@@ -266,7 +266,7 @@ function BoardColumn({
 }) {
   const meta = STORY_STATUS[status]
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col">
+    <div className="flex h-full w-[85vw] max-w-sm shrink-0 snap-start flex-col md:w-72 md:max-w-none">
       <div className="flex items-center justify-between px-2 pb-2">
         <span className="text-xs font-medium">{meta.label}</span>
         <span className="font-mono text-[0.625rem] text-muted-foreground">{stories.length}</span>

@@ -475,6 +475,33 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-story-comment",
+    description:
+      "Add a comment to one roadmap story's thread — respond to David's in-app feedback, ask a question, or flag a concern. Inspect the story first to read existing feedback (and use its revision). Set `addressee` to direct the note at a teammate (garnet / fable / codex) or omit it for a general comment.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["storyId", "kind", "author", "body"],
+      properties: [
+        "storyId",
+        "kind",
+        "author",
+        "body",
+        "addressee",
+        "parentCommentId",
+        "expectedRevision",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-skill-list",
     description:
       "List the managed skills visible at a scope, including their stable revisions and lifecycle metadata.",
@@ -630,6 +657,71 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
       readOnly: true,
       destructive: false,
       idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-evidence-ask",
+    description:
+      "Find BM25-ranked passages in the current session, project, or persona artifacts for a question. Returns structured citations with exact quotes and text offsets; when no passage matches, returns no-evidence and explicitly forbids invented citations.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["question"],
+      properties: ["question", "limit", "scope"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-distill",
+    description:
+      "Persist a distilled structured artifact (question / summary / resolution / references) from a source document or thread. Read the source first (sigil-read-file, or the attachment), do the distillation yourself, then call this to store it as a session-scoped artifact the chat renders as a card and drops a pointer to on the blackboard. Set sourceArtifactId + sourceLabel when distilling an attached file so the card links back.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["title", "question", "summary", "resolution", "references"],
+      properties: [
+        "title",
+        "question",
+        "summary",
+        "resolution",
+        "references",
+        "sourceArtifactId",
+        "sourceLabel",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-load-demo-doc",
+    description:
+      "Load the bundled Cerebras knowledge-base article into this session as an attachment, so it can be distilled (sigil-distill) or asked about with citations (sigil-evidence-ask). Call this when the user asks to load the demo document. Idempotent — the artifact is content-addressed, so re-loading returns the same one.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
       openWorld: false,
     },
   },
