@@ -48,7 +48,16 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
     setUsernameError(null)
     setSavingUsername(true)
     try {
-      const result = await authClient.updateUser({ username: usernameInput })
+      // Send BOTH: Better Auth's username plugin only auto-derives
+      // displayUsername from username on /sign-up/email, NOT on /update-user
+      // (verified in better-auth@1.6.23). Updating username alone leaves the
+      // stale displayUsername, which the UI reads first — so the change appears
+      // to revert after reload. username is normalized server-side; the raw
+      // input is the display handle.
+      const result = await authClient.updateUser({
+        username: usernameInput,
+        displayUsername: usernameInput,
+      })
       if (result.error) {
         setUsernameError(
           result.error.message ??
