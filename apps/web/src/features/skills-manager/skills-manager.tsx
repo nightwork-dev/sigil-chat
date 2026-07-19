@@ -74,7 +74,7 @@ function SkillsManagerBody({
   const [isCreating, setIsCreating] = useState(false);
   const showCreateForm = isCreating && selectedId === null;
 
-  // Attention coverage (David): the selected skill flows into agent context, so
+  // Attention coverage: the selected skill flows into agent context, so
   // "what does this skill do?" resolves against it without naming it.
   const selectedSkill = items.find((skill) => skill.id === selectedId) ?? null;
   const telemetry = useAttentionTelemetry();

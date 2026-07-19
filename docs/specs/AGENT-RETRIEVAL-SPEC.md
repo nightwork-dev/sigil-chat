@@ -10,8 +10,6 @@ attachment, and citation UX. It is no longer authoritative.
 - Canonical source, index, query, authorization, citation, receipt, and context
   contribution semantics: Gonk Core `docs/retrieval-design.md` and
   `@gonk/retrieval`.
-- Cross-repository disposition and shipped anchors:
-  the Gonk Core repository's `docs.local/specs/SIGIL-GONK-CONTRACT-DISPOSITION-20260716.md`.
 - Sigil search, result, citation, React Query, Eve, and host-adapter guidance:
   the sigil-agent repository's `docs/specs/RETRIEVAL-CONSUMER-PROFILE.md`.
 

@@ -66,7 +66,7 @@ export interface ChatInputAttachment {
  * get the previous plain compose bar.
  *
  * Ingestion (drag-drop / paste / pick) is delegated to the `useFileUpload` and
- * `useClipboard` cores (see docs.local/specs/INGRESS-CORES.md): when `onAttach`
+ * `useClipboard` cores: when `onAttach`
  * is set the whole bar is a dropzone and pasting image files attaches them;
  * when `onAttachUrl` is set, pasting a bare image URL attaches it by reference
  * instead of dropping the link into the text. Any other paste is untouched. The

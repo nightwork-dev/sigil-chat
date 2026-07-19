@@ -23,7 +23,6 @@
     "./types": "./src/types.ts",
     "./repository": "./src/repository.ts",
     "./markdown-repository": "./src/markdown-repository.ts",
-    "./mirk-repository": "./src/mirk-repository.ts",
-    "./sample": "./src/sample.ts"
+    "./mirk-repository": "./src/mirk-repository.ts"
   }
 }

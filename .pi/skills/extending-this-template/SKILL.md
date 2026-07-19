@@ -36,7 +36,7 @@ layout route.
 `apps/web/src/routes/_app.tsx` mounts `AppAgentSessions`
 (`@/components/agent-sessions.tsx`), which wraps
 `AgentRuntimeSessionProvider` + `AgentThreadControlsProvider` from
-`@niwork/agent`. It is deliberately INSIDE the protected `_app` boundary
+`@zigil/agent-surface`. It is deliberately INSIDE the protected `_app` boundary
 (below the `beforeLoad` session check), not at `__root.tsx` — `/login` and
 `/setup` are unauthenticated and must never create an Eve client or fetch
 channel data (S10.2). This means:
@@ -103,7 +103,7 @@ export const Route = createFileRoute("/_app/review")({
    `FileCheck2Icon`/Review). Do NOT add an icon "for visual interest."
 4. If the workspace must report user selections to the agent (a passage, a
    node, a row), wrap content in `AttentionProvider` from
-   `@niwork/agent/attention`. See `docs/guides/building-workspaces.md` and
+   `@zigil/agent-surface/attention`. See `docs/guides/building-workspaces.md` and
    `features/review/review-workspace.tsx` for the real pattern. Do NOT
    invent a separate ad hoc mechanism for this.
 5. If a Gonk tool result should update this workspace's data, wire a

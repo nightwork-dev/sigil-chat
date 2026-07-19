@@ -7,7 +7,7 @@ repo root are symlinks to it — edit this file, not those.
 This repo graduated out of a shared development worktree (2026-07-17) into its
 own repository. It still shares conventions and lineage with the Sigil Design
 repository (the shared component/scaffold template) and consumes released
-`@niwork/agent*` packages, but it is a distinct product with its own runtime,
+`@zigil/agent-*` packages, but it is a distinct product with its own runtime,
 trust model, and specs. Do not assume anything from Sigil Design's
 project-instructions file is true here without checking this file first.
 
@@ -102,21 +102,21 @@ Every route file carries the mandatory ancestor-path + chrome-description
 header comment (see any file above for the format) — this prevents
 duplicate-`<main>`/nested-chrome bugs. Preserve it when adding routes.
 
-## The `@niwork/agent*` packages
+## The `@zigil/agent-*` packages
 
 `apps/web` consumes released packages rather than owning agent runtime logic
 directly:
 
-- `@niwork/agent` (0.1.0) — neutral agent contracts
-- `@niwork/agent-eve` (0.1.0) — Eve host adapter
-- `@niwork/agent-react-query` (0.1.0) — React Query hooks/state over agent contracts
-- `@niwork/agent-gonk` (0.1.2, consumed by `apps/gonk`) — Gonk registry adapter
+- `@zigil/agent-surface` — neutral agent contracts
+- `@zigil/agent-eve` — Eve host adapter
+- `@zigil/agent-react` — React integration surfaces
+- `@zigil/agent-react-query` — React Query hooks/state over agent contracts
+- `@zigil/agent-gonk` (consumed by `apps/gonk`) — Gonk registry adapter
 
 Plus registry-installed HUD source (owned, not published) and `@gonk/scope`,
 `@gonk/store` for local scoping/storage primitives.
 
-Per the ratified split from the graduation move handoff (executed 2026-07-17;
-retained locally as program history, not part of the public spec tree):
+The current ownership split is:
 
 - **Sigil Design** owns shared graph, review, chat, text-editor,
   SpotlightScrim, and FloatingDock surfaces.
@@ -134,7 +134,7 @@ tool definitions into Eve.
 ## Dev workflow
 
 Requires Node 24. All dependencies — including the `@gonk/*` and
-`@niwork/agent*` packages — resolve from the public npm registry.
+`@zigil/agent-*` packages — resolve from the public npm registry.
 
 ```bash
 pnpm install
@@ -249,13 +249,13 @@ Four tiers — keep them straight so coordination material never scatters into a
 product branch or a bespoke folder:
 
 - **Shipped docs + product code** → this repo, tracked (`dev`).
-- **Repo-internal working notes** → this repo's `docs.local/` (gitignored).
+- **Repo-internal working notes** → a gitignored local notes directory.
 - **The roadmap** → the external, git-versioned roadmap store
   (`SIGIL_ROADMAP_DIR`), its own repo, shared across every worktree/agent —
   never committed into this repo.
 - **Ecosystem coordination / handoffs / strategy** (agent briefs, cross-agent
-  notes, anything not product-specific) → `/Users/dr/Dev/docs.local/` — never a
-  product repo.
+  notes, anything not product-specific) → an untracked workspace-level notes
+  directory, never a product repo.
 
 Local-only files/dirs are named `*.local` / `*.local.*` and gitignored by that
 pattern in every repo (except repos that are themselves local-only). Never

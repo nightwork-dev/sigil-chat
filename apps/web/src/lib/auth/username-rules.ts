@@ -14,7 +14,7 @@ const RESERVED_USERNAMES = new Set([
 ])
 
 // 1–32 chars: starts/ends [a-z0-9], middle may include . _ -. Length is not a
-// security property on a self-hosted install (David), so a single char is fine.
+// security property on a self-hosted install, so a single character is fine.
 const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,30}[a-z0-9])?$/
 
 export function normalizeUsername(username: string) {

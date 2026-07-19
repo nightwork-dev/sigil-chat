@@ -10,14 +10,12 @@ skill for whichever layer you're actually touching.
 
 ## The layer stack
 
-From `/Users/dr/Dev/CLAUDE.md` (the studio-wide ecosystem index), authoritative
-ordering, lowest to highest:
+The ecosystem layers, from lowest to highest, are:
 
 ```
 Mirk         data substrate — storage, fixtures, artifact bytes, lineage
 Gonk         capability access, identity/authz, host projection
 Sigil        reusable UI/UX + business-logic scaffold
-Deadletters  opinionated knowledge + business logic (builds on Sigil)
 apps         products composing the layers above
 ```
 
@@ -26,7 +24,7 @@ Sigil Chat is an **app** in this stack, composing:
 - **Sigil Design** (`templates/sigil-design`) — shared graph, review, chat,
   text-editor, SpotlightScrim, and FloatingDock surfaces. Canonical home for
   anything generalizable.
-- **Sigil Agent** (`@niwork/agent*` packages) — neutral agent contracts,
+- **Sigil Agent** (`@zigil/agent-*` packages) — neutral agent contracts,
   Eve host adapter, React Query hooks over agent contracts, Gonk registry
   adapter. Sigil Chat consumes these as released packages; it does not own
   agent runtime logic.
@@ -72,8 +70,7 @@ without an X-story is the exact failure mode this gate exists to stop.
 This is the shape every real feature in this repo follows — trace it through
 the worked examples below rather than trusting a description alone.
 
-1. **Domain store — Mirk, never a bespoke store (David, 2026-07-18:
-   "Everything needs to go to mirk").** Persistence = a **Mirk store**
+1. **Domain store — Mirk, never a bespoke store.** Persistence = a **Mirk store**
    (`platform/mirk` — the charter's storage substrate) behind a thin
    domain repository interface, with a custom Mirk **backend adapter** if
    the physical shape is special (markdown+headmatter, git-per-mutation —
@@ -179,5 +176,4 @@ the worked examples below rather than trusting a description alone.
 - **Rendering a distributable report** → `sigil-cli` skill.
 - **Reviewing a screen for UX quality** → `ux-design-language` skill.
 - **Coordinating with other agents on this repo** → `multi-agent-coordination`
-  skill (and, if you're the Garnet (the tactical agent) on this machine,
-  `local-coordination` for machine-local worktree/roadmap state).
+  skill.

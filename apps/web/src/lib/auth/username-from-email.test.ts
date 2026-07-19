@@ -8,7 +8,7 @@ import {
 
 describe("usernameFromEmail", () => {
   it("derives the sanitized, lowercased local-part", () => {
-    expect(usernameFromEmail("David.Smith@example.com")).toBe("david.smith")
+    expect(usernameFromEmail("Avery.Smith@example.com")).toBe("avery.smith")
     expect(usernameFromEmail("user.name-1@corp.co")).toBe("user.name-1")
     expect(usernameFromEmail("JJ@x.io")).toBe("jj")
   })
@@ -30,7 +30,7 @@ describe("usernameFromEmail", () => {
   // validator, or signup fails with no field for the user to correct.
   it("ALWAYS produces a username the server validator accepts", () => {
     const emails = [
-      "David.Smith@example.com",
+      "Avery.Smith@example.com",
       "a@b.com",
       "+++@x.com",
       "__weird__@x.co",
@@ -49,7 +49,7 @@ describe("usernameFromEmail", () => {
 
 describe("displayNameFromEmail", () => {
   it("uses the raw local-part as an editable starting name", () => {
-    expect(displayNameFromEmail("David.Smith@example.com")).toBe("David.Smith")
+    expect(displayNameFromEmail("Avery.Smith@example.com")).toBe("Avery.Smith")
     expect(displayNameFromEmail("jj@x.io")).toBe("jj")
   })
 })

@@ -218,4 +218,3 @@ export function isNew(name: string, referenceIso: string = COMPONENT_META_GENERA
   const ageMs = referenceMs - addedAtMs
   return ageMs >= 0 && ageMs <= NEW_WINDOW_HOURS * 60 * 60 * 1000
 }
-

@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { cp, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   MarkdownWorkItemsRepository,
+  resolveRoadmapDir,
 } from "./markdown-repository.js";
 import { MirkWorkItemsRepository } from "./mirk-repository.js";
 
@@ -44,7 +45,7 @@ describe("MirkWorkItemsRepository", () => {
     });
 
     let document = await repository.get();
-    expect(document.stories).toHaveLength(49);
+    expect(document.stories).toHaveLength(3);
     expect(document.reviews).toHaveLength(2);
     expect(gitLog(directory)).toEqual(["roadmap: seed initial stories"]);
 
@@ -54,7 +55,7 @@ describe("MirkWorkItemsRepository", () => {
     document = (
       await repository.assignReview(
         "S0.3",
-        { assignee: "David", gate: "decision:David" },
+        { assignee: "Owner", gate: "decision:owner" },
         document.revision,
       )
     ).document;
@@ -62,7 +63,7 @@ describe("MirkWorkItemsRepository", () => {
       await repository.decideReview(
         "review-S0.3-3",
         "changes-requested",
-        "David",
+        "Owner",
         document.revision,
       )
     ).document;
@@ -71,7 +72,7 @@ describe("MirkWorkItemsRepository", () => {
         id: "comment-mirk",
         storyId: "S0.3",
         kind: "reference",
-        author: "David",
+        author: "Owner",
         body: "Mirk now owns the backing.",
         createdAt: NOW,
       },
@@ -87,7 +88,7 @@ describe("MirkWorkItemsRepository", () => {
       id: "comment-mirk",
       storyId: "S0.3",
       kind: "reference",
-      author: "David",
+      author: "Owner",
       body: "Mirk now owns the backing.",
       createdAt: NOW,
     });
@@ -99,7 +100,7 @@ describe("MirkWorkItemsRepository", () => {
     expect(gitLog(directory)).toEqual([
       "story S0.3: comment comment-mirk",
       "review review-S0.3-3: changes-requested",
-      "story S0.3: assign decision:David review",
+      "story S0.3: assign decision:owner review",
       "story S0.3: ready→in-progress",
       "roadmap: seed initial stories",
     ]);
@@ -107,7 +108,10 @@ describe("MirkWorkItemsRepository", () => {
 
   it("round-trips a copy of the legacy markdown format byte-for-byte", async () => {
     const sourceDirectory = process.env.S15B_ROADMAP_COPY;
-    if (sourceDirectory === "/Users/dr/Dev/templates/sigil-roadmap")
+    if (
+      sourceDirectory &&
+      resolve(sourceDirectory) === resolve(resolveRoadmapDir())
+    )
       throw new Error("Round-trip verification must never use the live roadmap.");
 
     const legacyDirectory = await makeDirectory();
@@ -148,7 +152,7 @@ describe("MirkWorkItemsRepository", () => {
       id: "comment-round-trip",
       storyId: "S0.3",
       kind: "reference" as const,
-      author: "David",
+      author: "Owner",
       body: "Byte compatibility is the contract.",
       createdAt: NOW,
     };
@@ -221,9 +225,9 @@ describe("MirkWorkItemsRepository", () => {
         `title: ${id} title`,
         `status: ${status}`,
         "routing: claude:opus",
-        "reviewGate: decision:David",
+        "reviewGate: decision:owner",
         "deps: []",
-        "authoredBy: David",
+        "authoredBy: Owner",
         `createdAt: ${NOW}`,
         `updatedAt: ${NOW}`,
         "---",
@@ -250,7 +254,7 @@ describe("MirkWorkItemsRepository", () => {
       ]),
     );
 
-    // The board must survive a corrupt file (David: "I thought we fixed that")
+    // The board must survive a corrupt file without discarding valid stories.
     // — list() resolves instead of throwing, the idea story loads, and the
     // corrupt one is dropped rather than taking everything down with it.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

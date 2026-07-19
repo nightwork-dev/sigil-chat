@@ -373,8 +373,8 @@ function isRouting(value: unknown): value is Routing {
 
 function isReviewGate(value: unknown): value is ReviewGate {
   return (
-    value === "browser:David" ||
-    value === "decision:David" ||
+    value === "browser:owner" ||
+    value === "decision:owner" ||
     value === "peer" ||
     value === "none"
   );

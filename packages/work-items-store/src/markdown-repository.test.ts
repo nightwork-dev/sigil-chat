@@ -52,7 +52,7 @@ describe("MarkdownWorkItemsRepository", () => {
 
     const stories = await repo.list();
     expect(stories).toHaveLength(createWorkItemsDocument().stories.length);
-    expect(stories).toHaveLength(49);
+    expect(stories).toHaveLength(3);
 
     // One .md per story plus index.md and _reviews.md.
     expect(existsSync(join(dir, "S1.1.md"))).toBe(true);
@@ -63,7 +63,7 @@ describe("MarkdownWorkItemsRepository", () => {
     expect(document.revision).toBe(0);
     expect(document.reviews).toHaveLength(2);
     expect(document.stories.find(({ id }) => id === "S1.1")).toMatchObject({
-      epicId: "track-1",
+      epicId: "roadmap",
       status: "ready",
       routing: "pi:luna",
       reviewGate: "peer",
@@ -84,7 +84,7 @@ describe("MarkdownWorkItemsRepository", () => {
       id: "comment-1",
       storyId: "S0.3",
       kind: "reference",
-      author: "David",
+      author: "Owner",
       body: "Landed the commits.",
       createdAt: "2026-07-18T20:01:00.000Z",
     });
@@ -112,7 +112,7 @@ describe("MarkdownWorkItemsRepository", () => {
     expect(s15.map(({ id }) => id)).toEqual(["S0.3"]);
 
     const dev = await repo.list({ worktree: "sigil-chat-dev" });
-    expect(dev.length).toBe(48);
+    expect(dev.length).toBe(2);
     expect(dev.find(({ id }) => id === "S0.3")).toBeUndefined();
 
     const readyOnDev = await repo.list({
@@ -147,7 +147,7 @@ describe("MarkdownWorkItemsRepository", () => {
     document = (
       await repo.assignReview(
         "S1.0",
-        { assignee: "David", gate: "decision:David" },
+        { assignee: "Owner", gate: "decision:owner" },
         document.revision,
       )
     ).document;
@@ -156,7 +156,7 @@ describe("MarkdownWorkItemsRepository", () => {
       await repo.decideReview(
         "review-S1.0-3",
         "changes-requested",
-        "David",
+        "Owner",
         document.revision,
       )
     ).document;
@@ -166,7 +166,7 @@ describe("MarkdownWorkItemsRepository", () => {
           id: "comment-shape",
           storyId: "S1.0",
           kind: "concern",
-          author: "David",
+          author: "Owner",
           body: "One more pass on the shape decision.",
           createdAt: "2026-07-18T20:02:00.000Z",
         },
@@ -185,14 +185,14 @@ describe("MarkdownWorkItemsRepository", () => {
     );
     expect(reopened.stories.find(({ id }) => id === "S1.0")).toMatchObject({
       reviewDecision: "changes-requested",
-      decidedBy: "David",
+      decidedBy: "Owner",
     });
     expect(reopened.comments).toEqual([
       {
         id: "comment-shape",
         storyId: "S1.0",
         kind: "concern",
-        author: "David",
+        author: "Owner",
         body: "One more pass on the shape decision.",
         createdAt: "2026-07-18T20:02:00.000Z",
       },
@@ -205,7 +205,7 @@ describe("MarkdownWorkItemsRepository", () => {
     await repo.transitionStory("S0.3", "in-progress", initial.revision);
 
     await expect(
-      repo.assignReview("S0.3", { assignee: "David", gate: "peer" }, initial.revision),
+      repo.assignReview("S0.3", { assignee: "Owner", gate: "peer" }, initial.revision),
     ).rejects.toThrow(
       `Work-items revision conflict: expected ${initial.revision}, current ${initial.revision + 1}.`,
     );

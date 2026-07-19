@@ -7,18 +7,17 @@ description: End-to-end "how to build a feature here" for Sigil Chat — the lay
 
 ## RULE 0: Know the layer stack before touching anything
 
-From `/Users/dr/Dev/CLAUDE.md` (authoritative, lowest to highest):
+The ecosystem layers, from lowest to highest, are:
 
 ```
 Mirk         data substrate — storage, fixtures, artifact bytes, lineage
 Gonk         capability access, identity/authz, host projection
 Sigil        reusable UI/UX + business-logic scaffold
-Deadletters  opinionated knowledge + business logic (builds on Sigil)
 apps         products composing the layers above
 ```
 
 - [ ] Sigil Chat is an **app**: it composes Sigil Design (`templates/sigil-design`,
-      canonical home for generalizable UI), Sigil Agent (`@niwork/agent*`
+      canonical home for generalizable UI), Sigil Agent (`@zigil/agent-*`
       released packages — do not reimplement agent runtime logic here), and
       Gonk Core (`@gonk/*`). It owns app policy, domain reconciliation,
       attention projection, sessions, persistence wiring.

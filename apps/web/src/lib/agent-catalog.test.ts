@@ -88,7 +88,7 @@ describe("agent catalog projection", () => {
           },
           {
             name: "private-skill",
-            logicalPath: "/Users/operator/.eve/skills/private/SKILL.md",
+            logicalPath: "/workspace/operator/.eve/skills/private/SKILL.md",
           },
         ],
       },

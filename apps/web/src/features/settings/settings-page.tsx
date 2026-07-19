@@ -40,7 +40,7 @@ export function SettingsPage({
   section: SettingsSection
   onSectionChange: (section: SettingsSection) => void
 }) {
-  // Attention coverage (David): which settings section you're on flows into
+  // Attention coverage: the selected settings section flows into
   // agent context, so "change my theme" / "explain this setting" have a target.
   const telemetry = useAttentionTelemetry()
   const attention: AttentionContext = {

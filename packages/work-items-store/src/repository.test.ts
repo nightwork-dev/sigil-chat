@@ -28,15 +28,15 @@ afterEach(async () => {
 });
 
 describe("MemoryWorkItemsRepository", () => {
-  it("seeds the user stories and applies the work-item lifecycle", async () => {
+  it("seeds template stories and applies the work-item lifecycle", async () => {
     const repository = new MemoryWorkItemsRepository({
       now: () => "2026-07-18T20:00:00.000Z",
     });
     const initial = await repository.get();
 
-    expect(await repository.list()).toHaveLength(49);
+    expect(await repository.list()).toHaveLength(3);
     expect(initial.stories.find(({ id }) => id === "S1.1")).toMatchObject({
-      epicId: "track-1",
+      epicId: "roadmap",
       status: "ready",
       routing: "pi:luna",
       reviewGate: "peer",
@@ -59,7 +59,7 @@ describe("MemoryWorkItemsRepository", () => {
     const assigned = await repository.assignReview(
       "S1.1",
       {
-        assignee: "David",
+        assignee: "Owner",
         gate: "peer",
         title: "Review the store",
         summary: "Check persistence and concurrency behavior.",
@@ -75,7 +75,7 @@ describe("MemoryWorkItemsRepository", () => {
     expect(assignedReview).toMatchObject({
       id: "review-S1.1-3",
       storyId: "S1.1",
-      assignee: "David",
+      assignee: "Owner",
       unread: true,
       completed: false,
     });
@@ -84,7 +84,7 @@ describe("MemoryWorkItemsRepository", () => {
     const decided = await repository.decideReview(
       "review-S1.1-3",
       "approved",
-      "David",
+      "Owner",
       assigned.document.revision,
     );
     expect(
@@ -97,7 +97,7 @@ describe("MemoryWorkItemsRepository", () => {
     expect(decided.document.stories.find(({ id }) => id === "S1.1"))
       .toMatchObject({
         reviewDecision: "approved",
-        decidedBy: "David",
+        decidedBy: "Owner",
         decidedAt: "2026-07-18T20:00:00.000Z",
       });
 
@@ -106,7 +106,7 @@ describe("MemoryWorkItemsRepository", () => {
         id: "comment-1",
         storyId: "S1.1",
         kind: "approval",
-        author: "David",
+        author: "Owner",
         body: "The store behavior is ready for the next track.",
         createdAt: "2026-07-18T20:01:00.000Z",
       },
@@ -157,7 +157,7 @@ describe("FileWorkItemsRepository", () => {
     document = (
       await repository.assignReview(
         "S1.0",
-        { assignee: "David", gate: "decision:David" },
+        { assignee: "Owner", gate: "decision:owner" },
         document.revision,
       )
     ).document;
@@ -167,7 +167,7 @@ describe("FileWorkItemsRepository", () => {
       await repository.decideReview(
         "review-S1.0-3",
         "changes-requested",
-        "David",
+        "Owner",
         document.revision,
       )
     ).document;
@@ -177,7 +177,7 @@ describe("FileWorkItemsRepository", () => {
           id: "comment-shape-decision",
           storyId: "S1.0",
           kind: "concern",
-          author: "David",
+          author: "Owner",
           body: "The dedicated workspace decision needs one more pass.",
           createdAt: "2026-07-18T20:01:00.000Z",
         },
@@ -196,7 +196,7 @@ describe("FileWorkItemsRepository", () => {
     });
     expect(reloaded.stories.find(({ id }) => id === "S1.0")).toMatchObject({
       reviewDecision: "changes-requested",
-      decidedBy: "David",
+      decidedBy: "Owner",
     });
     expect(reloaded.comments).toHaveLength(1);
     expect(reloaded.history).toHaveLength(3);
@@ -214,7 +214,7 @@ describe("FileWorkItemsRepository", () => {
     await expect(
       repository.assignReview(
         "S0.3",
-        { assignee: "David", gate: "peer" },
+        { assignee: "Owner", gate: "peer" },
         initial.revision,
       ),
     ).rejects.toThrow(

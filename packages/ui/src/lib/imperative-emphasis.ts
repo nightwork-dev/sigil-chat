@@ -5,7 +5,7 @@
 // — that is a declarative single-target modal scrim with a focus trap that
 // persists until dismissed. This engine never traps focus and never persists;
 // every application it makes is invalidated by a new command, a timeout, or
-// `clear()`. See docs.local/specs/INGRESS-CORES.md, "Imperative emphasis" for
+// `clear()`. The Sigil Design ingress-core contract defines
 // the extraction rationale (ported from sigil-chat's `agent-dom-effects`).
 //
 // The target-attribute name and the DOM event name are both configurable so a

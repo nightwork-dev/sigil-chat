@@ -40,7 +40,7 @@ release.
 
 ## Why this boundary
 
-Deadletters provides the useful reference shape, not a package to copy whole.
+An existing application provides the useful reference shape, not a package to copy whole.
 Its implementation establishes several good patterns:
 
 - `packages/auth/src/server.ts` keeps Better Auth server configuration in one
@@ -54,9 +54,9 @@ Its implementation establishes several good patterns:
 - the first account can bootstrap administrative ownership without a manual
   database edit.
 
-Sigil Chat should adopt those seams, but not Deadletters' current breadth. It
+Sigil Chat should adopt those seams, but not the reference application's breadth. It
 does not yet have a second consumer that earns a reusable auth package, and it
-does not need Deadletters' admin plugin, OAuth providers, API keys, invitations,
+does not need an admin plugin, OAuth providers, API keys, invitations,
 content profiles, or Turso-specific product assumptions. Auth stays app-local
 under `apps/web/src/lib/auth/` until a real second application consumes the same
 contract.
@@ -93,7 +93,7 @@ is created.
 
 Consequently:
 
-- sign-in presents EMAIL and password (revised, David 2026-07-18: email is the login identifier — Better Auth core default; the username plugin remains for the mention-handle, not for sign-in);
+- sign-in presents email and password; email is the Better Auth login identifier, while the username remains a mention handle;
 - first-user setup and registration collect EMAIL and PASSWORD ONLY — username defaults to the email local-part and display name defaults from it, both editable later in Settings → Account ("Shouldn't it just be email/password with the ability to edit profile in settings?");
 - email IS the login key (superseding the earlier private-metadata stance); username is the mention-handle and profile identity, edited in settings;
 - the implementation must not fabricate synthetic email addresses to evade
@@ -103,7 +103,7 @@ Consequently:
 
 Username policy:
 
-- 1–32 characters (self-hosted install: no squatting/enumeration concerns; a 2-char owner name like "dr" is fine — the 3-char floor was public-platform convention, removed per David 2026-07-18);
+- 1–32 characters (a self-hosted install has no public-platform squatting concern, so a two-character owner name is valid);
 - lowercase ASCII letters, numbers, dots, underscores, and hyphens;
 - must begin and end with a letter or number;
 - case-insensitive uniqueness after normalization;
@@ -113,7 +113,7 @@ Username policy:
 
 Password policy:
 
-- 8–128 characters (Better Auth default floor; the 12 minimum was our own cargo-cult addition — removed per David 2026-07-18), ALL characters allowed incl. spaces/symbols, no composition rules;
+- 8–128 characters (Better Auth's default floor), all characters allowed including spaces and symbols, with no composition rules;
 - Better Auth's default password hashing implementation;
 - generic sign-in failure messages;
 - changing a password requires the current password and revokes other
@@ -242,7 +242,7 @@ a release blocker for multi-user deployment. Do not work around it by adding a
 
 Better Auth requires relational persistence for users, accounts, sessions,
 verification records, username fields, and JWT signing keys. Use its supported
-Kysely SQLite/libSQL shape, following Deadletters' proven adapter approach:
+Kysely SQLite/libSQL shape, following the proven adapter approach:
 
 - local default: `file:.data/sigil-chat.db`;
 - deployed option: `SIGIL_DATABASE_URL` plus optional

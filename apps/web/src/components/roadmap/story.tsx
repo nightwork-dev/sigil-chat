@@ -52,17 +52,17 @@ const ROUTING_LABEL: Record<Routing, string> = {
   codex: "codex",
 }
 
-// browser:David / decision:David are David's own gates (actionable by him);
+// browser:owner / decision:owner are installation-owner gates;
 // peer is someone else's; none carries no review and renders nothing.
-const GATE_META: Record<ReviewGate, { label: string; icon: typeof GavelIcon; david: boolean } | null> = {
-  "browser:David": { label: "Browser review", icon: MonitorIcon, david: true },
-  "decision:David": { label: "Decision", icon: GavelIcon, david: true },
-  peer: { label: "Peer review", icon: UsersIcon, david: false },
+const GATE_META: Record<ReviewGate, { label: string; icon: typeof GavelIcon; owner: boolean } | null> = {
+  "browser:owner": { label: "Browser review", icon: MonitorIcon, owner: true },
+  "decision:owner": { label: "Decision", icon: GavelIcon, owner: true },
+  peer: { label: "Peer review", icon: UsersIcon, owner: false },
   none: null,
 }
 
-export function isDavidGate(gate: ReviewGate): boolean {
-  return GATE_META[gate]?.david ?? false
+export function isOwnerGate(gate: ReviewGate): boolean {
+  return GATE_META[gate]?.owner ?? false
 }
 
 // ── Context ─────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ function Status({ className }: { className?: string }) {
 
 function RoutingBadge({ className }: { className?: string }) {
   const { routing } = useStoryContext()
-  // One encoding per fact (David's persistence-ladder): the label already
+  // One encoding per fact (the persistence ladder): the label already
   // carries the routing (e.g. "claude:opus"), so the bot/person icon is a
   // redundant second encoding — dropped.
   return (
@@ -136,7 +136,7 @@ function Meta({ className }: { className?: string }) {
         <span
           className={cn(
             "inline-flex items-center gap-1",
-            gate.david ? "text-info" : "text-muted-foreground",
+            gate.owner ? "text-info" : "text-muted-foreground",
           )}
         >
           {GateIcon ? <GateIcon className="size-2.5" aria-hidden="true" /> : null}

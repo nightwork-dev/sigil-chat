@@ -13,14 +13,12 @@ reference — the content exists even if your tool can't auto-load it.
 
 ## The layer stack
 
-From `/Users/dr/Dev/CLAUDE.md` (the studio-wide ecosystem index), authoritative
-ordering, lowest to highest:
+The ecosystem layers, from lowest to highest, are:
 
 ```
 Mirk         data substrate — storage, fixtures, artifact bytes, lineage
 Gonk         capability access, identity/authz, host projection
 Sigil        reusable UI/UX + business-logic scaffold
-Deadletters  opinionated knowledge + business logic (builds on Sigil)
 apps         products composing the layers above
 ```
 
@@ -29,7 +27,7 @@ Sigil Chat is an app in this stack, composing:
 - **Sigil Design** (`templates/sigil-design`) — shared graph, review, chat,
   text-editor, SpotlightScrim, and FloatingDock surfaces. Canonical home for
   anything generalizable.
-- **Sigil Agent** (`@niwork/agent*` packages) — neutral agent contracts, Eve
+- **Sigil Agent** (`@zigil/agent-*` packages) — neutral agent contracts, Eve
   host adapter, React Query hooks over agent contracts, Gonk registry
   adapter. Consumed as released packages — this repo does not own agent
   runtime logic.
@@ -54,7 +52,7 @@ worked examples below rather than trusting the description alone.
    a new one) owns the persisted shape and repository. Example:
    `packages/review-store` (types + repository consumed by both the server
    and the registry), `packages/work-items-store` — its `package.json`
-   `exports` map (`.`, `./types`, `./repository`, `./sample`) is the pattern
+   `exports` map (`.`, `./types`, `./repository`) is the pattern
    for explicit subpath exports (no barrel `export *`).
 2. **Gonk tool.** `apps/gonk/src/registry.ts` composes per-domain
    registration functions from `apps/gonk/src/registry/*.ts` (e.g.

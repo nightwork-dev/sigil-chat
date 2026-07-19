@@ -376,7 +376,7 @@ describe("Sigil Chat Gonk registry", () => {
       data: {
         revision: 0,
         stories: expect.arrayContaining([
-          expect.objectContaining({ id: "S1.2", status: "ready" }),
+          expect.objectContaining({ id: "S1.1", status: "ready" }),
         ]),
       },
     });
@@ -384,40 +384,40 @@ describe("Sigil Chat Gonk registry", () => {
     const transition = await collectToolOutcome(
       registry.invoke(
         "sigil-story-transition",
-        { id: "S1.2", status: "in-progress", expectedRevision: 0 },
+        { id: "S1.1", status: "in-progress", expectedRevision: 0 },
         makeBaseContext(),
       ),
     );
     expect(transition).toMatchObject({
       ok: true,
       data: {
-        changedIds: ["S1.2"],
+        changedIds: ["S1.1"],
         clientCommand: {
           type: "agent.domain.outcome",
           payload: {
             kind: "work-items.changed",
             resource: { kind: "work-items-board", id: "work-items" },
             operation: "story.transition",
-            changedIds: ["S1.2"],
+            changedIds: ["S1.1"],
           },
         },
       },
     });
 
-    const nextReviewId = `review-S1.2-${
+    const nextReviewId = `review-S1.1-${
       (await workItemsRepository.get()).reviews.length + 1
     }`;
     const assignment = await collectToolOutcome(
       registry.invoke(
         "sigil-story-assign-review",
-        { id: "S1.2", gate: "peer", expectedRevision: 1 },
+        { id: "S1.1", gate: "peer", expectedRevision: 1 },
         makeBaseContext(),
       ),
     );
     expect(assignment).toMatchObject({
       ok: true,
       data: {
-        changedIds: ["S1.2", nextReviewId],
+        changedIds: ["S1.1", nextReviewId],
         clientCommand: {
           payload: {
             kind: "work-items.changed",
@@ -432,7 +432,7 @@ describe("Sigil Chat Gonk registry", () => {
       reviews: expect.arrayContaining([
         expect.objectContaining({
           id: nextReviewId,
-          assignee: "David",
+          assignee: "Owner",
           unread: true,
           completed: false,
         }),

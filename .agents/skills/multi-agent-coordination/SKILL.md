@@ -12,22 +12,21 @@ non-trivial work.
 
 ## Agent roles (stay in your lane)
 
-- **Fable — strategic coordination.** Ecosystem-wide (gonk + eve + sigil +
-  deadletters): product direction, and what it takes to be self-contained
+- **Strategist — strategic coordination.** Ecosystem-wide product direction
+  and what it takes to be self-contained
   and safely deployable. Sets strategy; the top coordinator.
-- **Garnet (tactical agent, Claude Code harness) — tactical coordination + implementation
+- **Coordinator (tactical agent, Claude Code harness) — tactical coordination + implementation
   within the sigil ecosystem** (sigil-chat + sigil-design). Turns strategy
   into shipped, verified code; orchestrates `pi`/Claude workers; owns the
   commit + integration flow on `dev`.
-- **Codex — ecosystem analysis & interplay.** How the layers fit; auth/
-  accounts; the path to a safe deployable product. (Being partly handed to
-  Fable.) If you are codex reading this: your job is analysis and
+- **Analysis agent — ecosystem analysis & interplay.** How the layers fit;
+  auth/accounts; the path to a safe deployable product. Its job is analysis and
   cross-layer reasoning, not unilateral implementation inside sigil-chat —
   route implementation work back through the roadmap so the tactical agent
   can pick it up, or coordinate explicitly before touching shared files.
 
-Handoff shape: **Fable sets direction → the tactical agent implements +
-verifies → codex/Fable analysis informs both.** Tag each roadmap story with
+Handoff shape: **the strategist sets direction → the tactical agent implements +
+verifies → analysis informs both.** Tag each roadmap story with
 its `worktree`/owner so the lanes don't collide; don't reach into another
 agent's lane without coordinating through the roadmap.
 

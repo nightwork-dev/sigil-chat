@@ -1,20 +1,20 @@
 ---
-name: david-gate-preflight
-description: MANDATORY before requesting any browser:David review — the accumulated checklist of every issue David has flagged, run by a machine pass first so his attention only sees what machines cannot judge. Add every new David-flagged issue here the day it happens.
+name: review-gate-preflight
+description: MANDATORY before requesting any browser:owner review — a machine-verifiable checklist that protects the human reviewer's attention.
 ---
 
-# David-gate preflight
+# Review-gate preflight
 
-David's attention is the program's scarcest resource. A `browser:David`
-gate may only be REQUESTED after a preflight pass (Sonnet browser lane, or
+The owner's attention is the program's scarcest resource. A `browser:owner`
+gate may only be REQUESTED after a preflight pass (a browser-capable agent, or
 the implementing agent against a real browser) has verified every item
-below. Anything the preflight could have caught that reaches David anyway
+below. Anything the preflight could have caught that reaches the owner anyway
 is a process failure. **This list is append-only history: every issue
-David flags in review gets added the same day.**
+the owner flags in review gets added the same day.**
 
 ## The accumulated checklist (2026-07-18 origin)
 
-Viewport ~375px iPhone, hard-refreshed, over the tailnet preview:
+Viewport ~375px iPhone, hard-refreshed, against the mobile preview:
 
 - [ ] No double scroll: the page does not scroll; scroll lives in
       contained regions only (height chain intact root → main → surface).
@@ -35,10 +35,10 @@ Viewport ~375px iPhone, hard-refreshed, over the tailnet preview:
 ## Protocol
 
 1. Implementing lane finishes → runs or dispatches the preflight.
-2. Preflight failures → fix before David ever sees the story.
-3. Preflight passes → THEN move the story to `verify` and notify David,
+2. Preflight failures → fix before the owner ever sees the story.
+3. Preflight passes → THEN move the story to `verify` and notify the owner,
    stating "preflight passed" in the story comment.
-4. David flags something new anyway → it joins this checklist the same
+4. The owner flags something new anyway → it joins this checklist the same
    day, with the story reference.
 
 ## Wall-of-shame checks (mechanical — added 2026-07-18, images in

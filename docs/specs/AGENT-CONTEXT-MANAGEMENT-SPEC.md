@@ -9,8 +9,6 @@ no longer authoritative.
 
 - Canonical compiler, candidate, policy, budget, authorization, and receipt
   semantics: Gonk Core `docs/context-design.md` and `@gonk/context`.
-- Cross-repository disposition and shipped anchors:
-  the Gonk Core repository's `docs.local/specs/SIGIL-GONK-CONTRACT-DISPOSITION-20260716.md`.
 - Sigil tray, privacy, retention, preview, React Query, and host-adapter
   guidance:
   the sigil-agent repository's `docs/specs/CONTEXT-CONSUMER-PROFILE.md`.

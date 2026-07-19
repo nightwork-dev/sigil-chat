@@ -2,7 +2,7 @@
 
 > Date: 2026-07-16
 > Status: Initial implementation
-> Source reference: the tapestry repository (read-only extraction)
+> Source reference: a companion writing application (read-only extraction)
 > Depends on: `AGENT-EMBEDDING-SPEC.md`
 
 ## Goal
@@ -24,11 +24,11 @@ The useful loop is:
 
 ## Extraction boundary
 
-Tapestry remains the domain application and source of proven interaction
+The source application remains the domain owner and source of proven interaction
 patterns. `@workspace/review` receives only reusable, display-shaped
 components and headless review rules.
 
-| Tapestry surface | Shared result |
+| Source surface | Shared result |
 | --- | --- |
 | Piece feedback list | Compound annotation feed with a host-supplied body renderer |
 | Draft history panel | Compound revision history over a domain-free revision shape |
@@ -42,7 +42,7 @@ The following remain app-owned:
 - Dictation implementation
 - Markdown rendering policy
 - Confirmation language and mutation authorization
-- Tapestry-specific `Piece`, `Draft`, `Decision`, and `Annotation` store types
+- Source-specific document, draft, decision, and annotation store types
 
 ## Workspace shape
 
@@ -93,7 +93,7 @@ that Gonk exists.
 
 ## Acceptance
 
-- Review primitives contain no Tapestry imports or store hooks.
+- Review primitives contain no source-application imports or store hooks.
 - The review route renders inside the existing sidebar chrome.
 - Selecting review content changes the HUD's context label.
 - Multi-select publishes an ordered passage working set.

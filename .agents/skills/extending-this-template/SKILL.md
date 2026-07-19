@@ -44,7 +44,7 @@ Above `_app.tsx`, `routes/__root.tsx` mounts app-wide providers with no
 visible chrome: `ThemeProvider`, `QueryClientProvider`, and — critically —
 `AppAgentSessions` (`@/components/agent-sessions.tsx`), which wraps
 `AgentRuntimeSessionProvider` and `AgentThreadControlsProvider` from
-`@niwork/agent`. This is what "the shared agent session mounts above router
+`@zigil/agent-surface`. This is what "the shared agent session mounts above router
 swaps" means concretely: the agent session survives navigating between
 `/chat`, `/studio`, `/review`, etc., because it's provided once at the root,
 not per-route. A new workspace under `_app/` gets the live agent session for
@@ -134,7 +134,7 @@ that workspace.
    on), not decoration. Pick one that reads correctly at a glance.
 4. If the workspace needs to keep the agent informed of user selections
    (a passage, a node, a row), wrap its content in `AttentionProvider` from
-   `@niwork/agent/attention` and report selections through it — see
+   `@zigil/agent-surface/attention` and report selections through it — see
    `docs/guides/building-workspaces.md` for the full attention/context-tray
    loop and `features/review/review-workspace.tsx` for the real
    implementation.

@@ -14,26 +14,23 @@ or ship unverified changes. Read it before starting non-trivial work.
 Identify agents by **name + role, not harness** — several of us run in the same
 harness (Claude Code), so "Claude Code" names nothing.
 
-- **Fable — strategic coordination.** Ecosystem-wide (gonk + eve + sigil +
-  deadletters): product direction, and what it takes to be self-contained and
+- **Strategist — strategic coordination.** Ecosystem-wide product direction,
+  and what it takes to be self-contained and
   safely deployable. Sets strategy; the top coordinator. (Runs in Claude Code.)
-- **Garnet — tactical coordination + implementation within the sigil ecosystem**
+- **Coordinator — tactical coordination + implementation within the sigil ecosystem**
   (sigil-chat + sigil-design). Turns strategy into shipped, verified code;
   orchestrates `pi`/Claude workers; owns the commit + integration flow on `dev`.
-  (Runs in Claude Code — same harness as Fable, different role + identity.)
-- **Codex — ecosystem analysis & interplay.** How the layers fit; auth/accounts;
-  the path to a safe deployable product. (Being partly handed to Fable.)
+  (Runs in Claude Code — same harness as Strategist, different role + identity.)
+- **Analysis agent — ecosystem analysis & interplay.** How the layers fit;
+  auth/accounts and the path to a safe deployable product.
 - **pi workers** — dispatched, ephemeral mechanical execution (not a peer).
 
-**The strategic direction doc is live:**
-`/Users/dr/Dev/platform/ecosystem/specs/fable-direction-20260718.md`.
-**Re-read it after completing every task if it has changed** since you last
-read it (check its mtime first — cheap). David updates direction mid-flight
-through Fable; finishing your next task on stale direction wastes it.
-Include this instruction in every dispatch brief for multi-task workers.
+**Re-read the current roadmap and repository instructions after every completed
+task.** Finishing work against stale direction wastes it. Include this
+instruction in every dispatch brief for multi-task workers.
 
-Handoff shape: **Fable sets direction → Garnet implements + verifies →
-codex/Fable analysis informs both.** Tag each roadmap story with its
+Handoff shape: **the strategist sets direction → the coordinator implements +
+verifies → analysis informs both.** Tag each roadmap story with its
 `worktree`/owner so the lanes don't collide; don't reach into another agent's
 lane without coordinating through the roadmap.
 
@@ -66,20 +63,18 @@ bespoke folders — both anti-patterns. Four tiers:
 
 - **Product code + shipped docs** → the repo, on `dev` (tracked). Features and
   the `docs/` guides/specs that ship with the product.
-- **Repo-internal working notes** → *that repo's own* `docs.local/` (gitignored,
-  per-repo). Design notes and in-progress specs scoped to one repo.
+- **Repo-internal working notes** → a gitignored local notes directory.
 - **The roadmap** → the external, git-versioned roadmap store (`SIGIL_ROADMAP_DIR`),
   co-located, its own repo, shared across every worktree/agent. NOT in any
   product repo.
-- **Ecosystem-level coordination / handoff / strategy** — agent briefs, handoffs,
-  cross-agent notes; anything that spans repos or isn't product-specific →
-  **`/Users/dr/Dev/docs.local/`** (ecosystem-level, not tracked by any product
-  repo).
+- **Ecosystem-level coordination / handoff / strategy** — agent briefs,
+  handoffs, and cross-agent notes belong in an untracked workspace-level notes
+  directory.
 - **NEVER** put roadmap/coordination/handoff artifacts in a product's `dev` tree,
   and **NEVER invent a bespoke ad-hoc directory** — use the established homes
   above. (If you catch yourself `mkdir`-ing a new coordination folder, stop.)
 - **Naming convention:** local-only files/dirs are named `*.local` / `*.local.*`
-  (e.g. `docs.local`, `foo.local.md`, `.env.local`) and are gitignored by that
+  (e.g. `notes.local`, `foo.local.md`, `.env.local`) and are gitignored by that
   pattern in **every** repo — EXCEPT repos that are themselves local-only (the
   roadmap store), which track everything. Deliberately-tracked exceptions (e.g.
   CLI test fixtures using `.local` names) get an explicit `!` negation.
@@ -92,7 +87,7 @@ bespoke folders — both anti-patterns. Four tiers:
   lifecycle, NOT the agent.** Default, not the exception. Fanning out concurrent
   streams in a *single* tree is what collides on shared files (`.gitignore`,
   `CLAUDE.md`, `registry.ts`, `_app.tsx`).
-  - **Orchestrator (the tactical coordinator, Garnet):** create the worktree,
+  - **Orchestrator (the tactical coordinator):** create the worktree,
     **point it at shared config** (a fresh worktree lacks the gitignored `.env`),
     dispatch the agent into it, and after it reports — review, **merge or open a
     PR**, and only THEN remove the worktree + branch.

@@ -1,6 +1,6 @@
 // Derive a default username + display name from an email address.
 //
-// Setup and registration collect EMAIL + PASSWORD only (David, 2026-07-19);
+// Setup and registration collect EMAIL + PASSWORD only;
 // the username is the @mention handle, auto-derived here and editable later in
 // Settings → Account. Pure + client-safe (no server imports) so the setup form
 // and any server-side defaulting can share one derivation.

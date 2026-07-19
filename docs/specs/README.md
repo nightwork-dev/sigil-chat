@@ -57,20 +57,8 @@ contract content here.
   split; canonical content moved out of this repo to Gonk Core and
   `sigil-agent` (`docs/specs/SKILLS-CONSUMER-PROFILE.md`).
 
-## Program history
-
-The T1–T22 execution ledger, the current graduation worklist, the
-sigil-agent extraction disposition, the graduation/move handoff, the Gonk
-Core review response, cross-model review packets, and raw bug-evidence
-artifacts (including the fork-of-fork HTTP trace) are retained on disk under
-the gitignored `docs.local/history/`, not in this tracked tree. They record
-what happened (or, for the worklist, what remains within that history); they
-are not sources of current truth for ongoing design — read the active
-contracts above for that.
-
 ## Inherited from the `sigil-design` lineage — not Sigil Chat scope
 
 Design-system registry/CLI/theming documents carried over through shared git
 history were removed from this repository's tracked docs; the Sigil Design
-repository's own `docs/specs/` is authoritative for that material. (Local
-checkouts may retain copies under the gitignored `docs.local/`.)
+repository's own `docs/specs/` is authoritative for that material.

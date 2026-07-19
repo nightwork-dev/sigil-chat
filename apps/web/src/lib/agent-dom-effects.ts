@@ -3,7 +3,7 @@
 // engine. Preserves the existing wire contract — the `data-agent-target`
 // attribute and the `sigil:agent-dom-command` event — so `useAgentTarget`,
 // `getAgentTargetProps`, and the outcome projector don't have to change. See
-// sigil-design docs.local/specs/INGRESS-CORES.md, "Imperative emphasis".
+// Shared imperative-emphasis contract from the Sigil Design ingress cores.
 import {
   agentUiHighlightEffects,
   isAgentTargetId,

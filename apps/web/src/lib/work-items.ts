@@ -76,7 +76,7 @@ const assignReviewFn = createServerFn({ method: "POST" })
     return workItemsRepository.assignReview(
       data.id,
       {
-        assignee: "David",
+        assignee: "Owner",
         gate: data.gate,
         title: data.title,
         summary: data.summary,
@@ -99,7 +99,7 @@ const decideReviewFn = createServerFn({ method: "POST" })
     return workItemsRepository.decideReview(
       data.reviewId,
       data.decision,
-      data.decidedBy ?? "David",
+      data.decidedBy ?? "Owner",
       data.expectedRevision,
     );
   });

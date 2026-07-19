@@ -1,10 +1,10 @@
 <!--
 Captured artifact — provenance
 Source: https://www.cerebras.ai/blog/how-we-built-our-knowledge-base
-Captured: 2026-07-18 (Garnet, via Playwright browser subagent — direct HTTP/WebFetch 500s on bot protection)
-Purpose (per Fable's note):
+Captured: 2026-07-18 from the public source.
+Purpose:
   (a) real-world test document for sigil-chat Track 6 ingestion + Track 3 memory
-  (b) architecture-comparison read for Deadletters (their knowledge-base overlaps this design)
+  (b) architecture-comparison read for a knowledge-base implementation
 Verbatim capture — prose reproduced as-is; [Figure: ...] lines describe images that were
 diagrams in the original (not reproducible as text). Reference numbers in the body map to the
 References list at the end.

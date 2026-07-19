@@ -8,8 +8,6 @@
 >
 > - `docs/specs/AGENT-EMBEDDING-SPEC.md`
 > - the Gonk Core repository's `gonk-core/packages/adapters/tool-registry-mcp/src/http/web.ts`
-> - the Gonk Core repository's `docs.local/gonk-auth-v0-spec.md`
-> - the Gonk Core repository's `docs.local/requests/tool-registry-http-api-adapter.md`
 
 > **Gonk review status — REQUEST CHANGES (2026-07-16).**
 >

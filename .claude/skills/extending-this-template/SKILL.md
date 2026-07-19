@@ -44,7 +44,7 @@ Above `_app.tsx`, `routes/__root.tsx` mounts only app-wide providers with no
 visible chrome and no session/auth dependency: `ThemeProvider` and
 `QueryClientProvider`. `AppAgentSessions` (`@/components/agent-sessions.tsx`,
 wrapping `AgentRuntimeSessionProvider` and `AgentThreadControlsProvider` from
-`@niwork/agent`) is mounted one level down, INSIDE `_app.tsx`'s
+`@zigil/agent-surface`) is mounted one level down, INSIDE `_app.tsx`'s
 `AppLayout` — deliberately below the protected-route boundary (`_app.tsx`'s
 `beforeLoad` resolves the Better Auth session server-side and redirects to
 `/login` first). `/login` and `/setup` are top-level routes that sit outside
@@ -140,7 +140,7 @@ that workspace.
    on), not decoration. Pick one that reads correctly at a glance.
 4. If the workspace needs to keep the agent informed of user selections
    (a passage, a node, a row), wrap its content in `AttentionProvider` from
-   `@niwork/agent/attention` and report selections through it — see
+   `@zigil/agent-surface/attention` and report selections through it — see
    `docs/guides/building-workspaces.md` for the full attention/context-tray
    loop and `features/review/review-workspace.tsx` for the real
    implementation.

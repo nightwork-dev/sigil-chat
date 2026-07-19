@@ -339,8 +339,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       }
       if (!isStory(candidate)) {
         // Resilience: one malformed story file must NOT take down the whole
-        // board (this regressed from the markdown backing — David: "I thought
-        // we fixed that"). Skip it with a loud warning; the rest of the
+        // board. Skip it with a loud warning; the rest of the
         // roadmap still loads.
         console.warn(
           `[work-items] Skipping ${name}: not a valid story markdown file.`,

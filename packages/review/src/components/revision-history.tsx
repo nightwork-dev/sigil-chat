@@ -5,7 +5,7 @@
 //
 // The host adapts its store rows into ReviewRevision before rendering. Details
 // such as word count or media dimensions arrive as formatted strings, keeping
-// this package free of Tapestry's Draft type and of any one medium's schema.
+// this package free of the source application's draft type and any one medium's schema.
 
 import {
   createContext,

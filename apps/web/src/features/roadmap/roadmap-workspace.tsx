@@ -23,7 +23,7 @@ import {
   useUpsertStory,
 } from "@/lib/work-items"
 import {
-  isDavidGate,
+  isOwnerGate,
   Story,
   STORY_STATUS,
   STORY_STATUS_ORDER,
@@ -78,7 +78,7 @@ function groupByStatus(stories: StoryData[]): Record<StoryStatus, StoryData[]> {
   return groups
 }
 
-// Pending (uncompleted) reviews first, each set newest-first — David works the
+// Pending (uncompleted) reviews first, each set newest-first — the owner works the
 // top of the queue and the completed decisions settle beneath it.
 function orderReviews(reviews: ReviewItem[]): ReviewItem[] {
   return [...reviews].sort((a, b) => {
@@ -105,14 +105,14 @@ export function RoadmapWorkspace() {
 
   const allStories = stories.data ?? []
   const grouped = groupByStatus(allStories)
-  const davidReviews = orderReviews(
-    (reviews.data ?? []).filter((review) => review.assignee === "David"),
+  const ownerReviews = orderReviews(
+    (reviews.data ?? []).filter((review) => review.assignee === "Owner"),
   )
-  const pendingCount = davidReviews.filter((review) => !review.completed).length
+  const pendingCount = ownerReviews.filter((review) => !review.completed).length
   const selectedStory = allStories.find((story) => story.id === selectedId) ?? null
   const storiesById = new Map(allStories.map((story) => [story.id, story]))
 
-  // Attention coverage (David): the story you're viewing flows into the agent's
+  // Attention coverage: the story you're viewing flows into the agent's
   // context, so "what does this story need?" / "summarize this" resolve against
   // it without naming it — same loop as studio/evidence/review.
   const telemetry = useAttentionTelemetry()
@@ -149,7 +149,7 @@ export function RoadmapWorkspace() {
       pane={pane}
       setPane={setPane}
       pendingCount={pendingCount}
-      davidReviews={davidReviews}
+      ownerReviews={ownerReviews}
       storiesById={storiesById}
       selectedStory={selectedStory}
       onOpenStory={openDetail}
@@ -225,7 +225,7 @@ function AsidePaneBody({
   pane,
   setPane,
   pendingCount,
-  davidReviews,
+  ownerReviews,
   storiesById,
   selectedStory,
   onOpenStory,
@@ -233,7 +233,7 @@ function AsidePaneBody({
   pane: AsidePane
   setPane: (pane: AsidePane) => void
   pendingCount: number
-  davidReviews: ReviewItem[]
+  ownerReviews: ReviewItem[]
   storiesById: Map<string, StoryData>
   selectedStory: StoryData | null
   onOpenStory: (id: string) => void
@@ -267,12 +267,12 @@ function AsidePaneBody({
       </div>
       <div className="scroll-area min-h-0 flex-1 overflow-y-auto">
         {pane === "queue" ? (
-          <ReviewQueue reviews={davidReviews} storiesById={storiesById} onOpenStory={onOpenStory} />
+          <ReviewQueue reviews={ownerReviews} storiesById={storiesById} onOpenStory={onOpenStory} />
         ) : selectedStory ? (
           <StoryDetail
             key={selectedStory.id}
             story={selectedStory}
-            pendingReview={davidReviews.some(
+            pendingReview={ownerReviews.some(
               (review) => review.storyId === selectedStory.id && !review.completed,
             )}
           />
@@ -600,7 +600,7 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
         </div>
       ) : null}
 
-      {isDavidGate(story.reviewGate) && !pendingReview ? (
+      {isOwnerGate(story.reviewGate) && !pendingReview ? (
         <div className="border-t border-border pt-4">
           <Button size="sm" variant="outline" disabled={assign.isPending} onClick={requestReview}>
             <SendHorizonalIcon />
@@ -614,13 +614,13 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
   )
 }
 
-// Persona addressees David can direct feedback at. Open-but-validated: an
+// Persona addressees the owner can direct feedback at. Open-but-validated: an
 // unknown value renders as-is rather than breaking (the roster grows).
 const COMMENT_ADDRESSEES: { value: string; label: string }[] = [
   { value: "general", label: "Everyone" },
-  { value: "garnet", label: "Garnet" },
-  { value: "fable", label: "Fable" },
-  { value: "codex", label: "codex" },
+  { value: "coordinator", label: "Coordinator" },
+  { value: "strategist", label: "Strategist" },
+  { value: "analysis", label: "Analyst" },
 ]
 
 const COMMENT_KINDS: { value: StoryComment["kind"]; label: string }[] = [
@@ -635,8 +635,8 @@ function addresseeLabel(addressee: string): string {
 
 // In-app feedback ON a story (S1.7): the write-side of the review loop. A comment
 // is domain data persisted on the story's own record (roadmap store), survives
-// across worktrees/agents, and carries an addressee so David can direct a note at
-// one of the coordinating agents from his phone. (@name comms delivery is slice 2.)
+// across worktrees/agents, and carries an addressee so the owner can direct a note at
+// one of the coordinating agents from the review surface. (@name comms delivery is slice 2.)
 function StoryComments({ story }: { story: StoryData }) {
   const comments = useStoryComments(story.id)
   const addComment = useAddComment()
@@ -654,7 +654,7 @@ function StoryComments({ story }: { story: StoryData }) {
       .mutateAsync({
         storyId: story.id,
         kind,
-        author: "David",
+        author: "Owner",
         body: body.trim(),
         addressee: addressee === "general" ? undefined : addressee,
       })

@@ -9,8 +9,6 @@ review UX. It is no longer authoritative.
 
 - Canonical managed records, scope, lifecycle, activation, authorization, and
   receipt semantics: Gonk Core `docs/skills-design.md` and `@gonk/skills`.
-- Cross-repository disposition and shipped anchors:
-  the Gonk Core repository's `docs.local/specs/SIGIL-GONK-CONTRACT-DISPOSITION-20260716.md`.
 - Sigil catalog, detail, review, React Query, and host-adapter guidance:
   the sigil-agent repository's `docs/specs/SKILLS-CONSUMER-PROFILE.md`.
 

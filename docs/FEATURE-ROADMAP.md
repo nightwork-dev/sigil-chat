@@ -28,11 +28,11 @@
     parsing/conversion before a model can read them; today they attach but
     aren't decoded.
 - **Ingress Cores** — the drop/paste/pick/upload/clipboard machinery extracted
-  to reusable headless hooks in Sigil Design (`docs.local/specs/INGRESS-CORES.md`
-  there: `use-file-upload`, `use-clipboard`, `use-attachments`, `lib/delimited`,
-  `lib/dotenv`). Sigil Chat's compose bar consumes them. Done.
+  to reusable headless hooks in Sigil Design: `use-file-upload`,
+  `use-clipboard`, `use-attachments`, `lib/delimited`, and `lib/dotenv`.
+  Sigil Chat's compose bar consumes them. Done.
 
-## Requested — agent operations surface (David, 2026-07-18)
+## Requested — agent operations surface
 
 A management console for the things an agent *is made of*. These are product
 surfaces over existing Gonk/eve substrate, not new engines.
@@ -48,7 +48,7 @@ surfaces over existing Gonk/eve substrate, not new engines.
   client tool-approval preference (`agent-tool-approval.ts`) + the Gonk registry
   (`apps/gonk/src/registry.ts`) and its `ApprovalProvider`.
 
-## Requested — agent memory & workspace (David, 2026-07-18)
+## Requested — agent memory & workspace
 
 - **Memory** — a durable memory surface for the agent (store / recall / edit).
   Substrate candidate: Mirk (KV / collections / vectors). Needs a spec: what is

@@ -80,8 +80,8 @@ const commentKinds: StoryComment["kind"][] = [
   "approval",
 ];
 const reviewGates: ReviewGate[] = [
-  "browser:David",
-  "decision:David",
+  "browser:owner",
+  "decision:owner",
   "peer",
   "none",
 ];
@@ -248,7 +248,7 @@ export function registerStoryTools(
   registry.register({
     name: "sigil-story-assign-review",
     description:
-      "Assign David a pending review for one roadmap story. The new review item starts unread and incomplete until David decides it.",
+      "Assign the installation owner a pending review for one roadmap story. The new review item starts unread and incomplete until the owner decides it.",
     visibility: "always",
     approval: "write",
     input: shape<StoryAssignReviewInput>(
@@ -272,7 +272,7 @@ export function registerStoryTools(
       const result = await workItemsRepository.assignReview(
         input.id,
         {
-          assignee: "David",
+          assignee: "Owner",
           gate: input.gate,
           title: input.title,
           summary: input.summary,
@@ -291,7 +291,7 @@ export function registerStoryTools(
   registry.register({
     name: "sigil-story-comment",
     description:
-      "Add a comment to one roadmap story's thread — respond to David's in-app feedback, ask a question, or flag a concern. Inspect the story first to read existing feedback (and use its revision). Set `addressee` to direct the note at a teammate (garnet / fable / codex) or omit it for a general comment.",
+      "Add a comment to one roadmap story's thread — respond to the owner's in-app feedback, ask a question, or flag a concern. Inspect the story first to read existing feedback (and use its revision). Set `addressee` to direct the note at a teammate (coordinator / strategist / analysis) or omit it for a general comment.",
     visibility: "always",
     approval: "write",
     input: shape<StoryCommentInput>(

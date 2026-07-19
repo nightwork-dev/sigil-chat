@@ -227,10 +227,10 @@ export const INBOX_ITEMS: InboxItem[] = [
   },
   {
     id: "5",
-    sender: "david",
+    sender: "reviewer",
     subject: "Comment on PR #218",
     preview: "\"ship it once tests pass\"",
-    body: "David commented on pull request #218: \"Looks good — ship it once tests pass. Let's hold the migration until the backfill job drains.\"",
+    body: "A reviewer commented on pull request #218: \"Looks good — ship it once tests pass. Let's hold the migration until the backfill job drains.\"",
     tag: "review",
     time: "Fri",
     unread: false,

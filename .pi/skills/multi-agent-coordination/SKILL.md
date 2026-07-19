@@ -12,27 +12,24 @@ work.
 
 ## RULE 0: Stay in your lane
 
-- [ ] **Fable** — strategic coordination only. Ecosystem-wide (gonk + eve +
-      sigil + deadletters): product direction, self-containment, safe
+- [ ] **Strategist** — strategic coordination only. Ecosystem-wide product
+      direction, self-containment, safe
       deployability. Does NOT implement here.
-- [ ] **Garnet (tactical agent, Claude Code harness)** — tactical coordination +
+- [ ] **Coordinator (tactical agent, Claude Code harness)** — tactical coordination +
       implementation inside the sigil ecosystem (sigil-chat + sigil-design).
       Turns strategy into shipped, verified code; orchestrates `pi`/Claude
       workers; owns the commit + integration flow on `dev`.
-- [ ] **Codex** — ecosystem analysis & interplay (layers, auth/accounts, path
-      to safe deployable product). Being partly handed to Fable.
-- [ ] Handoff shape is fixed: **Fable sets direction → tactical agent
-      implements + verifies → codex/Fable analysis informs both.** Do not
+- [ ] **Analysis agent** — ecosystem analysis & interplay (layers,
+      auth/accounts, path to safe deployable product).
+- [ ] Handoff shape is fixed: **the strategist sets direction → tactical agent
+      implements + verifies → analysis informs both.** Do not
       reach into another agent's lane without coordinating through the
       roadmap first.
 
-## RULE 0: Re-read the live direction doc after EVERY completed task
+## RULE 0: Re-read live direction after EVERY completed task
 
-- [ ] The strategy is LIVE at
-      `/Users/dr/Dev/platform/ecosystem/specs/fable-direction-20260718.md`.
-      After completing each task: check its mtime; if changed since your
-      last read, re-read it BEFORE starting the next task. Never start a
-      task on stale direction.
+- [ ] After completing each task, re-read the current roadmap and repository
+      instructions before starting the next task. Never start on stale direction.
 - [ ] Every dispatch brief for a multi-task worker MUST include this rule.
 
 ## RULE 1: The shared roadmap is the ONLY coordination surface

@@ -13,7 +13,7 @@ project's domain model in with it.
 ## Stock shadcn primitives stay stock
 
 Shadcn-installed components (`Button`, `Badge`, `Dialog`, `Popover`, …)
-stay as close to upstream as possible (David, 2026-07-03). Don't rebase
+stay as close to upstream as possible. Don't rebase
 their variant vocabularies onto `lib/tone`, rename their variants, or
 dedupe their class strings into shared layers — upstream updates must stay
 a cheap `shadcn add --diff`, and LLM-generated code targeting standard
@@ -24,7 +24,7 @@ components.
 ## Responsive by default
 
 Every component and every demo must work at narrow widths without being
-asked (David, 2026-07-03). Concretely:
+asked. Concretely:
 
 - No horizontal overflow at 320px — wide content (tables, code, canvases)
   scrolls inside its own `overflow-x-auto` container, never the page.
@@ -41,7 +41,7 @@ asked (David, 2026-07-03). Concretely:
 ## Touch & pointer correctness
 
 Every drag surface — anything whose `onPointerDown` adjusts a value or
-position — MUST (David, 2026-07-03, after live mobile testing):
+position — MUST:
 
 - Set `touch-action: none` on the surface (`touch-action: pan-y`/`pan-x`
   only when one page-scroll axis should deliberately pass through).
