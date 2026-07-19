@@ -55,7 +55,7 @@ export function createSigilRegistry(
   registerStoryTools(registry, workItems);
   registerSkillTools(registry, skills);
   registerUiCommandTools(registry);
-  registerImageTools(registry);
+  registerImageTools(registry, artifacts);
   registerFileTools(registry, artifacts);
   registerEvidenceTools(registry, artifacts);
   registerDistillTools(registry, artifacts);

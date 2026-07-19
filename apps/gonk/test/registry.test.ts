@@ -6,13 +6,19 @@ import {
   FilesystemManagedSkillRegistry,
   type WritableManagedSkillRegistry,
 } from "@gonk/skills";
-import { collectToolOutcome, makeBaseContext } from "@gonk/tool-registry";
+import {
+  collectToolOutcome,
+  makeBaseContext,
+  ToolRegistry,
+} from "@gonk/tool-registry";
 import { FileObjectStore } from "@mirk/artifact/fs";
 import { FileGraphRepository } from "@workspace/graph-store/repository";
 import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionArtifactStore } from "../src/artifact-store.js";
+import { sigilApprovalProvider } from "../src/registry/approval.js";
+import { registerImageTools } from "../src/registry/image.js";
 import {
   createReviewDemoRepository,
   createSigilRegistry,
@@ -274,6 +280,114 @@ describe("Sigil Chat Gonk registry", () => {
       code: "INTERNAL",
       message: `Unknown file id for requested scope: ${stored.id}`,
     });
+  });
+
+  it("edits a scoped source image into a new artifact with provenance", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const source = await artifacts.putFile({
+      bytes: new Uint8Array([1, 2, 3]),
+      filename: "portrait.png",
+      mediaType: "image/png",
+      scope: "thread-image",
+    });
+    const editImage = vi.fn(async () => ({
+      bytes: new Uint8Array([4, 5, 6]),
+      mediaType: "image/png",
+      backend: "comfyui:phantom",
+      revisedPrompt: "Make the coat crimson",
+    }));
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(registry, artifacts, editImage);
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        {
+          sourceArtifactId: source.id,
+          instruction: "Make the coat crimson",
+          width: 512,
+          height: 512,
+        },
+        makeBaseContext({ host: { sessionScope: "thread-image" } }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        artifactId: expect.stringMatching(/^uploads\//),
+        url: expect.stringMatching(/^\/img\/uploads\//),
+        backend: "comfyui:phantom",
+        sourceArtifactId: source.id,
+        instruction: "Make the coat crimson",
+      },
+    });
+    expect(editImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceBytes: new Uint8Array([1, 2, 3]),
+        sourceMediaType: "image/png",
+        instruction: "Make the coat crimson",
+        width: 512,
+        height: 512,
+      }),
+    );
+    const files = await artifacts.listBySession("thread-image");
+    expect(files).toHaveLength(2);
+    expect(files[1]).toMatchObject({
+      filename: "portrait-edited.png",
+      provenance: {
+        kind: "image-edit",
+        sourceArtifactId: source.id,
+        instruction: "Make the coat crimson",
+        backend: "comfyui:phantom",
+      },
+    });
+  });
+
+  it("persists an inline edit source and fails loudly without a backend", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-fail-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(registry, artifacts, async () => {
+      throw new Error(
+        "Image edit backend is unavailable. No text-to-image fallback was attempted.",
+      );
+    });
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        {
+          inlineImage: {
+            base64: Buffer.from([1, 2, 3]).toString("base64"),
+            mediaType: "image/png",
+            filename: "inline.png",
+          },
+          instruction: "Add a gold halo",
+        },
+        makeBaseContext({ host: { sessionScope: "thread-inline" } }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: expect.stringContaining("No text-to-image fallback was attempted"),
+    });
+    const files = await artifacts.listBySession("thread-inline");
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({ filename: "inline.png" });
   });
 
   it("retrieves exact cited passages from session artifacts and fails closed without evidence", async () => {

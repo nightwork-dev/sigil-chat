@@ -623,6 +623,31 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-edit-image",
+    description:
+      "Edit an existing session image from a source artifact or inline image using a real instruction-edit backend. Returns a new session artifact and same-origin /img URL with derivation provenance. Fails loudly if the edit backend is unavailable; it never substitutes text-to-image generation.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["instruction"],
+      properties: [
+        "instruction",
+        "sourceArtifactId",
+        "inlineImage",
+        "width",
+        "height",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-list-session-files",
     description:
       "List files attached to the request's session, project, or persona resource scope. Omit scope to use the request's session scope.",

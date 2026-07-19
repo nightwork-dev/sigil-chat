@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "demo:evidence": "tsx scripts/evidence-demo.ts",
+    "demo:image-edit": "tsx scripts/image-edit-demo.ts",
     "dev": "portless sigil-chat-gonk tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "test": "vitest run",

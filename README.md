@@ -73,6 +73,13 @@ login/setup surface lands, local development can explicitly set
 `SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH=1`; production rejects that bypass. See
 [`.env.example`](.env.example) for the complete auth environment surface.
 
+Image instruction-editing uses the local image gateway's OpenAI-compatible
+`/v1/images/edits` endpoint. It defaults to `http://localhost:4000`; override
+that with `SIGIL_IMAGE_EDIT_GATEWAY_URL` and, when the gateway requires a
+bearer, set `SIGIL_IMAGE_EDIT_GATEWAY_KEY`. The edit tool fails explicitly
+when that backend is unavailable or rejects the request. It never falls back
+to text-to-image generation.
+
 ## Add a tool
 
 New tools live in one place, [`apps/gonk/src/registry.ts`](apps/gonk/src/registry.ts).

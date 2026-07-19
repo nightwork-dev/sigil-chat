@@ -80,6 +80,14 @@ export interface SessionArtifactMetadata {
   readonly size: number
   readonly createdAt: string
   readonly scope: ResourceScope
+  readonly provenance?: ArtifactProvenance
+}
+
+export interface ArtifactProvenance {
+  readonly kind: "image-edit"
+  readonly sourceArtifactId: string
+  readonly instruction: string
+  readonly backend: string
 }
 
 export interface SessionArtifactContent {
@@ -93,6 +101,7 @@ export interface PutSessionArtifactInput {
   readonly mediaType: string
   /** Accepts the old bare session id as well as a tiered scope. */
   readonly scope: ScopeInput
+  readonly provenance?: ArtifactProvenance
 }
 
 export type ScopePrincipal = AuthenticatedPrincipal | undefined
@@ -171,6 +180,7 @@ export class SessionArtifactStore {
         size: input.bytes.byteLength,
         createdAt: new Date().toISOString(),
         scope,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
       }
       const artifacts = await this.listByScope(scope, principal)
       await this.writeManifest(scope, [...artifacts, artifact])
@@ -332,7 +342,25 @@ function isStoredArtifactMetadata(
     typeof record.mediaType === "string" &&
     typeof record.size === "number" &&
     typeof record.createdAt === "string" &&
+    (record.provenance === undefined ||
+      isArtifactProvenance(record.provenance)) &&
     normalizeScope(record.scope as ScopeInput | undefined) !== undefined
+  )
+}
+
+function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const record = value as Record<string, unknown>
+  return (
+    record.kind === "image-edit" &&
+    typeof record.sourceArtifactId === "string" &&
+    record.sourceArtifactId.length > 0 &&
+    typeof record.instruction === "string" &&
+    record.instruction.length > 0 &&
+    typeof record.backend === "string" &&
+    record.backend.length > 0
   )
 }
 
