@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -44,12 +45,14 @@ export function AccountMenu({ user }: { user: CurrentSessionUser }) {
             <span className="truncate">{label}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="top">
-            <DropdownMenuLabel className="flex flex-col gap-0.5">
-              <span className="font-medium">{label}</span>
-              <span className="font-normal text-muted-foreground">
-                {user.role === "owner" ? "Owner" : "Member"}
-              </span>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span className="font-medium">{label}</span>
+                <span className="font-normal text-muted-foreground">
+                  {user.role === "owner" ? "Owner" : "Member"}
+                </span>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="max-sm:min-h-11"
