@@ -16,16 +16,41 @@ interface CalibrationAxisModel {
   lambda: number
 }
 
+export interface FeatureEvidence {
+  featureIndex: number
+  betweenRange: number
+  withinSpread: number
+  discrimination: number
+}
+
+export interface AxisCalibrationDiagnostics {
+  selectedFeatureIndices: number[]
+  evidence: FeatureEvidence[]
+  biasPixels: number
+  gain: number
+  rmsePixels: number
+  lowEvidence: boolean
+}
+
+export interface CalibrationDiagnostics {
+  x: AxisCalibrationDiagnostics
+  y: AxisCalibrationDiagnostics
+}
+
 export interface GazeCalibration {
   featureCount: number
   xModel: CalibrationAxisModel
   yModel: CalibrationAxisModel
+  diagnostics: CalibrationDiagnostics
 }
 
 export interface GazeCalibrationOptions {
   xFeatureIndices?: number[]
   yFeatureIndices?: number[]
   lambdaCandidates?: number[]
+  adaptiveFeatureSelection?: boolean
+  xPrimaryFeatureIndices?: number[]
+  yPrimaryFeatureIndices?: number[]
 }
 
 export interface CalibrationTargetSummary {
@@ -101,11 +126,12 @@ function fitAxis(
   featureIndices: number[],
   lambda: number,
 ): CalibrationAxisModel {
-  const means = featureIndices.map((featureIndex) =>
-    samples.reduce(
-      (sum, sample) => sum + (sample.features[featureIndex] ?? 0),
-      0,
-    ) / samples.length,
+  const means = featureIndices.map(
+    (featureIndex) =>
+      samples.reduce(
+        (sum, sample) => sum + (sample.features[featureIndex] ?? 0),
+        0,
+      ) / samples.length,
   )
   const scales = featureIndices.map((featureIndex, index) => {
     const mean = means[index] ?? 0
@@ -188,7 +214,11 @@ function selectLambda(
   let bestError = Number.POSITIVE_INFINITY
   for (const lambda of candidates) {
     let squaredError = 0
-    for (let heldOutIndex = 0; heldOutIndex < samples.length; heldOutIndex += 1) {
+    for (
+      let heldOutIndex = 0;
+      heldOutIndex < samples.length;
+      heldOutIndex += 1
+    ) {
       const training = samples.filter((_, index) => index !== heldOutIndex)
       const heldOut = samples[heldOutIndex]
       if (!heldOut) continue
@@ -202,6 +232,165 @@ function selectLambda(
     }
   }
   return bestLambda
+}
+
+function axisPredictions(
+  samples: CalibrationSample[],
+  axis: keyof ScreenPoint,
+  featureIndices: number[],
+  lambda: number,
+) {
+  return samples.map((heldOut, heldOutIndex) => {
+    const training = samples.filter((_, index) => index !== heldOutIndex)
+    const model = fitAxis(training, axis, featureIndices, lambda)
+    return predictAxis(model, heldOut.features)
+  })
+}
+
+function axisRmse(
+  samples: CalibrationSample[],
+  predictions: number[],
+  axis: keyof ScreenPoint,
+) {
+  return Math.sqrt(
+    samples.reduce((sum, sample, index) => {
+      const error = (predictions[index] ?? 0) - sample.target[axis]
+      return sum + error * error
+    }, 0) / samples.length,
+  )
+}
+
+function combinations(values: number[], maximumSize: number) {
+  const result: number[][] = []
+  const visit = (start: number, current: number[]) => {
+    if (current.length > 0) result.push([...current])
+    if (current.length >= maximumSize) return
+    for (let index = start; index < values.length; index += 1) {
+      current.push(values[index]!)
+      visit(index + 1, current)
+      current.pop()
+    }
+  }
+  visit(0, [])
+  return result
+}
+
+function featureEvidence(
+  samples: CalibrationSample[],
+  axis: keyof ScreenPoint,
+  featureIndices: number[],
+) {
+  const coordinateGroups = new Map<number, CalibrationSample[]>()
+  for (const sample of samples) {
+    const coordinate = sample.target[axis]
+    coordinateGroups.set(coordinate, [
+      ...(coordinateGroups.get(coordinate) ?? []),
+      sample,
+    ])
+  }
+
+  return featureIndices.map((featureIndex) => {
+    const groupCenters: number[] = []
+    const groupSpreads: number[] = []
+    for (const group of coordinateGroups.values()) {
+      const values = group.map((sample) => sample.features[featureIndex] ?? 0)
+      const center = median(values)
+      groupCenters.push(center)
+      groupSpreads.push(median(values.map((value) => Math.abs(value - center))))
+    }
+    const betweenRange = range(groupCenters)
+    const withinSpread = median(groupSpreads)
+    return {
+      featureIndex,
+      betweenRange,
+      withinSpread,
+      discrimination: betweenRange / Math.max(withinSpread * 2, 1e-6),
+    }
+  })
+}
+
+function range(values: number[]) {
+  return values.length ? Math.max(...values) - Math.min(...values) : 0
+}
+
+function chooseFeatures(
+  samples: CalibrationSample[],
+  axis: keyof ScreenPoint,
+  candidates: number[],
+  primary: number[],
+  lambdas: number[],
+) {
+  const evidence = featureEvidence(samples, axis, candidates)
+  const viable = new Set(
+    evidence
+      .filter((item) => item.discrimination >= 1.5)
+      .map((item) => item.featureIndex),
+  )
+  const eligible = candidates.filter(
+    (index) => viable.has(index) || primary.includes(index),
+  )
+  const subsets = combinations(eligible, Math.min(3, eligible.length)).filter(
+    (subset) => subset.some((index) => primary.includes(index)),
+  )
+  const fallback = primary.filter((index) => candidates.includes(index))
+  let bestFeatures = subsets[0] ?? fallback
+  let bestLambda = lambdas[0] ?? 1e-3
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const subset of subsets) {
+    if (samples.length <= subset.length + 1) continue
+    const lambda = selectLambda(samples, axis, subset, lambdas)
+    const predictions = axisPredictions(samples, axis, subset, lambda)
+    const rmse = axisRmse(samples, predictions, axis)
+    const score = rmse * (1 + 0.025 * Math.max(0, subset.length - 1))
+    if (score < bestScore) {
+      bestScore = score
+      bestFeatures = subset
+      bestLambda = lambda
+    }
+  }
+  return {
+    featureIndices: bestFeatures.length ? bestFeatures : candidates,
+    lambda: bestLambda,
+    evidence,
+    lowEvidence: !evidence.some(
+      (item) =>
+        primary.includes(item.featureIndex) && item.discrimination >= 1.5,
+    ),
+  }
+}
+
+function axisDiagnostics(
+  samples: CalibrationSample[],
+  axis: keyof ScreenPoint,
+  featureIndices: number[],
+  lambda: number,
+  evidence: FeatureEvidence[],
+  lowEvidence: boolean,
+): AxisCalibrationDiagnostics {
+  const predictions = axisPredictions(samples, axis, featureIndices, lambda)
+  const targets = samples.map((sample) => sample.target[axis])
+  const targetMean =
+    targets.reduce((sum, value) => sum + value, 0) / targets.length
+  const predictionMean =
+    predictions.reduce((sum, value) => sum + value, 0) / predictions.length
+  const covariance = targets.reduce(
+    (sum, target, index) =>
+      sum +
+      (target - targetMean) * ((predictions[index] ?? 0) - predictionMean),
+    0,
+  )
+  const targetVariance = targets.reduce(
+    (sum, target) => sum + (target - targetMean) ** 2,
+    0,
+  )
+  return {
+    selectedFeatureIndices: [...featureIndices],
+    evidence,
+    biasPixels: predictionMean - targetMean,
+    gain: targetVariance > 1e-8 ? covariance / targetVariance : 1,
+    rmsePixels: axisRmse(samples, predictions, axis),
+    lowEvidence,
+  }
 }
 
 function resolveOptions(
@@ -219,10 +408,12 @@ function resolveOptions(
   return {
     xFeatureIndices: optionsOrLambda.xFeatureIndices ?? allFeatures,
     yFeatureIndices: optionsOrLambda.yFeatureIndices ?? allFeatures,
-    lambdaCandidates:
-      optionsOrLambda.lambdaCandidates?.length
-        ? optionsOrLambda.lambdaCandidates
-        : DEFAULT_LAMBDAS,
+    lambdaCandidates: optionsOrLambda.lambdaCandidates?.length
+      ? optionsOrLambda.lambdaCandidates
+      : DEFAULT_LAMBDAS,
+    adaptiveFeatureSelection: optionsOrLambda.adaptiveFeatureSelection ?? false,
+    xPrimaryFeatureIndices: optionsOrLambda.xPrimaryFeatureIndices,
+    yPrimaryFeatureIndices: optionsOrLambda.yPrimaryFeatureIndices,
   }
 }
 
@@ -273,7 +464,8 @@ export function summarizeCalibrationTarget(
         ROBUST_Z_LIMIT,
     ),
   )
-  const retained = inliers.length >= Math.ceil(samples.length / 2) ? inliers : samples
+  const retained =
+    inliers.length >= Math.ceil(samples.length / 2) ? inliers : samples
 
   return {
     sample: {
@@ -299,7 +491,10 @@ export function fitGazeCalibration(
 
   const options = resolveOptions(featureCount, optionsOrLambda)
   const requiredSamples =
-    Math.max(options.xFeatureIndices.length, options.yFeatureIndices.length) + 1
+    Math.max(
+      options.adaptiveFeatureSelection ? 3 : options.xFeatureIndices.length,
+      options.adaptiveFeatureSelection ? 3 : options.yFeatureIndices.length,
+    ) + 1
   if (samples.length < requiredSamples) {
     throw new Error("Calibration needs more samples than fitted features.")
   }
@@ -307,25 +502,70 @@ export function fitGazeCalibration(
     ...options.xFeatureIndices,
     ...options.yFeatureIndices,
   ].some((index) => index < 0 || index >= featureCount)
-  if (invalidIndex) throw new Error("Calibration feature index is out of range.")
+  if (invalidIndex)
+    throw new Error("Calibration feature index is out of range.")
 
-  const xLambda = selectLambda(
-    samples,
-    "x",
-    options.xFeatureIndices,
-    options.lambdaCandidates,
-  )
-  const yLambda = selectLambda(
-    samples,
-    "y",
-    options.yFeatureIndices,
-    options.lambdaCandidates,
-  )
+  const xChoice = options.adaptiveFeatureSelection
+    ? chooseFeatures(
+        samples,
+        "x",
+        options.xFeatureIndices,
+        options.xPrimaryFeatureIndices ?? options.xFeatureIndices.slice(0, 1),
+        options.lambdaCandidates,
+      )
+    : {
+        featureIndices: options.xFeatureIndices,
+        lambda: selectLambda(
+          samples,
+          "x",
+          options.xFeatureIndices,
+          options.lambdaCandidates,
+        ),
+        evidence: featureEvidence(samples, "x", options.xFeatureIndices),
+        lowEvidence: false,
+      }
+  const yChoice = options.adaptiveFeatureSelection
+    ? chooseFeatures(
+        samples,
+        "y",
+        options.yFeatureIndices,
+        options.yPrimaryFeatureIndices ?? options.yFeatureIndices.slice(0, 1),
+        options.lambdaCandidates,
+      )
+    : {
+        featureIndices: options.yFeatureIndices,
+        lambda: selectLambda(
+          samples,
+          "y",
+          options.yFeatureIndices,
+          options.lambdaCandidates,
+        ),
+        evidence: featureEvidence(samples, "y", options.yFeatureIndices),
+        lowEvidence: false,
+      }
 
   return {
     featureCount,
-    xModel: fitAxis(samples, "x", options.xFeatureIndices, xLambda),
-    yModel: fitAxis(samples, "y", options.yFeatureIndices, yLambda),
+    xModel: fitAxis(samples, "x", xChoice.featureIndices, xChoice.lambda),
+    yModel: fitAxis(samples, "y", yChoice.featureIndices, yChoice.lambda),
+    diagnostics: {
+      x: axisDiagnostics(
+        samples,
+        "x",
+        xChoice.featureIndices,
+        xChoice.lambda,
+        xChoice.evidence,
+        xChoice.lowEvidence,
+      ),
+      y: axisDiagnostics(
+        samples,
+        "y",
+        yChoice.featureIndices,
+        yChoice.lambda,
+        yChoice.evidence,
+        yChoice.lowEvidence,
+      ),
+    },
   }
 }
 
