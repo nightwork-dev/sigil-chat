@@ -1,7 +1,9 @@
 # Authentication and user settings
 
 > Date: 2026-07-18
-> Status: ratified architecture contract; implementation pending
+> Status: ratified architecture contract; slice 1 and most of slice 3 are
+> implemented; slices 2 and 4 remain incomplete. Invitations are absent and
+> Gonk human-principal propagation remains open.
 > Owner: Sigil Chat application composition
 > Related: `AGENT-SESSION-RETENTION-ISSUE.md`, `AGENT-CONTEXT-AWARENESS-SPEC.md`, `GONK-MCP-AUTH-INTEGRATION-SPEC.md`
 

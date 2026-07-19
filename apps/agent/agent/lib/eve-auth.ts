@@ -16,6 +16,7 @@ import {
   type EveChannel,
   type EveChannelInput,
   type EveMessageContext,
+  type EveMessageResult,
 } from "eve/channels/eve"
 
 import type { EveSessionOwnerStore } from "./eve-session-owners"
@@ -129,6 +130,7 @@ export function createOwnedEveChannel(
 ): EveChannel {
   const { auth, ownerStore, ...channelOptions } = options
   const callers = new WeakMap<Request, SessionAuthContext>()
+  const onMessage = channelOptions.onMessage
   const channel = eveChannel({
     ...channelOptions,
     auth: async (request) => {
@@ -149,6 +151,14 @@ export function createOwnedEveChannel(
       }
       return caller
     },
+    onMessage:
+      onMessage === undefined
+        ? undefined
+        : async (context, message) =>
+            preserveTurnResourceScope(
+              context.eve.caller,
+              await onMessage(context, message),
+            ),
   })
 
   return {
@@ -157,6 +167,42 @@ export function createOwnedEveChannel(
       if (route.transport === "websocket") return route
       return wrapHttpRoute(route, callers, ownerStore)
     }),
+  }
+}
+
+/**
+ * The caller returned by route auth is the only authoritative source for the
+ * resource scope of this HTTP turn. Preserve it when an onMessage hook
+ * constructs a narrower runtime-auth projection for the same principal.
+ */
+function preserveTurnResourceScope(
+  caller: SessionAuthContext | null,
+  result: EveMessageResult,
+): EveMessageResult {
+  if (caller === null || result === null || result.auth === null) return result
+  if (
+    result.auth.principalId !== caller.principalId ||
+    result.auth.principalType !== caller.principalType
+  ) {
+    return result
+  }
+
+  const resourceScope = caller.attributes.sigilResourceScope
+  const sessionScope = caller.attributes.sigilSessionScope
+  if (typeof resourceScope !== "string" && typeof sessionScope !== "string") {
+    return result
+  }
+
+  return {
+    ...result,
+    auth: {
+      ...result.auth,
+      attributes: {
+        ...result.auth.attributes,
+        ...(typeof resourceScope === "string" ? { sigilResourceScope: resourceScope } : {}),
+        ...(typeof sessionScope === "string" ? { sigilSessionScope: sessionScope } : {}),
+      },
+    },
   }
 }
 

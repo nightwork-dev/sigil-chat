@@ -222,6 +222,66 @@ describe("owned Eve channel", () => {
     expect(response.status).toBe(403)
     expect(send).not.toHaveBeenCalled()
   })
+
+  it("preserves the current request scope into runtime auth after onMessage", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    const channel = createOwnedEveChannel({
+      auth: (request) => {
+        const subject = request.headers.get("x-test-subject")
+        if (!subject) return null
+        return {
+          attributes: {
+            sigilResourceScope: request.headers.get("x-sigil-scope") ?? "",
+          },
+          authenticator: "test",
+          issuer: "test",
+          principalId: subject,
+          principalType: "user",
+          subject,
+        }
+      },
+      onMessage: (context) => {
+        const caller = context.eve.caller
+        if (!caller) return null
+        return {
+          // A context compiler may return a narrowed projection. The channel
+          // must still carry the authoritative request scope into this turn.
+          auth: { ...caller, attributes: {} },
+        }
+      },
+      ownerStore,
+    })
+    const route = findRoute(channel, "POST", "/eve/v1/session")
+    const send = vi.fn(async () => ({
+      continuationToken: "eve:continuation-1",
+      id: "session-1",
+    }))
+
+    const response = await route.handler(
+      new Request("http://localhost/eve/v1/session", {
+        body: JSON.stringify({ message: "Hello" }),
+        headers: {
+          "content-type": "application/json",
+          "x-sigil-scope": "project:evidence-room",
+          "x-test-subject": "user-1",
+        },
+        method: "POST",
+      }),
+      routeArgs({ send }),
+    )
+
+    expect(response.status).toBe(202)
+    expect(send).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          attributes: expect.objectContaining({
+            sigilResourceScope: "project:evidence-room",
+          }),
+        }),
+      }),
+    )
+  })
 })
 
 async function signToken(
