@@ -3,17 +3,15 @@
 // One HUD, mounted once in the _app shell (below the auth boundary, inside the
 // app-global agent session and the shell WorkspaceAttentionProvider), so the
 // agent is reachable from EVERY workspace and always carries the current room's
-// attention. This replaces the per-workspace HUD mount that used to live only
-// in Studio. The conversation is the same session/thread as /chat — the panel's
+// attention. The conversation is the same session/thread as /chat — the panel's
 // AgentChat reads the app-global session from context, so it's one thread in
 // every room, and the Expand affordance jumps to /chat on that same thread.
 //
-// This increment lands the floating-panel tier. The full presentation
-// continuum (omnibar → floating → docked → half-screen → /chat) and per-user
-// geometry persistence build on this mount in the following S1.9 increments.
+// The compact HUD is a clean conversation surface: the heavy context inspector
+// and per-turn status live on the roomy /chat view, not this small panel.
 
 import { useState } from "react"
-import { Link } from "@tanstack/react-router"
+import { Link, useRouterState } from "@tanstack/react-router"
 
 import { AgentHud } from "@/components/agent/agent-hud"
 import {
@@ -24,6 +22,11 @@ import {
 export function ShellAgentHud() {
   const [open, setOpen] = useState(false)
   const approvalMode = useToolApprovalMode()
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+
+  // Redundant on /chat — that route IS the full agent conversation, so the
+  // floating "Ask your agent" affordance has nothing to add there.
+  if (pathname === "/chat") return null
 
   return (
     <AgentHud.Root
@@ -37,6 +40,10 @@ export function ShellAgentHud() {
         chatProps={{
           approvalMode,
           onApprovalModeChange: setToolApprovalMode,
+          // Keep the compact panel clean — the context inspector belongs on
+          // the full /chat view where there's room (and out of the narrow
+          // toolbar, where it collided with the session switcher).
+          showContextPrivacy: false,
           placeholder: "Ask the agent, or tell it to use a Gonk tool…",
         }}
       />

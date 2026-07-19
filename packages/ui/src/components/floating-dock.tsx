@@ -311,16 +311,20 @@ function Panel({
       )}
     >
       <header className="flex min-w-0 items-center justify-between gap-2 border-b border-border px-3">
-        <div className="min-w-0">
-          <p id={panelLabelId} className="truncate text-xs font-medium">
-            {heading}
-          </p>
-          {description ? (
-            <p className="truncate text-[10px] text-muted-foreground max-sm:hidden">
-              {description}
-            </p>
-          ) : null}
-        </div>
+        {heading || description ? (
+          <div className="min-w-0">
+            {heading ? (
+              <p id={panelLabelId} className="truncate text-xs font-medium">
+                {heading}
+              </p>
+            ) : null}
+            {description ? (
+              <p className="truncate text-[10px] text-muted-foreground max-sm:hidden">
+                {description}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex shrink-0 items-center gap-1">
           {actions}
           {expanded ? null : (

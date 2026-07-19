@@ -41,7 +41,6 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import {
   getAgentHudApprovalActions,
-  getAgentHudPanelDescription,
   getAgentHudStatusLabel,
   getAgentHudTriggerLabel,
   getAgentHudTriggerState,
@@ -100,7 +99,6 @@ function Panel({
   ...props
 }: AgentHudPanelProps) {
   const session = useAgentRuntimeSession();
-  const attention = useAttention();
   const panelActions = (
     <>
       <AgentStatus status={session.status} />
@@ -112,8 +110,8 @@ function Panel({
   return (
     <FloatingDock.Panel
       actions={panelActions}
-      description={getAgentHudPanelDescription(attention)}
-      heading="Agent HUD"
+      aria-label="Agent"
+      heading=""
       {...props}
     >
       {children ?? (
