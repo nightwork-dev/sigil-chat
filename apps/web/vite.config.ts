@@ -8,15 +8,12 @@ import tailwindcss from "@tailwindcss/vite"
 import { nitro } from "nitro/vite"
 import { readRuntimeTopology } from "@workspace/runtime-env/topology"
 
-// Local dev: load the repo-root .env so this process has GONK_MCP_KEY, matching
-// apps/gonk and apps/agent. The attachment-upload server function runs in this
-// vite/Nitro process and proxies to Gonk's authenticated /upload route, so it
-// needs the key server-side. Single source of truth is the root .env (see the
-// GONK_MCP_KEY note in CLAUDE.md); an explicit export still wins.
-if (process.env.GONK_MCP_KEY === undefined) {
-  const rootEnv = resolve(import.meta.dirname, "../../.env")
-  if (existsSync(rootEnv)) process.loadEnvFile(rootEnv)
-}
+// Load the repo-root .env for all server-only configuration, including Gonk
+// transport auth and Better Auth. process.loadEnvFile preserves explicitly
+// exported values, so the root file remains the local default rather than an
+// override.
+const rootEnv = resolve(import.meta.dirname, "../../.env")
+if (existsSync(rootEnv)) process.loadEnvFile(rootEnv)
 
 const { eveOrigin, gonkMcpUrl } = readRuntimeTopology(process.env)
 // Gonk's browser-facing origin (strip the /mcp path). The web app proxies
@@ -38,6 +35,7 @@ const config = defineConfig({
   },
   plugins: [
     nitro({
+      plugins: [resolve(import.meta.dirname, "server/plugins/auth.ts")],
       routeRules: {
         "/eve/**": {
           proxy: `${eveOrigin}/eve/**`,

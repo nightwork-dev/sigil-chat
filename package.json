@@ -4,6 +4,8 @@
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
+    "auth:generate": "pnpm --filter web auth:generate",
+    "auth:migrate": "pnpm --filter web auth:migrate",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",

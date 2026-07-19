@@ -18,11 +18,14 @@
     "@gonk/auth": "0.3.1",
     "@gonk/context": "0.3.1",
     "@gonk/retrieval": "0.3.1",
+    "@gonk/scope": "0.3.1",
     "@gonk/skills": "0.3.1",
+    "@gonk/store": "0.3.1",
     "@workspace/blackboard-store": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
     "ai": "^7.0.26",
     "eve": "0.24.4",
+    "jose": "^6.1.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
