@@ -60,6 +60,45 @@ describe("Sigil Eve context integration", () => {
     expect(JSON.stringify(payload)).not.toContain("AUTHORIZED_EDITORIAL_CONTEXT")
   })
 
+  it("injects the session blackboard into every turn (S3.2)", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: { sigilResourceScope: "session:sess-1" },
+      },
+      compiler: compilerWith([]),
+      readBlackboard: async (sessionId) =>
+        sessionId === "sess-1"
+          ? "TODO: ship the thing — BLACKBOARD_MARKER"
+          : "",
+    })
+    const send = vi.fn(async () => session())
+
+    const response = await postSession(channel, send, { message: "hi" })
+
+    expect(response.status).toBe(202)
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).toContain("Shared blackboard")
+    expect(JSON.stringify(payload)).toContain("BLACKBOARD_MARKER")
+  })
+
+  it("does not inject a blackboard for non-session scopes", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: { sigilResourceScope: "project:proj-1" },
+      },
+      compiler: compilerWith([]),
+      readBlackboard: async () => "SHOULD_NOT_APPEAR",
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "hi" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).not.toContain("SHOULD_NOT_APPEAR")
+  })
+
   it("does not leak denied context", async () => {
     const channel = testChannel({
       auth: {
@@ -281,12 +320,14 @@ function testChannel(options: {
   auth?: typeof SESSION_AUTH
   compiler: ContextCompiler
   pinnedResourceKeys?: readonly string[]
+  readBlackboard?: (sessionId: string) => Promise<string>
 }) {
   return eveChannel({
     auth: [() => options.auth ?? SESSION_AUTH],
     onMessage: createSigilEveOnMessage({
       compiler: options.compiler,
       pinnedResourceKeys: options.pinnedResourceKeys,
+      readBlackboard: options.readBlackboard,
     }),
   })
 }

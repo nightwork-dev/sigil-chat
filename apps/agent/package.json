@@ -19,6 +19,7 @@
     "@gonk/context": "0.3.1",
     "@gonk/retrieval": "0.3.1",
     "@gonk/skills": "0.3.1",
+    "@workspace/blackboard-store": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
     "ai": "^7.0.26",
     "eve": "0.24.4",

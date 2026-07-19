@@ -1,5 +1,6 @@
 import { localDev } from "eve/channels/auth"
 import { eveChannel } from "eve/channels/eve"
+import { blackboardRepository } from "@workspace/blackboard-store"
 import {
   createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
@@ -12,6 +13,9 @@ const contextCompiler = createDefaultSigilContextCompiler({ requiredSkillIds })
 const onMessage = createSigilEveOnMessage({
   compiler: contextCompiler,
   pinnedResourceKeys,
+  // S3.2: the session's shared blackboard rides every turn.
+  readBlackboard: async (sessionId) =>
+    (await blackboardRepository.read(sessionId)).content,
 })
 
 export default eveChannel({

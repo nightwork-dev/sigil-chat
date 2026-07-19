@@ -43,6 +43,14 @@ export interface SigilContextOptions {
   model?: string
   requestedContributorIds?: readonly string[]
   pinnedResourceKeys?: readonly string[]
+  /**
+   * Reads the session's shared blackboard (S3.2). When provided, the current
+   * session's blackboard content is injected into every turn's context so a
+   * user edit is visible to the agent on the very next turn (and vice-versa via
+   * the sigil-blackboard-write tool). Best-effort: a read failure never blocks
+   * a turn. Session is resolved from the caller's resource scope.
+   */
+  readBlackboard?: (sessionId: string) => Promise<string>
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -72,12 +80,57 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       return null
     }
 
-    const content = compiled.content.trim()
+    const blocks: string[] = []
+    const compiledContent = compiled.content.trim()
+    if (compiledContent.length > 0) blocks.push(compiledContent)
+
+    // S3.2: inject the session's shared blackboard every turn so a user (or
+    // agent) edit is visible to the other party on the next turn. Best-effort —
+    // never let a blackboard read block a turn.
+    if (options.readBlackboard) {
+      const sessionId = sessionIdFromScope(
+        readScopeAttribute(ctx.eve.caller),
+      )
+      if (sessionId !== null) {
+        try {
+          const blackboard = (await options.readBlackboard(sessionId)).trim()
+          if (blackboard.length > 0) {
+            blocks.push(
+              `## Shared blackboard (session scratch space)\n` +
+                `A scratch space you and the user both edit; it persists across ` +
+                `the session. Update it with the sigil-blackboard-write tool. ` +
+                `Current contents:\n\n${blackboard}`,
+            )
+          }
+        } catch {
+          // Blackboard context is best-effort; a read failure is not fatal.
+        }
+      }
+    }
+
     return {
       auth: ctx.eve.caller,
-      context: content.length > 0 ? [content] : undefined,
+      context: blocks.length > 0 ? blocks : undefined,
     }
   }
+}
+
+/** Only session-tier scopes have a blackboard; project/persona scopes do not. */
+function sessionIdFromScope(scope: string | undefined): string | null {
+  if (scope === undefined) return null
+  const trimmed = scope.trim()
+  if (trimmed.length === 0) return null
+  const separator = trimmed.indexOf(":")
+  if (separator < 0) return trimmed // legacy bare id = session scope
+  const id = trimmed.slice(separator + 1).trim()
+  return trimmed.slice(0, separator) === "session" && id.length > 0 ? id : null
+}
+
+function readScopeAttribute(
+  caller: EveMessageContext["eve"]["caller"],
+): string | undefined {
+  const value = caller?.attributes.sigilResourceScope
+  return typeof value === "string" ? value : undefined
 }
 
 export async function compileSigilContextForMessage(input: {
