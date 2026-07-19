@@ -6,6 +6,12 @@ import {
   ResourceManager,
   useResourceManager,
 } from "@workspace/data/components/resource-manager";
+import {
+  type AttentionContext,
+  type AttentionSelection,
+} from "@zigil/agent-react/attention";
+import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry";
+import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { SkillListRow } from "@/features/skills-manager/skill-list-row";
@@ -46,6 +52,14 @@ export function SkillsManager() {
   );
 }
 
+function skillTarget(skill: ManagedSkillSummary): AttentionSelection {
+  return {
+    kind: "skill",
+    id: skill.id,
+    label: skill.name ?? skill.id,
+  };
+}
+
 function SkillsManagerBody({
   query,
   onQueryChange,
@@ -55,9 +69,24 @@ function SkillsManagerBody({
   onQueryChange: (value: string) => void;
   resultCount: number;
 }) {
-  const { selectedId, select } = useResourceManager<ManagedSkillSummary>();
+  const { selectedId, select, items } =
+    useResourceManager<ManagedSkillSummary>();
   const [isCreating, setIsCreating] = useState(false);
   const showCreateForm = isCreating && selectedId === null;
+
+  // Attention coverage (David): the selected skill flows into agent context, so
+  // "what does this skill do?" resolves against it without naming it.
+  const selectedSkill = items.find((skill) => skill.id === selectedId) ?? null;
+  const telemetry = useAttentionTelemetry();
+  const attention: AttentionContext = {
+    application: "sigil-chat",
+    route: "/skills",
+    workspace: { kind: "skills", id: "skills", label: "Skills" },
+    selection: selectedSkill ? skillTarget(selectedSkill) : undefined,
+    selections: selectedSkill ? [skillTarget(selectedSkill)] : undefined,
+    history: telemetry.history,
+  };
+  usePublishWorkspaceAttention(attention);
 
   return (
     <>
