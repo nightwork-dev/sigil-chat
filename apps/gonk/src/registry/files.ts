@@ -148,7 +148,14 @@ export function requireResourceScope(
   ctx: ToolContext,
 ): ResourceScope {
   const hostScope = requestScope(ctx);
-  const scope = normalizeScope(requested ?? hostScope);
+  // The app-controlled turn scope (x-sigil-scope, e.g. project:evidence-room in
+  // the Evidence Room) is AUTHORITATIVE and wins over any model-supplied scope.
+  // The model routinely guesses a wrong scope (a focused doc's id, the route
+  // name), which previously clobbered the correct corpus; letting the model
+  // redirect a tool to a scope the workspace didn't authorize is also a
+  // scope-confusion hazard. The requested scope is only a fallback when the host
+  // set none.
+  const scope = normalizeScope(hostScope ?? requested);
   if (!scope) {
     throw new Error(
       "File tools require a resource scope, either in the request or in the tool input.",
