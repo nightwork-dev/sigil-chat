@@ -256,7 +256,7 @@ html.reduce-motion *::after {
 
 /* Reusable utility for any scrollable region: reserves stable space for the
    scrollbar so content never sits under it (instead of the bar overlapping
-   content on hover/overflow). Pair with a small pe-*/pr-* utility on the
+   content on hover/overflow). Pair with a small pe-* or pr-* utility on the
    scroll container when the reserved gutter alone does not give enough
    breathing room (e.g. cards butted right up against the edge). */
 @utility scroll-area {
