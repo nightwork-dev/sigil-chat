@@ -9,6 +9,7 @@ import {
   MapIcon,
   MessageSquareIcon,
   NetworkIcon,
+  SettingsIcon,
 } from "lucide-react"
 import type { NavModel } from "@workspace/ui/components/layouts/nav"
 
@@ -22,4 +23,5 @@ export const appNav: NavModel = {
     { to: "/review", label: "Review", icon: FileCheck2Icon },
     { to: "/skills", label: "Skills", icon: BracesIcon },
   ],
+  footer: [{ to: "/settings", label: "Settings", icon: SettingsIcon }],
 }

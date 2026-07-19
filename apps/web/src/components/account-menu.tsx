@@ -1,7 +1,5 @@
-import { useState } from "react"
-import { useRouter } from "@tanstack/react-router"
-import { useQueryClient } from "@tanstack/react-query"
-import { LogOutIcon } from "lucide-react"
+import { Link } from "@tanstack/react-router"
+import { LogOutIcon, SettingsIcon } from "lucide-react"
 
 import {
   SidebarMenu,
@@ -18,36 +16,20 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 
-import { authClient } from "@/lib/auth/client"
 import type { CurrentSessionUser } from "@/lib/auth/route-guard"
+import { useSignOut } from "@/lib/use-sign-out"
 
 // Signed-in identity + sign-out, rendered in the SidebarShell's `accountMenu`
 // slot (spec: "The sidebar footer shows the signed-in user's display name and
-// account menu"). Replaces the inherited demo /settings footer link — the
-// real settings surface lands in a later story (S10.4); this is the account
-// shell entry point only.
+// account menu"). Replaces the inherited demo /settings footer link. The real
+// settings surface (S10.4) lives at /settings — linked from here, not
+// duplicated: sign-out itself is shared via useSignOut so there is exactly
+// one fail-closed cache-clear implementation.
 export function AccountMenu({ user }: { user: CurrentSessionUser }) {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const [signingOut, setSigningOut] = useState(false)
+  const { signOut, signingOut } = useSignOut()
 
   const label = user.displayUsername || user.name || user.username || "Account"
   const initial = (label.trim()[0] ?? "?").toUpperCase()
-
-  async function handleSignOut() {
-    setSigningOut(true)
-    try {
-      await authClient.signOut()
-    } finally {
-      // Fail-closed: clear every private query, not just auth-tagged ones —
-      // a stale cache entry serving another user's data after sign-out is
-      // the failure mode the spec calls out explicitly.
-      queryClient.clear()
-      await router.navigate({ to: "/login" })
-      router.invalidate()
-      setSigningOut(false)
-    }
-  }
 
   return (
     <SidebarMenu>
@@ -71,8 +53,16 @@ export function AccountMenu({ user }: { user: CurrentSessionUser }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="max-sm:min-h-11"
+              render={<Link to="/settings" search={{ section: "account" }} />}
+            >
+              <SettingsIcon />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="max-sm:min-h-11"
               disabled={signingOut}
-              onClick={handleSignOut}
+              onClick={signOut}
             >
               <LogOutIcon />
               {signingOut ? "Signing out…" : "Sign out"}

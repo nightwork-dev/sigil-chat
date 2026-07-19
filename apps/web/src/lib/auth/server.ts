@@ -171,3 +171,11 @@ export async function hasAnyUser(): Promise<boolean> {
   const result = await database.client.execute("SELECT 1 FROM user LIMIT 1")
   return result.rows.length > 0
 }
+
+// Shared libsql client for app-owned tables that live in the same auth
+// database (e.g. user_settings, S10.4) but are NOT Better Auth's own schema.
+// Reuses the one cached connection rather than opening a second client.
+export async function getAuthDbClient(): Promise<Client> {
+  const { database } = await getAuthDatabase()
+  return database.client
+}

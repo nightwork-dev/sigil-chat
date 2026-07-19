@@ -213,6 +213,15 @@ html.no-transition *::after {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+/* Registry-backed reduced-motion preference (Settings → Appearance,
+   `appearance.reducedMotion`) — same effect as the OS media query above, but
+   user-controlled independent of the OS preference via a `.reduce-motion`
+   class on <html>. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  transition: none !important;
+}
 /* Accordion/Collapsible panels use a CSS animation (height) for open/close —
    the theme-transition rule above collides with it (Base UI warns when both
    a transition and an animation apply to the same panel). */
