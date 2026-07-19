@@ -14,6 +14,7 @@ import {
 import { REVIEW_DOCUMENT_ID, reviewDocumentKeys } from "./review-document"
 import { skillKeys } from "./skills"
 import { workItemKeys } from "./work-items"
+import { evidenceKeys } from "./evidence"
 
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "review.document.changed",
@@ -96,6 +97,34 @@ const workItemsChangedHandler: AgentOutcomeReconciliationHandler = {
   },
 }
 
+const evidenceChangedHandler: AgentOutcomeReconciliationHandler = {
+  kind: "evidence.changed",
+  schema: {
+    "~standard": {
+      version: 1,
+      vendor: "sigil-chat",
+      validate(value) {
+        const outcome = value as AgentDomainOutcome
+        if (
+          !value ||
+          typeof value !== "object" ||
+          outcome.kind !== "evidence.changed" ||
+          outcome.resource?.kind !== "evidence-room" ||
+          typeof outcome.resource.id !== "string" ||
+          outcome.resource.id.length === 0
+        ) {
+          return { issues: [{ message: "Expected an evidence-room outcome" }] }
+        }
+        return { value: outcome }
+      },
+    },
+  },
+  reconcile: async (_outcome, context) => {
+    // Refresh both the document list and the distill gallery for the room.
+    await context.invalidate([evidenceKeys.all()])
+  },
+}
+
 export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
   return createReactQueryOutcomeDispatcher({
     queryClient,
@@ -103,6 +132,7 @@ export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
       reviewDocumentChangedHandler,
       skillsChangedHandler,
       workItemsChangedHandler,
+      evidenceChangedHandler,
     ],
     duplicateKindPolicy: "reject",
     unhandledOutcomePolicy: "ignore",

@@ -100,7 +100,27 @@ export function registerDistillTools(
         }
       }
 
-      return { data: { artifactId: stored.id, distilled } };
+      return {
+        data: {
+          artifactId: stored.id,
+          distilled,
+          // Live-refresh the Evidence Room gallery: the projector dispatches this
+          // and agent-domain-outcomes invalidates the evidence query family.
+          clientCommand: {
+            type: "agent.domain.outcome",
+            payload: {
+              id: `evidence:distill.created:${stored.id}`,
+              kind: "evidence.changed",
+              resource: {
+                kind: "evidence-room",
+                id: `${scope.tier}:${scope.id}`,
+              },
+              operation: "distill.created",
+              changedIds: [stored.id],
+            },
+          },
+        },
+      };
     },
   });
 }
