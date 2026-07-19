@@ -18,6 +18,7 @@
     "@gonk/tool-registry-mcp": "0.3.1",
     "@mirk/artifact": "^0.1.0",
     "@workspace/agent-contracts": "workspace:*",
+    "@workspace/blackboard-store": "workspace:*",
     "@workspace/graph": "workspace:*",
     "@workspace/graph-store": "workspace:*",
     "@workspace/review-store": "workspace:*",

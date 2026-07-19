@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/blackboard-store",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@mirk/store-markdown": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  },
+  "exports": {
+    ".": "./src/repository.ts",
+    "./types": "./src/types.ts",
+    "./repository": "./src/repository.ts",
+    "./mirk-repository": "./src/mirk-repository.ts"
+  }
+}

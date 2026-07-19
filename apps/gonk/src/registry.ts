@@ -17,6 +17,7 @@ import {
 } from "@workspace/work-items-store";
 
 import { sigilApprovalProvider } from "./registry/approval.js";
+import { registerBlackboardTools } from "./registry/blackboard.js";
 import { registerGraphTools } from "./registry/graph.js";
 import { registerImageTools } from "./registry/image.js";
 import { registerFileTools } from "./registry/files.js";
@@ -53,6 +54,7 @@ export function createSigilRegistry(
   registerUiCommandTools(registry);
   registerImageTools(registry);
   registerFileTools(registry, artifacts);
+  registerBlackboardTools(registry);
 
   return registry;
 }

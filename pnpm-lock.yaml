@@ -93,6 +93,9 @@ importers:
       '@workspace/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts
+      '@workspace/blackboard-store':
+        specifier: workspace:*
+        version: link:../../packages/blackboard-store
       '@workspace/graph':
         specifier: workspace:*
         version: link:../../packages/graph
@@ -163,6 +166,9 @@ importers:
       '@workspace/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts
+      '@workspace/blackboard-store':
+        specifier: workspace:*
+        version: link:../../packages/blackboard-store
       '@workspace/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
@@ -270,6 +276,22 @@ importers:
         specifier: ^0.1.1
         version: 0.1.1
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@25.3.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.32.0)(msw@2.12.11(@types/node@25.3.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0)
+
+  packages/blackboard-store:
+    dependencies:
+      '@mirk/store-markdown':
+        specifier: 0.1.0
+        version: 0.1.0(better-sqlite3@12.10.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^25.1.0
+        version: 25.3.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
