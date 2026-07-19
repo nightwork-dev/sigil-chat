@@ -143,6 +143,30 @@ export function ReducerStudio() {
   const selectedReducerOption =
     REDUCER_OPTIONS.find((option) => option.value === reducerId) ?? null
 
+  // S1.9: publish this workspace's attention to the shell HUD. This is a HOOK,
+  // so it MUST run unconditionally — before the pending/error early returns
+  // below. Null until the document loads; the shell clears attention on null.
+  const attention: AttentionContext | null = documentQuery.data
+    ? {
+        application: "sigil-chat",
+        route: "/studio",
+        workspace: {
+          kind: "reducer-graph",
+          id: documentQuery.data.id,
+          revision: documentQuery.data.revision,
+          label: documentQuery.data.title,
+        },
+        selection: selection
+          ? graphSelectionAttention(selection, documentQuery.data)
+          : undefined,
+        selections: selection
+          ? [graphSelectionAttention(selection, documentQuery.data)]
+          : undefined,
+        history: telemetry.history,
+      }
+    : null
+  usePublishWorkspaceAttention(attention)
+
   if (documentQuery.isPending) {
     return (
       <div className="grid h-full place-items-center text-sm text-muted-foreground">
@@ -205,28 +229,6 @@ export function ReducerStudio() {
     sendCommand({ type: "node.add", node })
     updateSelection({ kind: "node", id })
   }
-
-  const attention: AttentionContext = {
-    application: "sigil-chat",
-    route: "/studio",
-    workspace: {
-      kind: "reducer-graph",
-      id: document.id,
-      revision: document.revision,
-      label: document.title,
-    },
-    selection: selection
-      ? graphSelectionAttention(selection, document)
-      : undefined,
-    selections: selection
-      ? [graphSelectionAttention(selection, document)]
-      : undefined,
-    history: telemetry.history,
-  }
-
-  // S1.9: publish this workspace's attention to the shell so the persistent
-  // agent HUD (mounted in _app) reads it — no local AttentionProvider/HUD.
-  usePublishWorkspaceAttention(attention)
 
   return (
     <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
