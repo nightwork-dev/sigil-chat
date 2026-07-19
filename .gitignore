@@ -28,6 +28,7 @@ dist
 .vinxi
 .eve
 .data
+source/
 
 # Debug
 npm-debug.log*
@@ -71,6 +72,7 @@ docs.local/
 # live agent roster) — loads for Claude Code on this machine but is never
 # committed; see .claude/skills/local-coordination/SKILL.md.
 .claude/skills/local-coordination/
+apps/agent/skills-archive/
 
 # Local-only files/dirs (naming convention) — gitignored everywhere EXCEPT
 # repos that are themselves local-only (e.g. the .sigil roadmap store).
