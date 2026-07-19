@@ -707,6 +707,25 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-load-demo-doc",
+    description:
+      "Load the bundled Cerebras knowledge-base article into this session as an attachment, so it can be distilled (sigil-distill) or asked about with citations (sigil-evidence-ask). Call this when the user asks to load the demo document. Idempotent — the artifact is content-addressed, so re-loading returns the same one.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-blackboard-read",
     description: "Read the shared markdown blackboard for the current session.",
     visibility: "always",
