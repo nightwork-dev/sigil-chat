@@ -23,8 +23,9 @@ import {
 } from "@workspace/ui/components/tooltip"
 import { PanelLeftIcon } from "lucide-react"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+import { useUserPreference } from "@workspace/ui/hooks/use-user-preference"
+
+const SIDEBAR_STORAGE_KEY = "sidebar:open"
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
@@ -67,9 +68,10 @@ function SidebarProvider({
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  // Internal state when uncontrolled. Persisted per-user across reloads + tabs
+  // (useUserPreference) so the collapsed/expanded choice is remembered. When
+  // `open`/`onOpenChange` are supplied, the parent controls it instead.
+  const [_open, _setOpen] = useUserPreference(SIDEBAR_STORAGE_KEY, defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -79,11 +81,8 @@ function SidebarProvider({
       } else {
         _setOpen(openState)
       }
-
-      // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
     },
-    [setOpenProp, open]
+    [setOpenProp, open, _setOpen]
   )
 
   // Helper to toggle the sidebar.
