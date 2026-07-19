@@ -346,10 +346,16 @@ function Panel({
           "fixed inset-4 z-[80] h-[calc(100dvh-2rem)]! w-[calc(100vw-2rem)]! max-h-none max-w-none resize-none max-sm:inset-2 max-sm:h-[calc(100dvh-1rem)]! max-sm:w-[calc(100vw-1rem)]!",
         // Docked side panel: full-height, flush to the assigned edge,
         // escapes the anchor via the same portal path as detached/expanded.
+        // Unlike detached (which floats with margin on every side), a docked
+        // panel is pinned flush against the viewport edge, so its width cap
+        // is `min(400px, 100vw)` rather than the "-2rem" margin formula —
+        // that single expression already collapses to full width below
+        // 400px (e.g. at 375px) with no separate max-sm override needed, and
+        // no `max-sm:w-full!` vs. base `w-[...]!` cascade race to lose.
         dock === "left" &&
-          "fixed top-0 left-0 z-[80] h-dvh! w-[min(400px,calc(100vw-2rem))]! max-w-[calc(100vw-2rem)] resize-none rounded-none border-y-0 border-l-0 max-sm:w-full!",
+          "fixed top-0 left-0 z-[80] h-dvh! w-[min(400px,100vw)]! resize-none rounded-none border-y-0 border-l-0",
         dock === "right" &&
-          "fixed top-0 right-0 z-[80] h-dvh! w-[min(400px,calc(100vw-2rem))]! max-w-[calc(100vw-2rem)] resize-none rounded-none border-y-0 border-r-0 max-sm:w-full!",
+          "fixed top-0 right-0 z-[80] h-dvh! w-[min(400px,100vw)]! resize-none rounded-none border-y-0 border-r-0",
         className,
       )}
     >
