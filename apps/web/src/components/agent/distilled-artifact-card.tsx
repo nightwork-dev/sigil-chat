@@ -8,7 +8,7 @@ import {
 } from "@/components/agent/tool-renderer-registry"
 import { cn } from "@workspace/ui/lib/utils"
 
-interface DistilledArtifact {
+export interface DistilledArtifact {
   title: string
   question: string
   summary: string
@@ -36,7 +36,15 @@ export function DistilledArtifactCard(props: ToolRendererProps) {
   if (!distilled || typeof distilled.title !== "string") {
     return <ToolCall {...props} />
   }
+  return <DistilledCard distilled={distilled} />
+}
 
+/**
+ * Presentational distilled-artifact card — reused by the chat tool renderer
+ * (above) and the D4.4 Evidence Room gallery. Pure: takes a DistilledArtifact,
+ * renders it. Mobile-clean (text wraps, no fixed widths), theme tokens only.
+ */
+export function DistilledCard({ distilled }: { distilled: DistilledArtifact }) {
   return (
     <figure className="my-1.5 overflow-hidden rounded-lg border border-border bg-card/60">
       <header className="flex items-start gap-2 border-b border-border/70 bg-muted/30 px-3.5 py-2.5">

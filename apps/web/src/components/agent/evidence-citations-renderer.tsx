@@ -12,14 +12,14 @@ interface EvidenceLocator {
   startLine: number
   endLine: number
 }
-interface EvidenceCitation {
+export interface EvidenceCitation {
   citationId: string
   artifactId: string
   filename: string
   quote: string
   locator: EvidenceLocator
 }
-interface EvidenceSearchResult {
+export interface EvidenceSearchResult {
   grounding: "grounded" | "no-evidence"
   citations: EvidenceCitation[]
 }
@@ -37,7 +37,15 @@ export function EvidenceCitationsRenderer(props: ToolRendererProps) {
   if (!result || typeof result.grounding !== "string") {
     return <ToolCall {...props} />
   }
+  return <EvidenceCitations result={result} />
+}
 
+/**
+ * Presentational citations panel — reused by the chat tool renderer (above) and
+ * the D4.4 Evidence Room ask region. Honest by construction: a no-evidence
+ * result renders "no supporting evidence" rather than an empty panel.
+ */
+export function EvidenceCitations({ result }: { result: EvidenceSearchResult }) {
   if (result.grounding === "no-evidence" || result.citations.length === 0) {
     return (
       <div className="my-1.5 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
