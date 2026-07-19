@@ -5,7 +5,7 @@ import { jwt, username } from "better-auth/plugins"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import type { Kysely } from "kysely"
 
-import { createAuthDatabase } from "./db"
+import { createAuthDatabase, type AuthDatabase } from "./db"
 import { readAuthEnvironment, type AuthEnvironment } from "./env"
 import { assertAuthMigrationsApplied } from "./migrations"
 import {
@@ -128,17 +128,43 @@ export function createSigilAuth(
   ) as unknown as SigilAuthInstance
 }
 
+let defaultDatabase: Promise<{ database: AuthDatabase; environment: AuthEnvironment }> | undefined
+
+// Shared, cached environment + connection so getAuth() and any other
+// installation-level query (e.g. the first-user check backing /setup) reuse
+// exactly one libsql client rather than opening a second connection.
+async function getAuthDatabase() {
+  if (!defaultDatabase) {
+    defaultDatabase = (async () => {
+      const environment = readAuthEnvironment()
+      const database = createAuthDatabase(environment)
+      await assertAuthMigrationsApplied(database.client)
+      return { database, environment }
+    })()
+  }
+
+  return defaultDatabase
+}
+
 let defaultAuth: Promise<SigilAuthInstance> | undefined
 
 export async function getAuth(): Promise<SigilAuthInstance> {
   if (!defaultAuth) {
     defaultAuth = (async () => {
-      const environment = readAuthEnvironment()
-      const database = createAuthDatabase(environment)
-      await assertAuthMigrationsApplied(database.client)
+      const { database, environment } = await getAuthDatabase()
       return createSigilAuth({ ...database, environment })
     })()
   }
 
   return defaultAuth
+}
+
+// First-run gate for /setup: true once any user row exists. Reuses the
+// cached auth connection rather than opening its own; this is a read-only
+// existence check, not a substitute for the registration-policy transaction
+// in policy.ts that actually decides the next user's role.
+export async function hasAnyUser(): Promise<boolean> {
+  const { database } = await getAuthDatabase()
+  const result = await database.client.execute("SELECT 1 FROM user LIMIT 1")
+  return result.rows.length > 0
 }
