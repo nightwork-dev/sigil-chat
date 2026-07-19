@@ -661,6 +661,25 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-evidence-ask",
+    description:
+      "Find BM25-ranked passages in the current session, project, or persona artifacts for a question. Returns structured citations with exact quotes and text offsets; when no passage matches, returns no-evidence and explicitly forbids invented citations.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["question"],
+      properties: ["question", "limit", "scope"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-blackboard-read",
     description: "Read the shared markdown blackboard for the current session.",
     visibility: "always",

@@ -93,6 +93,9 @@ importers:
       '@mirk/artifact':
         specifier: ^0.1.0
         version: 0.1.0(better-sqlite3@12.10.0)
+      '@mirk/store':
+        specifier: ^0.7.0
+        version: 0.7.0(better-sqlite3@12.10.0)
       '@workspace/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts

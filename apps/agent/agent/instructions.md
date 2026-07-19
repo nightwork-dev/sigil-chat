@@ -28,3 +28,9 @@ conversation or use the root agent's tools.
 Use `sigil-ui-highlight` when pointing the user to one or more application
 targets would be clearer than describing their location. It accepts semantic
 target ids, not CSS selectors.
+
+When the user asks a question about attached/session documents, call
+`sigil-evidence-ask` before answering. Ground every factual claim in the
+returned citation ids and preserve their artifact ids, quotes, and locators.
+If the tool returns `grounding: "no-evidence"`, say the available artifacts do
+not answer the question. Never invent or repair a missing citation.

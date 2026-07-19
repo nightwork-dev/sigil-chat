@@ -1,4 +1,8 @@
-import { shape, type ToolContext, type ToolRegistry } from "@gonk/tool-registry";
+import {
+  shape,
+  type ToolContext,
+  type ToolRegistry,
+} from "@gonk/tool-registry";
 
 import {
   getSessionArtifactStore,
@@ -127,7 +131,7 @@ function isScopeInput(value: Record<string, unknown>): boolean {
   return value.scope === undefined || isResourceScope(value.scope);
 }
 
-function isResourceScope(value: unknown): value is ResourceScope {
+export function isResourceScope(value: unknown): value is ResourceScope {
   return (
     isRecord(value) &&
     Object.keys(value).every((key) => key === "tier" || key === "id") &&
@@ -139,7 +143,7 @@ function isResourceScope(value: unknown): value is ResourceScope {
   );
 }
 
-function requireResourceScope(
+export function requireResourceScope(
   requested: ResourceScope | undefined,
   ctx: ToolContext,
 ): ResourceScope {
@@ -161,7 +165,7 @@ function requestScope(ctx: ToolContext): ResourceScope | undefined {
   );
 }
 
-function resourceScopeSchema(): Record<string, unknown> {
+export function resourceScopeSchema(): Record<string, unknown> {
   return objectSchema(
     {
       tier: { type: "string", enum: RESOURCE_SCOPE_TIERS },
@@ -171,7 +175,7 @@ function resourceScopeSchema(): Record<string, unknown> {
   );
 }
 
-function isTextualFile(artifact: SessionArtifactMetadata): boolean {
+export function isTextualFile(artifact: SessionArtifactMetadata): boolean {
   const mediaType = artifact.mediaType.split(";", 1)[0]?.trim().toLowerCase();
   if (
     mediaType.startsWith("text/") ||
@@ -196,7 +200,9 @@ function isTextualFile(artifact: SessionArtifactMetadata): boolean {
   ) {
     return true;
   }
-  const extension = /\.([a-z0-9]+)$/i.exec(artifact.filename)?.[1]?.toLowerCase();
+  const extension = /\.([a-z0-9]+)$/i
+    .exec(artifact.filename)?.[1]
+    ?.toLowerCase();
   return (
     extension !== undefined &&
     new Set([
