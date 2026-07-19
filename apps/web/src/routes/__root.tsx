@@ -2,7 +2,10 @@
 // Tree:
 //   apps/web/src/routes/__root.tsx — THIS FILE
 // Chrome: none — minimal wrapper, each layout route provides its own shell
-// Provides: ThemeProvider, QueryClientProvider, AgentSessionProvider, notFoundComponent, errorComponent
+// Provides: ThemeProvider, QueryClientProvider, notFoundComponent, errorComponent
+// Does NOT provide AgentSessionProvider — it lives below the protected `_app`
+// boundary (apps/web/src/routes/_app.tsx) so /login and /setup never create
+// an Eve client or fetch channel data.
 // Loads: globals.css (UI tokens), themes.css (theme variants), Google Fonts
 
 import {
@@ -31,7 +34,6 @@ import {
 } from "@/lib/theme"
 import { SITE } from "@/lib/site"
 import { AgentDomainOutcomeReconciler } from "@/lib/agent-domain-outcomes"
-import { AppAgentSessions } from "@/components/agent-sessions"
 
 import appCss from "@workspace/ui/globals.css?url"
 import themesCss from "@/styles/themes.css?url"
@@ -130,12 +132,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AppAgentSessions>
-          <AgentDomainOutcomeReconciler />
-          <Outlet />
-          <AgentDomEffects />
-          <Toaster position="bottom-right" />
-        </AppAgentSessions>
+        <AgentDomainOutcomeReconciler />
+        <Outlet />
+        <AgentDomEffects />
+        <Toaster position="bottom-right" />
       </ThemeProvider>
     </QueryClientProvider>
   )

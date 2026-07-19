@@ -40,15 +40,21 @@ items) and the `ThemePicker` action. Don't build a second shell unless you
 have a genuinely different chrome requirement; add a nav entry to the
 existing `nav` object in `_app.tsx` instead.
 
-Above `_app.tsx`, `routes/__root.tsx` mounts app-wide providers with no
-visible chrome: `ThemeProvider`, `QueryClientProvider`, and — critically —
-`AppAgentSessions` (`@/components/agent-sessions.tsx`), which wraps
-`AgentRuntimeSessionProvider` and `AgentThreadControlsProvider` from
-`@niwork/agent`. This is what "the shared agent session mounts above router
-swaps" means concretely: the agent session survives navigating between
-`/chat`, `/studio`, `/review`, etc., because it's provided once at the root,
-not per-route. A new workspace under `_app/` gets the live agent session for
-free through context — it does not need to instantiate its own.
+Above `_app.tsx`, `routes/__root.tsx` mounts only app-wide providers with no
+visible chrome and no session/auth dependency: `ThemeProvider` and
+`QueryClientProvider`. `AppAgentSessions` (`@/components/agent-sessions.tsx`,
+wrapping `AgentRuntimeSessionProvider` and `AgentThreadControlsProvider` from
+`@niwork/agent`) is mounted one level down, INSIDE `_app.tsx`'s
+`AppLayout` — deliberately below the protected-route boundary (`_app.tsx`'s
+`beforeLoad` resolves the Better Auth session server-side and redirects to
+`/login` first). `/login` and `/setup` are top-level routes that sit outside
+`_app` entirely, so they never mount `AppAgentSessions` and never create an
+Eve client or fetch channel data (S10.2). This is what "the shared agent
+session mounts above router swaps [within the product]" means concretely:
+the agent session survives navigating between `/chat`, `/studio`, `/review`,
+etc., because it's provided once inside `_app`, not per-route. A new
+workspace under `_app/` gets the live agent session for free through
+context — it does not need to instantiate its own.
 
 ## Route header comments — mandatory, and read them before editing
 

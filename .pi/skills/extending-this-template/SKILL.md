@@ -31,12 +31,15 @@ product uses. Do NOT build a second shell. To add a nav item, edit the
 existing `nav` object (`NavModel`) in `_app.tsx` — do not create a parallel
 layout route.
 
-## RULE 2: The agent session is provided ONCE, at `__root.tsx` — do not re-instantiate it
+## RULE 2: The agent session is provided ONCE, at `_app.tsx` — do not re-instantiate it
 
-`apps/web/src/routes/__root.tsx` mounts `AppAgentSessions`
+`apps/web/src/routes/_app.tsx` mounts `AppAgentSessions`
 (`@/components/agent-sessions.tsx`), which wraps
 `AgentRuntimeSessionProvider` + `AgentThreadControlsProvider` from
-`@niwork/agent`. This means:
+`@niwork/agent`. It is deliberately INSIDE the protected `_app` boundary
+(below the `beforeLoad` session check), not at `__root.tsx` — `/login` and
+`/setup` are unauthenticated and must never create an Eve client or fetch
+channel data (S10.2). This means:
 - The agent session persists across `/chat`, `/studio`, `/review`, etc.
   navigation because it lives above the router `<Outlet />`, not per-route.
 - A new workspace under `_app/` MUST consume the existing session via

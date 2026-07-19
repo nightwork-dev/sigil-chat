@@ -21,6 +21,9 @@
 //   SplitShell      + list        (master pane; children = detail pane)
 //   InspectorShell  + inspector   (collapsible right rail) + inspectorTitle
 //   SettingsShell   + title       (nav.items ARE the settings sections)
+//   SidebarShell    + accountMenu (bottom-of-sidebar identity/sign-out slot,
+//                                  rendered alongside nav.footer — content is
+//                                  app-authored, e.g. an account dropdown)
 //
 // Decoupling rules honored (spec §5): no hardcoded route lists, no router
 // instance, no app store, no app-specific components. `Link`/`useRouterState`
@@ -123,7 +126,12 @@ interface ShellSlots {
 // ─── SidebarShell ────────────────────────────────────────────────────────────
 // Collapsible icon rail (Cmd+B, provided by SidebarProvider) + breadcrumb bar.
 
-export function SidebarShell({ nav, actions, children }: ShellSlots) {
+export function SidebarShell({
+  nav,
+  actions,
+  children,
+  accountMenu,
+}: ShellSlots & { accountMenu?: ReactNode }) {
   const active = useActiveNav([...nav.items, ...(nav.footer ?? [])])
 
   return (
@@ -153,9 +161,12 @@ export function SidebarShell({ nav, actions, children }: ShellSlots) {
           </SidebarGroup>
         </SidebarContent>
 
-        {nav.footer && nav.footer.length > 0 ? (
+        {(nav.footer && nav.footer.length > 0) || accountMenu ? (
           <SidebarFooter>
-            <NavMenu items={nav.footer} />
+            {nav.footer && nav.footer.length > 0 ? (
+              <NavMenu items={nav.footer} />
+            ) : null}
+            {accountMenu}
           </SidebarFooter>
         ) : null}
 
