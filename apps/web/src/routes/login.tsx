@@ -2,7 +2,7 @@
 // Tree:
 //   apps/web/src/routes/__root.tsx  — HTML shell, ThemeProvider, QueryClientProvider (no visible chrome)
 //   apps/web/src/routes/login.tsx   — THIS FILE, standalone (no SidebarShell, no AgentSessionProvider)
-// Content: quiet username/password sign-in. Public route — renders without a
+// Content: quiet email/password sign-in. Public route — renders without a
 // session, without creating an Eve client, and without fetching channel data.
 
 import { useState, type FormEvent } from "react"
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const router = useRouter()
   const { returnTo } = Route.useSearch()
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -42,15 +42,15 @@ function LoginPage() {
     setError(null)
     setPending(true)
     try {
-      const result = await authClient.signIn.username({ username, password })
+      const result = await authClient.signIn.email({ email, password })
       if (result.error) {
-        setError("Incorrect username or password.")
+        setError("Incorrect email or password.")
         return
       }
       await router.navigate({ to: sanitizeReturnTo(returnTo) })
       router.invalidate()
     } catch {
-      setError("Incorrect username or password.")
+      setError("Incorrect email or password.")
     } finally {
       setPending(false)
     }
@@ -61,21 +61,22 @@ function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Sign in to {SITE.title}</CardTitle>
-          <CardDescription>Enter your username and password.</CardDescription>
+          <CardDescription>Enter your email and password.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                autoComplete="username"
+                autoComplete="email"
                 autoFocus
                 className="h-11 text-base md:text-sm"
-                id="username"
-                name="username"
-                onChange={(event) => setUsername(event.target.value)}
+                id="email"
+                name="email"
+                onChange={(event) => setEmail(event.target.value)}
                 required
-                value={username}
+                type="email"
+                value={email}
               />
             </div>
             <div className="flex flex-col gap-1.5">

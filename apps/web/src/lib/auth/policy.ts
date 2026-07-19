@@ -1,29 +1,13 @@
 import type { Client } from "@libsql/client"
 import { APIError } from "better-auth/api"
 
+import { isAllowedUsername, normalizeUsername } from "./username-rules"
+
 export type SigilRole = "member" | "owner"
 
-const RESERVED_USERNAMES = new Set([
-  "admin",
-  "api",
-  "auth",
-  "eve",
-  "gonk",
-  "settings",
-  "system",
-])
-const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{1,30}[a-z0-9])$/
-
-export function normalizeUsername(username: string) {
-  return username.toLowerCase()
-}
-
-export function isAllowedUsername(username: string) {
-  const normalized = normalizeUsername(username)
-  return (
-    USERNAME_PATTERN.test(normalized) && !RESERVED_USERNAMES.has(normalized)
-  )
-}
+// The charset/reserved rules are pure + client-safe (see username-rules.ts).
+// Re-exported here so existing server consumers keep importing from ./policy.
+export { isAllowedUsername, normalizeUsername }
 
 export interface RegistrationPolicy {
   roleForNextUser(): Promise<SigilRole>

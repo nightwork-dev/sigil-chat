@@ -37,7 +37,16 @@ describe("username policy", () => {
     expect(isAllowedUsername("david-tools")).toBe(true)
     expect(isAllowedUsername("admin")).toBe(false)
     expect(isAllowedUsername("-david")).toBe(false)
-    expect(isAllowedUsername("da")).toBe(false)
+  })
+
+  it("accepts short names — length is not a security property (min 1)", () => {
+    // David: username length is meaningless on a self-hosted install.
+    expect(isAllowedUsername("a")).toBe(true)
+    expect(isAllowedUsername("da")).toBe(true)
+    // charset + start/end + reserved rules still hold at any length.
+    expect(isAllowedUsername("-")).toBe(false)
+    expect(isAllowedUsername("a.")).toBe(false)
+    expect(isAllowedUsername("api")).toBe(false)
   })
 })
 

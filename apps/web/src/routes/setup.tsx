@@ -18,6 +18,10 @@ import { Alert, AlertDescription } from "@workspace/ui/components/alert"
 import { authClient } from "@/lib/auth/client"
 import { fetchInstallationHasOwner } from "@/lib/auth/route-guard"
 import { DEFAULT_RETURN_TO } from "@/lib/auth/return-to"
+import {
+  displayNameFromEmail,
+  usernameFromEmail,
+} from "@/lib/auth/username-from-email"
 import { SITE } from "@/lib/site"
 
 export const Route = createFileRoute("/setup")({
@@ -30,8 +34,6 @@ export const Route = createFileRoute("/setup")({
 
 function SetupPage() {
   const router = useRouter()
-  const [username, setUsername] = useState("")
-  const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -42,11 +44,13 @@ function SetupPage() {
     setError(null)
     setPending(true)
     try {
+      // Email + password only; username (the @mention handle) and display
+      // name default from the email local-part, both editable in Settings.
       const result = await authClient.signUp.email({
         email,
-        name: displayName,
+        name: displayNameFromEmail(email),
         password,
-        username,
+        username: usernameFromEmail(email),
       })
       if (result.error) {
         setError(result.error.message ?? "Could not create the first account.")
@@ -77,36 +81,10 @@ function SetupPage() {
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                autoComplete="username"
-                autoFocus
-                className="h-11 text-base md:text-sm"
-                id="username"
-                minLength={3}
-                maxLength={32}
-                name="username"
-                onChange={(event) => setUsername(event.target.value)}
-                required
-                value={username}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="displayName">Display name</Label>
-              <Input
-                autoComplete="name"
-                className="h-11 text-base md:text-sm"
-                id="displayName"
-                name="displayName"
-                onChange={(event) => setDisplayName(event.target.value)}
-                required
-                value={displayName}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>
               <Input
                 autoComplete="email"
+                autoFocus
                 className="h-11 text-base md:text-sm"
                 id="email"
                 name="email"
@@ -122,7 +100,7 @@ function SetupPage() {
                 autoComplete="new-password"
                 className="h-11 text-base md:text-sm"
                 id="password"
-                minLength={12}
+                minLength={8}
                 maxLength={128}
                 name="password"
                 onChange={(event) => setPassword(event.target.value)}

@@ -80,12 +80,14 @@ export function createSigilAuthOptions(
     emailAndPassword: {
       enabled: true,
       maxPasswordLength: 128,
-      minPasswordLength: 12,
+      // Better Auth's own default floor; no symbol/composition rules (David).
+      minPasswordLength: 8,
     },
     rateLimit: {
       enabled: true,
       customRules: {
-        "/sign-in/username": { max: 5, window: 60 },
+        // Sign-in is email + password (David); brute-force cap on that path.
+        "/sign-in/email": { max: 5, window: 60 },
         "/sign-up/email": { max: 3, window: 60 },
       },
       max: 100,
@@ -99,7 +101,8 @@ export function createSigilAuthOptions(
     plugins: [
       username({
         maxUsernameLength: 32,
-        minUsernameLength: 3,
+        // Length is meaningless on a self-hosted install (David); min 1.
+        minUsernameLength: 1,
         usernameNormalization: normalizeUsername,
         usernameValidator: isAllowedUsername,
         validationOrder: { username: "post-normalization" },
