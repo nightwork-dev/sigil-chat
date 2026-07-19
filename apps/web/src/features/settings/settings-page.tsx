@@ -86,7 +86,9 @@ export function SettingsPage({
           ))}
         </TabsList>
 
-        <div className="min-h-0 flex-1 overflow-auto">
+        {/* pb-16 keeps the last row (e.g. the Security session list) scrollable
+            clear of the floating agent HUD pinned bottom-right. */}
+        <div className="min-h-0 flex-1 overflow-auto pb-16">
           <TabsContent value="account">
             <AccountSection user={user} />
           </TabsContent>
