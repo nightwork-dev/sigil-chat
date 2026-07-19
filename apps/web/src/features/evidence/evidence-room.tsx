@@ -22,23 +22,16 @@ import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
 import { useFileUpload } from "@workspace/ui/hooks/use-file-upload"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
-import {
-  DistilledCard,
-  type DistilledArtifact,
-} from "@/components/agent/distilled-artifact-card"
+import { DistilledCard } from "@/components/agent/distilled-artifact-card"
 import {
   EVIDENCE_ROOM_SCOPE,
   useDeleteEvidenceDocument,
+  useEvidenceDistills,
   useEvidenceDocuments,
   useUploadEvidenceDocument,
+  type EvidenceDistill,
   type EvidenceDocument,
 } from "@/lib/evidence"
-
-/** A distilled artifact produced this session. */
-export interface EvidenceDistill {
-  artifactId: string
-  distilled: DistilledArtifact
-}
 
 type MobileTab = "library" | "distills" | "ask"
 
@@ -62,7 +55,7 @@ export function EvidenceRoom() {
   const documentsQuery = useEvidenceDocuments()
   const uploadDocument = useUploadEvidenceDocument()
   const deleteDocument = useDeleteEvidenceDocument()
-  const [distills] = useState<EvidenceDistill[]>([])
+  const distillsQuery = useEvidenceDistills()
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const [tab, setTab] = useState<MobileTab>("library")
 
@@ -113,7 +106,13 @@ export function EvidenceRoom() {
       deletingId={deleteDocument.isPending ? deleteDocument.variables : undefined}
     />
   )
-  const gallery = <GalleryRegion distills={distills} />
+  const gallery = (
+    <GalleryRegion
+      distills={distillsQuery.data ?? []}
+      isLoading={distillsQuery.isPending}
+      isError={distillsQuery.isError}
+    />
+  )
   const ask = <AskRegion selectedDoc={selectedDoc} />
 
   return (
@@ -275,11 +274,25 @@ function LibraryRegion({
   )
 }
 
-function GalleryRegion({ distills }: { distills: EvidenceDistill[] }) {
+function GalleryRegion({
+  distills,
+  isLoading,
+  isError,
+}: {
+  distills: EvidenceDistill[]
+  isLoading: boolean
+  isError: boolean
+}) {
   return (
     <div className="space-y-2 p-3">
       <RegionLabel>Distilled</RegionLabel>
-      {distills.length === 0 ? (
+      {isError ? (
+        <p className="text-xs text-destructive">
+          Couldn’t load distilled cards.
+        </p>
+      ) : isLoading ? (
+        <p className="text-xs text-muted-foreground">Loading distilled cards…</p>
+      ) : distills.length === 0 ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <SparklesIcon className="size-3.5" /> Distilled cards land here. Select a
           document and say “distill this”.

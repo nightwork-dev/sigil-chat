@@ -3,6 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { AGENT_SCOPE_HEADER } from "./agent-session-scope";
 import { getSession, requireSession } from "./auth/session";
+import { type DistilledArtifact } from "@/components/agent/distilled-artifact-card";
+
+// Wire contract with apps/gonk `registry/distill.ts` DISTILL_MEDIA_TYPE: distilled
+// artifacts are stored at the turn's scope with this media type, so they land in
+// the room's corpus alongside documents and we split the two by media type.
+const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json";
 
 /**
  * D4.4 Evidence Room persistence. The document corpus lives at a stable
@@ -28,9 +34,16 @@ export interface EvidenceDocument {
   readonly url: string;
 }
 
+/** A distilled card the agent produced into this room's corpus. */
+export interface EvidenceDistill {
+  readonly artifactId: string;
+  readonly distilled: DistilledArtifact;
+}
+
 export const evidenceKeys = {
   all: () => ["evidence"] as const,
   documents: () => ["evidence", "documents", EVIDENCE_ROOM_SCOPE] as const,
+  distills: () => ["evidence", "distills", EVIDENCE_ROOM_SCOPE] as const,
 };
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
@@ -67,7 +80,60 @@ const listEvidenceDocumentsFn = createServerFn({ method: "GET" }).handler(
         `Evidence document list failed (${response.status} ${response.statusText})`,
       );
     }
-    return (await response.json()) as EvidenceDocument[];
+    const artifacts = (await response.json()) as EvidenceDocument[];
+    // Distilled cards live in the same scope; the library lists documents only.
+    return artifacts.filter((doc) => doc.mediaType !== DISTILL_MEDIA_TYPE);
+  },
+);
+
+const listEvidenceDistillsFn = createServerFn({ method: "GET" }).handler(
+  async (): Promise<EvidenceDistill[]> => {
+    requireSession(await getSession());
+    const { readGonkClientEnvironment } = await import(
+      "@workspace/runtime-env/server"
+    );
+    const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
+    if (!apiKey) {
+      throw new Error(
+        "GONK_MCP_KEY is not configured for the web app's server process; the Evidence Room cannot reach Gonk.",
+      );
+    }
+    const artifactsUrl = gonkMcpUrl.replace(/\/mcp\/?$/, "/artifacts");
+    const imgBase = gonkMcpUrl.replace(/\/mcp\/?$/, "");
+
+    const response = await fetch(artifactsUrl, {
+      method: "GET",
+      headers: {
+        [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
+        authorization: `Bearer ${apiKey}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Evidence distill list failed (${response.status} ${response.statusText})`,
+      );
+    }
+    const artifacts = (await response.json()) as EvidenceDocument[];
+    const distillMetas = artifacts.filter(
+      (artifact) => artifact.mediaType === DISTILL_MEDIA_TYPE,
+    );
+
+    // Each distill's bytes are the DistilledArtifact JSON; read them from the
+    // content-addressed /img route (unauthenticated, but the bearer is harmless).
+    const distills = await Promise.all(
+      distillMetas.map(async (meta): Promise<EvidenceDistill | null> => {
+        const content = await fetch(`${imgBase}/img/${meta.id}`);
+        if (!content.ok) return null;
+        try {
+          const distilled = (await content.json()) as DistilledArtifact;
+          if (typeof distilled?.title !== "string") return null;
+          return { artifactId: meta.id, distilled };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return distills.filter((entry): entry is EvidenceDistill => entry !== null);
   },
 );
 
@@ -155,6 +221,13 @@ export function useEvidenceDocuments() {
   return useQuery({
     queryKey: evidenceKeys.documents(),
     queryFn: () => listEvidenceDocumentsFn(),
+  });
+}
+
+export function useEvidenceDistills() {
+  return useQuery({
+    queryKey: evidenceKeys.distills(),
+    queryFn: () => listEvidenceDistillsFn(),
   });
 }
 
