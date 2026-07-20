@@ -15,4 +15,17 @@ describe("app navigation profiles", () => {
 
     expect(items.map((item) => item.to)).toContain("/roadmap")
   })
+
+  it("exposes system status only in owner navigation", () => {
+    expect(
+      buildAppNav({ internalWorkspaces: false, owner: true }).footer?.map(
+        (item) => item.to,
+      ),
+    ).toContain("/status")
+    expect(
+      buildAppNav({ internalWorkspaces: false, owner: false }).footer?.map(
+        (item) => item.to,
+      ),
+    ).not.toContain("/status")
+  })
 })

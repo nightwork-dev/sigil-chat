@@ -10,11 +10,15 @@ import {
   MessageSquareIcon,
   NetworkIcon,
   SettingsIcon,
+  ActivityIcon,
   UserRoundIcon,
 } from "lucide-react"
 import type { NavModel } from "@workspace/ui/components/layouts/nav"
 
-export function buildAppNav(options: { internalWorkspaces: boolean }): NavModel {
+export function buildAppNav(options: {
+  internalWorkspaces: boolean
+  owner?: boolean
+}): NavModel {
   return {
     brand: { label: "Sigil Chat", to: "/chat" },
     items: [
@@ -28,7 +32,12 @@ export function buildAppNav(options: { internalWorkspaces: boolean }): NavModel 
       { to: "/review", label: "Review", icon: FileCheck2Icon },
       { to: "/skills", label: "Skills", icon: BracesIcon },
     ],
-    footer: [{ to: "/settings", label: "Settings", icon: SettingsIcon }],
+    footer: [
+      ...(options.owner
+        ? [{ to: "/status", label: "Status", icon: ActivityIcon }]
+        : []),
+      { to: "/settings", label: "Settings", icon: SettingsIcon },
+    ],
   }
 }
 

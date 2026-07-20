@@ -19,7 +19,7 @@ import { fetchCurrentSession } from "@/lib/auth/route-guard"
 import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
-import { appNav } from "@/lib/app-nav"
+import { buildAppNav } from "@/lib/app-nav"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -37,10 +37,16 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user } = Route.useRouteContext()
+  const nav = buildAppNav({
+    internalWorkspaces:
+      import.meta.env.DEV ||
+      import.meta.env.VITE_SIGIL_INTERNAL_WORKSPACES === "1",
+    owner: user.role === "owner",
+  })
 
   return (
     <SidebarShell
-      nav={appNav}
+      nav={nav}
       actions={<ThemePicker variant="compact" />}
       accountMenu={<AccountMenu user={user} />}
     >
