@@ -1,0 +1,11 @@
+services:
+  eve:
+    environment:
+      SIGIL_MODEL_AUTH_MODE: api
+      SIGIL_MODEL_CREDENTIAL_FILE: /run/secrets/model_api_credential
+    secrets:
+      - model_api_credential
+
+secrets:
+  model_api_credential:
+    file: ${SIGIL_SECRET_DIR:-/var/lib/sigil-invite-demo/secrets}/model_api_credential

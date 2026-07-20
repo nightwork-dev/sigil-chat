@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_EVE_ORIGIN,
   DEFAULT_GONK_MCP_URL,
@@ -12,11 +15,20 @@ import {
   parsePort,
   readAgentEnvironment,
   readGonkClientEnvironment,
+  readOptionalSecretFromFile,
   readGonkServerEnvironment,
   readStorageEnvironment,
 } from "./server.js";
 
 describe("runtime topology", () => {
+  const temporaryDirectories: string[] = [];
+
+  afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("provides the Portless development defaults", () => {
     expect(readRuntimeTopology({})).toEqual({
       eveOrigin: DEFAULT_EVE_ORIGIN,
@@ -45,7 +57,7 @@ describe("runtime topology", () => {
 
   it("returns stable actionable errors for invalid values", () => {
     expectRuntimeError(
-      () => readRuntimeTopology({ EVE_ORIGIN: "file:///tmp/eve" }),
+      () => readRuntimeTopology({ EVE_ORIGIN: "mailto:agent@example.test" }),
       "INVALID_HTTP_URL",
       "EVE_ORIGIN",
     );
@@ -94,9 +106,37 @@ describe("runtime topology", () => {
 
   it("uses the established model default and accepts an override", () => {
     expect(readAgentEnvironment({})).toEqual({ model: DEFAULT_CODEX_MODEL });
-    expect(readAgentEnvironment({ CODEX_MODEL: "gpt-5.6-sol" })).toEqual({
-      model: "gpt-5.6-sol",
+    expect(readAgentEnvironment({ CODEX_MODEL: "gpt-5.5" })).toEqual({
+      model: "gpt-5.5",
     });
+  });
+
+  it("prefers inline secret value over _FILE", () => {
+    expect(
+      readOptionalSecretFromFile(
+        {
+          GONK_MCP_KEY: "  inlined  ",
+          GONK_MCP_KEY_FILE: "ignored",
+        },
+        "GONK_MCP_KEY",
+      ),
+    ).toBe("inlined");
+  });
+
+  it("reads secret value from *_FILE", () => {
+    const directory = mkdtempSync(join(tmpdir(), "runtime-env-test-"));
+    temporaryDirectories.push(directory);
+    const secretFile = join(directory, "secret");
+    writeFileSync(secretFile, "file-backed-secret\n", { mode: 0o600 });
+
+    expect(
+      readOptionalSecretFromFile(
+        {
+          GONK_MCP_KEY_FILE: secretFile,
+        },
+        "GONK_MCP_KEY",
+      ),
+    ).toBe("file-backed-secret");
   });
 
   it("projects optional storage paths without inventing defaults", () => {
@@ -107,11 +147,11 @@ describe("runtime topology", () => {
     expect(
       readStorageEnvironment({
         SIGIL_CHAT_GRAPH_PATH: " ./data/graph.json ",
-        SIGIL_CHAT_REVIEW_PATH: "/tmp/review.json",
+        SIGIL_CHAT_REVIEW_PATH: " data/review.json ",
       }),
     ).toEqual({
       graphPath: "./data/graph.json",
-      reviewPath: "/tmp/review.json",
+      reviewPath: "data/review.json",
     });
   });
 });

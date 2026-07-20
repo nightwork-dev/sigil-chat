@@ -214,11 +214,11 @@ describe("MarkdownWorkItemsRepository", () => {
 
 describe("resolveRoadmapDir", () => {
   it("prefers an explicit override and an env var over the co-located default", () => {
-    expect(resolveRoadmapDir(undefined, "/tmp/custom-roadmap")).toBe(
-      "/tmp/custom-roadmap",
-    );
-    expect(resolveRoadmapDir("/tmp/env-roadmap", undefined)).toBe(
-      "/tmp/env-roadmap",
+    const explicitOverride = join(tmpdir(), "custom-roadmap");
+    const environmentOverride = join(tmpdir(), "env-roadmap");
+    expect(resolveRoadmapDir(undefined, explicitOverride)).toBe(explicitOverride);
+    expect(resolveRoadmapDir(environmentOverride, undefined)).toBe(
+      environmentOverride,
     );
   });
 

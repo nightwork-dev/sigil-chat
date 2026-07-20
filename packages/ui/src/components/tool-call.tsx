@@ -19,7 +19,7 @@ import {
 } from "@workspace/ui/components/collapsible"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { JsonValue } from "@/components/agent/json-value"
+import { JsonValue } from "@workspace/ui/components/blocks/json-value"
 
 export function ToolCall({
   canRespond,

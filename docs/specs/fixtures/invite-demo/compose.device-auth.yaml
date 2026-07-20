@@ -1,0 +1,10 @@
+services:
+  eve:
+    environment:
+      SIGIL_MODEL_AUTH_MODE: codex-device
+      CODEX_HOME: /var/lib/eve-credential/codex-home
+    volumes:
+      - type: bind
+        source: ${SIGIL_CODEX_HOME_PATH:-/var/lib/sigil-invite-demo/codex-home}
+        target: /var/lib/eve-credential/codex-home
+        read_only: false

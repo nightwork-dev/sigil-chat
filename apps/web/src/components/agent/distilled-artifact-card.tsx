@@ -1,11 +1,11 @@
 import type { ReactNode } from "react"
 import { FileTextIcon, SparklesIcon } from "lucide-react"
 
-import { ToolCall } from "@/components/agent/tool-call"
+import { ToolCall } from "@workspace/ui/components/tool-call"
 import {
   getToolOutputData,
   type ToolRendererProps,
-} from "@/components/agent/tool-renderer-registry"
+} from "@workspace/ui/components/tool-renderer-registry"
 import { cn } from "@workspace/ui/lib/utils"
 
 export interface DistilledArtifact {

@@ -1,8 +1,8 @@
-import { ToolCall } from "@/components/agent/tool-call"
+import { ToolCall } from "@workspace/ui/components/tool-call"
 import {
   getToolOutputData,
   type ToolRendererProps,
-} from "@/components/agent/tool-renderer-registry"
+} from "@workspace/ui/components/tool-renderer-registry"
 
 interface GeneratedImageOutput {
   url?: string

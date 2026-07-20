@@ -11,7 +11,8 @@
     "build": "eve build",
     "dev": "portless sigil-chat-agent eve dev --no-ui --host 127.0.0.1",
     "start": "eve start --host 127.0.0.1",
-    "test": "vitest run",
+    "test": "vitest run && pnpm test:cold-boot",
+    "test:cold-boot": "node scripts/cold-boot-smoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

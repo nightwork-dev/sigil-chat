@@ -34,7 +34,7 @@ type PublishFn = (context: AttentionContext | null) => void
 const PublishContext = createContext<PublishFn | null>(null)
 
 // A parallel channel for the OPTIONAL explicit resource scope a workspace wants
-// the agent's tools to act on (codex's D4.4 companion fix). The Evidence Room
+// the agent's tools to act on. The Evidence Room
 // publishes `project:evidence-room` so "distill this" / "ask" reach the room's
 // durable corpus, not the per-thread session scope AgentChat otherwise defaults
 // to. Workspaces that publish nothing leave this null and AgentChat falls back

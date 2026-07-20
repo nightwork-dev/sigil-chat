@@ -64,6 +64,8 @@ reports/
 .playwright-mcp
 traces/
 apps/web/public/llms.txt
+# Nested agent runtime stores are never public assets.
+apps/web/public/**/.agents/
 
 # Internal planning/strategy docs — not shipped in the public template
 docs.local/
@@ -78,3 +80,10 @@ apps/agent/skills-archive/
 # repos that are themselves local-only (e.g. the .sigil roadmap store).
 *.local
 *.local.*
+
+# deploy secrets/locals
+deploy/aws/terraform/terraform.tfvars
+deploy/aws/terraform/.terraform/
+deploy/aws/terraform/*.tfplan
+deploy/aws/terraform/plan.txt
+deploy/aws/terraform/terraform.tfstate*

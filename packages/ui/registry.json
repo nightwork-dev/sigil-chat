@@ -1641,6 +1641,24 @@
       ]
     },
     {
+      "name": "json-value",
+      "type": "registry:block",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/code-block"
+      ],
+      "categories": [
+        "block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/blocks/json-value.tsx",
+          "type": "registry:block",
+          "target": "@ui/blocks/json-value.tsx"
+        }
+      ]
+    },
+    {
       "name": "kbd",
       "type": "registry:ui",
       "dependencies": [],
@@ -2732,6 +2750,11 @@
           "path": ".registry-staging/src/components/sidebar.tsx",
           "type": "registry:ui",
           "target": "@ui/sidebar.tsx"
+        },
+        {
+          "path": ".registry-staging/src/hooks/use-user-preference.ts",
+          "type": "registry:hook",
+          "target": "@hooks/use-user-preference.ts"
         }
       ]
     },
@@ -3327,6 +3350,42 @@
           "path": ".registry-staging/src/lib/tone.ts",
           "type": "registry:lib",
           "target": "@lib/tone.ts"
+        }
+      ]
+    },
+    {
+      "name": "tool-call",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent-surface",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/card",
+        "@sigil/collapsible",
+        "@sigil/json-value"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tool-call.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tool-call.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tool-renderer-registry",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent-surface"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tool-renderer-registry.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tool-renderer-registry.tsx"
         }
       ]
     },

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto"
+import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
 import {
   chmodSync,
   existsSync,
@@ -79,7 +80,7 @@ export function readAuthEnvironment(
   const databaseUrl =
     source.SIGIL_DATABASE_URL ?? (isProduction ? undefined : LOCAL_DATABASE_URL)
   const secret =
-    source.BETTER_AUTH_SECRET ??
+    readOptionalSecretFromFile(source, "BETTER_AUTH_SECRET") ??
     (isProduction ? undefined : getOrCreateLocalSecret(options.localSecretPath))
   const installationId =
     source.SIGIL_INSTALLATION_ID ??

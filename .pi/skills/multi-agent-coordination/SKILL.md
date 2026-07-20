@@ -113,11 +113,8 @@ work.
       green if self-contained — commit a package together with the
       `package.json`/`tsconfig` wiring that references it.
 - [ ] Do NOT commit another agent's half-finished in-flight files.
-- [ ] Every commit carries trailers:
-      ```
-      Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-      Claude-Session: <session url>
-      ```
+- [ ] Public commits describe the product concern, not the authoring harness,
+      persona, or session. Do not add agent identity or session URL trailers.
 
 ## RULE 7: Where things live
 

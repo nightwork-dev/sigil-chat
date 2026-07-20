@@ -12,12 +12,11 @@ const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json";
 
 /**
  * D4.4 Evidence Room persistence. The document corpus lives at a stable
- * PROJECT-tier scope so it survives sessions and reloads (David: "an actual
- * product that I can use to load data into persistently"), not the per-thread
- * session scope chat attachments use.
+ * PROJECT-tier scope so it survives sessions and reloads, rather than using
+ * the per-thread session scope reserved for ephemeral chat attachments.
  *
- * Every path is session-gated and proxied server-side (codex's ratified
- * read-path contract): the browser never talks to Gonk directly, never becomes
+ * Every path is session-gated and proxied server-side: the browser never talks
+ * to Gonk directly, never becomes
  * an MCP client, and never sees `GONK_MCP_KEY`. This web process holds the key
  * (via turbo `globalPassThroughEnv`) and forwards it to Gonk's authenticated
  * `/artifacts` + `/upload` routes; `/img/<key>` reads stay unauthenticated and

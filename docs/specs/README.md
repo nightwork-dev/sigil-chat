@@ -13,6 +13,12 @@ Currently authoritative for this product's design/implementation.
   owner-scoped application records, and trusted principal propagation from Web
   through Eve to Gonk. Ratified architecture contract; implementation pending.
 
+- [`DEPLOYMENT-INVITE-DEMO-SPEC.md`](DEPLOYMENT-INVITE-DEMO-SPEC.md) —
+  disposable one-origin, invite-only deployment and teardown contract with a
+  secret-free Compose topology fixture. Specification only; public deployment
+  is blocked on membership, principal-propagation, retention, and credential
+  proofs.
+
 - [`AGENT-EMBEDDING-SPEC.md`](AGENT-EMBEDDING-SPEC.md) — `@workspace/agent`
   embeddable agent framework. Implemented and architect-approved; live-browser
   acceptance remains. Scoped to this repo, written to port cleanly to

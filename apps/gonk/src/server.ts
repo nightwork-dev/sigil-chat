@@ -34,6 +34,7 @@ if (process.env.GONK_MCP_KEY === undefined) {
 
 const { port, apiKey } = readGonkServerEnvironment(process.env)
 const maxRequestBodyBytes = 1024 * 1024
+const host = process.env.HOST ?? "127.0.0.1"
 // Uploads are real file bytes (photos, PDFs), not JSON tool payloads — give
 // them a bigger ceiling than the MCP JSON body limit above.
 const maxUploadBodyBytes = 10 * 1024 * 1024
@@ -53,15 +54,15 @@ if (!apiKey) {
 // otherwise); capture it so nested request handlers keep that non-undefined type.
 const serviceBearerKey: string = apiKey
 const handler = createSigilMcpHandler({ apiKey, port })
-
 const mcpSessionScopes = new Map<string, { bearer: string; scope: ResourceScope }>()
+
 const server = createServer((request, response) => {
   void handleRequest(request, response)
 })
 
-server.listen(port, "127.0.0.1", () => {
+server.listen(port, host, () => {
   const address = server.address() as AddressInfo
-  console.log(`Gonk MCP listening on http://127.0.0.1:${address.port}/mcp`)
+  console.log(`Gonk MCP listening on http://${host}:${address.port}/mcp`)
 })
 
 async function stop(): Promise<void> {
@@ -132,7 +133,6 @@ async function handleRequest(
       request = new Request(request, { headers })
     }
     const response = await handler.handle(request)
-    await writeWebResponse(outgoing, response)
     const establishedSessionId = response.headers.get("mcp-session-id")
     if (establishedSessionId && requestedScope) {
       mcpSessionScopes.set(establishedSessionId, {
@@ -140,6 +140,7 @@ async function handleRequest(
         scope: requestedScope,
       })
     }
+    await writeWebResponse(outgoing, response)
   } catch (error) {
     console.error(error)
     if (!outgoing.headersSent) {

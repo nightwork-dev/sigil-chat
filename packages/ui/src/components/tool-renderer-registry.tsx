@@ -11,8 +11,10 @@ import type {
  * renderers at init; the message-part dispatch renders through {@link ToolCallSlot}.
  *
  * Self-contained by design: it depends only on the `@zigil/agent-surface`
- * contract, so it lifts cleanly into `@zigil/agent-react` once the API settles
- * (see the sigil feature roadmap, Phase 1). Phase 2 hook: a renderer may inspect
+ * contract. Lives in `@workspace/ui` alongside `agent-hud` — the design-system's
+ * agent-UI tier. (A non-UI consumer would warrant moving this into
+ * `@zigil/agent-react`; none exists yet, so the package split is deferred.)
+ * Phase 2 hook: a renderer may inspect
  * `part.output`, and a future `block-spec` output kind can delegate to the block
  * runtime — additive, no rewrite.
  */

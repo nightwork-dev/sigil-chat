@@ -3,17 +3,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 /**
- * Codex-backed text-to-image, the same mechanism Pi uses.
- *
- * Ported from `@gonk/image-gen`'s host-agnostic `CodexImageProvider` (that
- * package is not published to public npm, which this app resolves from). Pi's
- * only host-specific piece is where the OAuth token comes from — it asks Pi's
- * model registry. We read the same token eve already authenticates with: the
- * local `codex login` session at `~/.codex/auth.json`. The generation call
- * itself is a plain `fetch` to the Codex Responses API — no Pi runtime needed.
- *
- * Extraction candidate: publish `@gonk/image-gen` and consume it here instead
- * of vendoring, once the ecosystem is ready to add it to the public scope.
+ * Codex-backed text-to-image using the same local `codex login` session Eve
+ * authenticates with. The generation call is a plain fetch and has no
+ * dependency on another agent harness.
  */
 
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api";

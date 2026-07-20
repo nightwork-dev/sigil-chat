@@ -8,6 +8,7 @@ export type RuntimeEnvironmentErrorCode =
   | "INVALID_MODEL"
   | "INVALID_PATH_BASE"
   | "INVALID_PORT"
+  | "INVALID_SECRET"
   | "INVALID_STORAGE_PATH";
 
 export class RuntimeEnvironmentError extends Error {

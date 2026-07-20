@@ -29,13 +29,12 @@ export function stageOverlay() {
 }
 
 function isGeneratedPath(path) {
-  const relative = path
-    .slice(repositoryRoot.length + 1)
-    .replaceAll("\\", "/");
+  const relative = path.slice(repositoryRoot.length + 1).replaceAll("\\", "/");
   return relative
     .split("/")
     .some((segment) =>
       [
+        ".env",
         "node_modules",
         "dist",
         ".turbo",
@@ -43,9 +42,7 @@ function isGeneratedPath(path) {
         ".vite",
         ".eve",
         "coverage",
-      ].includes(
-        segment,
-      ),
+      ].includes(segment),
     );
 }
 

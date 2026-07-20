@@ -104,11 +104,8 @@ agent's lane without coordinating through the roadmap.
   it's self-contained — commit a package together with the
   `package.json`/`tsconfig` wiring that references it.
 - Don't commit another agent's half-finished in-flight files.
-- Trailers on every commit identify the authoring agent/session — match
-  whatever convention your harness already uses for this (Claude Code uses
-  `Co-Authored-By: Claude ... <noreply@anthropic.com>` +
-  `Claude-Session: <url>`; codex should use its own equivalent identifying
-  trailer rather than omitting attribution).
+- Public commits describe the product concern, not the authoring harness,
+  persona, or session. Do not add agent identity or session URL trailers.
 
 ## Where things live
 

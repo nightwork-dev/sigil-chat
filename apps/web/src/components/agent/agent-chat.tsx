@@ -64,7 +64,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { AuthorizationCard } from "@/components/agent/authorization-card"
 import { ContextTray } from "@/components/agent/context-tray"
-import { ToolCall } from "@/components/agent/tool-call"
+import { ToolCall } from "@workspace/ui/components/tool-call"
 import { GenerateImageRenderer } from "@/components/agent/image-tool-renderer"
 import { DistilledArtifactCard } from "@/components/agent/distilled-artifact-card"
 import { EvidenceCitationsRenderer } from "@/components/agent/evidence-citations-renderer"
@@ -72,7 +72,7 @@ import {
   registerToolRenderer,
   setDefaultToolRenderer,
   ToolCallSlot,
-} from "@/components/agent/tool-renderer-registry"
+} from "@workspace/ui/components/tool-renderer-registry"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   readRuntimeTopology,
   RuntimeEnvironmentError,
@@ -61,7 +62,7 @@ export function readGonkClientEnvironment(
 ): GonkClientEnvironment {
   return {
     ...readRuntimeTopology(env),
-    apiKey: readOptionalSecret(env.GONK_MCP_KEY),
+    apiKey: readOptionalSecretFromFile(env, "GONK_MCP_KEY"),
   };
 }
 
@@ -74,11 +75,42 @@ export function readGonkServerEnvironment(
   };
 }
 
-export function readOptionalSecret(
-  value: string | undefined,
+export function readOptionalSecretFromFile(
+  env: RuntimeEnvironment,
+  name: string,
 ): string | undefined {
-  const secret = value?.trim();
-  return secret || undefined;
+  const fileName = `${name}_FILE`;
+  const inline = env[name]?.trim();
+  if (inline) return inline;
+
+  const secretFile = env[fileName]?.trim();
+  if (!secretFile) return undefined;
+
+  try {
+    const secret = readFileSync(secretFile, "utf8").toString().trim();
+    if (!secret) {
+      throw new RuntimeEnvironmentError(
+        "INVALID_SECRET",
+        fileName,
+        `${name} file is empty`,
+      );
+    }
+    return secret;
+  } catch (error) {
+    if (error instanceof RuntimeEnvironmentError) throw error;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new RuntimeEnvironmentError(
+        "INVALID_SECRET",
+        fileName,
+        "secret file does not exist",
+      );
+    }
+    throw new RuntimeEnvironmentError(
+      "INVALID_SECRET",
+      fileName,
+      `could not read secret file: ${error}`,
+    );
+  }
 }
 
 export function parsePort(

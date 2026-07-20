@@ -45,9 +45,9 @@ const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
  * what the user has open/focused flows into the agent's context, so "distill
  * this" resolves to the focused document without naming it.
  *
- * The library is a real product surface (David: "an actual product I can load
- * data into persistently") — documents are durable project-tier artifacts
- * (`lib/evidence.ts`) that survive sessions and reloads, not session ephemera.
+ * The library is a real product surface: documents are durable project-tier
+ * artifacts (`lib/evidence.ts`) that survive sessions and reloads, not session
+ * ephemera.
  */
 export function EvidenceRoom() {
   const isMobile = useIsMobile()
@@ -86,7 +86,7 @@ export function EvidenceRoom() {
   // S1.9: publish to the shell HUD (see workspace-attention) — no local
   // AttentionProvider; the persistent HUD in _app reads this.
   usePublishWorkspaceAttention(attention)
-  // Pin the agent's tools to this room's durable corpus (codex's companion fix):
+  // Pin the agent's tools to this room's durable corpus:
   // "distill this" / "ask" operate on project:evidence-room, not the session scope.
   usePublishWorkspaceResourceScope(EVIDENCE_ROOM_SCOPE)
 

@@ -1,0 +1,133 @@
+name: sigil-chat
+
+x-service-hardening: &service-hardening
+  restart: unless-stopped
+  read_only: true
+  init: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:size=64m
+    - /home/sigil/.cache:size=64m
+  logging:
+    driver: local
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  migrate:
+    image: ${SIGIL_MIGRATE_IMAGE:?set SIGIL_MIGRATE_IMAGE to an immutable digest}
+    restart: "no"
+    read_only: true
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:size=64m, /home/sigil/.cache:size=64m]
+    environment:
+      NODE_ENV: production
+      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
+      BETTER_AUTH_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
+      SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
+      SIGIL_AUTH_REGISTRATION: closed
+    secrets: [better_auth_secret]
+    volumes: [web_data:/var/lib/sigil-web]
+    networks: [backend]
+
+  web:
+    <<: *service-hardening
+    image: ${SIGIL_WEB_IMAGE:?set SIGIL_WEB_IMAGE to an immutable digest}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      BETTER_AUTH_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
+      SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
+      SIGIL_AUTH_TRUSTED_ORIGINS: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_AUTH_REGISTRATION: closed
+      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
+      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      EVE_ORIGIN: http://eve:3001
+      GONK_MCP_URL: http://gonk:8808/mcp
+    secrets: [better_auth_secret, gonk_mcp_key]
+    volumes: [web_data:/var/lib/sigil-web]
+    expose: ["3000"]
+    networks: [backend]
+
+  eve:
+    <<: *service-hardening
+    image: ${SIGIL_EVE_IMAGE:?set SIGIL_EVE_IMAGE to an immutable digest}
+    command: ["sh", "-c", "cd /app/apps/agent && exec node .output/server/index.mjs"]
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3001"
+      SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
+      SIGIL_EVE_AUTH_ISSUER: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_EVE_AUTH_JWKS_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}/api/auth/jwks
+      SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
+      GONK_MCP_URL: http://gonk:8808/mcp
+      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      CODEX_HOME: /var/lib/sigil-eve/codex-home
+    secrets: [gonk_mcp_key]
+    volumes: [eve_data:/var/lib/sigil-eve, eve_state:/app/apps/agent/.eve]
+    expose: ["3001"]
+    # edge too: eve needs egress for JWKS-over-HTTPS and model providers
+    networks: [edge, backend]
+
+  gonk:
+    <<: *service-hardening
+    image: ${SIGIL_GONK_IMAGE:?set SIGIL_GONK_IMAGE to an immutable digest}
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8808"
+      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
+      SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
+    secrets: [gonk_mcp_key]
+    volumes: [gonk_data:/var/lib/sigil-gonk]
+    expose: ["8808"]
+    networks: [backend]
+
+  edge:
+    <<: *service-hardening
+    image: caddy:2.10-alpine
+    # caddy's binary ships file capabilities; exec fails EPERM under
+    # no-new-privileges + cap_drop ALL. Edge keeps read_only+non-root instead.
+    cap_drop: []
+    security_opt: []
+    user: "10004:10004"
+    depends_on: [web, eve, gonk]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST}
+    ports: ["80:8080", "443:8443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/sigil-chat/caddy-data:/data
+      - /srv/sigil-chat/caddy-config:/config
+    networks: [edge, backend]
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  web_data: {}
+  eve_data: {}
+  eve_state: {}
+  gonk_data: {}
+
+secrets:
+  better_auth_secret:
+    file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/better_auth_secret
+  gonk_mcp_key:
+    file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/gonk_mcp_key

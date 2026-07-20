@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars locally. Do not put credentials, private keys, or a
+# real production hostname in version control.
+aws_region        = "us-west-2"
+aws_profile       = "sigil-deploy"
+availability_zone = "us-west-2a"
+public_host       = "chat.example.invalid"
+key_name          = "sigil-chat-disposable"
+public_key_path   = "/absolute/path/to/sigil-chat-disposable.pub"
+admin_cidr        = "203.0.113.7/32"
+
+# Set both values only when Route53 owns the public hostname.
+# route53_zone_id     = "Z0123456789EXAMPLE"
+# route53_record_name = "chat.example.com"

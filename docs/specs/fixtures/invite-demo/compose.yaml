@@ -1,0 +1,222 @@
+name: sigil-invite-demo-spec
+
+x-service-hardening: &service-hardening
+  restart: unless-stopped
+  read_only: true
+  init: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  deploy:
+    resources:
+      limits:
+        cpus: "1.00"
+        memory: 1G
+        pids: 256
+
+services:
+  migrate:
+    <<: *service-hardening
+    image: ${SIGIL_WEB_IMAGE:-sigil-chat-web:spec-only}
+    restart: "no"
+    user: "10001:10001"
+    command: ["sigil-admin", "migrate", "apply", "--fail-closed"]
+    environment:
+      NODE_ENV: production
+      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
+    secrets:
+      - better_auth_secret
+    volumes:
+      - web_data:/var/lib/sigil-web
+    networks:
+      - backend
+
+  web:
+    <<: *service-hardening
+    image: ${SIGIL_WEB_IMAGE:-sigil-chat-web:spec-only}
+    user: "10001:10001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      BETTER_AUTH_URL: https://${PUBLIC_HOST:-invite-demo.invalid}
+      SIGIL_AUTH_TRUSTED_ORIGINS: https://${PUBLIC_HOST:-invite-demo.invalid}
+      SIGIL_AUTH_REGISTRATION: closed
+      SIGIL_INVITES_MODE: required
+      SIGIL_EXEC_MODE: disabled
+      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
+      SIGIL_INVITE_TOKEN_PEPPER_FILE: /run/secrets/invite_token_pepper
+      SIGIL_RETENTION_SECRET_KEY_FILE: /run/secrets/retention_secret_key
+      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      EVE_ORIGIN: https://${PUBLIC_HOST:-invite-demo.invalid}
+      GONK_MCP_URL: http://gonk:8808/mcp
+      SIGIL_LOG_REDACTION: strict
+    secrets:
+      - better_auth_secret
+      - invite_token_pepper
+      - retention_secret_key
+      - gonk_mcp_key
+    volumes:
+      - web_data:/var/lib/sigil-web
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "sigil-admin", "health", "--component", "web"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    networks:
+      - backend
+
+  eve:
+    <<: *service-hardening
+    image: ${SIGIL_EVE_IMAGE:-sigil-chat-eve:spec-only}
+    user: "10002:10002"
+    depends_on:
+      gonk:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3001"
+      SIGIL_EXEC_MODE: disabled
+      SIGIL_MODEL_AUTH_MODE: unconfigured
+      SIGIL_EVE_AUTH_ISSUER: https://${PUBLIC_HOST:-invite-demo.invalid}
+      SIGIL_EVE_AUTH_JWKS_URL: http://web:3000/api/auth/jwks
+      SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
+      GONK_MCP_URL: http://gonk:8808/mcp
+      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      SIGIL_LOG_REDACTION: strict
+    secrets:
+      - gonk_mcp_key
+    volumes:
+      - eve_state:/var/lib/sigil-eve
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "sigil-admin", "health", "--component", "eve"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    networks:
+      - backend
+
+  gonk:
+    <<: *service-hardening
+    image: ${SIGIL_GONK_IMAGE:-sigil-chat-gonk:spec-only}
+    user: "10003:10003"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8808"
+      SIGIL_EXEC_MODE: disabled
+      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
+      SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
+      SIGIL_LOG_REDACTION: strict
+    secrets:
+      - gonk_mcp_key
+    volumes:
+      - gonk_data:/var/lib/sigil-gonk
+    expose:
+      - "8808"
+    healthcheck:
+      test: ["CMD", "sigil-admin", "health", "--component", "gonk"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    networks:
+      - backend
+
+  edge:
+    <<: *service-hardening
+    image: caddy:2.10-alpine
+    user: "10004:10004"
+    depends_on:
+      web:
+        condition: service_healthy
+      eve:
+        condition: service_healthy
+      gonk:
+        condition: service_healthy
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-invite-demo.invalid}
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - proxy_data:/data
+      - proxy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    networks:
+      - edge
+      - backend
+
+  backup:
+    <<: *service-hardening
+    image: busybox:1.37
+    profiles:
+      - ops
+    restart: "no"
+    user: "10005:10005"
+    command:
+      [
+        "sh",
+        "-c",
+        "echo 'spec-only: use the reviewed encrypted backup command' >&2; exit 64",
+      ]
+    volumes:
+      - web_data:/source/web:ro
+      - eve_state:/source/eve:ro
+      - gonk_data:/source/gonk:ro
+      - backup_data:/backup
+    networks:
+      - backend
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  web_data: {}
+  eve_state: {}
+  gonk_data: {}
+  proxy_data: {}
+  proxy_config: {}
+  backup_data: {}
+
+secrets:
+  better_auth_secret:
+    file: ${SIGIL_SECRET_DIR:-/var/lib/sigil-invite-demo/secrets}/better_auth_secret
+  gonk_mcp_key:
+    file: ${SIGIL_SECRET_DIR:-/var/lib/sigil-invite-demo/secrets}/gonk_mcp_key
+  invite_token_pepper:
+    file: ${SIGIL_SECRET_DIR:-/var/lib/sigil-invite-demo/secrets}/invite_token_pepper
+  retention_secret_key:
+    file: ${SIGIL_SECRET_DIR:-/var/lib/sigil-invite-demo/secrets}/retention_secret_key

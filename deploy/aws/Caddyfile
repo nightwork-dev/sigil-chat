@@ -1,0 +1,29 @@
+{
+	admin off
+	http_port 8080
+	https_port 8443
+}
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	respond /healthz "ok" 200
+
+	handle /eve/* {
+		reverse_proxy eve:3001
+	}
+
+	handle /img/* {
+		reverse_proxy gonk:8808
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

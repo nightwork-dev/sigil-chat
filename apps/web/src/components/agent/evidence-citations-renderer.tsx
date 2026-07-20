@@ -1,12 +1,12 @@
 import { FileTextIcon, QuoteIcon } from "lucide-react"
 
-import { ToolCall } from "@/components/agent/tool-call"
+import { ToolCall } from "@workspace/ui/components/tool-call"
 import {
   getToolOutputData,
   type ToolRendererProps,
-} from "@/components/agent/tool-renderer-registry"
+} from "@workspace/ui/components/tool-renderer-registry"
 
-// Local view of the sigil-evidence-ask output (codex's D4.2 plumbing). The web
+// Local view of the sigil-evidence-ask output. The web
 // renderer owns what it reads from the tool result — no dependency on apps/gonk.
 interface EvidenceLocator {
   startLine: number
