@@ -14,6 +14,7 @@ import type {
   ForkAgentThreadInput,
 } from "@/lib/agent-threads-domain";
 import type { SigilAuthSession } from "@/lib/auth/server";
+import { useAgentPrincipalId } from "@/lib/agent-principal";
 
 export type {
   AgentThread,
@@ -166,45 +167,53 @@ const setActiveAgentThreadFn = createServerFn({ method: "POST" })
   });
 
 export const agentThreadKeys = {
-  all: () => ["agent-threads"] as const,
-  lists: () => [...agentThreadKeys.all(), "list"] as const,
-  list: (includeArchived = false) =>
-    [...agentThreadKeys.lists(), { includeArchived }] as const,
-  details: () => [...agentThreadKeys.all(), "detail"] as const,
-  detail: (id: string) => [...agentThreadKeys.details(), id] as const,
-  preference: () => [...agentThreadKeys.all(), "active-preference"] as const,
+  all: (principalId: string) => ["agent-threads", principalId] as const,
+  lists: (principalId: string) =>
+    [...agentThreadKeys.all(principalId), "list"] as const,
+  list: (principalId: string, includeArchived = false) =>
+    [...agentThreadKeys.lists(principalId), { includeArchived }] as const,
+  details: (principalId: string) =>
+    [...agentThreadKeys.all(principalId), "detail"] as const,
+  detail: (principalId: string, id: string) =>
+    [...agentThreadKeys.details(principalId), id] as const,
+  preference: (principalId: string) =>
+    [...agentThreadKeys.all(principalId), "active-preference"] as const,
 };
 
 export function useAgentThreads(includeArchived = false) {
+  const principalId = useAgentPrincipalId();
   return useQuery({
-    queryKey: agentThreadKeys.list(includeArchived),
+    queryKey: agentThreadKeys.list(principalId, includeArchived),
     queryFn: () => listAgentThreadsFn({ data: { includeArchived } }),
   });
 }
 
 export function useAgentThread(id: string | undefined) {
+  const principalId = useAgentPrincipalId();
   return useQuery({
-    queryKey: agentThreadKeys.detail(id ?? "none"),
+    queryKey: agentThreadKeys.detail(principalId, id ?? "none"),
     queryFn: () => getAgentThreadFn({ data: { id: id ?? "" } }),
     enabled: Boolean(id),
   });
 }
 
 export function useActiveAgentThreadPreference() {
+  const principalId = useAgentPrincipalId();
   return useQuery({
-    queryKey: agentThreadKeys.preference(),
+    queryKey: agentThreadKeys.preference(principalId),
     queryFn: () => getActiveAgentThreadPreferenceFn(),
   });
 }
 
 export function useCreateAgentThread() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: { personaId: string; title?: string }) =>
       createAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
-      cacheThread(queryClient, thread);
-      cacheActivePreference(queryClient, {
+      cacheThread(queryClient, principalId, thread);
+      cacheActivePreference(queryClient, principalId, {
         members: thread.members,
         activeThreadId: thread.id,
         updatedAt: thread.updatedAt,
@@ -215,25 +224,27 @@ export function useCreateAgentThread() {
 
 export function useRenameAgentThread() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: {
       id: string;
       title: string;
       expectedRevision?: number;
     }) => renameAgentThreadFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, thread),
+    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
   });
 }
 
 export function useArchiveAgentThread() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: { id: string; expectedRevision?: number }) =>
       archiveAgentThreadFn({ data: input }),
     onSuccess: async (thread) => {
-      cacheThread(queryClient, thread);
+      cacheThread(queryClient, principalId, thread);
       await queryClient.invalidateQueries({
-        queryKey: agentThreadKeys.preference(),
+        queryKey: agentThreadKeys.preference(principalId),
       });
     },
   });
@@ -241,23 +252,24 @@ export function useArchiveAgentThread() {
 
 export function useDeleteAgentThread() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: { id: string; expectedRevision?: number }) =>
       deleteAgentThreadFn({ data: input }),
     onSuccess: async (thread) => {
       queryClient.removeQueries({
-        queryKey: agentThreadKeys.detail(thread.id),
+        queryKey: agentThreadKeys.detail(principalId, thread.id),
       });
       queryClient.setQueryData<AgentThreadSummary[]>(
-        agentThreadKeys.list(true),
+        agentThreadKeys.list(principalId, true),
         (current) => current?.filter((candidate) => candidate.id !== thread.id),
       );
       queryClient.setQueryData<AgentThreadSummary[]>(
-        agentThreadKeys.list(false),
+        agentThreadKeys.list(principalId, false),
         (current) => current?.filter((candidate) => candidate.id !== thread.id),
       );
       await queryClient.invalidateQueries({
-        queryKey: agentThreadKeys.preference(),
+        queryKey: agentThreadKeys.preference(principalId),
       });
     },
   });
@@ -265,24 +277,26 @@ export function useDeleteAgentThread() {
 
 export function useSaveAgentThreadSnapshot() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: {
       id: string;
       snapshot: AgentThreadSnapshot;
       expectedRevision?: number;
     }) => saveAgentThreadSnapshotFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, thread),
+    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
   });
 }
 
 export function useForkAgentThread() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: ForkAgentThreadInput) =>
       forkAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
-      cacheThread(queryClient, thread);
-      cacheActivePreference(queryClient, {
+      cacheThread(queryClient, principalId, thread);
+      cacheActivePreference(queryClient, principalId, {
         members: thread.members,
         activeThreadId: thread.id,
         updatedAt: thread.updatedAt,
@@ -293,31 +307,41 @@ export function useForkAgentThread() {
 
 export function useConsumeAgentThreadForkSeed() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: { id: string; expectedRevision?: number }) =>
       consumeAgentThreadForkSeedFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, thread),
+    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
   });
 }
 
 export function useSetActiveAgentThread() {
   const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
   return useMutation({
     mutationFn: (input: { id?: string }) =>
       setActiveAgentThreadFn({ data: input }),
-    onSuccess: (preference) => cacheActivePreference(queryClient, preference),
+    onSuccess: (preference) =>
+      cacheActivePreference(queryClient, principalId, preference),
   });
 }
 
-function cacheThread(queryClient: QueryClient, thread: AgentThread) {
-  queryClient.setQueryData(agentThreadKeys.detail(thread.id), thread);
+function cacheThread(
+  queryClient: QueryClient,
+  principalId: string,
+  thread: AgentThread,
+) {
+  queryClient.setQueryData(
+    agentThreadKeys.detail(principalId, thread.id),
+    thread,
+  );
   const summary = projectCachedThreadSummary(thread);
   queryClient.setQueryData<AgentThreadSummary[]>(
-    agentThreadKeys.list(true),
+    agentThreadKeys.list(principalId, true),
     (current) => upsertThread(current, summary),
   );
   queryClient.setQueryData<AgentThreadSummary[]>(
-    agentThreadKeys.list(false),
+    agentThreadKeys.list(principalId, false),
     (current) =>
       thread.status === "archived"
         ? current?.filter((candidate) => candidate.id !== thread.id)
@@ -327,9 +351,13 @@ function cacheThread(queryClient: QueryClient, thread: AgentThread) {
 
 function cacheActivePreference(
   queryClient: QueryClient,
+  principalId: string,
   preference: AgentThreadPreference,
 ) {
-  queryClient.setQueryData(agentThreadKeys.preference(), preference);
+  queryClient.setQueryData(
+    agentThreadKeys.preference(principalId),
+    preference,
+  );
 }
 
 function upsertThread(

@@ -13,7 +13,10 @@ import { AgentProfileView } from "@/components/agents/agent-profile"
 import { agentProfileQueryOptions } from "@/lib/agent-profile"
 
 export const Route = createFileRoute("/_app/agents/$personaId")({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(agentProfileQueryOptions(params.personaId)),
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(
+      agentProfileQueryOptions(context.user.id, params.personaId),
+    ),
   component: AgentProfileRoute,
 })
 

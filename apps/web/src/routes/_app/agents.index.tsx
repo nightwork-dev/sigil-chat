@@ -14,7 +14,10 @@ import { Card, CardContent } from "@workspace/ui/components/card"
 import { agentRosterQueryOptions } from "@/lib/agent-profile"
 
 export const Route = createFileRoute("/_app/agents/")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(agentRosterQueryOptions()),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(
+      agentRosterQueryOptions(context.user.id),
+    ),
   component: AgentRoster,
 })
 

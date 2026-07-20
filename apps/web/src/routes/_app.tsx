@@ -20,6 +20,7 @@ import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attenti
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
 import { buildAppNav } from "@/lib/app-nav"
+import { AgentPrincipalProvider } from "@/lib/agent-principal"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -51,11 +52,13 @@ function AppLayout() {
       accountMenu={<AccountMenu user={user} />}
     >
       <WorkspaceAttentionProvider>
-        <AppAgentSessions principalId={user.id}>
-          <Outlet />
-          <ShellAgentHud />
-          <ShellOmnibar />
-        </AppAgentSessions>
+        <AgentPrincipalProvider principalId={user.id}>
+          <AppAgentSessions principalId={user.id}>
+            <Outlet />
+            <ShellAgentHud />
+            <ShellOmnibar />
+          </AppAgentSessions>
+        </AgentPrincipalProvider>
       </WorkspaceAttentionProvider>
     </SidebarShell>
   )

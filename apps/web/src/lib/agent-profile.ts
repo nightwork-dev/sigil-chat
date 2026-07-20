@@ -12,6 +12,7 @@ import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { MemoryRecord } from "@gonk/memory"
 import type { ResolvedPersona } from "@gonk/persona"
 import type { SigilAuthSession } from "./auth/server"
+import { useAgentPrincipalId } from "./agent-principal"
 
 export interface AgentMemoryPane {
   accepted: MemoryRecord[]
@@ -77,32 +78,38 @@ export const agentProfileKeys = {
   detail: (principalId: string, personaId: string) => [...agentProfileKeys.all(), principalId, personaId] as const,
 }
 
-export function agentProfileQueryOptions(personaId: string) {
+export function agentProfileQueryOptions(
+  principalId: string,
+  personaId: string,
+) {
   return queryOptions({
-    queryKey: agentProfileKeys.detail("owner", personaId),
+    queryKey: agentProfileKeys.detail(principalId, personaId),
     queryFn: () => fetchAgentProfile({ data: personaId }),
   })
 }
 
-export function agentRosterQueryOptions() {
+export function agentRosterQueryOptions(principalId: string) {
   return queryOptions({
-    queryKey: agentProfileKeys.roster("owner"),
+    queryKey: agentProfileKeys.roster(principalId),
     queryFn: () => listPersonas(),
   })
 }
 
 export function useAgentProfile(personaId: string) {
-  return useQuery(agentProfileQueryOptions(personaId))
+  const principalId = useAgentPrincipalId()
+  return useQuery(agentProfileQueryOptions(principalId, personaId))
 }
 
 export function useAgentRoster() {
-  return useQuery(agentRosterQueryOptions())
+  const principalId = useAgentPrincipalId()
+  return useQuery(agentRosterQueryOptions(principalId))
 }
 
 export function useInvalidateAgentProfile(personaId: string) {
   const qc = useQueryClient()
+  const principalId = useAgentPrincipalId()
   return () =>
     qc.invalidateQueries({
-      queryKey: agentProfileKeys.detail("owner", personaId),
+      queryKey: agentProfileKeys.detail(principalId, personaId),
     })
 }
