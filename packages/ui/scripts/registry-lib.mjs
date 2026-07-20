@@ -24,6 +24,7 @@ const CATEGORY_DIRS = new Set([
   "blocks",
   "constraints",
   "creative",
+  "dnd",
   "display",
   "effects",
   "graph",

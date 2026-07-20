@@ -1092,6 +1092,24 @@
       ]
     },
     {
+      "name": "draggable",
+      "type": "registry:ui",
+      "dependencies": [
+        "@dnd-kit/core",
+        "@dnd-kit/utilities"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/dnd/draggable.tsx",
+          "type": "registry:ui",
+          "target": "@ui/dnd/draggable.tsx"
+        }
+      ]
+    },
+    {
       "name": "drawer",
       "type": "registry:ui",
       "dependencies": [
@@ -1105,6 +1123,23 @@
           "path": ".registry-staging/src/components/drawer.tsx",
           "type": "registry:ui",
           "target": "@ui/drawer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "drop-zone",
+      "type": "registry:ui",
+      "dependencies": [
+        "@dnd-kit/core"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/dnd/drop-zone.tsx",
+          "type": "registry:ui",
+          "target": "@ui/dnd/drop-zone.tsx"
         }
       ]
     },
@@ -1655,6 +1690,27 @@
           "path": ".registry-staging/src/components/blocks/json-value.tsx",
           "type": "registry:block",
           "target": "@ui/blocks/json-value.tsx"
+        }
+      ]
+    },
+    {
+      "name": "kanban-board",
+      "type": "registry:block",
+      "dependencies": [
+        "@dnd-kit/core",
+        "@dnd-kit/sortable"
+      ],
+      "registryDependencies": [
+        "@sigil/sortable"
+      ],
+      "categories": [
+        "block"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/blocks/kanban-board.tsx",
+          "type": "registry:block",
+          "target": "@ui/blocks/kanban-board.tsx"
         }
       ]
     },
@@ -2833,6 +2889,25 @@
           "path": ".registry-staging/src/components/sonner.tsx",
           "type": "registry:ui",
           "target": "@ui/sonner.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sortable",
+      "type": "registry:ui",
+      "dependencies": [
+        "@dnd-kit/core",
+        "@dnd-kit/sortable",
+        "@dnd-kit/utilities"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/dnd/sortable.tsx",
+          "type": "registry:ui",
+          "target": "@ui/dnd/sortable.tsx"
         }
       ]
     },

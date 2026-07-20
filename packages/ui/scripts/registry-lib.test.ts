@@ -120,6 +120,17 @@ describe("buildRegistry", () => {
     expect(registry.items.find((item) => item.name === "popover")?.registryDependencies).toEqual(["@sigil/button"])
   })
 
+  it("publishes drag-and-drop primitives as registry dependencies", async () => {
+    const fileMap = await readSourceFileMap(path.join(packageRoot, "src"))
+    const packageJson = JSON.parse(await fs.readFile(path.join(packageRoot, "package.json"), "utf8"))
+    const registry = buildRegistry(fileMap, { packageJson })
+
+    expect(registry.items.find((item) => item.name === "kanban-board")?.registryDependencies).toEqual(
+      expect.arrayContaining(["@sigil/sortable"]),
+    )
+    expect(registry.items.find((item) => item.name === "sortable")).toBeDefined()
+  })
+
   it("ships colocated CSS imported by a registry component", () => {
     const registry = buildRegistry({
       "src/components/typeset.tsx": `import "./typeset.css"
