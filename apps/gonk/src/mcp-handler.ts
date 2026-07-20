@@ -27,6 +27,9 @@ export function createSigilMcpHandler({
       `127.0.0.1:${port}`,
       `localhost:${port}`,
       "sigil-chat-gonk.localhost:1355",
+      // Deployment hostnames (e.g. compose service names) join via env.
+      ...(process.env.GONK_ALLOWED_HOSTS?.split(",").map((h) => h.trim())
+        .filter(Boolean) ?? []),
     ],
     authenticate: async (request) => {
       if (

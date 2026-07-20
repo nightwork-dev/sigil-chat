@@ -80,7 +80,7 @@ services:
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
       CODEX_HOME: /var/lib/sigil-eve/codex-home
     secrets: [gonk_mcp_key]
-    volumes: [eve_data:/var/lib/sigil-eve, eve_app:/app/apps/agent]
+    volumes: [eve_data:/var/lib/sigil-eve, eve_app:/app/apps/agent, eve_scope:/app/.agents]
     expose: ["3001"]
     # edge too: eve needs egress for JWKS-over-HTTPS and model providers
     networks: [edge, backend]
@@ -93,6 +93,7 @@ services:
       HOST: 0.0.0.0
       PORT: "8808"
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      GONK_ALLOWED_HOSTS: gonk:8808
       SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
       SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
     secrets: [gonk_mcp_key]
@@ -130,6 +131,7 @@ volumes:
   eve_state: {}
   eve_app: {}
   gonk_scope: {}
+  eve_scope: {}
   gonk_data: {}
 
 secrets:
