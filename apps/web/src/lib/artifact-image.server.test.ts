@@ -36,7 +36,7 @@ describe("artifact image authorization", () => {
     const fetcher = vi.fn<typeof fetch>()
     const response = await readArtifactImage(
       new Request(
-        "https://chat.example.test/img?key=uploads%2Fimage.png&scope=session:thread-1",
+        "https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=session:thread-1",
       ),
       dependencies({ fetcher, getSession: () => Promise.resolve(null) }),
     )
@@ -48,7 +48,7 @@ describe("artifact image authorization", () => {
     const fetcher = vi.fn<typeof fetch>()
     const response = await readArtifactImage(
       new Request(
-        "https://chat.example.test/img?key=uploads%2Fimage.png&scope=session:thread-2",
+        "https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=session:thread-2",
       ),
       dependencies({ fetcher }),
     )
@@ -60,7 +60,7 @@ describe("artifact image authorization", () => {
     for (const scope of ["project:other", "persona:any"]) {
       const response = await readArtifactImage(
         new Request(
-          `https://chat.example.test/img?key=uploads%2Fimage.png&scope=${scope}`,
+          `https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=${scope}`,
         ),
         dependencies(),
       )
@@ -78,7 +78,7 @@ describe("artifact image authorization", () => {
     )
     const response = await readArtifactImage(
       new Request(
-        "https://chat.example.test/img?key=uploads%2Fimage.png&scope=session:thread-1",
+        "https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=session:thread-1",
       ),
       dependencies({ fetcher }),
     )

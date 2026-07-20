@@ -51,13 +51,13 @@ export function imagePublicUrl(key: string, scope: ScopeInput): string {
   const base = process.env.GONK_PUBLIC_URL
   const scopeHeader = formatScopeHeader(scope)
   if (!scopeHeader) throw new Error("Artifact URL requires a valid scope")
-  const path = `/img?key=${encodeURIComponent(key)}&scope=${encodeURIComponent(scopeHeader)}`
+  const path = `/api/media/artifact?key=${encodeURIComponent(key)}&scope=${encodeURIComponent(scopeHeader)}`
   return base ? `${base.replace(/\/$/, "")}${path}` : path
 }
 
 /** Same served URL scheme as {@link imagePublicUrl}, named for the general
  *  case: /upload stores arbitrary attachments (not only generated images)
- *  under the same object store, served back through the same /img/ route. */
+ *  under the same object store, served back through the same media route. */
 export const artifactPublicUrl = imagePublicUrl
 
 /** Content-addressed key for an arbitrary uploaded attachment (image or

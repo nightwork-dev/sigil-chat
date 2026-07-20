@@ -14,7 +14,7 @@ describe("agentPortraitUrl", () => {
 
   it("prefers an owner-uploaded private portrait", () => {
     expect(agentPortraitUrl("sigil-chat-eve", true)).toBe(
-      "/api/agent-portrait?personaId=sigil-chat-eve",
+      "/api/media/portrait?personaId=sigil-chat-eve",
     )
   })
 

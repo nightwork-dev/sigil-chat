@@ -29,8 +29,9 @@ const config = defineConfig({
     jsx: "automatic",
   },
   plugins: [
+    tanstackStart(),
     nitro({
-      plugins: [resolve(import.meta.dirname, "server/plugins/auth.ts")],
+      serverDir: resolve(import.meta.dirname, "server"),
       routeRules: {
         "/eve/**": {
           proxy: `${eveOrigin}/eve/**`,
@@ -46,7 +47,6 @@ const config = defineConfig({
       projects: ["./tsconfig.json", "../../packages/ui/tsconfig.json"],
     }),
     tailwindcss(),
-    tanstackStart(),
     viteReact(),
   ],
 })

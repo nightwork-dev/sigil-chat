@@ -32,7 +32,7 @@ export interface AgentProfile {
    *  `Persona` yet, so the chip renders base+revision alone. */
   lineage: { authoredBaseId: string; policyRevision: string }
   /** Whether the persona registry has a portrait blob on disk. The view
-   *  fetches the image itself from /api/agent-portrait; this is just the
+   *  fetches the image itself from /api/media/portrait; this is just the
    *  presence flag so it knows whether to attempt that or fall back to the
    *  initial-glyph. */
   hasPortrait: boolean
@@ -77,7 +77,7 @@ export function agentPortraitUrl(
   hasPortrait: boolean,
 ): string | undefined {
   return hasPortrait
-    ? `/api/agent-portrait?personaId=${encodeURIComponent(personaId)}`
+    ? `/api/media/portrait?personaId=${encodeURIComponent(personaId)}`
     : DEFAULT_PORTRAITS[personaId]
 }
 
