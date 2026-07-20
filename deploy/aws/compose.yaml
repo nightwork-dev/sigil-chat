@@ -57,14 +57,17 @@ services:
       EVE_ORIGIN: http://eve:3001
       GONK_MCP_URL: http://gonk:8808/mcp
     secrets: [better_auth_secret, gonk_mcp_key]
-    volumes: [web_data:/var/lib/sigil-web]
+    volumes: [web_data:/var/lib/sigil-web, web_scope:/app/.agents]
     expose: ["3000"]
     networks: [backend]
 
   eve:
     <<: *service-hardening
     image: ${SIGIL_EVE_IMAGE:?set SIGIL_EVE_IMAGE to an immutable digest}
-    command: ["sh", "-c", "cd /app/apps/agent && exec node .output/server/index.mjs"]
+    command: ["pnpm", "--filter", "sigil-chat-agent", "exec", "eve", "start", "--host", "0.0.0.0"]
+    tmpfs:
+      - /tmp:size=64m
+      - /home/sigil/.cache:size=64m
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -77,7 +80,7 @@ services:
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
       CODEX_HOME: /var/lib/sigil-eve/codex-home
     secrets: [gonk_mcp_key]
-    volumes: [eve_data:/var/lib/sigil-eve, eve_state:/app/apps/agent/.eve]
+    volumes: [eve_data:/var/lib/sigil-eve, eve_app:/app/apps/agent]
     expose: ["3001"]
     # edge too: eve needs egress for JWKS-over-HTTPS and model providers
     networks: [edge, backend]
@@ -93,7 +96,7 @@ services:
       SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
       SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
     secrets: [gonk_mcp_key]
-    volumes: [gonk_data:/var/lib/sigil-gonk]
+    volumes: [gonk_data:/var/lib/sigil-gonk, gonk_scope:/app/.agents]
     expose: ["8808"]
     networks: [backend]
 
@@ -122,8 +125,11 @@ networks:
 
 volumes:
   web_data: {}
+  web_scope: {}
   eve_data: {}
   eve_state: {}
+  eve_app: {}
+  gonk_scope: {}
   gonk_data: {}
 
 secrets:
