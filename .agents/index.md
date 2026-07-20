@@ -58,13 +58,15 @@ file does not repeat it.
 │   ├── agent-contracts/ → @workspace/agent-contracts — shared client command and semantic highlight contracts
 │   ├── chat/           → @workspace/chat — ChatMessage, ChatInput, ChatList, markdown
 │   ├── data/           → @workspace/data — EntityBrowser, EntityTable, DetailPanel
-│   ├── canvas/         → @workspace/canvas — spatial editor primitives, grid types
 │   ├── graph/           → @workspace/graph — reducer graph engine (nodes, sockets, data-kinds, document, builtins)
 │   ├── graph-store/     → @workspace/graph-store — graph persistence repository
 │   ├── review/          → @workspace/review — review/annotation UI components
 │   ├── review-store/    → @workspace/review-store — review persistence repository, types
 │   ├── file-store-core/ → @workspace/file-store-core — local file-backed store primitive
-│   └── cli/             → sigil — the sigil-design CLI (create/render/pack-template), vendored here
+│   ├── runtime-env/     → @workspace/runtime-env — typed environment + topology readers all three apps bootstrap from
+│   ├── blackboard-store/ → @workspace/blackboard-store — shared blackboard doc store (wraps @mirk/store-markdown)
+│   ├── work-items-store/ → @workspace/work-items-store — roadmap/work-items store (wraps @mirk/store-markdown)
+│   └── chat-overlay/     → @sigil-design/chat-overlay — build-time overlay generator for `sigil create`, not a runtime dependency
 ├── turbo.json
 └── pnpm-workspace.yaml
 ```
@@ -79,24 +81,36 @@ The product surface is the pathless `_app` layout
 (`_app.tsx` — SidebarShell, Cmd+B collapsible, breadcrumb bar, theme picker),
 which wraps:
 
-- `_app/index.tsx` — redirects to the canonical agentic reducer workspace
+- `_app/index.tsx` — redirects to `/chat` (static landing target until S10.4's
+  last-workspace setting exists)
 - `_app/chat.tsx` — the chat workspace
-- `_app/dashboard.tsx` — stat cards / charts / data table demo
 - `_app/studio.tsx` — ReducerStudio, the typed reducer graph workspace with an overlaid agent HUD
 - `_app/review.tsx` — review/annotation workspace
 - `_app/skills.tsx` — searchable Eve capability catalog (Gonk Core lifecycle boundary)
-- `_app/canvas.tsx`, `_app/data.tsx` — canvas and data-browsing workspaces
+- `_app/evidence.tsx` — Evidence Room: document library → distilled-cards
+  gallery → ask-with-citations (sigil-evidence-ask), with selection→agent
+  attention
+- `_app/roadmap.tsx` — RoadmapWorkspace: story/work-items board over the
+  external roadmap store, reconciled through the work-items domain-outcome loop
+- `_app/settings.tsx` — real user settings (account / appearance / security /
+  agent preferences), nested inside the existing app chrome
+
+Outside `_app` (no product nav): `login.tsx`, `setup.tsx`, and
+`api/auth/$.ts` (the Better Auth surface), plus `labs.gaze.tsx` — the
+quarantined gaze lab route (out of scope for this doc's product-surface
+description; see the repo's `labs.gaze` skill/owner notes).
 
 `__root.tsx` (no visible chrome) provides ThemeProvider, QueryClientProvider,
 AgentSessionProvider, and loads global styles/fonts.
 
 The inherited demo route tree (`showcase/*`, `gallery/*`, `examples/*`,
-`sidebar.*`, `footer/*`, `menubar/*`, `split/*`, `settings/*`, `inspector/*` —
-54 files) was **removed in DS.1** (2026-07-19): all 54 had zero product-code
-imports (evidence: the de-scaffold inventory). Sigil Design's own showcase is
-the component catalog now — look there for shell-pattern and component
-reference, not here. `settings/*` was demo-only; S10.4 rebuilds real settings
-from scratch. The product surface is the `_app/*` workspaces listed above.
+`sidebar.*`, `footer/*`, `menubar/*`, `split/*`, `settings/*`, `inspector/*`,
+`dashboard.tsx`, `canvas.tsx`, `data.tsx` among them) was **removed in DS.1**
+(2026-07-19): all had zero product-code imports (evidence: the de-scaffold
+inventory). Sigil Design's own showcase is the component catalog now — look
+there for shell-pattern and component reference, not here. Settings is real
+now (`_app/settings.tsx`, above), not demo-only. The product surface is the
+`_app/*` workspaces listed above.
 
 Every route file carries the mandatory ancestor-path + chrome-description
 header comment (see any file above for the format) — this prevents
