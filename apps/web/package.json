@@ -40,7 +40,6 @@
     "@tanstack/router-plugin": "^1.168.18",
     "@workspace/agent-contracts": "workspace:*",
     "@workspace/blackboard-store": "workspace:*",
-    "@workspace/canvas": "workspace:*",
     "@workspace/chat": "workspace:*",
     "@workspace/data": "workspace:*",
     "@workspace/graph": "workspace:*",

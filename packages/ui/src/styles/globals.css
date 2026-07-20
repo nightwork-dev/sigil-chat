@@ -7,7 +7,6 @@
 @custom-variant dark (&:is(.dark *));
 @source "../../../../apps/**/*.{ts,tsx}";
 @source "../../../../packages/chat/src/**/*.{ts,tsx}";
-@source "../../../../packages/canvas/src/**/*.{ts,tsx}";
 @source "../../../../packages/data/src/**/*.{ts,tsx}";
 @source "../../../../packages/review/src/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
