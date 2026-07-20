@@ -79,4 +79,36 @@ describe("ridge gaze calibration", () => {
     expect(new Set(targets.map((target) => target.join(","))).size).toBe(16)
     expect(targets[0]).not.toEqual([0.1, 0.1])
   })
+
+  it("selects discriminative per-user features and reports signed bias and gain", () => {
+    const samples = Array.from({ length: 16 }, (_, index) => {
+      const column = index % 4
+      const row = Math.floor(index / 4)
+      const x = 100 + column * 250
+      const y = 80 + row * 180
+      return {
+        features: [
+          column * 0.1 + row * 0.001,
+          row * 0.1 + column * 0.001,
+          (index % 2) * 100,
+          Math.sin(index) * 50,
+        ],
+        target: { x, y },
+      }
+    })
+    const calibration = fitGazeCalibration(samples, {
+      xFeatureIndices: [0, 2, 3],
+      yFeatureIndices: [1, 2, 3],
+      xPrimaryFeatureIndices: [0],
+      yPrimaryFeatureIndices: [1],
+      adaptiveFeatureSelection: true,
+      lambdaCandidates: [0.001],
+    })
+    expect(calibration.diagnostics.x.selectedFeatureIndices).toContain(0)
+    expect(calibration.diagnostics.y.selectedFeatureIndices).toContain(1)
+    expect(calibration.diagnostics.x.selectedFeatureIndices).not.toContain(2)
+    expect(calibration.diagnostics.x.lowEvidence).toBe(false)
+    expect(Math.abs(calibration.diagnostics.x.biasPixels)).toBeLessThan(1)
+    expect(calibration.diagnostics.x.gain).toBeCloseTo(1, 2)
+  })
 })

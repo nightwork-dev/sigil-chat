@@ -6,6 +6,7 @@ import {
   ArchiveIcon,
   BracesIcon,
   FileCheck2Icon,
+  FlaskConicalIcon,
   LibraryBigIcon,
   MapIcon,
   MessageSquareIcon,
@@ -31,7 +32,10 @@ export function buildAppNav(options: {
       { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
       { to: "/artifacts", label: "Artifacts", icon: ArchiveIcon },
       ...(options.internalWorkspaces
-        ? [{ to: "/roadmap", label: "Roadmap", icon: MapIcon }]
+        ? [
+            { to: "/labs", label: "Labs", icon: FlaskConicalIcon },
+            { to: "/roadmap", label: "Roadmap", icon: MapIcon },
+          ]
         : []),
       { to: "/review", label: "Review", icon: FileCheck2Icon },
       { to: "/skills", label: "Skills", icon: BracesIcon },

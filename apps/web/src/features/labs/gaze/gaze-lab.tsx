@@ -5,33 +5,42 @@ import {
   CrosshairIcon,
   EyeIcon,
   EyeOffIcon,
+  InfoIcon,
   RotateCcwIcon,
   SquareIcon,
 } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 
 import {
   createCalibrationTargets,
-  fitGazeCalibration,
   leaveOneTargetOutResiduals,
-  predictGaze,
   summarizeCalibrationTarget,
   type CalibrationSample,
-  type GazeCalibration,
+  type CalibrationDiagnostics,
   type NormalizedCalibrationTarget,
   type ScreenPoint,
 } from "./calibration"
+import { LocalCorrectionField } from "./corrections"
 import {
   createGazeEstimator,
   type GazeConfidence,
   type GazeEstimator,
 } from "./estimator"
-import {
-  GAZE_X_FEATURE_INDICES,
-  GAZE_Y_FEATURE_INDICES,
-} from "./features"
+import { FixationSettler } from "./fixation"
 import { OneEuroFilter, type OneEuroOptions } from "./one-euro"
+import {
+  fitPoseCalibrationLayer,
+  predictLayeredGaze,
+  upsertPoseCalibrationLayer,
+  type PoseCalibrationLayer,
+  type PoseCoverage,
+} from "./pose-calibration"
 import {
   advanceProtocol,
   createIdleProtocolState,
@@ -69,9 +78,41 @@ interface ObservationFields {
   failureModes: string
 }
 
-const CALIBRATION_SETTLE_MS = 600
+type TeachStatus = "idle" | "settling" | "collecting" | "learned"
+type CalibrationMode = "replace" | "add"
+
 const CALIBRATION_FRAMES = 24
+const TEACH_FRAMES = 18
 const FRAME_INTERVAL_MS = 1000 / 30
+const TUNING_CONTROLS: Array<{
+  key: keyof OneEuroOptions
+  min: number
+  max: number
+  step: number
+  help: string
+}> = [
+  {
+    key: "minCutoff",
+    min: 0.1,
+    max: 5,
+    step: 0.1,
+    help: "Baseline responsiveness. Lower values make a steadier but slower cursor; higher values follow small movements faster but show more jitter.",
+  },
+  {
+    key: "beta",
+    min: 0,
+    max: 0.1,
+    step: 0.001,
+    help: "How much smoothing relaxes during fast gaze changes. Raise it if large movements lag; lower it if quick movements overshoot or feel twitchy.",
+  },
+  {
+    key: "dCutoff",
+    min: 0.1,
+    max: 5,
+    step: 0.1,
+    help: "Smoothing applied to the estimated movement speed. Usually leave this near 1; lowering it makes the filter slower to react to changes in speed.",
+  },
+]
 
 function clampPoint(point: ScreenPoint): ScreenPoint {
   return {
@@ -92,6 +133,30 @@ function panelGlow(active: boolean, enabled: boolean, confident: boolean) {
     : "border-border/50 bg-background/30"
 }
 
+function HelpLabel({ children, help }: { children: string; help: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className="inline-grid size-4 place-items-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              aria-label={`Help: ${children}`}
+            />
+          }
+        >
+          <InfoIcon className="size-3" />
+        </TooltipTrigger>
+        <TooltipContent side="right" className="max-w-64 leading-relaxed">
+          {help}
+        </TooltipContent>
+      </Tooltip>
+    </span>
+  )
+}
+
 export function GazeLab() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -99,12 +164,19 @@ export function GazeLab() {
   const animationFrameRef = useRef<number | null>(null)
   const lastFrameAtRef = useRef(0)
   const trackingStartedAtRef = useRef(0)
-  const calibrationRef = useRef<GazeCalibration | null>(null)
+  const calibrationLayersRef = useRef<PoseCalibrationLayer[]>([])
+  const calibrationModeRef = useRef<CalibrationMode>("replace")
   const calibrationSamplesRef = useRef<CalibrationSample[]>([])
   const calibrationTargetsRef = useRef<NormalizedCalibrationTarget[]>([])
-  const calibrationTargetStartedAtRef = useRef(0)
   const calibrationTargetIndexRef = useRef(0)
   const calibrationTargetFramesRef = useRef(0)
+  const calibrationSettlerRef = useRef(new FixationSettler())
+  const correctionFieldRef = useRef(new LocalCorrectionField())
+  const pointerRef = useRef<ScreenPoint | null>(null)
+  const teachActiveRef = useRef(false)
+  const teachTargetRef = useRef<ScreenPoint | null>(null)
+  const teachSamplesRef = useRef<CalibrationSample[]>([])
+  const teachSettlerRef = useRef(new FixationSettler())
   const xFilterRef = useRef(new OneEuroFilter())
   const yFilterRef = useRef(new OneEuroFilter())
   const gridQuantizerRef = useRef(new HysteresisQuantizer())
@@ -124,6 +196,21 @@ export function GazeLab() {
   const [calibrationProgress, setCalibrationProgress] =
     useState<CalibrationProgress | null>(null)
   const [calibrationResiduals, setCalibrationResiduals] = useState<number[]>([])
+  const [calibrationDiagnostics, setCalibrationDiagnostics] =
+    useState<CalibrationDiagnostics | null>(null)
+  const [calibrationLayers, setCalibrationLayers] = useState<
+    PoseCalibrationLayer[]
+  >([])
+  const [calibrationMode, setCalibrationMode] =
+    useState<CalibrationMode>("replace")
+  const [poseCoverage, setPoseCoverage] = useState<{
+    coverage: PoseCoverage
+    nearestDistance: number
+  } | null>(null)
+  const [teachStatus, setTeachStatus] = useState<TeachStatus>("idle")
+  const [teachTarget, setTeachTarget] = useState<ScreenPoint | null>(null)
+  const [teachCollected, setTeachCollected] = useState(0)
+  const [correctionCount, setCorrectionCount] = useState(0)
   const [showCursor, setShowCursor] = useState(true)
   const [showRegionGlow, setShowRegionGlow] = useState(true)
   const [filterOptions, setFilterOptions] = useState<OneEuroOptions>({
@@ -155,9 +242,15 @@ export function GazeLab() {
   }, [])
 
   const resetTrackingState = useCallback(() => {
-    calibrationRef.current = null
+    calibrationLayersRef.current = []
     calibrationSamplesRef.current = []
     calibrationTargetsRef.current = []
+    calibrationSettlerRef.current.reset()
+    correctionFieldRef.current.clear()
+    teachActiveRef.current = false
+    teachTargetRef.current = null
+    teachSamplesRef.current = []
+    teachSettlerRef.current.reset()
     xFilterRef.current.reset()
     yFilterRef.current.reset()
     gridQuantizerRef.current.reset()
@@ -170,6 +263,13 @@ export function GazeLab() {
     setEvents([])
     setCalibrationProgress(null)
     setCalibrationResiduals([])
+    setCalibrationDiagnostics(null)
+    setCalibrationLayers([])
+    setPoseCoverage(null)
+    setTeachStatus("idle")
+    setTeachTarget(null)
+    setTeachCollected(0)
+    setCorrectionCount(0)
   }, [])
 
   const stopCamera = useCallback(() => {
@@ -217,15 +317,33 @@ export function GazeLab() {
     }
   }, [releaseCamera])
 
-  const beginCalibration = useCallback(() => {
-    calibrationRef.current = null
+  const beginCalibration = useCallback((mode: CalibrationMode) => {
+    calibrationModeRef.current = mode
+    setCalibrationMode(mode)
+    if (mode === "replace") {
+      calibrationLayersRef.current = []
+      setCalibrationLayers([])
+      setPoseCoverage(null)
+      correctionFieldRef.current.clear()
+      setCorrectionCount(0)
+    }
     calibrationSamplesRef.current = []
     calibrationTargetsRef.current = createCalibrationTargets()
     calibrationTargetIndexRef.current = 0
     calibrationTargetFramesRef.current = 0
-    calibrationTargetStartedAtRef.current = performance.now()
+    calibrationSettlerRef.current.reset()
+    teachActiveRef.current = false
+    teachTargetRef.current = null
+    teachSamplesRef.current = []
+    teachSettlerRef.current.reset()
+    protocolRef.current = createIdleProtocolState()
+    setProtocol(protocolRef.current)
     setCalibrationProgress({ targetIndex: 0, collected: 0, settling: true })
     setCalibrationResiduals([])
+    setCalibrationDiagnostics(null)
+    setTeachStatus("idle")
+    setTeachTarget(null)
+    setTeachCollected(0)
     setPhase("calibrating")
   }, [])
 
@@ -240,13 +358,16 @@ export function GazeLab() {
             ),
           ).sample,
       )
-      const calibration = fitGazeCalibration(targetSamples, {
-        xFeatureIndices: [...GAZE_X_FEATURE_INDICES],
-        yFeatureIndices: [...GAZE_Y_FEATURE_INDICES],
-      })
-      calibrationRef.current = calibration
+      const layer = fitPoseCalibrationLayer(targetSamples)
+      const layers =
+        calibrationModeRef.current === "replace"
+          ? [layer]
+          : upsertPoseCalibrationLayer(calibrationLayersRef.current, layer)
+      calibrationLayersRef.current = layers
+      setCalibrationLayers(layers)
+      setCalibrationDiagnostics(layer.calibration.diagnostics)
       setCalibrationResiduals(
-        leaveOneTargetOutResiduals(targetSamples, calibration),
+        leaveOneTargetOutResiduals(targetSamples, layer.calibration),
       )
       setCalibrationProgress(null)
       xFilterRef.current.reset()
@@ -258,9 +379,68 @@ export function GazeLab() {
       setError(
         cause instanceof Error ? cause.message : "Calibration fit failed.",
       )
-      setPhase("ready")
+      setPhase(calibrationLayersRef.current.length ? "tracking" : "ready")
     }
   }, [])
+
+  const finishTeach = useCallback(() => {
+    const layers = calibrationLayersRef.current
+    const target = teachTargetRef.current
+    const samples = teachSamplesRef.current
+    teachActiveRef.current = false
+    teachSamplesRef.current = []
+    teachSettlerRef.current.reset()
+    setTeachCollected(0)
+    if (!layers.length || !target || samples.length < TEACH_FRAMES) {
+      setTeachStatus("idle")
+      setTeachTarget(null)
+      return
+    }
+    const summary = summarizeCalibrationTarget(samples).sample
+    const predicted = predictLayeredGaze(layers, summary.features).point
+    correctionFieldRef.current.teach(predicted, target)
+    setCorrectionCount(correctionFieldRef.current.getAnchors().length)
+    setTeachStatus("learned")
+    setTeachTarget(null)
+    xFilterRef.current.reset()
+    yFilterRef.current.reset()
+    window.setTimeout(() => setTeachStatus("idle"), 900)
+  }, [])
+
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      pointerRef.current = { x: event.clientX, y: event.clientY }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Shift" ||
+        event.repeat ||
+        phase !== "tracking" ||
+        protocolRef.current.phase !== "idle" ||
+        !pointerRef.current
+      ) {
+        return
+      }
+      teachActiveRef.current = true
+      teachTargetRef.current = { ...pointerRef.current }
+      teachSamplesRef.current = []
+      teachSettlerRef.current.reset()
+      setTeachTarget({ ...pointerRef.current })
+      setTeachStatus("settling")
+      setTeachCollected(0)
+    }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Shift" && teachActiveRef.current) finishTeach()
+    }
+    window.addEventListener("pointermove", onPointerMove)
+    window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("keyup", onKeyUp)
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("keyup", onKeyUp)
+    }
+  }, [finishTeach, phase])
 
   useEffect(() => {
     if (
@@ -295,8 +475,13 @@ export function GazeLab() {
 
       if (phase === "calibrating") {
         const targetIndex = calibrationTargetIndexRef.current
-        const settling =
-          now - calibrationTargetStartedAtRef.current < CALIBRATION_SETTLE_MS
+        let settling = true
+        if (sample.confidence === "high" && sample.features) {
+          const fixation = calibrationSettlerRef.current.update(
+            sample.features.values,
+          )
+          settling = !fixation.stable
+        }
         if (!settling && sample.confidence === "high" && sample.features) {
           const position = calibrationTargetsRef.current[targetIndex]
           if (!position) return
@@ -316,7 +501,8 @@ export function GazeLab() {
             }
             calibrationTargetIndexRef.current += 1
             calibrationTargetFramesRef.current = 0
-            calibrationTargetStartedAtRef.current = now
+            calibrationSettlerRef.current.reset()
+            settling = true
           }
         }
         setCalibrationProgress({
@@ -327,20 +513,58 @@ export function GazeLab() {
         return
       }
 
-      if (phase !== "tracking" || !calibrationRef.current) return
+      if (phase !== "tracking" || !calibrationLayersRef.current.length) return
 
       let activeGrid = activeGridRegion
       if (sample.features) {
         xFilterRef.current.setOptions(filterOptions)
         yFilterRef.current.setOptions(filterOptions)
-        const raw = clampPoint(
-          predictGaze(calibrationRef.current, sample.features.values),
+        const layeredPrediction = predictLayeredGaze(
+          calibrationLayersRef.current,
+          sample.features.values,
         )
+        setPoseCoverage({
+          coverage: layeredPrediction.coverage,
+          nearestDistance: layeredPrediction.nearestDistance,
+        })
+        const baseRaw = layeredPrediction.point
+        const raw = clampPoint(correctionFieldRef.current.apply(baseRaw))
         const smoothed = {
           x: xFilterRef.current.filter(raw.x, now),
           y: yFilterRef.current.filter(raw.y, now),
         }
         setPoint(smoothed)
+
+        if (teachActiveRef.current && teachTargetRef.current) {
+          const pointer = pointerRef.current
+          const heldTarget = teachTargetRef.current
+          if (
+            !pointer ||
+            Math.hypot(pointer.x - heldTarget.x, pointer.y - heldTarget.y) > 8
+          ) {
+            teachTargetRef.current = pointer ? { ...pointer } : null
+            teachSamplesRef.current = []
+            teachSettlerRef.current.reset()
+            setTeachTarget(pointer ? { ...pointer } : null)
+            setTeachStatus("settling")
+            setTeachCollected(0)
+          } else if (sample.confidence === "high") {
+            const fixation = teachSettlerRef.current.update(
+              sample.features.values,
+            )
+            if (
+              fixation.stable &&
+              teachSamplesRef.current.length < TEACH_FRAMES
+            ) {
+              teachSamplesRef.current.push({
+                features: sample.features.values,
+                target: { ...heldTarget },
+              })
+              setTeachStatus("collecting")
+              setTeachCollected(teachSamplesRef.current.length)
+            }
+          }
+        }
 
         const viewport = {
           width: window.innerWidth,
@@ -417,17 +641,25 @@ export function GazeLab() {
     const recommendation = recommendProtocol(protocol.report)
     return {
       storyId: "GZ.1",
-      protocolVersion: 1,
+      protocolVersion: 3,
       capturedAt: new Date().toISOString(),
       baseline: protocol.report.baseline,
       drift: protocol.report.drift,
       driftDeltaPercentagePoints: protocol.report.driftDeltaPercentagePoints,
       performance: protocol.report.performance,
+      poseCalibration: {
+        layerCount: calibrationLayers.length,
+        layers: calibrationLayers.map((layer) => ({
+          pose: layer.pose,
+          diagnostics: layer.calibration.diagnostics,
+        })),
+      },
+      localCorrections: correctionFieldRef.current.getAnchors(),
       observations,
       recommendation,
       recommendationLine: `${recommendation} — thresholds: wire ≥80% baseline, ≥75% drift, ≤10pp drift, ≤8ms mean; iterate ≥55% baseline, ≥50% drift, ≤16ms mean; otherwise drop.`,
     }
-  }, [observations, protocol.report])
+  }, [calibrationLayers, observations, protocol.report])
   const findingsJson = findings ? JSON.stringify(findings, null, 2) : ""
 
   return (
@@ -486,24 +718,38 @@ export function GazeLab() {
               </p>
             </fieldset>
 
-            <fieldset
-              className="space-y-3 text-xs"
-              disabled={phase !== "tracking"}
-            >
-              <legend className="mb-2 font-medium">One Euro tuning</legend>
-              {(
-                [
-                  ["minCutoff", 0.1, 5, 0.1],
-                  ["beta", 0, 0.1, 0.001],
-                  ["dCutoff", 0.1, 5, 0.1],
-                ] as const
-              ).map(([key, min, max, step]) => (
-                <label key={key} className="block space-y-1">
+            <div className="space-y-2 text-xs">
+              <h2 className="font-medium">Hold-to-teach</h2>
+              <p className="leading-relaxed text-muted-foreground">
+                Put the real mouse pointer where the estimate is wrong. Hold
+                Shift and stare at the pointer until 18/18, then release. Nearby
+                errors improve; distant calibration stays intact.
+              </p>
+              <p className="font-mono text-[10px] text-cyan-300">
+                {teachStatus === "idle"
+                  ? `${correctionCount} local correction${correctionCount === 1 ? "" : "s"}`
+                  : teachStatus === "learned"
+                    ? "local correction learned"
+                    : `${teachStatus} · ${teachCollected}/${TEACH_FRAMES}`}
+              </p>
+            </div>
+
+            <fieldset className="space-y-3 text-xs">
+              <legend className="mb-2 font-medium">
+                <HelpLabel help="A motion filter that suppresses webcam jitter while remaining responsive when your gaze moves quickly.">
+                  One Euro tuning
+                </HelpLabel>
+              </legend>
+              {TUNING_CONTROLS.map(({ key, min, max, step, help }) => (
+                <div key={key} className="space-y-1">
                   <span className="flex justify-between">
-                    {key} <code>{filterOptions[key].toFixed(3)}</code>
+                    <HelpLabel help={help}>{key}</HelpLabel>
+                    <code>{filterOptions[key].toFixed(3)}</code>
                   </span>
                   <input
+                    aria-label={key}
                     className="w-full accent-cyan-400"
+                    disabled={phase !== "tracking"}
                     type="range"
                     min={min}
                     max={max}
@@ -516,13 +762,17 @@ export function GazeLab() {
                       }))
                     }
                   />
-                </label>
+                </div>
               ))}
             </fieldset>
 
             {calibrationResiduals.length > 0 && (
               <div className="text-xs">
-                <h2 className="font-medium">Held-out calibration error</h2>
+                <h2 className="font-medium">
+                  <HelpLabel help="Pixel distance between each target and a prediction made without training on that target. Lower is better; very uneven cells usually indicate a weak screen region.">
+                    Held-out calibration error
+                  </HelpLabel>
+                </h2>
                 <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-[10px]">
                   {calibrationResiduals.map((residual, index) => (
                     <span
@@ -533,6 +783,51 @@ export function GazeLab() {
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {calibrationDiagnostics && (
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <h2 className="font-medium text-foreground">
+                  <HelpLabel help="Diagnostics for the most recently added head-position profile. They describe systematic offset, usable range, and which eye measurements survived validation.">
+                    Calibration shape
+                  </HelpLabel>
+                </h2>
+                <p>
+                  <HelpLabel help="Average signed horizontal error. Positive means predictions lean right; negative means they lean left.">
+                    X bias
+                  </HelpLabel>{" "}
+                  {calibrationDiagnostics.x.biasPixels.toFixed(0)}px ·{" "}
+                  <HelpLabel help="How much of the calibrated horizontal range the model reproduces. 1.00 is ideal; below 1 compresses toward center.">
+                    gain
+                  </HelpLabel>{" "}
+                  {calibrationDiagnostics.x.gain.toFixed(2)} ·{" "}
+                  <HelpLabel help="Indices of the eye-local measurements selected for this axis after held-out validation. Head-pose features are intentionally excluded.">
+                    features
+                  </HelpLabel>{" "}
+                  [{calibrationDiagnostics.x.selectedFeatureIndices.join(", ")}]
+                </p>
+                <p>
+                  <HelpLabel help="Average signed vertical error. Positive means predictions lean down; negative means they lean up.">
+                    Y bias
+                  </HelpLabel>{" "}
+                  {calibrationDiagnostics.y.biasPixels.toFixed(0)}px ·{" "}
+                  <HelpLabel help="How much of the calibrated vertical range the model reproduces. 1.00 is ideal; below 1 compresses toward center.">
+                    gain
+                  </HelpLabel>{" "}
+                  {calibrationDiagnostics.y.gain.toFixed(2)} ·{" "}
+                  <HelpLabel help="Indices of the eye-local measurements selected for this axis after held-out validation. Head-pose features are intentionally excluded.">
+                    features
+                  </HelpLabel>{" "}
+                  [{calibrationDiagnostics.y.selectedFeatureIndices.join(", ")}]
+                </p>
+                {(calibrationDiagnostics.x.lowEvidence ||
+                  calibrationDiagnostics.y.lowEvidence) && (
+                  <p className="text-amber-300">
+                    Weak eye discrimination detected; recalibrate with steadier
+                    fixation and wider target coverage.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -570,11 +865,14 @@ export function GazeLab() {
                 </h2>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Keep your head comfortable and follow sixteen randomized
-                  targets. Each target settles for 600ms, then collects 24
-                  usable frames. Stay at one distance with even light on your
-                  face. Usually 22–28s.
+                  targets. Collection begins only when your eyes and head have
+                  measurably settled, then keeps 24 usable frames. Stay at one
+                  distance with even light on your face.
                 </p>
-                <Button className="mt-4" onClick={beginCalibration}>
+                <Button
+                  className="mt-4"
+                  onClick={() => beginCalibration("replace")}
+                >
                   Begin calibration
                 </Button>
               </div>
@@ -582,9 +880,13 @@ export function GazeLab() {
               <div className="max-w-md space-y-3 text-sm text-muted-foreground">
                 <p>
                   {phase === "calibrating"
-                    ? "Look at the target until it moves."
+                    ? calibrationMode === "add"
+                      ? "Keep your head in the new position and look at each target until it moves."
+                      : "Look at the target until it moves."
                     : protocol.phase === "idle"
-                      ? "Calibration complete. The visible estimate and both coarse region layouts are live."
+                      ? poseCoverage?.coverage === "outside"
+                        ? "This head position is outside calibrated coverage. Hold it comfortably, then add it as another position."
+                        : "Calibration complete. Move naturally; nearby head-position profiles blend automatically."
                       : protocol.phase === "waiting-drift"
                         ? `Baseline complete. Drift run starts automatically in ${Math.ceil(driftWaitRemaining / 1000)}s.`
                         : protocol.phase === "complete"
@@ -635,6 +937,32 @@ export function GazeLab() {
                 <div className="flex justify-between gap-2">
                   <dt>Uptime</dt>
                   <dd>{Math.floor(trackingUptimeMs / 1000)}s</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>
+                    <HelpLabel help="How close your current head orientation and position are to a recorded calibration profile. Add a position when this says outside.">
+                      Pose coverage
+                    </HelpLabel>
+                  </dt>
+                  <dd
+                    className={
+                      poseCoverage?.coverage === "covered"
+                        ? "text-emerald-400"
+                        : poseCoverage?.coverage === "outside"
+                          ? "text-destructive"
+                          : "text-amber-400"
+                    }
+                  >
+                    {poseCoverage?.coverage ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt>
+                    <HelpLabel help="Number of distinct head positions currently recorded. Nearby repeated calibrations replace one another instead of creating duplicates.">
+                      Head profiles
+                    </HelpLabel>
+                  </dt>
+                  <dd>{calibrationLayers.length}</dd>
                 </div>
               </dl>
               <p className="mt-2 text-[10px] text-muted-foreground">
@@ -713,10 +1041,29 @@ export function GazeLab() {
           </span>
         </div>
         <div className="flex gap-2">
-          {(phase === "tracking" || phase === "ready") && (
-            <Button variant="outline" size="sm" onClick={beginCalibration}>
-              <RotateCcwIcon className="size-3.5" /> Recalibrate
-            </Button>
+          {phase === "tracking" && protocol.phase === "idle" && (
+            <>
+              <Button size="sm" onClick={() => beginCalibration("add")}>
+                <CrosshairIcon className="size-3.5" /> Add head position
+              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label="Start calibration over"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => beginCalibration("replace")}
+                    />
+                  }
+                >
+                  <RotateCcwIcon className="size-3.5" /> Start over
+                </TooltipTrigger>
+                <TooltipContent>
+                  Discard every head-position profile and local correction.
+                </TooltipContent>
+              </Tooltip>
+            </>
           )}
           {phase !== "off" && phase !== "error" && (
             <Button variant="destructive" size="sm" onClick={stopCamera}>
@@ -756,6 +1103,15 @@ export function GazeLab() {
           }}
         >
           <CrosshairIcon className="size-6 text-fuchsia-200" />
+        </div>
+      )}
+
+      {teachTarget && (
+        <div
+          className="pointer-events-none fixed z-[60] grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-300 bg-amber-300/10 shadow-[0_0_24px_rgba(252,211,77,0.45)]"
+          style={{ left: teachTarget.x, top: teachTarget.y }}
+        >
+          <CrosshairIcon className="size-4 text-amber-200" />
         </div>
       )}
 
