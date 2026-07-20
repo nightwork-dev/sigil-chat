@@ -22,14 +22,14 @@ describe("agent readiness", () => {
 
     await expect(
       checkAgentReadiness({
-        codexHome: "/runtime/codex",
+        codexHome: "virtual-codex-home",
         read,
         fetcher: async () => new Response(null, { status: 200 }),
       }),
     ).resolves.toBe(true)
     await expect(
       checkAgentReadiness({
-        codexHome: "/runtime/codex",
+        codexHome: "virtual-codex-home",
         read,
         fetcher: async () => new Response(null, { status: 503 }),
       }),

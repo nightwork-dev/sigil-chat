@@ -86,6 +86,13 @@ async function handleRequest(
       `http://${incoming.headers.host ?? `127.0.0.1:${port}`}`,
     ).pathname
     if (pathname === "/health") {
+      if (incoming.headers.authorization !== `Bearer ${serviceBearerKey}`) {
+        outgoing.writeHead(401, {
+          "content-type": "text/plain; charset=utf-8",
+        })
+        outgoing.end("Unauthorized")
+        return
+      }
       const health = await createHealthResponse()
       outgoing.writeHead(health.status, Object.fromEntries(health.headers))
       outgoing.end(await health.text())

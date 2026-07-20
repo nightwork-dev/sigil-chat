@@ -18,6 +18,7 @@ import {
 } from "../lib/memory"
 import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
 import { requireAuthorizedResourceScope } from "../lib/scope-authorization"
+import { createReadinessRoute } from "../lib/readiness"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
@@ -37,7 +38,7 @@ const onMessage = createSigilEveOnMessage({
     ).markdown,
 })
 
-export default createOwnedEveChannel({
+const channel = createOwnedEveChannel({
   auth: async (request) => {
     const auth = await authenticatePrincipal(request)
     if (!auth) return auth
@@ -89,6 +90,11 @@ export default createOwnedEveChannel({
   defaultPersonaId: DEFAULT_PERSONA_ID,
   ownerStore: eveSessionOwnerStore,
 })
+
+export default {
+  ...channel,
+  routes: [...channel.routes, createReadinessRoute(authenticatePrincipal)],
+}
 
 function readCsvEnv(name: string) {
   return (process.env[name] ?? "")
