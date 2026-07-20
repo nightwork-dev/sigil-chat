@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { Kysely } from "kysely"
 import { LibsqlDialect } from "kysely-libsql"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { AuthEnvironment } from "./env"
 import { AuthInviteService, AuthInviteUnavailableError } from "./invites.server"
@@ -146,6 +146,25 @@ describe("AuthInviteService", () => {
       }),
     ).rejects.toBeInstanceOf(AuthInviteUnavailableError)
     await expect(service.list()).resolves.toMatchObject([{ status: "revoked" }])
+  })
+
+  it("rejects an invalid token before spending password-hash work", async () => {
+    const { client } = await createDatabase()
+    const passwordHasher = vi.fn(() => Promise.resolve("unused"))
+    const service = new AuthInviteService({
+      client,
+      passwordHasher,
+      pepper: TEST_PEPPER,
+    })
+
+    await expect(
+      service.redeem({
+        email: "member@example.test",
+        password: "a-safe-password",
+        token: "invalid-token",
+      }),
+    ).rejects.toBeInstanceOf(AuthInviteUnavailableError)
+    expect(passwordHasher).not.toHaveBeenCalled()
   })
 
   it("allows exactly one winner when the same token is redeemed concurrently", async () => {

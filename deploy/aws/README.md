@@ -51,6 +51,7 @@ sudo chown -R 10004:10004 /srv/sigil-chat/caddy-data /srv/sigil-chat/caddy-confi
 
 openssl rand -base64 48 | sudo tee /srv/sigil-chat/secrets/better_auth_secret >/dev/null
 openssl rand -base64 48 | sudo tee /srv/sigil-chat/secrets/gonk_mcp_key >/dev/null
+openssl rand -base64 48 | sudo tee /srv/sigil-chat/secrets/invite_token_pepper >/dev/null
 sudo chmod 0400 /srv/sigil-chat/secrets/*
 
 node deploy/aws/verify-release.mjs sigil-images.env
@@ -58,17 +59,24 @@ sudo deploy/aws/update-images.sh sigil-images.env
 ```
 
 Local-only `deploy.env.local` supplies the hostname, installation ID, secret
-directory, and four image digests. It must not be committed. Once DNS resolves
-to the host, bring up the deployment from this directory:
+directory, and four image digests. It must not be committed. The update starts
+only the private services:
 
 ```bash
 docker compose --env-file deploy.env.local ps
-curl --fail --resolve "$PUBLIC_HOST:443:127.0.0.1" "https://$PUBLIC_HOST/healthz"
 ```
 
 Then run `codex login --device-auth` as the Eve service identity, with its
-credential state contained in the `eve_data` Docker volume. That is a human
-device-auth interaction and is never automated or stored in this repository.
+credential state contained in the dedicated `codex_auth` Docker volume. After
+model readiness passes, activate the public edge. Device auth is a human
+interaction and is never automated or stored in this repository.
+
+```bash
+docker compose --env-file deploy.env.local exec eve codex login --device-auth
+docker compose --env-file deploy.env.local exec eve pnpm --filter sigil-chat-agent healthcheck
+docker compose --env-file deploy.env.local up -d edge
+curl --fail "https://$PUBLIC_HOST/healthz"
+```
 
 For rollback, pass the prior manifest to the same update command. The script
 also saves the pre-update environment as `deploy.env.local.previous`, so the

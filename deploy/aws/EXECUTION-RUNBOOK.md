@@ -105,29 +105,33 @@ CDK, modules, or workspaces for DEP.2.
 
    No secret prints or enters the image manifest.
 
-9. Validate and pull all four immutable images, start private services and
-   Caddy, then make the external TLS check.
+9. Validate and pull all four immutable images, then start the private
+   services. Eve uses process liveness for container ordering, so this clean
+   startup does not require a model credential yet.
 
    ```bash
    ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \
      "sudo /opt/sigil-chat/deploy/update-images.sh /opt/sigil-chat/deploy/sigil-images.env"
-   curl --fail --show-error --connect-timeout 15 "https://$PUBLIC_HOST/healthz"
    ```
 
-   Expected: `web`, `eve`, `gonk`, and `edge` are running; curl prints `ok`.
-   The update command validates all four digests before Docker runs. No Eve or
-   Gonk port is public.
+   Expected: `web`, `eve`, and `gonk` are running; `edge` is intentionally not
+   started yet. The update command validates all four digests before Docker
+   runs. No Eve or Gonk port is public.
 
-10. Complete device auth as the Eve service identity, then verify app login,
-    model response, and a container restart from a phone.
+10. Complete device auth as the Eve service identity, prove model-aware
+    readiness, activate the edge, then verify app login, model response, and a
+    container restart from a phone. Docker uses Eve process liveness for startup
+    ordering, so the private runtime comes up before this credential exists.
 
     ```bash
     ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \
-      'sudo docker compose --env-file /opt/sigil-chat/deploy/deploy.env.local -f /opt/sigil-chat/deploy/compose.yaml exec eve codex login --device-auth'
+      'sudo docker compose --env-file /opt/sigil-chat/deploy/deploy.env.local -f /opt/sigil-chat/deploy/compose.yaml exec eve codex login --device-auth && sudo docker compose --env-file /opt/sigil-chat/deploy/deploy.env.local -f /opt/sigil-chat/deploy/compose.yaml exec eve pnpm --filter sigil-chat-agent healthcheck && sudo docker compose --env-file /opt/sigil-chat/deploy/deploy.env.local -f /opt/sigil-chat/deploy/compose.yaml up -d edge'
+    curl --fail --show-error --connect-timeout 15 "https://$PUBLIC_HOST/healthz"
     ```
 
-    Expected: a device-auth URL/code is displayed and completed privately. Never
-    copy that code into the report.
+    Expected: a device-auth URL/code is displayed and completed privately, then
+    the model-aware healthcheck exits zero, edge starts, and curl prints `ok`.
+    Never copy the code into the report.
 
 11. Teardown proof: revoke device auth, remove app state, destroy Terraform,
     and prove the public origin gone.

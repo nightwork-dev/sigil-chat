@@ -45,6 +45,7 @@ interface AuthInviteServiceOptions {
   createId?: () => string
   createToken?: () => string
   now?: () => Date
+  passwordHasher?: (password: string) => Promise<string>
   pepper: string
 }
 
@@ -69,6 +70,7 @@ export class AuthInviteService {
   private readonly createId: () => string
   private readonly createToken: () => string
   private readonly now: () => Date
+  private readonly passwordHasher: (password: string) => Promise<string>
   private readonly pepper: string
 
   constructor(options: AuthInviteServiceOptions) {
@@ -81,6 +83,7 @@ export class AuthInviteService {
       options.createToken ??
       (() => randomBytes(INVITE_BYTES).toString("base64url"))
     this.now = options.now ?? (() => new Date())
+    this.passwordHasher = options.passwordHasher ?? hashPassword
     this.pepper = options.pepper
   }
 
@@ -162,7 +165,6 @@ export class AuthInviteService {
     // Better Auth's own password primitive is used, but account admission and
     // invite consumption share one libSQL write transaction so a race or any
     // failed insert creates neither an account nor a consumed invitation.
-    const passwordHash = await hashPassword(input.password)
     const transaction = await this.client.transaction("write")
     try {
       const invite = await this.requireAvailableInvite(transaction, input.token)
@@ -178,6 +180,7 @@ export class AuthInviteService {
       if (existing.rows.length > 0) {
         throw new Error("An account already exists for this email address.")
       }
+      const passwordHash = await this.passwordHasher(input.password)
 
       const userId = this.createId()
       const accountId = this.createId()

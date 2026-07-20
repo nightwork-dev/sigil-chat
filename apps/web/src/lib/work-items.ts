@@ -40,6 +40,11 @@ const listStoriesFn = createServerFn({ method: "GET" })
   });
 
 const listReviewsFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { getSession } = await import("@/lib/auth/session");
+  const { authenticatedWorkItemsViewer } = await import(
+    "@/lib/work-items-viewer.server"
+  );
+  authenticatedWorkItemsViewer(await getSession());
   const { workItemsRepository } = await import("@workspace/work-items-store");
   const document = await workItemsRepository.get();
   return document.reviews;
@@ -48,6 +53,11 @@ const listReviewsFn = createServerFn({ method: "GET" }).handler(async () => {
 const getStoryFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } = await import(
+      "@/lib/work-items-viewer.server"
+    );
+    authenticatedWorkItemsViewer(await getSession());
     const { workItemsRepository } = await import("@workspace/work-items-store");
     const document = await workItemsRepository.get();
     const story = document.stories.find(

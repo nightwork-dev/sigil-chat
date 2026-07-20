@@ -35,7 +35,7 @@ cp "$script_dir/update-images.sh" /opt/sigil-chat/deploy/update-images.sh
 cp "$script_dir/verify-release.mjs" /opt/sigil-chat/deploy/verify-release.mjs
 chmod 0755 /opt/sigil-chat/deploy/update-images.sh
 
-for secret in better_auth_secret gonk_mcp_key; do
+for secret in better_auth_secret gonk_mcp_key invite_token_pepper; do
   path="/srv/sigil-chat/secrets/$secret"
   if [[ ! -s $path ]]; then
     umask 077

@@ -58,12 +58,15 @@ services:
       GONK_MCP_URL: http://gonk:8808/mcp
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
-    secrets: [better_auth_secret, gonk_mcp_key]
+      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_INVITE_TOKEN_PEPPER_FILE: /run/secrets/invite_token_pepper
+    secrets: [better_auth_secret, gonk_mcp_key, invite_token_pepper]
     volumes:
       - web_data:/var/lib/sigil-web
       - web_scope:/app/.agents
       - web_appdata:/app/.data
       - eve_identity:/var/lib/sigil-identity:ro
+      - blackboard_data:/var/lib/sigil-blackboard
     expose: ["3000"]
     healthcheck:
       test:
@@ -109,9 +112,11 @@ services:
       SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
       GONK_MCP_URL: http://gonk:8808/mcp
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
-      CODEX_HOME: /var/lib/sigil-eve/codex-home
+      CODEX_HOME: /var/lib/sigil-codex
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
+      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_SANDBOX_MODE: disabled
     secrets: [gonk_mcp_key]
     volumes:
       [
@@ -119,10 +124,22 @@ services:
         eve_app:/app/apps/agent,
         eve_scope:/app/.agents,
         eve_identity:/var/lib/sigil-identity,
+        codex_auth:/var/lib/sigil-codex,
+        blackboard_data:/var/lib/sigil-blackboard,
       ]
     expose: ["3001"]
     healthcheck:
-      test: ["CMD", "pnpm", "--filter", "sigil-chat-agent", "healthcheck"]
+      # Container ordering needs process liveness, not model credentials. A fresh
+      # deployment obtains Codex device auth only after edge/TLS is available.
+      # Model-aware readiness remains authenticated at /sigil/v1/readiness and
+      # is checked by the owner status surface plus the post-login runbook step.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/eve/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 4
@@ -140,8 +157,13 @@ services:
       GONK_ALLOWED_HOSTS: gonk:8808
       SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
       SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
+      SIGIL_ARTIFACT_DIR: /var/lib/sigil-gonk/artifacts
+      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
     secrets: [gonk_mcp_key]
-    volumes: [gonk_data:/var/lib/sigil-gonk, gonk_scope:/app/.agents]
+    volumes:
+      - gonk_data:/var/lib/sigil-gonk
+      - gonk_scope:/app/.agents
+      - blackboard_data:/var/lib/sigil-blackboard
     expose: ["8808"]
     healthcheck:
       test:
@@ -199,9 +221,13 @@ volumes:
   eve_scope: {}
   eve_identity: {}
   gonk_data: {}
+  blackboard_data: {}
+  codex_auth: {}
 
 secrets:
   better_auth_secret:
     file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/better_auth_secret
   gonk_mcp_key:
     file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/gonk_mcp_key
+  invite_token_pepper:
+    file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/invite_token_pepper

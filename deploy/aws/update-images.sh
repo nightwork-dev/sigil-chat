@@ -26,8 +26,11 @@ done
 rm -f "$deploy_env.bak"
 
 docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" pull
-docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" up -d --remove-orphans
+docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" up -d migrate web gonk eve
 docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" ps
+
+echo "Private services updated. Complete Eve device auth and its healthcheck, then activate edge:"
+echo "  docker compose --env-file $deploy_env -f $script_dir/compose.yaml up -d edge"
 
 echo "Updated from immutable image manifest. Roll back with:"
 echo "  DEPLOY_ENV=$deploy_env $0 $previous_images"
