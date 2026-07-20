@@ -11,6 +11,8 @@ admin_cidr        = "203.0.113.7/32"
 # Only this repository's protected environment can obtain release credentials.
 github_repository = "example/sigil-chat"
 github_environment = "production"
+github_owner_id = 12345678
+github_repository_id = 987654321
 
 # Set both values only when Route53 owns the public hostname.
 # route53_zone_id     = "Z0123456789EXAMPLE"

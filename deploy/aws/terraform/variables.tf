@@ -88,6 +88,16 @@ variable "github_environment" {
   default     = "production"
 }
 
+variable "github_owner_id" {
+  description = "Immutable numeric GitHub owner ID used in the OIDC subject."
+  type        = number
+}
+
+variable "github_repository_id" {
+  description = "Immutable numeric GitHub repository ID used in the OIDC subject."
+  type        = number
+}
+
 variable "route53_zone_id" {
   description = "Optional existing Route53 hosted-zone ID. Leave null to manage DNS elsewhere."
   type        = string
