@@ -4,6 +4,7 @@ import { useState } from "react"
 import {
   AtSignIcon,
   CheckIcon,
+  GripVerticalIcon,
   InboxIcon,
   LayoutListIcon,
   MessageSquareIcon,
@@ -44,6 +45,11 @@ import type {
 } from "@workspace/work-items-store/types"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import {
+  KanbanBoard,
+  type KanbanColumn,
+} from "@workspace/ui/components/blocks/kanban-board"
+import type { SortableItemRenderProps } from "@workspace/ui/components/dnd/sortable"
 import {
   Empty,
   EmptyDescription,
@@ -120,6 +126,32 @@ export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
   const pendingCount = ownerReviews.filter((review) => !review.completed).length
   const selectedStory = allStories.find((story) => story.id === selectedId) ?? null
   const storiesById = new Map(allStories.map((story) => [story.id, story]))
+
+  // KanbanBoard is controlled: it calls onMove, we reconcile by transitioning
+  // the story's status (the store is the source of truth). The board reads the
+  // same boardStories, so a successful transition re-renders the card in its
+  // new column on the next query tick.
+  const transition = useTransitionStory()
+  const boardItems: Record<string, StoryData> = Object.fromEntries(
+    boardStories.map((story) => [story.id, story]),
+  )
+  const boardColumns: KanbanColumn[] = STORY_STATUS_ORDER.map((status) => ({
+    id: status,
+    title: STORY_STATUS[status].label,
+  }))
+  const boardColumnItems: Record<string, string[]> = Object.fromEntries(
+    STORY_STATUS_ORDER.map((status) => [
+      status,
+      (grouped[status] ?? []).map((story) => story.id),
+    ]),
+  )
+  function handleBoardMove(id: string, _from: string, to: string, _newIndex: number) {
+    transition
+      .mutateAsync({ id, status: to as StoryStatus })
+      .catch((error: unknown) =>
+        toast.error(error instanceof Error ? error.message : "Could not move story"),
+      )
+  }
 
   // Attention coverage: the story you're viewing flows into the agent's
   // context, so "what does this story need?" / "summarize this" resolve against
@@ -209,15 +241,26 @@ export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
           </Empty>
         ) : (
           <div className="scroll-area flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-3 p-3">
-            {STORY_STATUS_ORDER.map((status) => (
-              <BoardColumn
-                key={status}
-                status={status}
-                stories={grouped[status]}
-                selectedId={selectedId}
-                onSelect={openDetail}
-              />
-            ))}
+            <KanbanBoard
+              columns={boardColumns}
+              items={boardItems}
+              columnItems={boardColumnItems}
+              onMove={handleBoardMove}
+              renderCard={(story, drag) => (
+                <RoadmapCard
+                  key={story.id}
+                  story={story}
+                  selected={story.id === selectedId}
+                  onSelect={openDetail}
+                  drag={drag}
+                />
+              )}
+              renderColumnHeader={(column) => (
+                <span className="text-xs font-medium">{STORY_STATUS[column.id as StoryStatus].label}</span>
+              )}
+              className="w-full"
+              columnClassName="h-full w-[85vw] max-w-sm snap-start md:w-72 md:max-w-none"
+            />
           </div>
         )}
       </section>
@@ -308,71 +351,59 @@ function AsidePaneBody({
   )
 }
 
-function BoardColumn({
-  status,
-  stories,
-  selectedId,
-  onSelect,
-}: {
-  status: StoryStatus
-  stories: StoryData[]
-  selectedId: string | null
-  onSelect: (id: string) => void
-}) {
-  const meta = STORY_STATUS[status]
-  return (
-    <div className="flex h-full w-[85vw] max-w-sm shrink-0 snap-start flex-col md:w-72 md:max-w-none">
-      <div className="flex items-center justify-between px-2 pb-2">
-        <span className="text-xs font-medium">{meta.label}</span>
-        <span className="font-mono text-[0.625rem] text-muted-foreground">{stories.length}</span>
-      </div>
-      {/* px gives the selected card's focus ring breathing room (it was clipped
-          on the left); .scroll-area reserves the scrollbar gutter so it doesn't
-          sit flush against the cards' right edge. */}
-      <div className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2 pt-0.5 pb-2">
-        {stories.length === 0 ? (
-          <p className="px-1 text-[0.625rem] text-muted-foreground/70">Empty</p>
-        ) : (
-          stories.map((story) => (
-            <BoardCard
-              key={story.id}
-              story={story}
-              selected={story.id === selectedId}
-              onSelect={onSelect}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-function BoardCard({
+function RoadmapCard({
   story,
   selected,
   onSelect,
+  drag,
 }: {
   story: StoryData
   selected: boolean
   onSelect: (id: string) => void
+  drag: SortableItemRenderProps
 }) {
   return (
     <Story.Root story={story}>
-      <button
-        type="button"
-        aria-pressed={selected}
-        onClick={() => onSelect(story.id)}
+      <div
+        ref={drag.setNodeRef}
+        style={drag.style}
         className={cn(
-          "flex w-full flex-col gap-2 rounded-md border bg-card p-3 text-left transition-colors hover:border-border/80 hover:bg-muted/40",
-          selected ? "border-primary ring-1 ring-primary/30" : "border-border",
+          "flex w-full flex-col gap-2 rounded-md border bg-card p-3 text-left transition-colors",
+          selected
+            ? "border-primary ring-1 ring-primary/30"
+            : "border-border hover:border-border/80 hover:bg-muted/40",
         )}
       >
-        <Story.Title className="text-sm" />
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-start gap-1.5">
+          {/* Drag handle: carries the sortable listeners so the card body's
+              click (open detail) and inner badges stay interactive. The handle
+              is the drag activator via setActivatorNodeRef. */}
+          <button
+            type="button"
+            ref={drag.setActivatorNodeRef}
+            {...drag.attributes}
+            {...drag.listeners}
+            className="mt-0.5 shrink-0 cursor-grab text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
+            aria-label={`Drag ${story.id} to reorder`}
+          >
+            <GripVerticalIcon className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onSelect(story.id)}
+            className="min-w-0 flex-1 text-left"
+          >
+            <Story.Title className="text-sm" />
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pl-5">
           <Story.RoutingBadge />
         </div>
-        <Story.Meta />
-      </button>
+        <div className="pl-5">
+          <Story.Meta />
+        </div>
+      </div>
     </Story.Root>
   )
 }
