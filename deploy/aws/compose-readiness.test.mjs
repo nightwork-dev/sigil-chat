@@ -5,9 +5,18 @@ import test from "node:test"
 
 const directory = new URL(".", import.meta.url).pathname
 const compose = readFileSync(resolve(directory, "compose.yaml"), "utf8")
+const caddyfile = readFileSync(resolve(directory, "Caddyfile"), "utf8")
 const runbook = readFileSync(resolve(directory, "EXECUTION-RUNBOOK.md"), "utf8")
 const releaseTerraform = readFileSync(
   resolve(directory, "terraform/release.tf"),
+  "utf8",
+)
+const productionWorkflow = readFileSync(
+  resolve(directory, "../../.github/workflows/prod-images.yml"),
+  "utf8",
+)
+const rollbackWorkflow = readFileSync(
+  resolve(directory, "../../.github/workflows/prod-rollback.yml"),
   "utf8",
 )
 
@@ -40,6 +49,14 @@ test("SSM downloads release manifests from an HTTPS S3 URL", () => {
   assert.doesNotMatch(releaseTerraform, /sourceInfo: '\{"path":"s3:\/\//)
 })
 
+test("release workflows allow the host updater fifteen minutes", () => {
+  for (const workflow of [productionWorkflow, rollbackWorkflow]) {
+    assert.doesNotMatch(workflow, /aws ssm wait command-executed/)
+    assert.match(workflow, /for attempt in \$\(seq 1 60\)/)
+    assert.match(workflow, /Pending\|InProgress\|Delayed\) sleep 15/)
+  }
+})
+
 test("update command stops the public edge before replacing services", () => {
   const updateScript = readFileSync(
     resolve(directory, "update-images.sh"),
@@ -57,6 +74,11 @@ test("update command stops the public edge before replacing services", () => {
     ) < updateScript.lastIndexOf("up -d --wait --no-deps web gonk eve"),
   )
   assert.match(updateScript, /up -d --wait --no-deps edge/)
+})
+
+test("edge health uses a non-redirecting internal Caddy listener", () => {
+  assert.match(caddyfile, /:8081 \{\s+respond \/healthz 200\s+\}/)
+  assert.match(compose, /http:\/\/127\.0\.0\.1:8081\/healthz/)
 })
 
 test("production services share writable blackboard storage", () => {
@@ -83,8 +105,23 @@ test("shared stores are initialized for one runtime filesystem identity", () => 
     compose.indexOf("\n  migrate:"),
   )
   assert.match(storageInit, /user: "0:0"/)
-  assert.match(storageInit, /install -d -o 10000 -g 10000 -m 0700/)
-  for (const volume of ["blackboard_data", "codex_auth", "eve_identity"]) {
+  assert.match(
+    storageInit,
+    /cap_add: \[CHOWN, FOWNER, DAC_OVERRIDE, DAC_READ_SEARCH\]/,
+  )
+  assert.match(storageInit, /chown -R 10000:10000/)
+  for (const volume of [
+    "web_data",
+    "web_scope",
+    "web_appdata",
+    "eve_data",
+    "eve_scope",
+    "gonk_data",
+    "gonk_scope",
+    "blackboard_data",
+    "codex_auth",
+    "eve_identity",
+  ]) {
     assert.match(storageInit, new RegExp(`${volume}:`))
   }
 })
@@ -96,6 +133,7 @@ test("only Eve receives the persistent Codex credential volume", () => {
   const gonk = compose.slice(gonkStart, compose.indexOf("\n  edge:"))
   assert.match(eve, /CODEX_HOME: \/var\/lib\/sigil-codex/)
   assert.match(eve, /codex_auth:\/var\/lib\/sigil-codex/)
+  assert.doesNotMatch(eve, /eve_app:\/app\/apps\/agent/)
   assert.doesNotMatch(gonk, /CODEX_HOME|CODEX_AUTH_FILE|codex_auth/)
   assert.match(gonk, /SIGIL_LOCAL_CODEX_IMAGE_GENERATION: disabled/)
 })

@@ -24,14 +24,27 @@ services:
     restart: "no"
     read_only: true
     cap_drop: [ALL]
-    cap_add: [CHOWN]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE, DAC_READ_SEARCH]
     security_opt: [no-new-privileges:true]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        install -d -o 10000 -g 10000 -m 0700
+        chown -R 10000:10000
+        /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
         /var/lib/sigil-blackboard /var/lib/sigil-codex /var/lib/sigil-identity
+        /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents
+        && chmod 0700
+        /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
+        /var/lib/sigil-blackboard /var/lib/sigil-codex /var/lib/sigil-identity
+        /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents
     volumes:
+      - web_data:/var/lib/sigil-web
+      - web_scope:/app/web-agents
+      - web_appdata:/app/web-data
+      - eve_data:/var/lib/sigil-eve
+      - eve_scope:/app/eve-agents
+      - gonk_data:/var/lib/sigil-gonk
+      - gonk_scope:/app/gonk-agents
       - blackboard_data:/var/lib/sigil-blackboard
       - codex_auth:/var/lib/sigil-codex
       - eve_identity:/var/lib/sigil-identity
@@ -146,7 +159,6 @@ services:
     volumes:
       [
         eve_data:/var/lib/sigil-eve,
-        eve_app:/app/apps/agent,
         eve_scope:/app/.agents,
         eve_identity:/var/lib/sigil-identity,
         codex_auth:/var/lib/sigil-codex,
@@ -224,7 +236,7 @@ services:
     ports: ["80:8080", "443:8443"]
     healthcheck:
       test:
-        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8081/healthz"]
       interval: 15s
       timeout: 5s
       retries: 4
@@ -244,8 +256,6 @@ volumes:
   web_scope: {}
   web_appdata: {}
   eve_data: {}
-  eve_state: {}
-  eve_app: {}
   gonk_scope: {}
   eve_scope: {}
   eve_identity: {}

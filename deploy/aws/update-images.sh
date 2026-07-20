@@ -45,6 +45,10 @@ restore_previous_release() {
   compose_current up -d --wait --no-deps edge
 }
 
+# Clear interrupted layers before pulling, but retain complete candidate images
+# so a retry does not download them again.
+docker container prune -f
+docker image prune -f
 compose_candidate pull
 compose_current stop edge web
 
@@ -70,6 +74,10 @@ fi
 
 compose_current ps
 
+# Previous releases remain recoverable by digest from ECR. Once the candidate
+# is healthy, discard the now-unused local images to keep the small host ready
+# for its next release.
+docker image prune -af
 rm -f "$rollback_env"
 
 echo "Release healthy. Roll back to the immediately previous manifest with:"
