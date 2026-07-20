@@ -8,7 +8,7 @@ export const imageKeys = [
 ];
 
 const digestPattern =
-  /^ghcr\.io\/[a-z0-9._-]+\/sigil-chat-(eve|gonk|migrate|web)@sha256:[a-f0-9]{64}$/;
+  /^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/sigil-chat-(eve|gonk|migrate|web)@sha256:[a-f0-9]{64}$/;
 
 export function parseImageManifest(source) {
   const values = new Map();
@@ -27,7 +27,7 @@ export function parseImageManifest(source) {
     if (values.has(key)) throw new Error(`Duplicate manifest key: ${key}`);
     const match = digestPattern.exec(value);
     if (!match)
-      throw new Error(`Image is not an immutable GHCR digest: ${key}`);
+      throw new Error(`Image is not an immutable private ECR digest: ${key}`);
     if (`SIGIL_${match[1].toUpperCase()}_IMAGE` !== key) {
       throw new Error(`Image target does not match manifest key: ${key}`);
     }

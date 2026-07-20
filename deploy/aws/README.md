@@ -40,10 +40,12 @@ Use `terraform output -raw elastic_ip` after apply for DNS and external checks.
 ## Release and launch on the host
 
 Push or merge the reviewed revision to `prod`. The production-images workflow
-runs the repository gates, builds all four Docker targets, pushes them to GHCR,
-and emits a `sigil-images-<commit>` artifact containing immutable digest
-references. No repository secret is required; GitHub's scoped package token is
-used only to publish generic images.
+runs the repository gates, assumes the narrowly scoped AWS release role through
+GitHub OIDC, builds all four Docker targets, and pushes immutable images to the
+private ECR repositories. It writes the digest manifest to the versioned S3
+artifact bucket and asks the existing host to deploy it through SSM Run Command.
+No registry password, AWS access key, SSH key, or production secret is stored in
+GitHub.
 
 ```bash
 sudo install -d -m 0700 /srv/sigil-chat/{secrets,caddy-data,caddy-config}
@@ -59,14 +61,16 @@ sudo deploy/aws/update-images.sh sigil-images.env
 ```
 
 Local-only `deploy.env.local` supplies the hostname, installation ID, secret
-directory, and four image digests. It must not be committed. The update starts
-only the private services:
+directory, and four image digests. It must not be committed. The update pulls
+the candidate images before touching the live environment, stops web traffic,
+runs the candidate migration to completion, replaces the private services, and
+starts the edge only after their health checks pass:
 
 ```bash
 docker compose --env-file deploy.env.local ps
 ```
 
-Then run `codex login --device-auth` as the Eve service identity, with its
+On the first deployment, run `codex login --device-auth` as the Eve service identity, with its
 credential state contained in the dedicated `codex_auth` Docker volume. After
 model readiness passes, activate the public edge. Device auth is a human
 interaction and is never automated or stored in this repository.
@@ -83,13 +87,16 @@ docker compose --env-file deploy.env.local up -d edge
 curl --fail "https://$PUBLIC_HOST/healthz"
 ```
 
-For rollback, pass the prior manifest to the same update command. The script
-also saves the pre-update environment as `deploy.env.local.previous`, so the
-most recent change can be reversed without reconstructing a tag:
+For rollback, dispatch the `Roll back production images` workflow with the full
+40-character SHA of any previously deployed release. Its manifest remains in
+the versioned artifact bucket, and the same migration/readiness gates apply:
 
 ```bash
-sudo deploy/aws/update-images.sh previous-sigil-images.env
+gh workflow run prod-rollback.yml --ref prod -f release_sha=<full-release-sha>
 ```
+
+On the host, the immediately previous manifest is also retained for emergency
+operator rollback as `deploy.env.local.previous-images`.
 
 ## Teardown
 

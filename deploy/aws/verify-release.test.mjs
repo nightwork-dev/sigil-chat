@@ -11,7 +11,7 @@ const digest = "a".repeat(64);
 const validManifest = ["EVE", "GONK", "MIGRATE", "WEB"]
   .map(
     (target) =>
-      `SIGIL_${target}_IMAGE=ghcr.io/example/sigil-chat-${target.toLowerCase()}@sha256:${digest}`,
+      `SIGIL_${target}_IMAGE=123456789012.dkr.ecr.us-west-2.amazonaws.com/sigil-chat-${target.toLowerCase()}@sha256:${digest}`,
   )
   .join("\n");
 const shellVerifier = new URL("./verify-release.sh", import.meta.url).pathname;

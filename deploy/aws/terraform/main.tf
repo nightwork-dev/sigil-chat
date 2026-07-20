@@ -96,6 +96,13 @@ resource "aws_instance" "sigil_chat" {
   user_data                   = file("${path.module}/user-data.sh")
   user_data_replace_on_change = true
 
+  lifecycle {
+    # The default subnet assigns a public address before the separately managed
+    # EIP is associated. AWS reports that observed value as true; reconciling
+    # it would replace the live instance without changing its effective edge.
+    ignore_changes = [associate_public_ip_address]
+  }
+
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"

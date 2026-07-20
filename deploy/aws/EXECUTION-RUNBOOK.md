@@ -105,28 +105,27 @@ CDK, modules, or workspaces for DEP.2.
 
    No secret prints or enters the image manifest.
 
-9. Validate and pull all four immutable images, stop the public edge, then
-   replace the private services. This ordering applies to first deploys,
-   upgrades, and rollbacks: a failed update must leave the edge stopped. Eve
-   uses process liveness for container ordering, so this step does not require
-   a model credential yet.
+9. Validate and pull all four immutable images, stop the public edge and web,
+   run the candidate migration, then replace the private services. The live
+   manifest changes only after migration succeeds. Readiness failure restores
+   the previous manifest and services; edge starts only after the candidate
+   private services are healthy. Eve uses process liveness for container
+   ordering, so this step does not require a model credential yet.
 
    ```bash
    ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \
      "sudo /opt/sigil-chat/deploy/update-images.sh /opt/sigil-chat/deploy/sigil-images.env"
    ```
 
-   Expected: `web`, `eve`, and `gonk` are running; `edge` is intentionally
-   stopped, including during an upgrade or rollback. The update command
-   validates all four digests before Docker runs. No Eve or Gonk port is
-   public.
+   Expected: `web`, `eve`, `gonk`, and `edge` are healthy. The update command
+   validates all four ECR digests before Docker runs and does not replace the
+   application services when migration fails. No Eve or Gonk port is public.
 
-10. Complete device auth as the Eve service identity, prove model-aware
-    readiness, activate the edge, then verify app login, model response, and a
-    container restart from a phone. Repeat this readiness gate after every
-    upgrade or rollback before restarting edge. Docker uses Eve process
-    liveness for startup ordering, so the private runtime comes up before this
-    credential exists.
+10. On the first deployment, complete device auth as the Eve service identity,
+    prove model-aware readiness, then verify app login, model response, and a
+    container restart from a phone. Docker uses Eve process liveness for startup
+    ordering, so the public shell can come up before the model credential
+    exists; model-aware readiness remains a separate authenticated gate.
 
     ```bash
     ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \

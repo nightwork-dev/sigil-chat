@@ -37,8 +37,8 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     echo "Duplicate manifest key: $key" >&2
     exit 1
   }
-  [[ "$value" =~ ^ghcr\.io/[a-z0-9._-]+/sigil-chat-${target}@sha256:[a-f0-9]{64}$ ]] || {
-    echo "Image is not an immutable GHCR digest: $key" >&2
+  [[ "$value" =~ ^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/sigil-chat-${target}@sha256:[a-f0-9]{64}$ ]] || {
+    echo "Image is not an immutable private ECR digest: $key" >&2
     exit 1
   }
   seen[$key]=1

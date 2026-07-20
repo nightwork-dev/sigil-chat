@@ -71,6 +71,23 @@ variable "artifact_bucket_name" {
   }
 }
 
+variable "github_repository" {
+  description = "GitHub owner/repository allowed to assume the release role."
+  type        = string
+  default     = "nightwork-dev/sigil-chat"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
+    error_message = "github_repository must use owner/repository form."
+  }
+}
+
+variable "github_environment" {
+  description = "Protected GitHub environment allowed to assume the release role."
+  type        = string
+  default     = "production"
+}
+
 variable "route53_zone_id" {
   description = "Optional existing Route53 hosted-zone ID. Leave null to manage DNS elsewhere."
   type        = string

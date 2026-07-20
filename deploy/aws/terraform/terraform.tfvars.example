@@ -8,6 +8,10 @@ key_name          = "sigil-chat-disposable"
 public_key_path   = "/absolute/path/to/sigil-chat-disposable.pub"
 admin_cidr        = "203.0.113.7/32"
 
+# Only this repository's protected environment can obtain release credentials.
+github_repository = "example/sigil-chat"
+github_environment = "production"
+
 # Set both values only when Route53 owns the public hostname.
 # route53_zone_id     = "Z0123456789EXAMPLE"
 # route53_record_name = "chat.example.com"

@@ -26,6 +26,12 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 }
 [[ $mode == prepare ]] || usage
 
+apt-get update -qq
+apt-get install -y --no-install-recommends amazon-ecr-credential-helper
+install -d -m 0700 /root/.docker
+printf '%s\n' '{"credsStore":"ecr-login"}' >/root/.docker/config.json
+chmod 0600 /root/.docker/config.json
+
 install -d -m 0755 /opt/sigil-chat/deploy
 install -d -m 0700 /srv/sigil-chat/secrets
 install -d -m 0700 -o 10004 -g 10004 /srv/sigil-chat/caddy-data /srv/sigil-chat/caddy-config

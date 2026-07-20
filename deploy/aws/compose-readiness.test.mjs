@@ -33,15 +33,17 @@ test("update command stops the public edge before replacing services", () => {
     "utf8",
   )
   assert.ok(
-    updateScript.indexOf("stop edge") <
-      updateScript.indexOf("up -d migrate web gonk eve"),
+    updateScript.indexOf("stop edge web") <
+      updateScript.indexOf(
+        "up --abort-on-container-exit --exit-code-from migrate migrate",
+      ),
   )
-  assert.match(updateScript, /up -d migrate web gonk eve/)
-  const dockerInvocations = updateScript
-    .split("\n")
-    .filter((line) => line.startsWith("docker compose"))
-    .join("\n")
-  assert.doesNotMatch(dockerInvocations, /up(?: -d)? edge/)
+  assert.ok(
+    updateScript.indexOf(
+      "up --abort-on-container-exit --exit-code-from migrate migrate",
+    ) < updateScript.lastIndexOf("up -d --wait --no-deps web gonk eve"),
+  )
+  assert.match(updateScript, /up -d --wait --no-deps edge/)
 })
 
 test("production services share writable blackboard storage", () => {
