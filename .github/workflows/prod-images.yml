@@ -26,7 +26,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm -r --if-present test
+      - run: pnpm --filter '!sigil-chat-agent' -r --if-present test
+      - run: pnpm --filter sigil-chat-agent exec vitest run
       - run: pnpm lint
       - run: node --test deploy/aws/*.test.mjs
 
@@ -48,6 +49,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Normalize registry path
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: echo "IMAGE_PREFIX=ghcr.io/${REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
       - id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -55,16 +60,16 @@ jobs:
           file: Dockerfile
           target: ${{ matrix.target }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/sigil-chat-${{ matrix.target }}:${{ github.sha }}
+          tags: ${{ env.IMAGE_PREFIX }}/sigil-chat-${{ matrix.target }}:${{ github.sha }}
       - name: Write immutable image reference
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE_OWNER: ${{ github.repository_owner }}
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
           IMAGE_TARGET: ${{ matrix.target }}
         run: |
           mkdir -p image-digests
           key="SIGIL_$(printf '%s' "$IMAGE_TARGET" | tr '[:lower:]' '[:upper:]')_IMAGE"
-          printf '%s=ghcr.io/%s/sigil-chat-%s@%s\n' "$key" "$IMAGE_OWNER" "$IMAGE_TARGET" "$IMAGE_DIGEST" > "image-digests/$IMAGE_TARGET.env"
+          printf '%s=%s/sigil-chat-%s@%s\n' "$key" "$IMAGE_PREFIX" "$IMAGE_TARGET" "$IMAGE_DIGEST" > "image-digests/$IMAGE_TARGET.env"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: image-digest-${{ matrix.target }}
