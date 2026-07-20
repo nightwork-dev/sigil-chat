@@ -71,6 +71,83 @@ export interface KanbanBoardProps<T> {
   columnClassName?: string
 }
 
+/**
+ * Pure move resolution extracted from handleDragEnd so the index math is
+ * exhaustively testable without rendering React. Returns null for a no-op
+ * (dropped outside, dropped back on the same spot, or missing column data).
+ *
+ * `newIndex` is the FINAL desired position of the dragged card in `toColumnId`,
+ * computed against the target list AFTER removing the dragged card (same-column
+ * case), so the consumer can remove-then-insert without offset math.
+ */
+export interface ResolvedBoardMove {
+  activeId: string
+  fromColumnId: string
+  toColumnId: string
+  newIndex: number
+}
+
+export function resolveBoardMove(
+  drop: {
+    activeId: string
+    fromColumnId: string | undefined
+    overId: string | null
+    /** "column" when dropped on a column body; anything else (or null) = a card. */
+    overType: string | null
+    /** The columnId carried by `over` when it's a card; undefined for a column body. */
+    overColumnId: string | undefined
+  },
+  columnItems: Record<string, string[]>,
+): ResolvedBoardMove | null {
+  if (!drop.overId) return null
+  if (!drop.fromColumnId) return null
+  const overIsColumn = drop.overType === "column"
+  const toColumnId = overIsColumn ? drop.overId : drop.overColumnId
+  if (!toColumnId) return null
+
+  const draggedId = drop.activeId
+  const fromColumnId = drop.fromColumnId
+  const targetRaw = columnItems[toColumnId] ?? []
+  const sourceRaw = columnItems[fromColumnId] ?? []
+  const sameColumn = fromColumnId === toColumnId
+  // For same-column moves, index against the list WITHOUT the dragged card so
+  // `newIndex` is the post-removal insertion point (no offset math for the
+  // consumer).
+  const targetList = sameColumn ? targetRaw.filter((id) => id !== draggedId) : targetRaw
+  const originalIndex = sameColumn ? sourceRaw.indexOf(draggedId) : -1
+  let newIndex: number
+  if (overIsColumn) {
+    newIndex = targetList.length
+  } else if (drop.overId === draggedId) {
+    // Dropped back onto itself — would re-insert at its original slot. Map to
+    // the pre-removal index so the no-op guard below fires.
+    newIndex = originalIndex
+  } else {
+    const hit = targetList.indexOf(drop.overId)
+    newIndex = hit === -1 ? targetList.length : hit
+  }
+  // Direction-aware adjustment for same-column moves: when a card is dragged
+  // DOWNWARD onto a later card, it should land AFTER that card (not before).
+  // The raw `hit` is "insert before the hovered card," which is correct for
+  // upward moves but off-by-one for downward moves. Compare the dragged
+  // card's original position to the hovered card's to decide before/after.
+  // (Cross-column moves keep `hit` — there's no "original position" to
+  // compare against in the target column.)
+  if (sameColumn && !overIsColumn && drop.overId !== draggedId) {
+    const overOriginal = sourceRaw.indexOf(drop.overId)
+    if (
+      overOriginal !== -1 &&
+      originalIndex < overOriginal &&
+      newIndex === targetList.indexOf(drop.overId)
+    ) {
+      newIndex += 1
+    }
+  }
+  // Same-column no-op: the card would land exactly where it started.
+  if (sameColumn && newIndex === originalIndex) return null
+  return { activeId: draggedId, fromColumnId, toColumnId, newIndex }
+}
+
 export function KanbanBoard<T>({
   columns,
   items,
@@ -94,52 +171,17 @@ export function KanbanBoard<T>({
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null)
-    const { active, over } = event
-    if (!over) return
-    const draggedId = String(active.id)
-    const fromColumnId = active.data.current?.columnId as string | undefined
-    // `over` is either a card (carries columnId) or a column body (type "column").
-    const overIsColumn = over.data.current?.type === "column"
-    const toColumnId = overIsColumn
-      ? String(over.id)
-      : (over.data.current?.columnId as string | undefined)
-    if (!fromColumnId || !toColumnId) return
-
-    const targetRaw = columnItems[toColumnId] ?? []
-    const sourceRaw = columnItems[fromColumnId] ?? []
-    const sameColumn = fromColumnId === toColumnId
-    // For same-column moves, index against the list WITHOUT the dragged card so
-    // `newIndex` is the post-removal insertion point (no offset math for the
-    // consumer).
-    const targetList = sameColumn ? targetRaw.filter((id) => id !== draggedId) : targetRaw
-    const originalIndex = sameColumn ? sourceRaw.indexOf(draggedId) : -1
-    let newIndex: number
-    if (overIsColumn) {
-      newIndex = targetList.length
-    } else if (String(over.id) === draggedId) {
-      // Dropped back onto itself — would re-insert at its original slot. Map to
-      // the pre-removal index so the no-op guard below fires.
-      newIndex = originalIndex
-    } else {
-      const hit = targetList.indexOf(String(over.id))
-      newIndex = hit === -1 ? targetList.length : hit
-    }
-    // Direction-aware adjustment for same-column moves: when a card is dragged
-    // DOWNWARD onto a later card, it should land AFTER that card (not before).
-    // The raw `hit` is "insert before the hovered card," which is correct for
-    // upward moves but off-by-one for downward moves. Compare the dragged
-    // card's original position to the hovered card's to decide before/after.
-    // (Cross-column moves keep `hit` — there's no "original position" to
-    // compare against in the target column.)
-    if (sameColumn && !overIsColumn && String(over.id) !== draggedId) {
-      const overOriginal = sourceRaw.indexOf(String(over.id))
-      if (overOriginal !== -1 && originalIndex < overOriginal && newIndex === targetList.indexOf(String(over.id))) {
-        newIndex += 1
-      }
-    }
-    // Same-column no-op: the card would land exactly where it started.
-    if (sameColumn && newIndex === originalIndex) return
-    onMove(draggedId, fromColumnId, toColumnId, newIndex)
+    const move = resolveBoardMove(
+      {
+        activeId: String(event.active.id),
+        fromColumnId: event.active.data.current?.columnId as string | undefined,
+        overId: event.over ? String(event.over.id) : null,
+        overType: (event.over?.data.current?.type as string | undefined) ?? null,
+        overColumnId: event.over?.data.current?.columnId as string | undefined,
+      },
+      columnItems,
+    )
+    if (move) onMove(move.activeId, move.fromColumnId, move.toColumnId, move.newIndex)
   }
 
   const activeItem = activeId ? items[activeId] : undefined
