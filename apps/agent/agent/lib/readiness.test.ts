@@ -5,10 +5,10 @@ import { createReadinessRoute } from "./readiness"
 describe("authenticated agent readiness", () => {
   it("rejects unauthenticated requests before inspecting model auth", async () => {
     let inspected = false
-    const route = createReadinessRoute(async () => null, {
-      hasModelAuth: async () => {
+    const route = createReadinessRoute(() => Promise.resolve(null), {
+      hasModelAuth: () => {
         inspected = true
-        return true
+        return Promise.resolve(true)
       },
     })
 
@@ -22,13 +22,14 @@ describe("authenticated agent readiness", () => {
 
   it("fails closed when the model credential is unavailable", async () => {
     const route = createReadinessRoute(
-      async () => ({
-        attributes: {},
-        authenticator: "test",
-        principalId: "owner-1",
-        principalType: "user",
-      }),
-      { hasModelAuth: async () => false },
+      () =>
+        Promise.resolve({
+          attributes: {},
+          authenticator: "test",
+          principalId: "owner-1",
+          principalType: "user",
+        }),
+      { hasModelAuth: () => Promise.resolve(false) },
     )
 
     const response = await route.handler(
@@ -41,13 +42,14 @@ describe("authenticated agent readiness", () => {
 
   it("reports ready only after authentication and model credential checks", async () => {
     const route = createReadinessRoute(
-      async () => ({
-        attributes: {},
-        authenticator: "test",
-        principalId: "user-1",
-        principalType: "user",
-      }),
-      { hasModelAuth: async () => true },
+      () =>
+        Promise.resolve({
+          attributes: {},
+          authenticator: "test",
+          principalId: "user-1",
+          principalType: "user",
+        }),
+      { hasModelAuth: () => Promise.resolve(true) },
     )
 
     const response = await route.handler(
