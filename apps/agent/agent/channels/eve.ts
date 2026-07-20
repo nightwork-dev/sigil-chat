@@ -16,6 +16,7 @@ import {
   memoryTurn,
   personaHost,
 } from "../lib/memory"
+import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
@@ -42,10 +43,8 @@ export default createOwnedEveChannel({
     // Keep this raw header name in sync with the Sigil Chat approval client.
     // This is a client-declared UI preference;
     // it is not verified and is not a security boundary.
-    const toolApproval =
-      request.headers.get("x-sigil-tool-approval") === "always"
-        ? "always"
-        : "ask"
+    const rawToolApproval = request.headers.get("x-sigil-tool-approval")
+    const toolApproval = parseToolApprovalPreference(rawToolApproval)
     const resourceScope =
       request.headers.get("x-sigil-scope")?.trim() ??
       request.headers.get("x-sigil-session-id")?.trim()
@@ -61,7 +60,7 @@ export default createOwnedEveChannel({
       ...auth,
       attributes: {
         ...auth.attributes,
-        sigilToolApproval: toolApproval,
+        sigilToolApproval: JSON.stringify(toolApproval),
         ...(requestedPersonaId
           ? { sigilRequestedPersonaId: requestedPersonaId }
           : {}),

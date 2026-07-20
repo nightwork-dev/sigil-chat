@@ -67,7 +67,31 @@ const APPEARANCE_MODES = ["light", "dark", "system"] as const
 export type RegisteredAppearanceMode = (typeof APPEARANCE_MODES)[number]
 
 const TOOL_APPROVAL_DEFAULTS = ["ask", "always"] as const
+const MAX_TOOL_APPROVAL_OVERRIDES = 64
+const MAX_TOOL_NAME_LENGTH = 160
 export type RegisteredToolApprovalDefault = (typeof TOOL_APPROVAL_DEFAULTS)[number]
+export type RegisteredToolApprovalOverrides = Record<
+  string,
+  RegisteredToolApprovalDefault
+>
+
+function isToolApprovalOverrides(
+  value: unknown,
+): value is RegisteredToolApprovalOverrides {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const entries = Object.entries(value)
+  return (
+    entries.length <= MAX_TOOL_APPROVAL_OVERRIDES &&
+    entries.every(
+      ([toolName, mode]) =>
+        toolName.length > 0 &&
+        toolName.length <= MAX_TOOL_NAME_LENGTH &&
+        (TOOL_APPROVAL_DEFAULTS as readonly unknown[]).includes(mode),
+    )
+  )
+}
 
 function isWorkspacePanelState(value: unknown): value is Record<string, unknown> {
   // Validated workspace-specific object: a plain JSON-serializable record.
@@ -111,6 +135,12 @@ export const SETTINGS_REGISTRY = {
     isValid: (value): value is RegisteredToolApprovalDefault =>
       typeof value === "string" &&
       (TOOL_APPROVAL_DEFAULTS as readonly string[]).includes(value),
+  }),
+  "agent.toolApprovalOverrides": definition<RegisteredToolApprovalOverrides>({
+    key: "agent.toolApprovalOverrides",
+    allowedScopes: ["user"],
+    defaultValue: {},
+    isValid: isToolApprovalOverrides,
   }),
   "agent.activeChannelId": definition<string | null>({
     key: "agent.activeChannelId",

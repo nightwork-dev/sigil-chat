@@ -2,16 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   fetchAgentCatalogFromEve,
+  fetchGonkToolCatalog,
   projectAgentCatalog,
 } from "./agent-catalog";
 
 describe("agent catalog projection", () => {
   it("authenticates Eve inspection with the verified session token", async () => {
-    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
+    const fetcher = (_url: string | URL | Request, init?: RequestInit) => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer verified-eve-token",
       );
-      return Response.json({ agent: { name: "Sigil Chat" } });
+      return Promise.resolve(Response.json({ agent: { name: "Sigil Chat" } }));
     };
 
     await expect(
@@ -24,8 +25,10 @@ describe("agent catalog projection", () => {
   });
 
   it("fails closed when Eve rejects inspection credentials", async () => {
-    const fetcher = async () =>
-      new Response(null, { status: 401, statusText: "Unauthorized" });
+    const fetcher = () =>
+      Promise.resolve(
+        new Response(null, { status: 401, statusText: "Unauthorized" }),
+      );
 
     await expect(
       fetchAgentCatalogFromEve(
@@ -105,5 +108,48 @@ describe("agent catalog projection", () => {
     expect(catalog.skills[0]?.sourcePath).toBe("skills/safe-skill/SKILL.md");
     expect(catalog.skills[1]?.sourcePath).toBeUndefined();
     expect(catalog.subagents[0]?.sourcePath).toBeUndefined();
+  });
+
+  it("lists authenticated Gonk tools under Eve's qualified runtime names", async () => {
+    let call = 0;
+    const fetcher = (_url: string | URL | Request, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        "Bearer gonk-service-token",
+      );
+      call += 1;
+      if (call === 1) {
+        return Promise.resolve(
+          Response.json({}, { headers: { "mcp-session-id": "session-1" } }),
+        );
+      }
+      if (call === 2) return Promise.resolve(new Response(null, { status: 202 }));
+      if (call === 3) {
+        return Promise.resolve(
+          Response.json({
+            result: {
+              tools: [
+                { name: "sigil-read-file", description: "Read a session file." },
+              ],
+            },
+          }),
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    };
+
+    await expect(
+      fetchGonkToolCatalog(
+        "http://sigil-chat-gonk.localhost:1355/mcp",
+        "gonk-service-token",
+        fetcher as typeof fetch,
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: "gonk__sigil-read-file",
+        name: "sigil-read-file",
+        runtimeStatus: "callable",
+      }),
+    ]);
+    expect(call).toBe(4);
   });
 });

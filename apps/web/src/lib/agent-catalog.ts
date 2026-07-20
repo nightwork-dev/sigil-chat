@@ -32,6 +32,15 @@ export interface AgentSubagentCatalogItem {
   };
 }
 
+export interface AgentToolCatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  origin: "gonk";
+  availability: "available";
+  runtimeStatus: "callable";
+}
+
 export interface AgentCatalog {
   agent: {
     name: string;
@@ -39,6 +48,7 @@ export interface AgentCatalog {
   };
   skills: readonly AgentSkillCatalogItem[];
   subagents: readonly AgentSubagentCatalogItem[];
+  tools: readonly AgentToolCatalogItem[];
   management: {
     source: "eve-inspection";
     lifecycle: "unavailable";
@@ -96,13 +106,129 @@ const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
       "@workspace/runtime-env/topology"
     );
     const { getEveBearerToken } = await import("./auth/session");
-    const origin = readRuntimeTopology(process.env).eveOrigin;
-    return fetchAgentCatalogFromEve(
-      joinRuntimeUrl(origin, "/eve/v1/info"),
-      await getEveBearerToken(),
+    const { readGonkClientEnvironment } = await import(
+      "@workspace/runtime-env/server"
     );
+    const origin = readRuntimeTopology(process.env).eveOrigin;
+    const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
+    if (!apiKey) {
+      throw new Error(
+        "GONK_MCP_KEY is not configured for the web app's server process; the tool catalog cannot authenticate against Gonk.",
+      );
+    }
+    const [catalog, tools] = await Promise.all([
+      fetchAgentCatalogFromEve(
+        joinRuntimeUrl(origin, "/eve/v1/info"),
+        await getEveBearerToken(),
+      ),
+      fetchGonkToolCatalog(gonkMcpUrl, apiKey),
+    ]);
+    return { ...catalog, tools };
   },
 );
+
+interface McpToolInfo {
+  name?: unknown;
+  description?: unknown;
+}
+
+export async function fetchGonkToolCatalog(
+  url: string,
+  bearer: string,
+  fetcher: typeof fetch = fetch,
+): Promise<AgentToolCatalogItem[]> {
+  const headers = {
+    accept: "application/json, text/event-stream",
+    authorization: `Bearer ${bearer}`,
+    "content-type": "application/json",
+  };
+  const initialized = await fetcher(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "sigil-chat-web", version: "0.0.1" },
+      },
+    }),
+  });
+  if (!initialized.ok) {
+    throw new Error(
+      `Gonk tool catalog initialization failed (${initialized.status} ${initialized.statusText})`,
+    );
+  }
+  const sessionId = initialized.headers.get("mcp-session-id");
+  if (!sessionId) throw new Error("Gonk did not return an MCP session id.");
+  const sessionHeaders = { ...headers, "mcp-session-id": sessionId };
+
+  try {
+    const notification = await fetcher(url, {
+      method: "POST",
+      headers: sessionHeaders,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    });
+    if (!notification.ok && notification.status !== 202) {
+      throw new Error(
+        `Gonk tool catalog session initialization failed (${notification.status} ${notification.statusText})`,
+      );
+    }
+    const response = await fetcher(url, {
+      method: "POST",
+      headers: sessionHeaders,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/list",
+        params: {},
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Gonk tool catalog failed (${response.status} ${response.statusText})`,
+      );
+    }
+    const payload: unknown = await response.json();
+    if (typeof payload !== "object" || payload === null) {
+      throw new Error("Gonk returned an invalid MCP tool catalog response.");
+    }
+    if (typeof (payload as { error?: unknown }).error === "object") {
+      throw new Error("Gonk rejected the MCP tool catalog request.");
+    }
+    const result = (payload as { result?: unknown }).result;
+    if (typeof result !== "object" || result === null) {
+      throw new Error("Gonk returned an MCP tool catalog response without a result.");
+    }
+    const tools = (result as { tools?: unknown }).tools;
+    if (!Array.isArray(tools)) {
+      throw new Error("Gonk returned an invalid MCP tool list.");
+    }
+    return tools.flatMap((candidate) => {
+      if (typeof candidate !== "object" || candidate === null) return [];
+      const tool = candidate as McpToolInfo;
+      const name = stringValue(tool.name, "");
+      if (!name) return [];
+      return [{
+        id: `gonk__${name}`,
+        name,
+        description: stringValue(tool.description, "Application tool"),
+        origin: "gonk" as const,
+        availability: "available" as const,
+        runtimeStatus: "callable" as const,
+      }];
+    });
+  } finally {
+    await fetcher(url, { method: "DELETE", headers: sessionHeaders }).catch(
+      () => undefined,
+    );
+  }
+}
 
 export async function fetchAgentCatalogFromEve(
   url: string,
@@ -226,6 +352,7 @@ export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
     },
     skills: projectSkills(info.skills),
     subagents: projectSubagents(info.subagents),
+    tools: [],
     management: {
       source: "eve-inspection",
       lifecycle: "unavailable",

@@ -21,6 +21,16 @@ describe("SETTINGS_REGISTRY", () => {
     expect(validateSettingValue("appearance.reducedMotion", "yes")).toBe(false)
     expect(validateSettingValue("agent.toolApprovalDefault", "always")).toBe(true)
     expect(validateSettingValue("agent.toolApprovalDefault", "sometimes")).toBe(false)
+    expect(
+      validateSettingValue("agent.toolApprovalOverrides", {
+        "gonk__sigil-read-file": "always",
+      }),
+    ).toBe(true)
+    expect(
+      validateSettingValue("agent.toolApprovalOverrides", {
+        "gonk__sigil-read-file": "sometimes",
+      }),
+    ).toBe(false)
   })
 
   it("declares which scope tiers each key allows", () => {
@@ -36,6 +46,7 @@ describe("SETTINGS_REGISTRY", () => {
       "appearance.mode",
       "appearance.reducedMotion",
       "agent.toolApprovalDefault",
+      "agent.toolApprovalOverrides",
       "agent.activeChannelId",
       "workspace.lastChannel",
       "workspace.panelState",
