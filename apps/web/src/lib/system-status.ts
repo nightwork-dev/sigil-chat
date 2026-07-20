@@ -1,23 +1,23 @@
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { createServerFn } from "@tanstack/react-start";
+import { queryOptions, useQuery } from "@tanstack/react-query"
+import { createServerFn } from "@tanstack/react-start"
 
 export interface ServiceStatus {
-  id: "web" | "eve" | "gonk";
-  label: string;
-  status: "healthy" | "unhealthy";
-  latencyMs: number;
+  id: "web" | "eve" | "gonk"
+  label: string
+  status: "healthy" | "unhealthy"
+  latencyMs: number
 }
 
 export interface SystemStatus {
-  checkedAt: string;
-  services: readonly ServiceStatus[];
-  usage: { status: "unavailable" };
+  checkedAt: string
+  services: readonly ServiceStatus[]
+  usage: { status: "unavailable" }
 }
 
 export const fetchSystemStatus = createServerFn({ method: "GET" }).handler(
   async (): Promise<SystemStatus> =>
     (await import("./system-status.server")).readSystemStatus(),
-);
+)
 
 export async function measureService(
   id: ServiceStatus["id"],
@@ -25,28 +25,28 @@ export async function measureService(
   operation: () => Promise<void>,
   now: () => number = () => performance.now(),
 ): Promise<ServiceStatus> {
-  const startedAt = now();
+  const startedAt = now()
   try {
-    await operation();
+    await operation()
     return {
       id,
       label,
       status: "healthy",
       latencyMs: Math.max(0, Math.round(now() - startedAt)),
-    };
+    }
   } catch {
     return {
       id,
       label,
       status: "unhealthy",
       latencyMs: Math.max(0, Math.round(now() - startedAt)),
-    };
+    }
   }
 }
 
 export const systemStatusKeys = {
   all: () => ["system-status"] as const,
-};
+}
 
 export function systemStatusQueryOptions() {
   return queryOptions({
@@ -54,9 +54,9 @@ export function systemStatusQueryOptions() {
     queryFn: () => fetchSystemStatus(),
     refetchInterval: 30_000,
     retry: false,
-  });
+  })
 }
 
 export function useSystemStatus() {
-  return useQuery(systemStatusQueryOptions());
+  return useQuery(systemStatusQueryOptions())
 }
