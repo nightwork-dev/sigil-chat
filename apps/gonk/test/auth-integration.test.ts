@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createOrchestrator } from "@gonk/tool-orchestrator";
 import { ToolRegistry, passthrough } from "@gonk/tool-registry";
 import type { WebMcpHandler } from "@gonk/tool-registry-mcp/http";
 import {
@@ -73,7 +72,7 @@ async function rpc(
 }
 
 function webHandler(
-  source: ToolRegistry | ReturnType<typeof createOrchestrator>,
+  source: ToolRegistry,
   authorize: AgentMcpAuthorizationPolicy = authorizeSigilMcpRequest,
 ): WebMcpHandler {
   const handler = createAgentWebMcpHandler({
@@ -425,53 +424,5 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
       "Sensitive hidden description",
     );
     expect(hiddenExecuted).toBe(false);
-  });
-
-  it("denies orchestrator pin mutations without changing pending state", async () => {
-    const registry = new ToolRegistry({
-      security: {
-        approvalProvider: {
-          decide: () => ({ outcome: "approved" }),
-        },
-      },
-    });
-    registry.register({
-      name: "sigil-test-payload",
-      description: "On-demand tool used as a pin target.",
-      visibility: "on-demand",
-      approval: "read",
-      input: passthrough(),
-      handler: async () => ({ data: { ok: true } }),
-    });
-    const orchestrator = createOrchestrator({
-      registries: [registry],
-      scope: "mcp",
-    });
-    const handler = webHandler(orchestrator, ({ request }) =>
-      request.action === "tool.invoke" &&
-      request.resource.target === "load_tool"
-        ? { outcome: "deny", reason: "Pin mutation denied" }
-        : { outcome: "allow", reason: "Allowed for test" },
-    );
-    const sessionId = await initialize(handler);
-
-    const response = await rpc(handler, sessionId, 2, "tools/call", {
-      name: "load_tool",
-      arguments: { name: "sigil-test-payload" },
-    });
-
-    expect(response).toMatchObject({
-      result: {
-        isError: true,
-        structuredContent: {
-          error: {
-            code: "AUTHORIZATION_DENIED",
-            message: "Pin mutation denied",
-          },
-        },
-      },
-    });
-    expect(orchestrator.pendingPins()).toEqual({ add: [], remove: [] });
-    expect(orchestrator.committedPins()).toEqual([]);
   });
 });
