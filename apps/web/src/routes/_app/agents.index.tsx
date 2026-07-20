@@ -8,7 +8,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowRightIcon } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar"
 import { Card, CardContent } from "@workspace/ui/components/card"
 
 import { agentRosterQueryOptions } from "@/lib/agent-profile"
@@ -53,11 +57,21 @@ function AgentRoster() {
                 <Card className="h-full transition-colors group-hover:border-primary/40 group-focus-visible:border-primary/40">
                   <CardContent className="flex items-center gap-4 p-4">
                     <Avatar className="size-11">
-                      <AvatarFallback className="font-medium text-primary">{initial}</AvatarFallback>
+                      {persona.hasPortrait && (
+                        <AvatarImage
+                          src={`/api/agent-portrait?personaId=${encodeURIComponent(persona.id)}`}
+                          alt=""
+                        />
+                      )}
+                      <AvatarFallback className="font-medium text-primary">
+                        {initial}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <h2 className="truncate font-medium">{persona.name}</h2>
-                      <p className="line-clamp-2 text-sm text-muted-foreground">{persona.description || persona.id}</p>
+                      <p className="line-clamp-2 text-sm text-muted-foreground">
+                        {persona.description || persona.id}
+                      </p>
                     </div>
                     <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </CardContent>
