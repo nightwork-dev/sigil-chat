@@ -47,8 +47,40 @@ export const sigilMemoryHost = new EveMemoryHost({
  * The consumer supplies Eve's authenticated session identity; EveMemoryHost
  * alone translates it into persona's host-neutral executionSessionId.
  */
-export function memoryTurn(eveSessionId: string, principalId: string): TrustedMemoryTurn {
-  return { eveSessionId, channelId: "sigil-chat", principalId }
+export function memoryTurn(
+  eveSessionId: string | undefined,
+  principalId: string | undefined,
+): TrustedMemoryTurn {
+  const authenticatedPrincipalId = requireNonBlank(
+    principalId,
+    "authenticated principal",
+  )
+
+  // Eve 0.25.2 exposes `ctx.eve.sessionId` only for continuation requests.
+  // A new-session onMessage hook has no durable Eve id yet, so bind it to a
+  // stable, principal-scoped provisional identity instead. Never let the host
+  // receive an absent or whitespace-only identity.
+  const executionSessionId = normalizeNonBlank(eveSessionId)
+    ?? `new:${authenticatedPrincipalId}`
+
+  return {
+    eveSessionId: executionSessionId,
+    channelId: "sigil-chat",
+    principalId: authenticatedPrincipalId,
+  }
+}
+
+function requireNonBlank(value: string | undefined, label: string): string {
+  const normalized = normalizeNonBlank(value)
+  if (normalized === undefined) {
+    throw new Error(`Memory actions require a non-blank ${label}.`)
+  }
+  return normalized
+}
+
+function normalizeNonBlank(value: string | undefined): string | undefined {
+  const normalized = value?.trim()
+  return normalized && normalized.length > 0 ? normalized : undefined
 }
 
 export function memoryDraft(principalId: string, content: string): MemoryRecordDraft {

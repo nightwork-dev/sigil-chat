@@ -86,8 +86,8 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
 
     const blocks: string[] = []
     if (options.identityFloor) {
-      const principalId = caller.principalId
-      const eveSessionId = ctx.eve.sessionId ?? `new:${principalId}`
+      const principalId = requireNonBlankCallerPrincipal(caller.principalId)
+      const eveSessionId = nonBlank(ctx.eve.sessionId) ?? `new:${principalId}`
       const identity = options.identityFloor({ eveSessionId, principalId }).trim()
       if (identity.length > 0) blocks.push(identity)
     }
@@ -123,6 +123,19 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       context: blocks.length > 0 ? blocks : undefined,
     }
   }
+}
+
+function requireNonBlankCallerPrincipal(value: string | undefined): string {
+  const principalId = nonBlank(value)
+  if (principalId === undefined) {
+    throw new Error("Eve identity projection requires an authenticated principal.")
+  }
+  return principalId
+}
+
+function nonBlank(value: string | undefined): string | undefined {
+  const normalized = value?.trim()
+  return normalized && normalized.length > 0 ? normalized : undefined
 }
 
 /** Only session-tier scopes have a blackboard; project/persona scopes do not. */
