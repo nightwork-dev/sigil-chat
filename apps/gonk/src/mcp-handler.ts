@@ -11,20 +11,30 @@ import {
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
 import { createSigilRegistry } from "./registry.js"
+import type { ContainerRegistries } from "./registry/containers.js"
 
 export function createSigilMcpHandler({
   apiKey,
   port,
   portlessUrl = process.env.PORTLESS_URL,
   configuredAllowedHosts = process.env.GONK_ALLOWED_HOSTS,
+  containers,
 }: {
   apiKey: string
   port: number
   portlessUrl?: string
   configuredAllowedHosts?: string
+  containers?: ContainerRegistries
 }) {
   return createAgentWebMcpHandler({
-    source: createSigilRegistry(),
+    source: createSigilRegistry(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      containers,
+    ),
     serverName: "sigil-chat-gonk",
     serverVersion: "0.0.1",
     allowedHosts: [

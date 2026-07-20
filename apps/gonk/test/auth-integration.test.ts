@@ -1,4 +1,8 @@
+import type { KvStore } from "@gonk/store/types";
 import { afterEach, describe, expect, it } from "vitest";
+
+import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js";
+import { WorkspaceRegistry } from "../../agent/agent/lib/workspace-registry.js";
 
 import { ToolRegistry, passthrough } from "@gonk/tool-registry";
 import type { WebMcpHandler } from "@gonk/tool-registry-mcp/http";
@@ -14,6 +18,17 @@ import { createSigilRegistry, sigilApprovalProvider } from "../src/registry.js";
 const endpoint = "http://sigil.test/mcp";
 const token = "sigil-test-token";
 const handlers: WebMcpHandler[] = [];
+
+function containers() {
+  const projects = new ProjectRegistry({ store: memoryKv(new Map()) });
+  return {
+    projects,
+    workspaces: new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    }),
+  };
+}
 
 afterEach(async () => {
   await Promise.all(handlers.splice(0).map((handler) => handler.close()));
@@ -90,7 +105,14 @@ function webHandler(
 
 describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => {
   it("preserves Sigil registry MCP initialize, list, call, and masked error parity", async () => {
-    const registry = createSigilRegistry();
+    const registry = createSigilRegistry(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      containers(),
+    );
     const handler = webHandler(registry, ({ request }) =>
       request.resource.target === "sigil-ui-highlight"
         ? { outcome: "deny", reason: "Hidden from this principal" }
@@ -426,3 +448,20 @@ describe("published Gonk 0.2.0 and Sigil Agent Gonk 0.1.1 compatibility", () => 
     expect(hiddenExecuted).toBe(false);
   });
 });
+
+function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
+  return {
+    delete: (key) => void values.delete(key),
+    entries: (prefix = "") =>
+      [...values.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => ({ key, value })),
+    get: (key) => values.get(key),
+    list: (prefix = "") =>
+      [...values.keys()].filter((key) => key.startsWith(prefix)),
+    patch: () => {
+      throw new Error("not implemented");
+    },
+    set: (key, value) => void values.set(key, value),
+  };
+}

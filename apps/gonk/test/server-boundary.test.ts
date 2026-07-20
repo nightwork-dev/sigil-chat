@@ -1,11 +1,25 @@
+import type { KvStore } from "@gonk/store/types"
 import { afterEach, describe, expect, it } from "vitest"
 
+import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js"
+import { WorkspaceRegistry } from "../../agent/agent/lib/workspace-registry.js"
 import { createAgentMcpBearerHeaders } from "@zigil/agent-gonk"
 
 import { createSigilMcpHandler } from "../src/mcp-handler.js"
 
 const token = "sigil-server-boundary-token"
 const handlers: ReturnType<typeof createSigilMcpHandler>[] = []
+
+function containers() {
+  const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+  return {
+    projects,
+    workspaces: new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    }),
+  }
+}
 
 afterEach(async () => {
   await Promise.all(handlers.splice(0).map((handler) => handler.close()))
@@ -35,7 +49,11 @@ function initializeRequest(host: string) {
 
 describe("production MCP handler boundary", () => {
   it("uses JSON responses for the mounted production composition", async () => {
-    const handler = createSigilMcpHandler({ apiKey: token, port: 8808 })
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      port: 8808,
+      containers: containers(),
+    })
     handlers.push(handler)
 
     const response = await handler.handle(initializeRequest("127.0.0.1:8808"))
@@ -45,7 +63,11 @@ describe("production MCP handler boundary", () => {
   })
 
   it("rejects a valid bearer presented through an unapproved host", async () => {
-    const handler = createSigilMcpHandler({ apiKey: token, port: 8808 })
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      port: 8808,
+      containers: containers(),
+    })
     handlers.push(handler)
 
     const response = await handler.handle(initializeRequest("attacker.example"))
@@ -58,6 +80,7 @@ describe("production MCP handler boundary", () => {
       apiKey: token,
       port: 8808,
       portlessUrl: "http://sigil-chat-roadmap-gonk.localhost:1355",
+      containers: containers(),
     })
     handlers.push(handler)
 
@@ -68,3 +91,20 @@ describe("production MCP handler boundary", () => {
     expect(response.status).toBe(200)
   })
 })
+
+function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
+  return {
+    delete: (key) => void values.delete(key),
+    entries: (prefix = "") =>
+      [...values.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => ({ key, value })),
+    get: (key) => values.get(key),
+    list: (prefix = "") =>
+      [...values.keys()].filter((key) => key.startsWith(prefix)),
+    patch: () => {
+      throw new Error("not implemented")
+    },
+    set: (key, value) => void values.set(key, value),
+  }
+}

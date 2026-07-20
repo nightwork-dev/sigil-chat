@@ -69,6 +69,26 @@ describe("agent client command contracts", () => {
     ).toBe(true)
   })
 
+  it("accepts project and workspace registry domain outcomes", () => {
+    for (const resource of [
+      { kind: "project-registry", id: "project-1" },
+      { kind: "workspace-registry", id: "workspace-1" },
+    ]) {
+      expect(
+        isAgentClientCommand({
+          type: "agent.domain.outcome",
+          payload: {
+            id: `containers:${resource.id}`,
+            kind: "containers.changed",
+            resource,
+            operation: "container.upsert",
+            changedIds: [resource.id],
+          },
+        }),
+      ).toBe(true)
+    }
+  })
+
   it("keeps Gonk tool input stricter than the client envelope", () => {
     expect(
       isAgentClientCommand({

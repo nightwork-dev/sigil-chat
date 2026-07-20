@@ -69,6 +69,9 @@ export function isAgentClientCommand(
       (outcome.kind === "work-items.changed" &&
         outcome.resource.kind === "work-items-board") ||
       (outcome.kind === "skills.changed" &&
-        outcome.resource.kind === "skills-catalog"))
+        outcome.resource.kind === "skills-catalog") ||
+      (outcome.kind === "containers.changed" &&
+        (outcome.resource.kind === "project-registry" ||
+          outcome.resource.kind === "workspace-registry")))
   )
 }
