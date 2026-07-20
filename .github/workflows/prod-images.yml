@@ -115,10 +115,25 @@ jobs:
             --comment "Deploy Sigil Chat ${GITHUB_SHA}" \
             --query 'Command.CommandId' \
             --output text)"
-          if ! aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"; then
-            aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID"
-            exit 1
-          fi
+          for attempt in $(seq 1 60); do
+            command_status="$(aws ssm get-command-invocation \
+              --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" \
+              --query Status \
+              --output text)"
+            case "$command_status" in
+              Success) break ;;
+              Pending|InProgress|Delayed) sleep 15 ;;
+              *)
+                aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID"
+                exit 1
+                ;;
+            esac
+            if [ "$attempt" -eq 60 ]; then
+              echo "SSM deployment exceeded 15 minutes" >&2
+              exit 1
+            fi
+          done
           aws ssm get-command-invocation \
             --command-id "$command_id" \
             --instance-id "$INSTANCE_ID" \

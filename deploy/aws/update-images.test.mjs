@@ -75,6 +75,13 @@ test("updates all image digests and preserves a rollback manifest", () => {
   );
 
   const invocations = readFileSync(dockerLog, "utf8").trim().split("\n");
+  const containerPrune = invocations.findIndex((line) =>
+    line.endsWith("container prune -f"),
+  );
+  const imagePrune = invocations.findIndex((line) =>
+    line.endsWith("image prune -f"),
+  );
+  const pull = invocations.findIndex((line) => line.endsWith("pull"));
   const stopEdge = invocations.findIndex((line) =>
     line.endsWith("stop edge web"),
   );
@@ -83,6 +90,8 @@ test("updates all image digests and preserves a rollback manifest", () => {
       "up --abort-on-container-exit --exit-code-from migrate migrate",
     ),
   );
+  assert.ok(containerPrune >= 0 && containerPrune < pull);
+  assert.ok(imagePrune > containerPrune && imagePrune < pull);
   const replacePrivateServices = invocations.findIndex((line) =>
     line.endsWith("up -d --wait --no-deps web gonk eve"),
   );
@@ -98,6 +107,11 @@ test("updates all image digests and preserves a rollback manifest", () => {
   assert.ok(
     invocations.some((line) => line.endsWith("up -d --wait --no-deps edge")),
     "edge must return only after private services pass readiness",
+  );
+  assert.ok(
+    invocations.findLastIndex((line) => line.endsWith("image prune -af")) >
+      replacePrivateServices,
+    "unused release images must be removed only after the candidate is healthy",
   );
 });
 
