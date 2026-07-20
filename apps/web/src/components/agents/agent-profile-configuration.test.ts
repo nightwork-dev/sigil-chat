@@ -83,6 +83,7 @@ function catalogFixture(): AgentCatalog {
         },
       },
     ],
+    runtimeTools: [],
     tools: [],
     management: {
       source: "eve-inspection",

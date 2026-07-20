@@ -41,6 +41,16 @@ export interface AgentToolCatalogItem {
   runtimeStatus: "callable";
 }
 
+export interface AgentRuntimeToolCatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  origin: "eve-framework" | "eve-authored";
+  availability: "available";
+  runtimeStatus: "callable" | "discoverable";
+  requiresApproval: boolean;
+}
+
 export interface AgentConnectionCatalogItem {
   id: string;
   name: string;
@@ -62,6 +72,7 @@ export interface AgentCatalog {
   connections: readonly AgentConnectionCatalogItem[];
   skills: readonly AgentSkillCatalogItem[];
   subagents: readonly AgentSubagentCatalogItem[];
+  runtimeTools: readonly AgentRuntimeToolCatalogItem[];
   tools: readonly AgentToolCatalogItem[];
   management: {
     source: "eve-inspection";
@@ -113,6 +124,10 @@ interface EveAgentInfo {
   subagents?: {
     local?: unknown;
   };
+  tools?: {
+    available?: unknown;
+    dynamic?: unknown;
+  };
   diagnostics?: {
     discoveryErrors?: unknown;
     discoveryWarnings?: unknown;
@@ -123,6 +138,14 @@ interface EveConnectionInfo {
   connectionName?: unknown;
   description?: unknown;
   protocol?: unknown;
+}
+
+interface EveToolInfo {
+  name?: unknown;
+  slug?: unknown;
+  description?: unknown;
+  origin?: unknown;
+  requiresApproval?: unknown;
 }
 
 interface EveInstructionsInfo {
@@ -435,6 +458,47 @@ function projectSubagents(
   });
 }
 
+function projectRuntimeTools(
+  value: EveAgentInfo["tools"],
+): AgentRuntimeToolCatalogItem[] {
+  const available = Array.isArray(value?.available) ? value.available : [];
+  const dynamic = Array.isArray(value?.dynamic) ? value.dynamic : [];
+  const known = new Set<string>();
+
+  const project = (
+    candidate: unknown,
+    index: number,
+    runtimeStatus: AgentRuntimeToolCatalogItem["runtimeStatus"],
+  ): AgentRuntimeToolCatalogItem | null => {
+    if (typeof candidate !== "object" || candidate === null) return null;
+    const tool = candidate as EveToolInfo;
+    const name = stringValue(tool.name, stringValue(tool.slug, ""));
+    if (!name || known.has(name)) return null;
+    known.add(name);
+    const origin = tool.origin === "authored" ? "eve-authored" : "eve-framework";
+    return {
+      id: `eve__${name || `runtime-tool-${index + 1}`}`,
+      name,
+      description: stringValue(tool.description, "Runtime capability"),
+      origin,
+      availability: "available",
+      runtimeStatus,
+      requiresApproval: tool.requiresApproval === true,
+    };
+  };
+
+  return [
+    ...available.flatMap((candidate, index) => {
+      const tool = project(candidate, index, "callable");
+      return tool === null ? [] : [tool];
+    }),
+    ...dynamic.flatMap((candidate, index) => {
+      const tool = project(candidate, available.length + index, "discoverable");
+      return tool === null ? [] : [tool];
+    }),
+  ];
+}
+
 export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
   return {
     agent: {
@@ -448,6 +512,7 @@ export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
     connections: projectConnections(info.connections),
     skills: projectSkills(info.skills),
     subagents: projectSubagents(info.subagents),
+    runtimeTools: projectRuntimeTools(info.tools),
     tools: [],
     management: {
       source: "eve-inspection",

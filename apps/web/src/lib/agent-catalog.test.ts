@@ -98,6 +98,23 @@ describe("agent catalog projection", () => {
           },
         ],
       },
+      tools: {
+        available: [
+          {
+            name: "web_search",
+            description: "Search the web.",
+            origin: "framework",
+            requiresApproval: false,
+          },
+        ],
+        dynamic: [
+          {
+            slug: "connection_search",
+            description: "Discover connected application tools.",
+            origin: "framework",
+          },
+        ],
+      },
       diagnostics: { discoveryErrors: 0, discoveryWarnings: 0 },
     });
 
@@ -127,6 +144,17 @@ describe("agent catalog projection", () => {
         description: "Workspace application tools.",
         protocol: "mcp",
       },
+    ]);
+    expect(catalog.runtimeTools).toEqual([
+      expect.objectContaining({
+        name: "web_search",
+        origin: "eve-framework",
+        runtimeStatus: "callable",
+      }),
+      expect.objectContaining({
+        name: "connection_search",
+        runtimeStatus: "discoverable",
+      }),
     ]);
 
     const serialized = JSON.stringify(catalog);
@@ -175,6 +203,7 @@ describe("agent catalog projection", () => {
       dynamicResolvers: 0,
     });
     expect(catalog.connections).toEqual([]);
+    expect(catalog.runtimeTools).toEqual([]);
   });
 
   it("lists authenticated Gonk tools under Eve's qualified runtime names", async () => {
