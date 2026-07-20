@@ -16,10 +16,27 @@ import type {
 } from "@workspace/work-items-store/types";
 
 const listStoriesFn = createServerFn({ method: "GET" })
-  .validator((input?: { filter?: StoryFilter }) => input ?? {})
+  .validator(
+    (input?: { filter?: StoryFilter; addressedToMe?: boolean }) => input ?? {},
+  )
   .handler(async ({ data }) => {
     const { workItemsRepository } = await import("@workspace/work-items-store");
-    return workItemsRepository.list(data.filter);
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } = await import(
+      "@/lib/work-items-viewer.server"
+    );
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const stories = await workItemsRepository.list(data.filter);
+    if (!data.addressedToMe) return stories;
+
+    const { storiesAddressedToViewer } = await import(
+      "@/lib/story-comment-mentions"
+    );
+    const document = await workItemsRepository.get();
+    return storiesAddressedToViewer(stories, document.comments, {
+      role: viewer.role,
+      username: viewer.username,
+    });
   });
 
 const listReviewsFn = createServerFn({ method: "GET" }).handler(async () => {
@@ -107,6 +124,11 @@ const decideReviewFn = createServerFn({ method: "POST" })
 const listStoryCommentsFn = createServerFn({ method: "GET" })
   .validator((input: { storyId: string }) => input)
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } = await import(
+      "@/lib/work-items-viewer.server"
+    );
+    authenticatedWorkItemsViewer(await getSession());
     const { workItemsRepository } = await import("@workspace/work-items-store");
     const document = await workItemsRepository.get();
     return document.comments.filter(
@@ -119,7 +141,6 @@ const addCommentFn = createServerFn({ method: "POST" })
     (input: {
       storyId: string;
       kind: StoryComment["kind"];
-      author: string;
       body: string;
       addressee?: string;
       parentCommentId?: string;
@@ -127,6 +148,12 @@ const addCommentFn = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } = await import(
+      "@/lib/work-items-viewer.server"
+    );
+    const session = await getSession();
+    const viewer = authenticatedWorkItemsViewer(session);
     const { workItemsRepository } = await import("@workspace/work-items-store");
     // id + createdAt are minted server-side so two devices can't collide and
     // the timestamp is authoritative.
@@ -134,7 +161,7 @@ const addCommentFn = createServerFn({ method: "POST" })
       id: crypto.randomUUID(),
       storyId: data.storyId,
       kind: data.kind,
-      author: data.author,
+      author: viewer.role === "owner" ? "Owner" : "Member",
       body: data.body,
       createdAt: new Date().toISOString(),
       ...(data.addressee ? { addressee: data.addressee } : {}),
@@ -142,7 +169,31 @@ const addCommentFn = createServerFn({ method: "POST" })
         ? { parentCommentId: data.parentCommentId }
         : {}),
     };
-    return workItemsRepository.addComment(comment, data.expectedRevision);
+    const result = await workItemsRepository.addComment(
+      comment,
+      data.expectedRevision,
+    );
+
+    const { parseSingleInlineSelector } = await import(
+      "@/lib/story-comment-mentions"
+    );
+    const selector = parseSingleInlineSelector(comment.body);
+    if (selector) {
+      try {
+        const { depositStoryCommentMention } = await import(
+          "@/lib/story-comment-mentions.server"
+        );
+        await depositStoryCommentMention({
+          reference: { storyId: comment.storyId, commentId: comment.id },
+          selector,
+          viewer: viewer.user,
+        });
+      } catch {
+        // The durable domain comment is authoritative. A missing/unavailable
+        // harness inbox must not turn a successful write into a duplicate retry.
+      }
+    }
+    return result;
   });
 
 export const workItemKeys = {
@@ -153,14 +204,26 @@ export const workItemKeys = {
   reviews: () => [...workItemKeys.all(), "reviews"] as const,
   comments: (storyId: string) =>
     [...workItemKeys.all(), storyId, "comments"] as const,
+  addressed: (viewerId: string, filter?: StoryFilter) =>
+    [...workItemKeys.all(), "addressed", viewerId, filter ?? {}] as const,
 };
 
-export function useStories(filter?: StoryFilter) {
+export function useStories(
+  filter?: StoryFilter,
+  addressedTo?: { viewerId: string; enabled: boolean },
+) {
   return useQuery({
     // Unfiltered board stays on the base key so mutation reconciliation
     // (reconcileWorkItems) updates it in place; filtered views get a sub-key.
-    queryKey: filter ? workItemKeys.list(filter) : workItemKeys.all(),
-    queryFn: () => listStoriesFn({ data: { filter } }),
+    queryKey: addressedTo?.enabled
+      ? workItemKeys.addressed(addressedTo.viewerId, filter)
+      : filter
+        ? workItemKeys.list(filter)
+        : workItemKeys.all(),
+    queryFn: () =>
+      listStoriesFn({
+        data: { filter, addressedToMe: addressedTo?.enabled ?? false },
+      }),
     refetchOnMount: "always",
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
@@ -261,7 +324,6 @@ export function useAddComment() {
     mutationFn: (input: {
       storyId: string;
       kind: StoryComment["kind"];
-      author: string;
       body: string;
       addressee?: string;
       parentCommentId?: string;

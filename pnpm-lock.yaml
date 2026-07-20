@@ -168,6 +168,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gonk/comms':
+        specifier: 0.5.0
+        version: 0.5.0(sqlite-vec@0.1.9)
       '@gonk/eve-host':
         specifier: 0.5.1-mem2.6
         version: 0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
@@ -1359,8 +1362,20 @@ packages:
   '@gonk/auth@0.3.1':
     resolution: {integrity: sha512-LTLUCxRRA2bqqp+B69OPyapSjXWhZgGM4XuK9ujrIb1Aj9dfzH1ch0UgXPEYdIfAWP5uboZywaNB4yKu0CcyqQ==}
 
+  '@gonk/autotune@0.5.0':
+    resolution: {integrity: sha512-0+2K+HVFA+QmpKulBZPpkR2ffzrVVZIJHlKl/8zA+IajhbB7OUJYtbLkYO4sEnG5Yp8lHYcjjxEO/16FgfCTyw==}
+
+  '@gonk/channel@0.3.1':
+    resolution: {integrity: sha512-NzmwSDQa4eQwBe2T2O1O4rTBnaSWo2zqlcpdFZ+QO/3P8G4mKCUQaghGb4h51guK90D8Do0fuO+nTDOGffFogA==}
+
+  '@gonk/comms@0.5.0':
+    resolution: {integrity: sha512-HenwpBtldubHw7uYHFWQAhpFJCRfBeY7TlyJHkr+l87PnC41uEqqQ/kt1Gwii2YAagiJwFbJKlOXLlFlMRD2NQ==}
+
   '@gonk/context@0.3.1':
     resolution: {integrity: sha512-uxMwkTQOMf31EXBmQC+LRruivV4NsTWTYuMUKUlTbOijpHEttcEnLzSWV/ij48ja+oEgnKv0yvx3Hln+8D9ofA==}
+
+  '@gonk/curator@0.5.0':
+    resolution: {integrity: sha512-9pryoLdbaZWa//nI8/IuQe7NqCb9IVV/8iUjc6LqSHe5c7P32+GOTnPoE7joJz1DQgHf6omBLUD52HnjewH/uw==}
 
   '@gonk/embedding@0.5.1-mem2.5':
     resolution: {integrity: sha512-4N6uWJjOQh5pMOl7vt3gCqeifkBO23aKxph05/HDOmCLf/iHzX/SWxFmJxW/RvUhsi536wBGUT9K+LazNKtxtQ==}
@@ -1370,23 +1385,49 @@ packages:
     peerDependencies:
       eve: '*'
 
+  '@gonk/extension-spec@0.3.1':
+    resolution: {integrity: sha512-qqIUGQZtXx4HYxJms+a4R3oLK2crYpmTDgCJTiFoTbZPIH+p3niml2CN0SUummzZ7s5bHt5IPNy1xgec8wdMRg==}
+
+  '@gonk/harness-run@0.5.0':
+    resolution: {integrity: sha512-oyvpTVcgPDj3R3RnX2R1hkPZfGsDt55oMxRlXd4edvkPczSKZmzouCt+xAgcHVlYsLGAfcGsFSDdAV8ahIWVwA==}
+
   '@gonk/image-gen@0.5.0':
     resolution: {integrity: sha512-DphBQst1Dxk0UUJWU2U5gH5EYdoStATQUWqj3T695A869O9H2A7WLzZAEv2iPoqxp8gumtZk9JOdOtMdxM+5Mg==}
+
+  '@gonk/jobs@0.5.0':
+    resolution: {integrity: sha512-9PJk4CMY99haR3BByGQVDRQ0hEOUEw2OWBvhzPmo6PP6WPBL8eRJXdcCPim469JmKQmIPYVtPYpS6zrCq4CYbg==}
 
   '@gonk/memory@0.5.1-mem2.5':
     resolution: {integrity: sha512-eFFk3c+BpnjdjyFMc/UCjUlAngfuxuGNDllrLe3HGYZ5fQ0VqTye4X8X+kixblEWt0LHVTk7hkJa7uqkN6ClUw==}
 
+  '@gonk/persona@0.5.0':
+    resolution: {integrity: sha512-/OipEUvk+rNB0RwE1sm2X3cjlId5RYzZGv0OozZ8kjltzaO+7UjBMAu5d9r1SCratNQ9uhiqudPudO5Rn4SvkQ==}
+
   '@gonk/persona@0.5.1-mem2.5':
     resolution: {integrity: sha512-3cFu72vj2CmqDu+bjD1rqBQZKKENkCkt48Ug+REPCgcHUaGW4fT9eb0l5tJV5urxBadjNd4BqQnxn3rmY23Oiw==}
 
+  '@gonk/rlm@0.5.0':
+    resolution: {integrity: sha512-fzxBMgsO70MB2/8WE4Ahb+6W2y8tlVfNG+jdAsPZIWGdCMLX+tMJaK7W1IVQJf2rVltv8SpFNU74BIINugzb2Q==}
+    peerDependencies:
+      isolated-vm: '>=5.0.0 <7'
+    peerDependenciesMeta:
+      isolated-vm:
+        optional: true
+
   '@gonk/scope@0.3.1':
     resolution: {integrity: sha512-/QVfPn5XImVQat6GsThXbo1fRLPx2ULKylDqiE8AUCyVQf1RiV7cX91m0DjAn0dYuqwcnw/I+NSibFHDf9u5Wg==}
+
+  '@gonk/skill-creator@0.5.0':
+    resolution: {integrity: sha512-7Cy8mkGgsCmQw28rtfMWbQBW3Se8gYjs2ipKrtcFewiUe5cRjg+1HYWFr3dziHWAisZ3NqKLjTAyTV2iIWj02A==}
 
   '@gonk/skills@0.3.1':
     resolution: {integrity: sha512-bMP1EA/lm97i/aWtLG/1wUBPamaFNqPpmeoduOpECANHgt450CtdSJC/lnBKtfBdge0lgcdWRlrGRbx4ErchTw==}
 
   '@gonk/store@0.3.1':
     resolution: {integrity: sha512-yz4qDkjMOcappXk1dw17AzK0+dVp8/1BFdtkGA09D8aRwBiJ6ky60VgPWRsHWUKxn+L759rU3B7aPa1QHP06GQ==}
+
+  '@gonk/temporal@0.3.1':
+    resolution: {integrity: sha512-3/xOG05cCUnE8kXU1we/33r3GxJ/VIPDH7/b5o/ErphAg9vVVUnS5IYcnc5v9S4eGl7dY9VnePqWaCY7b/IVNg==}
 
   '@gonk/tool-orchestrator@0.3.1':
     resolution: {integrity: sha512-SnTWz1ZkaTFxyThCs+8j/KwIXu+ZjKOSkcxne9QQZgAhlPNrn8zF49tYr0dHcw/FGScMDrWPgjLpXY+rfmHkow==}
@@ -1405,6 +1446,9 @@ packages:
 
   '@gonk/utils@0.3.1':
     resolution: {integrity: sha512-XzJpc+uyZf+p65sRoPt22c3+IJu7w1jXv6jQxrclIpT7l7DohFjzRcAmffR/nPwEpf/SS7+uwCHo6i0ORnRmNw==}
+
+  '@gonk/work-items@0.5.0':
+    resolution: {integrity: sha512-oOAqTIJy7W6ep96xsaFL8CJYpKfn+Np2IkYY4W4amZbXh5p0qhBORuaFpKCXbye98VlWb9aMzXygpwhegom5fw==}
 
   '@hono/node-server@1.19.11':
     resolution: {integrity: sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g==}
@@ -7441,10 +7485,43 @@ snapshots:
 
   '@gonk/auth@0.3.1': {}
 
+  '@gonk/autotune@0.5.0':
+    dependencies:
+      '@gonk/scope': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+
+  '@gonk/channel@0.3.1':
+    dependencies:
+      '@gonk/scope': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@standard-schema/spec': 1.1.0
+
+  '@gonk/comms@0.5.0(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/channel': 0.3.1
+      '@gonk/scope': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@gonk/work-items': 0.5.0(sqlite-vec@0.1.9)
+    transitivePeerDependencies:
+      - isolated-vm
+      - sqlite-vec
+
   '@gonk/context@0.3.1':
     dependencies:
       '@gonk/auth': 0.3.1
       '@standard-schema/spec': 1.1.0
+
+  '@gonk/curator@0.5.0(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/autotune': 0.5.0
+      '@gonk/scope': 0.3.1
+      '@gonk/skill-creator': 0.5.0(sqlite-vec@0.1.9)
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/temporal': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+    transitivePeerDependencies:
+      - sqlite-vec
 
   '@gonk/embedding@0.5.1-mem2.5':
     dependencies:
@@ -7478,9 +7555,27 @@ snapshots:
       - supports-color
       - zod
 
+  '@gonk/extension-spec@0.3.1':
+    dependencies:
+      '@gonk/scope': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+
+  '@gonk/harness-run@0.5.0': {}
+
   '@gonk/image-gen@0.5.0':
     dependencies:
       '@gonk/scope': 0.3.1
+
+  '@gonk/jobs@0.5.0(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/harness-run': 0.5.0
+      '@gonk/rlm': 0.5.0(sqlite-vec@0.1.9)
+      '@gonk/scope': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+    transitivePeerDependencies:
+      - isolated-vm
+      - sqlite-vec
 
   '@gonk/memory@0.5.1-mem2.5':
     dependencies:
@@ -7493,16 +7588,44 @@ snapshots:
     optionalDependencies:
       sqlite-vec: 0.1.9
 
+  '@gonk/persona@0.5.0':
+    dependencies:
+      '@gonk/scope': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      yaml: 2.9.0
+
   '@gonk/persona@0.5.1-mem2.5':
     dependencies:
       '@gonk/scope': 0.3.1
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       yaml: 2.9.0
 
+  '@gonk/rlm@0.5.0(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/curator': 0.5.0(sqlite-vec@0.1.9)
+      '@gonk/scope': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      fast-glob: 3.3.3
+    transitivePeerDependencies:
+      - sqlite-vec
+
   '@gonk/scope@0.3.1':
     dependencies:
       '@gonk/utils': 0.3.1
       yaml: 2.9.0
+
+  '@gonk/skill-creator@0.5.0(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/auth': 0.3.1
+      '@gonk/extension-spec': 0.3.1
+      '@gonk/persona': 0.5.0
+      '@gonk/scope': 0.3.1
+      '@gonk/skills': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      yaml: 2.9.0
+    transitivePeerDependencies:
+      - sqlite-vec
 
   '@gonk/skills@0.3.1(sqlite-vec@0.1.9)':
     dependencies:
@@ -7522,6 +7645,12 @@ snapshots:
       '@gonk/utils': 0.3.1
       '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       better-sqlite3: 12.10.0
+    transitivePeerDependencies:
+      - sqlite-vec
+
+  '@gonk/temporal@0.3.1(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
     transitivePeerDependencies:
       - sqlite-vec
 
@@ -7552,6 +7681,17 @@ snapshots:
       '@gonk/scope': 0.3.1
 
   '@gonk/utils@0.3.1': {}
+
+  '@gonk/work-items@0.5.0(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/jobs': 0.5.0(sqlite-vec@0.1.9)
+      '@gonk/persona': 0.5.0
+      '@gonk/scope': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+    transitivePeerDependencies:
+      - isolated-vm
+      - sqlite-vec
 
   '@hono/node-server@1.19.11(hono@4.12.8)':
     dependencies:

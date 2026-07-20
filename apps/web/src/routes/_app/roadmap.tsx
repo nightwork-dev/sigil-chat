@@ -18,5 +18,10 @@ export const Route = createFileRoute("/_app/roadmap")({
       throw redirect({ to: "/chat" })
     }
   },
-  component: RoadmapWorkspace,
+  component: RoadmapRoute,
 })
+
+function RoadmapRoute() {
+  const { user } = Route.useRouteContext()
+  return <RoadmapWorkspace viewer={user} />
+}
