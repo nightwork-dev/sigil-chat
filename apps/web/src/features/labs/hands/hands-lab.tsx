@@ -749,7 +749,7 @@ export function HandsLab() {
                     panel.
                   </p>
                   <div className="grid grid-cols-2 gap-2">
-                    {["Amber", "Garnet", "Signal", "Quiet"].map((label) => (
+                    {["Amber", "Copper", "Signal", "Quiet"].map((label) => (
                       <button
                         key={label}
                         type="button"
