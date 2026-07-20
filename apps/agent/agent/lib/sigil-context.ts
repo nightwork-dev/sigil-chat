@@ -51,6 +51,17 @@ export interface SigilContextOptions {
     personaId: string
     principalId: string
   }) => string
+  /**
+   * Resolves audience-filtered memory for the latest user turn. The host owns
+   * the authenticated identity and returns append-only context; callers must
+   * never widen principal, persona, channel, or session through model input.
+   */
+  recallLatestTurn?: (input: {
+    eveSessionId: string
+    personaId: string
+    principalId: string
+    query: string
+  }) => string | undefined
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -83,18 +94,31 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     }
 
     const blocks: string[] = []
-    if (options.identityFloor) {
+    if (options.identityFloor || options.recallLatestTurn) {
       const principalId = requireNonBlankCallerPrincipal(caller.principalId)
       const personaId = requireCallerPersona(caller)
       const eveSessionId = nonBlank(ctx.eve.sessionId) ?? `new:${principalId}`
-      const identity = options
-        .identityFloor({
-          eveSessionId,
-          personaId,
-          principalId,
-        })
-        .trim()
-      if (identity.length > 0) blocks.push(identity)
+      if (options.identityFloor) {
+        const identity = options
+          .identityFloor({
+            eveSessionId,
+            personaId,
+            principalId,
+          })
+          .trim()
+        if (identity.length > 0) blocks.push(identity)
+      }
+      if (options.recallLatestTurn) {
+        const recalled = options
+          .recallLatestTurn({
+            eveSessionId,
+            personaId,
+            principalId,
+            query: messageToQuery(message),
+          })
+          ?.trim()
+        if (recalled) blocks.push(recalled)
+      }
     }
     const compiledContent = compiled.content.trim()
     if (compiledContent.length > 0) blocks.push(compiledContent)

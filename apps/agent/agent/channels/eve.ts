@@ -36,6 +36,11 @@ const onMessage = createSigilEveOnMessage({
     personaHost(personaId).identityAtSessionStart(
       memoryTurn(eveSessionId, principalId),
     ).markdown,
+  recallLatestTurn: ({ eveSessionId, personaId, principalId, query }) =>
+    personaHost(personaId).automaticRecallForTurn(
+      memoryTurn(eveSessionId, principalId),
+      query,
+    ).message?.content,
 })
 
 const channel = createOwnedEveChannel({

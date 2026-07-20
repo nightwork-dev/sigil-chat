@@ -23,6 +23,24 @@ const catalog: AgentCatalog = {
   subagents: [],
   runtimeTools: [
     {
+      id: "eve__recall_read",
+      name: "recall_read",
+      description: "Recall accepted memories.",
+      origin: "eve-authored",
+      availability: "available",
+      runtimeStatus: "callable",
+      requiresApproval: false,
+    },
+    {
+      id: "eve__remember",
+      name: "remember",
+      description: "Remember an accepted fact.",
+      origin: "eve-authored",
+      availability: "available",
+      runtimeStatus: "callable",
+      requiresApproval: false,
+    },
+    {
       id: "eve__todo",
       name: "todo",
       description: "Track current work.",
@@ -90,6 +108,16 @@ describe("capability presentation model", () => {
     expect(groups.find((group) => group.id === "connected-tools")?.items).toEqual([
       expect.objectContaining({ availability: "Discoverable" }),
     ])
+    expect(groups.find((group) => group.id === "agent-memory")?.items).toEqual([
+      expect.objectContaining({
+        id: "eve__durable-memory",
+        name: "Durable Memory",
+        scope: "Authorized memory scope",
+      }),
+    ])
+    expect(
+      groups.flatMap((group) => group.items.map((item) => item.id)),
+    ).not.toContain("eve__remember")
   })
 
   it("filters a grouped catalog without duplicating matching rows", () => {

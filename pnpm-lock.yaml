@@ -44,14 +44,14 @@ importers:
         specifier: 0.3.1
         version: 0.3.1
       '@gonk/eve-host':
-        specifier: 0.5.1-mem2.6
-        version: 0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
+        specifier: 0.6.0
+        version: 0.6.0(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
       '@gonk/memory':
-        specifier: 0.5.1-mem2.5
-        version: 0.5.1-mem2.5
+        specifier: 0.6.0
+        version: 0.6.0
       '@gonk/persona':
-        specifier: 0.5.1-mem2.5
-        version: 0.5.1-mem2.5
+        specifier: 0.6.0
+        version: 0.6.0
       '@gonk/scope':
         specifier: 0.3.1
         version: 0.3.1
@@ -175,14 +175,14 @@ importers:
         specifier: 0.5.0
         version: 0.5.0(sqlite-vec@0.1.9)
       '@gonk/eve-host':
-        specifier: 0.5.1-mem2.6
-        version: 0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
+        specifier: 0.6.0
+        version: 0.6.0(@gonk/scope@0.3.1)(eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
       '@gonk/memory':
-        specifier: 0.5.1-mem2.5
-        version: 0.5.1-mem2.5
+        specifier: 0.6.0
+        version: 0.6.0
       '@gonk/persona':
-        specifier: 0.5.1-mem2.5
-        version: 0.5.1-mem2.5
+        specifier: 0.6.0
+        version: 0.6.0
       '@gonk/scope':
         specifier: 0.3.1
         version: 0.3.1
@@ -760,6 +760,21 @@ importers:
         version: 3.2.6(@types/debug@4.1.13)(@types/node@25.3.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.32.0)(msw@2.12.11(@types/node@25.3.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0)
 
 packages:
+
+  '@acausal/distributions@3.0.0-alpha.3':
+    resolution: {integrity: sha512-l9aANUUNU1MAMGRS9NUDNjwJ0aUYFQZrimC2Bc5lm+yDBSmQ/UUesI6WFfKe3HT93i6YaPG7v/mKJMDjUBo//w==}
+
+  '@acausal/markov@3.0.0-alpha.3':
+    resolution: {integrity: sha512-Tn7bH3bkri6pQjdCCiovy5NYXR8wh03FdUpc2IAgqfCPEPSwQmj2JY6c7WZYqQ2lYVI0M3NdJfwFAvsskKvs+g==}
+
+  '@acausal/random@3.0.0-alpha.3':
+    resolution: {integrity: sha512-DtnNiSBHDM21PsPbWWNJsfqof5AITPT/irEzW/+S/BwgMzknP+/zhJwuuPKCTD79iu9eJT+08wbxMsrP5aUNwA==}
+
+  '@acausal/sampler@3.0.0-alpha.3':
+    resolution: {integrity: sha512-3dI1uRF6yYr6YJKwAt+vmsHymDZkwAyInEx6GioAXQjdW9Ll1KE46rDX4/2Fo4Y8xClf9fqP6lYmLWtN+TqUMw==}
+
+  '@acausal/scalr@3.0.0-alpha.3':
+    resolution: {integrity: sha512-b6ps8vn5OKS4xRUhjqPODWG/H3QmM7q8gs598+M3NhEcVRgEO6ajnP/2Kp0jka6/LUhDb9k6+4gc0iE1N9LbhA==}
 
   '@ai-sdk/gateway@4.0.21':
     resolution: {integrity: sha512-GafyeyHFDKJjdtbyhCQ0aC2FORdyE56IxK45EZ1JLO1iVdg8XqEU3bwnRzI0+5S1XHV7W2qQsxkZnGYPbsFiXA==}
@@ -1383,11 +1398,11 @@ packages:
   '@gonk/curator@0.5.0':
     resolution: {integrity: sha512-9pryoLdbaZWa//nI8/IuQe7NqCb9IVV/8iUjc6LqSHe5c7P32+GOTnPoE7joJz1DQgHf6omBLUD52HnjewH/uw==}
 
-  '@gonk/embedding@0.5.1-mem2.5':
-    resolution: {integrity: sha512-4N6uWJjOQh5pMOl7vt3gCqeifkBO23aKxph05/HDOmCLf/iHzX/SWxFmJxW/RvUhsi536wBGUT9K+LazNKtxtQ==}
+  '@gonk/embedding@0.5.0':
+    resolution: {integrity: sha512-LCjzu8TeWLwcSpWdd8qr9A6TpszwTJufQ5yUBaqc50giZEfkrUNzB+xlA34cwBwAQJLuntLVs6CDfno4GmIJZA==}
 
-  '@gonk/eve-host@0.5.1-mem2.6':
-    resolution: {integrity: sha512-KU53NdzoijDNQ6hAIjSGWWSiFJPfOV5cRFwN1vN7ER9easahSPnQiYjIh5rG5dU+n0Ncdfs2YDjqgFoFzjwo7w==}
+  '@gonk/eve-host@0.6.0':
+    resolution: {integrity: sha512-mBAE/nqfwpIZpJBiHnxvLZEboelV8bZu9VDxa9BZYg7wB7gcj/HYXqq2K67rrtZlRpX1UNM8fJXfM+cWn73jZg==}
     peerDependencies:
       eve: '*'
 
@@ -1403,14 +1418,14 @@ packages:
   '@gonk/jobs@0.5.0':
     resolution: {integrity: sha512-9PJk4CMY99haR3BByGQVDRQ0hEOUEw2OWBvhzPmo6PP6WPBL8eRJXdcCPim469JmKQmIPYVtPYpS6zrCq4CYbg==}
 
-  '@gonk/memory@0.5.1-mem2.5':
-    resolution: {integrity: sha512-eFFk3c+BpnjdjyFMc/UCjUlAngfuxuGNDllrLe3HGYZ5fQ0VqTye4X8X+kixblEWt0LHVTk7hkJa7uqkN6ClUw==}
+  '@gonk/memory@0.6.0':
+    resolution: {integrity: sha512-PCY4mGo/6mHF+1bUt7pVg1tqgnyKZ0Ob04hqAP5O7Z2DHPKq6x1Z7S/OAYl2+RHwhO4hVbE0iju6tVC/c5VL6Q==}
 
   '@gonk/persona@0.5.0':
     resolution: {integrity: sha512-/OipEUvk+rNB0RwE1sm2X3cjlId5RYzZGv0OozZ8kjltzaO+7UjBMAu5d9r1SCratNQ9uhiqudPudO5Rn4SvkQ==}
 
-  '@gonk/persona@0.5.1-mem2.5':
-    resolution: {integrity: sha512-3cFu72vj2CmqDu+bjD1rqBQZKKENkCkt48Ug+REPCgcHUaGW4fT9eb0l5tJV5urxBadjNd4BqQnxn3rmY23Oiw==}
+  '@gonk/persona@0.6.0':
+    resolution: {integrity: sha512-8yMwVRRUA2BaJyo36CVbm0v7ZgUWDQLbYDgJCuPQcN9223Of3o0kGaCOmM+1OwaobcMtm3iZWC0sEx5fwNKqhw==}
 
   '@gonk/rlm@0.5.0':
     resolution: {integrity: sha512-fzxBMgsO70MB2/8WE4Ahb+6W2y8tlVfNG+jdAsPZIWGdCMLX+tMJaK7W1IVQJf2rVltv8SpFNU74BIINugzb2Q==}
@@ -3204,6 +3219,9 @@ packages:
 
   '@zigil/agent-surface@0.1.1':
     resolution: {integrity: sha512-c0h2NjJT0Dfm5aTvD99Ta4CSsJxOdv7+1FFOFBJichoGCvQ2djQGafj0gFAN9H+F/Y5gZp9OgfUiBSz6W3aGGw==}
+
+  acausal@3.0.0-alpha.3:
+    resolution: {integrity: sha512-xltbLFklP7BY/i+Q1rTY25meemWxtCxj2uZRS0gqNnvh02kLHkzftgmPV8gnAtDO+F4S1U7ffgbKLzoJlTJTkQ==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -6910,6 +6928,25 @@ packages:
 
 snapshots:
 
+  '@acausal/distributions@3.0.0-alpha.3':
+    dependencies:
+      '@acausal/random': 3.0.0-alpha.3
+      '@acausal/scalr': 3.0.0-alpha.3
+
+  '@acausal/markov@3.0.0-alpha.3':
+    dependencies:
+      '@acausal/distributions': 3.0.0-alpha.3
+      '@acausal/random': 3.0.0-alpha.3
+      '@acausal/scalr': 3.0.0-alpha.3
+
+  '@acausal/random@3.0.0-alpha.3': {}
+
+  '@acausal/sampler@3.0.0-alpha.3':
+    dependencies:
+      '@acausal/random': 3.0.0-alpha.3
+
+  '@acausal/scalr@3.0.0-alpha.3': {}
+
   '@ai-sdk/gateway@4.0.21(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
@@ -7529,15 +7566,15 @@ snapshots:
     transitivePeerDependencies:
       - sqlite-vec
 
-  '@gonk/embedding@0.5.1-mem2.5':
+  '@gonk/embedding@0.5.0':
     dependencies:
       '@gonk/scope': 0.3.1
 
-  '@gonk/eve-host@0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
+  '@gonk/eve-host@0.6.0(@gonk/scope@0.3.1)(eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
     dependencies:
       '@gonk/auth': 0.3.1
-      '@gonk/memory': 0.5.1-mem2.5
-      '@gonk/persona': 0.5.1-mem2.5
+      '@gonk/memory': 0.6.0
+      '@gonk/persona': 0.6.0
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
       eve: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -7547,11 +7584,11 @@ snapshots:
       - supports-color
       - zod
 
-  '@gonk/eve-host@0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
+  '@gonk/eve-host@0.6.0(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
     dependencies:
       '@gonk/auth': 0.3.1
-      '@gonk/memory': 0.5.1-mem2.5
-      '@gonk/persona': 0.5.1-mem2.5
+      '@gonk/memory': 0.6.0
+      '@gonk/persona': 0.6.0
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
       eve: 0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -7583,9 +7620,9 @@ snapshots:
       - isolated-vm
       - sqlite-vec
 
-  '@gonk/memory@0.5.1-mem2.5':
+  '@gonk/memory@0.6.0':
     dependencies:
-      '@gonk/embedding': 0.5.1-mem2.5
+      '@gonk/embedding': 0.5.0
       '@gonk/scope': 0.3.1
       '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
       '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -7600,10 +7637,11 @@ snapshots:
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       yaml: 2.9.0
 
-  '@gonk/persona@0.5.1-mem2.5':
+  '@gonk/persona@0.6.0':
     dependencies:
       '@gonk/scope': 0.3.1
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      acausal: 3.0.0-alpha.3
       yaml: 2.9.0
 
   '@gonk/rlm@0.5.0(sqlite-vec@0.1.9)':
@@ -9524,6 +9562,14 @@ snapshots:
   '@zigil/agent-surface@0.1.1':
     dependencies:
       '@standard-schema/spec': 1.1.0
+
+  acausal@3.0.0-alpha.3:
+    dependencies:
+      '@acausal/distributions': 3.0.0-alpha.3
+      '@acausal/markov': 3.0.0-alpha.3
+      '@acausal/random': 3.0.0-alpha.3
+      '@acausal/sampler': 3.0.0-alpha.3
+      '@acausal/scalr': 3.0.0-alpha.3
 
   accepts@2.0.0:
     dependencies:

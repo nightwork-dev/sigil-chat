@@ -20,9 +20,9 @@
   "dependencies": {
     "@gonk/auth": "0.3.1",
     "@gonk/context": "0.3.1",
-    "@gonk/eve-host": "0.5.1-mem2.6",
-    "@gonk/memory": "0.5.1-mem2.5",
-    "@gonk/persona": "0.5.1-mem2.5",
+    "@gonk/eve-host": "0.6.0",
+    "@gonk/memory": "0.6.0",
+    "@gonk/persona": "0.6.0",
     "@gonk/scope": "0.3.1",
     "@gonk/skills": "0.3.1",
     "@gonk/store": "0.3.1",

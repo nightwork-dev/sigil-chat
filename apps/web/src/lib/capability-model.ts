@@ -34,7 +34,7 @@ const GROUPS: Record<string, GroupDefinition> = {
   "agent-memory": {
     id: "agent-memory",
     title: "Memory",
-    description: "Remember, correct, and forget durable context.",
+    description: "Recall and curate durable context within the authenticated relationship.",
   },
   "app-guidance": {
     id: "app-guidance",
@@ -103,6 +103,13 @@ const GROUPS: Record<string, GroupDefinition> = {
   },
 }
 
+const MEMORY_RUNTIME_TOOLS = new Set([
+  "recall_read",
+  "remember",
+  "correct-memory",
+  "forget-memory",
+])
+
 function groupForGonkTool(name: string): string {
   if (name.startsWith("sigil-graph-") || name === "sigil-reducer-catalog")
     return "graph"
@@ -150,8 +157,7 @@ function scopeForGonkTool(name: string): string {
 }
 
 function groupForRuntimeTool(name: string): string {
-  if (name === "remember" || name === "correct-memory" || name === "forget-memory")
-    return "agent-memory"
+  if (MEMORY_RUNTIME_TOOLS.has(name)) return "agent-memory"
   if (name === "agent") return "delegation"
   if (name === "ask_question") return "conversation"
   if (name === "todo") return "planning"
@@ -164,8 +170,7 @@ function groupForRuntimeTool(name: string): string {
 }
 
 function scopeForRuntimeTool(name: string): string {
-  if (name === "remember" || name === "correct-memory" || name === "forget-memory")
-    return "Authorized memory scope"
+  if (MEMORY_RUNTIME_TOOLS.has(name)) return "Authorized memory scope"
   if (name === "agent") return "Delegated task"
   if (name === "ask_question" || name === "todo") return "Current session"
   if (name === "load_skill") return "Current agent runtime"
@@ -237,7 +242,30 @@ export function projectCapabilityGroups(
     else grouped.set(groupId, [item])
   }
 
+  const memoryTools = catalog.runtimeTools.filter((tool) =>
+    MEMORY_RUNTIME_TOOLS.has(tool.name),
+  )
+  if (memoryTools.length > 0) {
+    append("agent-memory", {
+      id: "eve__durable-memory",
+      name: "Durable Memory",
+      description:
+        "Recall relevant context and manage accepted memories without crossing the authenticated relationship boundary.",
+      source: "Eve runtime",
+      scope: "Authorized memory scope",
+      availability: memoryTools.some(
+        (tool) => tool.runtimeStatus === "discoverable",
+      )
+        ? "Discoverable"
+        : "Available",
+      consent: memoryTools.some((tool) => tool.requiresApproval)
+        ? "Requires approval"
+        : "Managed by runtime",
+    })
+  }
+
   for (const tool of catalog.runtimeTools) {
+    if (MEMORY_RUNTIME_TOOLS.has(tool.name)) continue
     append(groupForRuntimeTool(tool.name), runtimeItem(tool))
   }
   for (const tool of catalog.tools) {

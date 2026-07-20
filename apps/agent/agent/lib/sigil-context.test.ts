@@ -13,6 +13,7 @@ import {
   createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
   createSkillContextContributor,
+  type SigilContextOptions,
 } from "./sigil-context"
 
 const SESSION_AUTH = {
@@ -136,6 +137,53 @@ describe("Sigil Eve context integration", () => {
     ])
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("IDENTITY_FLOOR")
+  })
+
+  it("adds host-authorized recall only to the latest model turn", async () => {
+    const recalls: Array<{
+      eveSessionId: string
+      personaId: string
+      principalId: string
+      query: string
+    }> = []
+    const channel = testChannel({
+      compiler: compilerWith([]),
+      identityFloor: () => "STABLE_IDENTITY_FLOOR",
+      recallLatestTurn: (input) => {
+        recalls.push(input)
+        return "## Relevant memory\n- The launch code word is marigold."
+      },
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, {
+      message: "What is the launch code word?",
+    })
+
+    expect(recalls).toEqual([
+      {
+        eveSessionId: "new:user-1",
+        personaId: "agent-a",
+        principalId: "user-1",
+        query: "What is the launch code word?",
+      },
+    ])
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).toContain("STABLE_IDENTITY_FLOOR")
+    expect(JSON.stringify(payload)).toContain("marigold")
+  })
+
+  it("omits recall when the host finds nothing authorized and relevant", async () => {
+    const channel = testChannel({
+      compiler: compilerWith([]),
+      recallLatestTurn: () => undefined,
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "Unrelated question" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).not.toContain("Relevant memory")
   })
 
   it("injects the session blackboard into every turn (S3.2)", async () => {
@@ -331,6 +379,7 @@ function testChannel(options: {
   }) => string
   pinnedResourceKeys?: readonly string[]
   readBlackboard?: (sessionId: string) => Promise<string>
+  recallLatestTurn?: SigilContextOptions["recallLatestTurn"]
 }) {
   return eveChannel({
     auth: [() => options.auth ?? SESSION_AUTH],
@@ -339,6 +388,7 @@ function testChannel(options: {
       identityFloor: options.identityFloor,
       pinnedResourceKeys: options.pinnedResourceKeys,
       readBlackboard: options.readBlackboard,
+      recallLatestTurn: options.recallLatestTurn,
     }),
   })
 }
