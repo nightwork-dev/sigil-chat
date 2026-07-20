@@ -43,6 +43,11 @@ import {
   AlertTitle,
 } from "@workspace/ui/components/alert"
 import { Button } from "@workspace/ui/components/button"
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar"
 import { Card } from "@workspace/ui/components/card"
 import {
   Empty,
@@ -88,7 +93,11 @@ import {
 } from "@workspace/ui/components/tool-renderer-registry"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
-import { useAgentRoster } from "@/lib/agent-profile"
+import {
+  agentPortraitUrl,
+  useAgentRoster,
+  type AgentPersonaSummary,
+} from "@/lib/agent-profile"
 import { useCreateAgentThread } from "@/lib/agent-threads"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import {
@@ -229,7 +238,7 @@ export function AgentChat({
         )}
       >
         {showLeading ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             {showStatus && showStatusIndicator ? (
               <AgentStatusIndicator status={session.status} />
             ) : null}
@@ -405,28 +414,54 @@ function NewSessionPersonaPicker({ busy }: { busy: boolean }) {
         ) : (
           <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
             {roster.data.map((persona) => (
-              <button
-                className="flex min-h-11 flex-col rounded-md px-3 py-2 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+              <PersonaPickerItem
                 disabled={disabled}
                 key={persona.id}
-                onClick={() =>
+                onSelect={() =>
                   createThread.mutate(
                     { personaId: persona.id },
                     { onSuccess: () => setOpen(false) },
                   )
                 }
-                type="button"
-              >
-                <span className="font-medium">{persona.name}</span>
-                <span className="line-clamp-1 text-muted-foreground">
-                  {persona.description || persona.id}
-                </span>
-              </button>
+                persona={persona}
+              />
             ))}
           </div>
         )}
       </PopoverContent>
     </Popover>
+  )
+}
+
+function PersonaPickerItem({
+  disabled,
+  onSelect,
+  persona,
+}: {
+  disabled: boolean
+  onSelect: () => void
+  persona: AgentPersonaSummary
+}) {
+  const portraitUrl = agentPortraitUrl(persona.id, persona.hasPortrait)
+
+  return (
+    <button
+      className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+      disabled={disabled}
+      onClick={onSelect}
+      type="button"
+    >
+      <Avatar className="size-9 shrink-0">
+        {portraitUrl ? <AvatarImage alt="" src={portraitUrl} /> : null}
+        <AvatarFallback>{persona.name.slice(0, 1)}</AvatarFallback>
+      </Avatar>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="font-medium">{persona.name}</span>
+        <span className="line-clamp-1 text-muted-foreground">
+          {persona.description || persona.id}
+        </span>
+      </span>
+    </button>
   )
 }
 
@@ -450,7 +485,7 @@ function AgentSessionSwitcher({
         render={
           <Button
             aria-label="Open conversation history"
-            className="min-w-0 max-w-[min(28rem,50vw)] justify-start px-2 max-sm:size-11 max-sm:px-0"
+            className="w-full min-w-0 max-w-full justify-start overflow-hidden px-2 max-sm:size-11 max-sm:px-0"
             size="sm"
             title={activeThread?.title ?? "Conversation history"}
             variant="ghost"

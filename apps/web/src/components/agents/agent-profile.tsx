@@ -50,6 +50,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import {
+  agentPortraitUrl,
   useAgentMemoryActions,
   useAgentProfile,
   useUpdateAgentPersona,
@@ -112,6 +113,7 @@ function Header({ className }: { className?: string }) {
   const createThread = useCreateAgentThread()
   const navigate = useNavigate()
   const initial = (persona.name ?? persona.id).slice(0, 1).toUpperCase()
+  const portraitUrl = agentPortraitUrl(persona.id, hasPortrait)
 
   return (
     <header
@@ -119,12 +121,7 @@ function Header({ className }: { className?: string }) {
       className={cn("flex items-start gap-5", className)}
     >
       <Avatar className="size-20">
-        {hasPortrait && (
-          <AvatarImage
-            src={`/api/agent-portrait?personaId=${encodeURIComponent(persona.id)}`}
-            alt=""
-          />
-        )}
+        {portraitUrl ? <AvatarImage src={portraitUrl} alt="" /> : null}
         <AvatarFallback className="text-2xl font-medium text-primary">
           {initial}
         </AvatarFallback>

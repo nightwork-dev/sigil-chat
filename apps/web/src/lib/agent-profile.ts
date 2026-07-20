@@ -66,6 +66,21 @@ export interface AgentMemoryRecordInput {
   recordId: string
 }
 
+const DEFAULT_PORTRAITS: Readonly<Record<string, string>> = {
+  "sigil-chat-atlas": "/assets/personas/atlas.png",
+  "sigil-chat-eve": "/assets/personas/eve.png",
+}
+
+/** Private owner uploads override the versioned portrait for demo personas. */
+export function agentPortraitUrl(
+  personaId: string,
+  hasPortrait: boolean,
+): string | undefined {
+  return hasPortrait
+    ? `/api/agent-portrait?personaId=${encodeURIComponent(personaId)}`
+    : DEFAULT_PORTRAITS[personaId]
+}
+
 export const fetchAgentProfile = createServerFn({ method: "GET" })
   .validator((personaId: string) => personaId)
   .handler(async ({ data: personaId }): Promise<AgentProfile> => {

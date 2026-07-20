@@ -15,7 +15,10 @@ import {
 } from "@workspace/ui/components/avatar"
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-import { agentRosterQueryOptions } from "@/lib/agent-profile"
+import {
+  agentPortraitUrl,
+  agentRosterQueryOptions,
+} from "@/lib/agent-profile"
 
 export const Route = createFileRoute("/_app/agents/")({
   loader: ({ context }) =>
@@ -47,6 +50,10 @@ function AgentRoster() {
         <div className="grid gap-3 sm:grid-cols-2">
           {personas.map((persona) => {
             const initial = persona.name.slice(0, 1).toUpperCase()
+            const portraitUrl = agentPortraitUrl(
+              persona.id,
+              persona.hasPortrait,
+            )
             return (
               <Link
                 key={persona.id}
@@ -57,12 +64,9 @@ function AgentRoster() {
                 <Card className="h-full transition-colors group-hover:border-primary/40 group-focus-visible:border-primary/40">
                   <CardContent className="flex items-center gap-4 p-4">
                     <Avatar className="size-11">
-                      {persona.hasPortrait && (
-                        <AvatarImage
-                          src={`/api/agent-portrait?personaId=${encodeURIComponent(persona.id)}`}
-                          alt=""
-                        />
-                      )}
+                      {portraitUrl ? (
+                        <AvatarImage src={portraitUrl} alt="" />
+                      ) : null}
                       <AvatarFallback className="font-medium text-primary">
                         {initial}
                       </AvatarFallback>
