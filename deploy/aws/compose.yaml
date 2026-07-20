@@ -149,7 +149,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8808/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "const fs=require('node:fs');const key=fs.readFileSync('/run/secrets/gonk_mcp_key','utf8').trim();fetch('http://127.0.0.1:8808/health',{headers:{authorization:'Bearer '+key}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s

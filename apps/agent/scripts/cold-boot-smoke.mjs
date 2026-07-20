@@ -25,6 +25,9 @@ try {
     join(appDirectory, "tsconfig.json"),
     join(fixtureDirectory, "tsconfig.json"),
   )
+  cpSync(join(appDirectory, "scripts"), join(fixtureDirectory, "scripts"), {
+    recursive: true,
+  })
   symlinkSync(join(appDirectory, "node_modules"), join(fixtureDirectory, "node_modules"))
 
   const port = await reservePort()

@@ -85,6 +85,14 @@ async function handleRequest(
       incoming.url ?? "/",
       `http://${incoming.headers.host ?? `127.0.0.1:${port}`}`,
     ).pathname
+    if (pathname === "/live") {
+      outgoing.writeHead(200, {
+        "cache-control": "no-store",
+        "content-type": "application/json; charset=utf-8",
+      })
+      outgoing.end(JSON.stringify({ status: "live" }))
+      return
+    }
     if (pathname === "/health") {
       if (incoming.headers.authorization !== `Bearer ${serviceBearerKey}`) {
         outgoing.writeHead(401, {
