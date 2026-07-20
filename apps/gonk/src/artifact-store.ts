@@ -350,6 +350,7 @@ function manifestKey(scope: ResourceScope): string {
   const digest = createHash("sha256").update(scope.id).digest("hex")
   const directory = {
     session: "sessions",
+    workspace: "workspaces",
     project: "projects",
     persona: "personas",
   }[scope.tier]

@@ -2,7 +2,7 @@ import { readGonkClientEnvironment } from "@workspace/runtime-env/server"
 
 import type { UploadedAttachment } from "./agent-attachments"
 import { AGENT_SCOPE_HEADER } from "./agent-session-scope"
-import { assertAuthorizedScope } from "./agent-scope-delegation"
+import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import type { SigilAuthSession } from "./auth/server"
 import { requireSession } from "./auth/session"
 

@@ -1,4 +1,5 @@
 import { ToolRegistry } from "@gonk/tool-registry";
+import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries.js";
 import {
   getSessionArtifactStore,
   type SessionArtifactStore,
@@ -29,6 +30,10 @@ import {
   registerReviewTools,
 } from "./registry/review.js";
 import { registerStoryTools } from "./registry/story.js";
+import {
+  registerContainerTools,
+  type ContainerRegistries,
+} from "./registry/containers.js";
 import { createSkillRegistry, registerSkillTools } from "./registry/skills.js";
 import {
   registerRuntimeTools,
@@ -44,6 +49,7 @@ export function createSigilRegistry(
   workItems: WorkItemsRepository = workItemsRepository,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
   skills = createSkillRegistry(),
+  containers: ContainerRegistries = getProjectWorkspaceRegistries(),
 ): ToolRegistry {
   const registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
@@ -53,6 +59,7 @@ export function createSigilRegistry(
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
   registerStoryTools(registry, workItems);
+  registerContainerTools(registry, containers);
   registerSkillTools(registry, skills);
   registerUiCommandTools(registry);
   registerImageTools(

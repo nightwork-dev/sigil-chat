@@ -502,6 +502,120 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-project-list",
+    description:
+      "List the durable projects and their membership records. Inspect a project before replacing it.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-project-inspect",
+    description:
+      "Inspect one durable project, including its members and settings.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-project-upsert",
+    description:
+      "Create or replace a durable project record, including its authoritative members and settings. Inspect first when updating.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["project"],
+      properties: ["project"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-workspace-list",
+    description:
+      "List focused workspaces, optionally only those contained by one project.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: ["projectId"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-workspace-inspect",
+    description:
+      "Inspect one workspace and its containing project id.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-workspace-upsert",
+    description:
+      "Create or replace a workspace inside an existing project. Inspect first when updating.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["workspace"],
+      properties: ["workspace"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-skill-list",
     description:
       "List the managed skills visible at a scope, including their stable revisions and lifecycle metadata.",
@@ -650,7 +764,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-list-session-files",
     description:
-      "List files attached to the request's session, project, or persona resource scope. Omit scope to use the request's session scope.",
+      "List files attached to the request's session, workspace, project, or persona resource scope. Omit scope to use the request's session scope.",
     visibility: "always",
     approval: "read",
     schema: {
@@ -669,7 +783,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-read-file",
     description:
-      "Read a file attached to the request's session, project, or persona resource scope by id. Omit scope to use the request's session scope; text is decoded with a bounded response and binary files return metadata.",
+      "Read a file attached to the request's session, workspace, project, or persona resource scope by id. Omit scope to use the request's session scope; text is decoded with a bounded response and binary files return metadata.",
     visibility: "always",
     approval: "read",
     schema: {
@@ -688,7 +802,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-evidence-ask",
     description:
-      "Find BM25-ranked passages in the current session, project, or persona artifacts for a question. Returns structured citations with exact quotes and text offsets; when no passage matches, returns no-evidence and explicitly forbids invented citations.",
+      "Find BM25-ranked passages in the current session, workspace, project, or persona artifacts for a question. Returns structured citations with exact quotes and text offsets; when no passage matches, returns no-evidence and explicitly forbids invented citations.",
     visibility: "always",
     approval: "read",
     schema: {

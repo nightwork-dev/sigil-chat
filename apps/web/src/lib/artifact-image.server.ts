@@ -1,6 +1,6 @@
 import type { SigilAuthSession } from "./auth/server"
 import { requireSession } from "./auth/session"
-import { assertAuthorizedScope } from "./agent-scope-delegation"
+import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 
 interface ArtifactImageEnvironment {
   apiKey?: string

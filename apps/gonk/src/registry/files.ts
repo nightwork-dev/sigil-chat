@@ -35,7 +35,7 @@ export function registerFileTools(
   registry.register({
     name: "sigil-list-session-files",
     description:
-      "List files attached to the request's session, project, or persona resource scope. Omit scope to use the request's session scope.",
+      "List files attached to the request's session, workspace, project, or persona resource scope. Omit scope to use the request's session scope.",
     visibility: "always",
     approval: "read",
     input: shape<ResourceScopeInput>(
@@ -57,7 +57,7 @@ export function registerFileTools(
   registry.register({
     name: "sigil-read-file",
     description:
-      "Read a file attached to the request's session, project, or persona resource scope by id. Omit scope to use the request's session scope; text is decoded with a bounded response and binary files return metadata.",
+      "Read a file attached to the request's session, workspace, project, or persona resource scope by id. Omit scope to use the request's session scope; text is decoded with a bounded response and binary files return metadata.",
     visibility: "always",
     approval: "read",
     input: shape<ReadFileInput>(

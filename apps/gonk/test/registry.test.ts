@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { AuthContext } from "@gonk/auth";
+import type { KvStore } from "@gonk/store/types";
 import {
   FilesystemManagedSkillRegistry,
   type WritableManagedSkillRegistry,
@@ -19,6 +20,8 @@ import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repositor
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionArtifactStore } from "../src/artifact-store.js";
+import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js";
+import { WorkspaceRegistry } from "../../agent/agent/lib/workspace-registry.js";
 import { sigilApprovalProvider } from "../src/registry/approval.js";
 import { registerBlackboardTools } from "../src/registry/blackboard.js";
 import { registerImageTools } from "../src/registry/image.js";
@@ -52,6 +55,11 @@ async function makeRegistry(
   const workItemsRepository = new MemoryWorkItemsRepository({
     now: () => "2026-07-16T12:00:00.000Z",
   });
+  const projectRegistry = new ProjectRegistry({ store: memoryKv(new Map()) });
+  const workspaceRegistry = new WorkspaceRegistry({
+    projects: projectRegistry,
+    store: memoryKv(new Map()),
+  });
   return {
     registry: createSigilRegistry(
       repository,
@@ -59,9 +67,12 @@ async function makeRegistry(
       workItemsRepository,
       artifacts,
       skillRegistry,
+      { projects: projectRegistry, workspaces: workspaceRegistry },
     ),
     repository,
     workItemsRepository,
+    projectRegistry,
+    workspaceRegistry,
   };
 }
 
@@ -671,6 +682,107 @@ describe("Sigil Chat Gonk registry", () => {
     });
   });
 
+  it("reads and mutates project/workspace registries through domain outcomes", async () => {
+    const { registry } = await makeRegistry();
+    const project = {
+      id: "project-1",
+      name: "Project One",
+      description: "A durable project.",
+      members: [{ principalId: "user-1", role: "owner" }],
+      settings: { visibility: "shared" },
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-1",
+    };
+    const workspace = {
+      id: "workspace-1",
+      projectId: project.id,
+      name: "Workspace One",
+      description: "A focused effort.",
+      status: "active",
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-1",
+    };
+
+    const listed = await collectToolOutcome(
+      registry.invoke("sigil-project-list", {}, makeBaseContext()),
+    );
+    expect(listed).toMatchObject({ ok: true, data: { projects: [] } });
+
+    const createdProject = await collectToolOutcome(
+      registry.invoke("sigil-project-upsert", { project }, makeBaseContext()),
+    );
+    expect(createdProject).toMatchObject({
+      ok: true,
+      data: {
+        project,
+        clientCommand: {
+          type: "agent.domain.outcome",
+          payload: {
+            kind: "containers.changed",
+            resource: { kind: "project-registry", id: project.id },
+            operation: "project.upsert",
+            changedIds: [project.id],
+          },
+        },
+      },
+    });
+
+    const inspectedProject = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-inspect",
+        { id: project.id },
+        makeBaseContext(),
+      ),
+    );
+    expect(inspectedProject).toMatchObject({
+      ok: true,
+      data: { project },
+    });
+
+    const createdWorkspace = await collectToolOutcome(
+      registry.invoke(
+        "sigil-workspace-upsert",
+        { workspace },
+        makeBaseContext(),
+      ),
+    );
+    expect(createdWorkspace).toMatchObject({
+      ok: true,
+      data: {
+        workspace,
+        clientCommand: {
+          payload: {
+            kind: "containers.changed",
+            resource: { kind: "workspace-registry", id: workspace.id },
+            operation: "workspace.upsert",
+            changedIds: [workspace.id],
+          },
+        },
+      },
+    });
+
+    const listedWorkspaces = await collectToolOutcome(
+      registry.invoke(
+        "sigil-workspace-list",
+        { projectId: project.id },
+        makeBaseContext(),
+      ),
+    );
+    expect(listedWorkspaces).toMatchObject({
+      ok: true,
+      data: { workspaces: [workspace] },
+    });
+
+    const malformed = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        { project: { ...project, members: [{ principalId: "user-1" }] } },
+        makeBaseContext(),
+      ),
+    );
+    expect(malformed).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+  });
+
   it("round-trips a managed skill through the Gonk CRUD tools", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-chat-skills-"));
     temporaryDirectories.push(directory);
@@ -1278,3 +1390,20 @@ describe("Sigil Chat Gonk registry", () => {
     expect(JSON.stringify(outcome)).not.toContain("selector");
   });
 });
+
+function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
+  return {
+    delete: (key) => void values.delete(key),
+    entries: (prefix = "") =>
+      [...values.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => ({ key, value })),
+    get: (key) => values.get(key),
+    list: (prefix = "") =>
+      [...values.keys()].filter((key) => key.startsWith(prefix)),
+    patch: () => {
+      throw new Error("not implemented");
+    },
+    set: (key, value) => void values.set(key, value),
+  };
+}
