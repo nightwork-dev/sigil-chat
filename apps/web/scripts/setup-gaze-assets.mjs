@@ -8,9 +8,16 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const publicDirectory = resolve(scriptDirectory, "../public")
 const modelDirectory = join(publicDirectory, "models")
 const wasmTargetDirectory = join(publicDirectory, "mediapipe/wasm")
-const modelPath = join(modelDirectory, "face_landmarker.task")
-const modelUrl =
-  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+const models = [
+  {
+    filename: "face_landmarker.task",
+    url: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+  },
+  {
+    filename: "hand_landmarker.task",
+    url: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+  },
+]
 
 const bundlePath = require.resolve("@mediapipe/tasks-vision")
 const packageDirectory = dirname(bundlePath)
@@ -26,23 +33,26 @@ for (const filename of await readdir(wasmSourceDirectory)) {
   )
 }
 
-let modelExists = false
-try {
-  modelExists = (await stat(modelPath)).size > 0
-} catch {
-  modelExists = false
-}
-
-if (!modelExists) {
-  const response = await fetch(modelUrl)
-  if (!response.ok) {
-    throw new Error(
-      `Could not download MediaPipe face landmarker (${response.status} ${response.statusText}).`,
-    )
+for (const model of models) {
+  const modelPath = join(modelDirectory, model.filename)
+  let modelExists = false
+  try {
+    modelExists = (await stat(modelPath)).size > 0
+  } catch {
+    modelExists = false
   }
-  await writeFile(modelPath, new Uint8Array(await response.arrayBuffer()))
+
+  if (!modelExists) {
+    const response = await fetch(model.url)
+    if (!response.ok) {
+      throw new Error(
+        `Could not download MediaPipe ${model.filename} (${response.status} ${response.statusText}).`,
+      )
+    }
+    await writeFile(modelPath, new Uint8Array(await response.arrayBuffer()))
+  }
 }
 
 console.log(
-  "Gaze assets ready in apps/web/public (runtime network not required).",
+  "Vision assets ready in apps/web/public (runtime network not required).",
 )
