@@ -1,7 +1,10 @@
 import { pathToFileURL } from "node:url"
-import { hasCodexAccessToken, hasCodexModelAuth } from "./model-auth.mjs"
+import {
+  hasCodexAccessToken,
+  hasCodexModelAuth,
+} from "../agent/lib/model-auth.mjs"
 
-export { hasCodexAccessToken } from "./model-auth.mjs"
+export { hasCodexAccessToken } from "../agent/lib/model-auth.mjs"
 
 export async function checkAgentReadiness(options = {}) {
   const fetcher = options.fetcher ?? fetch

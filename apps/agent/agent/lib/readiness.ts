@@ -1,7 +1,7 @@
 import { GET, type HttpRouteDefinition } from "eve/channels"
 import type { AuthFn } from "eve/channels/auth"
 
-import { hasCodexModelAuth } from "../../scripts/model-auth.mjs"
+import { hasCodexModelAuth } from "./model-auth.mjs"
 
 export interface ReadinessRouteOptions {
   hasModelAuth?: () => Promise<boolean>
