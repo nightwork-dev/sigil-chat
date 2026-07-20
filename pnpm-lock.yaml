@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  eve@0.24.4:
+    hash: lxwtbs4wpcmfawr56efypxx7ru
+    path: patches/eve@0.24.4.patch
+
 importers:
 
   .:
@@ -64,7 +69,7 @@ importers:
         version: 12.10.0
       eve:
         specifier: 0.24.4
-        version: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       jose:
         specifier: ^6.1.3
         version: 6.2.1
@@ -243,7 +248,7 @@ importers:
         version: 1.6.23(@tanstack/react-start@1.168.26(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(rolldown@1.2.0)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(better-sqlite3@12.10.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@3.2.6(@types/debug@4.1.13)(@types/node@25.3.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.32.0)(msw@2.12.11(@types/node@25.3.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0))
       eve:
         specifier: 0.24.4
-        version: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       kysely:
         specifier: ^0.28.17
         version: 0.28.17
@@ -8990,7 +8995,7 @@ snapshots:
   '@zigil/agent-eve@0.1.5(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(react@19.2.4)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))':
     dependencies:
       '@zigil/agent-surface': 0.1.1
-      eve: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+      eve: 0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       react: 19.2.4
     transitivePeerDependencies:
       - '@azure/app-configuration'
@@ -9965,7 +9970,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.29(zod@4.4.3)
       nitro: 3.0.260610-beta(@libsql/client@0.15.15)(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))

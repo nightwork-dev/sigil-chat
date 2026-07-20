@@ -14,7 +14,9 @@ import {
   getSessionArtifactStore,
 } from "./artifact-store.js"
 import {
+  formatScopeHeader,
   normalizeScopeHeaders,
+  type ResourceScope,
   SIGIL_SCOPE_HEADER,
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
@@ -52,6 +54,7 @@ if (!apiKey) {
 const serviceBearerKey: string = apiKey
 const handler = createSigilMcpHandler({ apiKey, port })
 
+const mcpSessionScopes = new Map<string, { bearer: string; scope: ResourceScope }>()
 const server = createServer((request, response) => {
   void handleRequest(request, response)
 })
@@ -113,9 +116,30 @@ async function handleRequest(
       outgoing.end("Not found")
       return
     }
-    const request = await toWebRequest(incoming)
+    let request = await toWebRequest(incoming)
+    const sessionId = request.headers.get("mcp-session-id")
+    const bearer = request.headers.get("authorization") ?? ""
+    const requestedScope = normalizeScopeHeaders(
+      request.headers.get(SIGIL_SCOPE_HEADER) ?? undefined,
+      request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
+    )
+    const remembered = sessionId ? mcpSessionScopes.get(sessionId) : undefined
+    const scope = requestedScope ??
+      (remembered?.bearer === bearer ? remembered.scope : undefined)
+    if (scope && !request.headers.has(SIGIL_SCOPE_HEADER)) {
+      const headers = new Headers(request.headers)
+      headers.set(SIGIL_SCOPE_HEADER, formatScopeHeader(scope)!)
+      request = new Request(request, { headers })
+    }
     const response = await handler.handle(request)
     await writeWebResponse(outgoing, response)
+    const establishedSessionId = response.headers.get("mcp-session-id")
+    if (establishedSessionId && requestedScope) {
+      mcpSessionScopes.set(establishedSessionId, {
+        bearer,
+        scope: requestedScope,
+      })
+    }
   } catch (error) {
     console.error(error)
     if (!outgoing.headersSent) {

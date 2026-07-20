@@ -26,5 +26,10 @@
   "packageManager": "pnpm@9.0.6",
   "engines": {
     "node": ">=24"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "eve@0.24.4": "patches/eve@0.24.4.patch"
+    }
   }
 }
