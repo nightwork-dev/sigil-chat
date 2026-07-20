@@ -65,7 +65,7 @@ describe("MarkdownWorkItemsRepository", () => {
     expect(document.stories.find(({ id }) => id === "S1.1")).toMatchObject({
       epicId: "roadmap",
       status: "ready",
-      routing: "pi:luna",
+      routing: "implementation",
       reviewGate: "peer",
       deps: ["S1.0"],
       worktree: "sigil-chat-dev",
@@ -103,10 +103,7 @@ describe("MarkdownWorkItemsRepository", () => {
 
     const story = (await repo.list()).find(({ id }) => id === "S0.3");
     if (!story) throw new Error("Missing seed story S0.3.");
-    await repo.upsertStory(
-      { ...story, worktree: "sigil-chat-s15" },
-      0,
-    );
+    await repo.upsertStory({ ...story, worktree: "sigil-chat-s15" }, 0);
 
     const s15 = await repo.list({ worktree: "sigil-chat-s15" });
     expect(s15.map(({ id }) => id)).toEqual(["S0.3"]);
@@ -176,13 +173,13 @@ describe("MarkdownWorkItemsRepository", () => {
 
     const reopened = await new MarkdownWorkItemsRepository({ dir }).get();
     expect(reopened.revision).toBe(document.revision);
-    expect(reopened.reviews.find(({ id }) => id === "review-S1.0-3")).toMatchObject(
-      {
-        decision: "changes-requested",
-        completed: true,
-        unread: false,
-      },
-    );
+    expect(
+      reopened.reviews.find(({ id }) => id === "review-S1.0-3"),
+    ).toMatchObject({
+      decision: "changes-requested",
+      completed: true,
+      unread: false,
+    });
     expect(reopened.stories.find(({ id }) => id === "S1.0")).toMatchObject({
       reviewDecision: "changes-requested",
       decidedBy: "Owner",
@@ -205,7 +202,11 @@ describe("MarkdownWorkItemsRepository", () => {
     await repo.transitionStory("S0.3", "in-progress", initial.revision);
 
     await expect(
-      repo.assignReview("S0.3", { assignee: "Owner", gate: "peer" }, initial.revision),
+      repo.assignReview(
+        "S0.3",
+        { assignee: "Owner", gate: "peer" },
+        initial.revision,
+      ),
     ).rejects.toThrow(
       `Work-items revision conflict: expected ${initial.revision}, current ${initial.revision + 1}.`,
     );
@@ -216,7 +217,9 @@ describe("resolveRoadmapDir", () => {
   it("prefers an explicit override and an env var over the co-located default", () => {
     const explicitOverride = join(tmpdir(), "custom-roadmap");
     const environmentOverride = join(tmpdir(), "env-roadmap");
-    expect(resolveRoadmapDir(undefined, explicitOverride)).toBe(explicitOverride);
+    expect(resolveRoadmapDir(undefined, explicitOverride)).toBe(
+      explicitOverride,
+    );
     expect(resolveRoadmapDir(environmentOverride, undefined)).toBe(
       environmentOverride,
     );

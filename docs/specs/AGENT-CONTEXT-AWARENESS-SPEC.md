@@ -74,10 +74,10 @@ small enough to finish and rich enough to prove the product:
   demonstration.
 
 Sigil's existing typed graph engine, reducer registry, and canvas primitives are
-the starting substrate. Oubliette is product archaeology: its useful lesson is
-that entities and relationships become substantially more useful when they are
-directly manipulable, but its React Flow, Jotai, tRPC, and Surreal wiring should
-not be ported as an architecture.
+the starting substrate. Earlier internal prototypes established that entities
+and relationships become substantially more useful when they are directly
+manipulable, but their application-specific React Flow, state, RPC, and storage
+wiring should not be ported as an architecture.
 
 V1 should use a conventional, legible node-and-port graph. Sigil's experimental
 shape-to-computation semantics can remain a later interaction mode; making
@@ -193,7 +193,7 @@ extension point if it preserves the contract above.
   operation can exist.
 - Maintaining a second state model for agent-made changes outside the
   application's normal query, mutation, history, and undo paths.
-- Rebuilding Oubliette's full entity platform before the agentic workspace
+- Rebuilding an earlier prototype's full entity platform before the agentic workspace
   interaction has been proven.
 
 ## 9. Acceptance Criteria
@@ -259,13 +259,13 @@ Selection, focus, viewport, and highlighting remain Sigil-owned ephemeral UI
 state. They may be exposed through a live workspace-awareness bridge, but must
 not be smuggled into the durable graph document or Gonk's graph mutation API.
 
-### Port lineage from Oubliette and Basilisk
+### Port lineage from earlier prototypes
 
-Oubliette's surviving React Flow implementation distinguished broad source and
-target handles, while its facet relations carried the more useful semantics:
-direction, stable ordering, weight, and selected context keys. Basilisk's core
-idea was likewise not a visual handle style; it was that several independently
-computed facets could feed an ordered contextual assembly downstream.
+Earlier graph prototypes distinguished broad source and target handles, while
+their facet relations carried the more useful semantics: direction, stable
+ordering, weight, and selected context keys. Their core lesson was not a visual
+handle style; it was that several independently computed facets could feed an
+ordered contextual assembly downstream.
 
 Sigil Chat keeps that useful lineage but makes the contract explicit at the
 port rather than inferring it from node categories:
