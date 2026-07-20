@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from "@workspace/ui/components/sheet"
 import { Textarea } from "@workspace/ui/components/textarea"
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
 
 import { useBlackboard, useWriteBlackboard } from "@/lib/blackboard"
 
@@ -65,6 +66,7 @@ export function SessionBlackboard({ sessionId }: { sessionId: string }) {
                 aria-label="Session blackboard notes"
                 className="min-h-64 flex-1 resize-none font-mono text-sm leading-6"
                 defaultValue={blackboard.data.content}
+                maxLength={MAX_BLACKBOARD_CONTENT_CHARS}
                 name="content"
                 placeholder="Keep decisions, constraints, and working notes here…"
               />

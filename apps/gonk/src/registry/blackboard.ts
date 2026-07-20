@@ -7,6 +7,7 @@ import {
   blackboardRepository,
   type BlackboardRepository,
 } from "@workspace/blackboard-store";
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits";
 
 import {
   normalizeScope,
@@ -52,7 +53,9 @@ export function registerBlackboardTools(
     ),
     inputJsonSchema: {
       type: "object",
-      properties: { content: { type: "string" } },
+      properties: {
+        content: { type: "string", maxLength: MAX_BLACKBOARD_CONTENT_CHARS },
+      },
       required: ["content"],
       additionalProperties: false,
     },
@@ -71,7 +74,8 @@ function isBlackboardWriteInput(value: unknown): value is BlackboardWriteInput {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, ["content"]) &&
-    typeof value.content === "string"
+    typeof value.content === "string" &&
+    value.content.length <= MAX_BLACKBOARD_CONTENT_CHARS
   );
 }
 

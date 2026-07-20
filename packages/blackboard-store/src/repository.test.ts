@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MirkBlackboardRepository } from "./mirk-repository.js";
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "./limits.js";
 
 const temporaryDirectories: string[] = [];
 const NOW = "2026-07-18T20:00:00.000Z";
@@ -65,5 +66,20 @@ describe("MirkBlackboardRepository", () => {
       updatedAt: "",
       updatedBy: "",
     });
+  });
+
+  it("rejects content too large to inject safely into a turn", async () => {
+    const repository = new MirkBlackboardRepository({
+      dir: await makeDirectory(),
+      git: false,
+    });
+
+    await expect(
+      repository.write(
+        "session-a",
+        "x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1),
+        "human",
+      ),
+    ).rejects.toThrow(`${MAX_BLACKBOARD_CONTENT_CHARS} characters or fewer`);
   });
 });

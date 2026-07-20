@@ -6,6 +6,7 @@ import { MarkdownStore, type MarkdownMutation } from "@mirk/store-markdown";
 
 import type { BlackboardRepository } from "./repository.js";
 import type { BlackboardDoc } from "./types.js";
+import { assertBlackboardContent } from "./limits.js";
 
 const BLACKBOARD_COLLECTION = "blackboard";
 const DEFAULT_BLACKBOARD_DIR = ".data/blackboard";
@@ -67,6 +68,7 @@ export class MirkBlackboardRepository implements BlackboardRepository {
     content: string,
     updatedBy: string,
   ): Promise<BlackboardDoc> {
+    assertBlackboardContent(content);
     return this.runExclusive(async () => {
       await this.ensureReady();
       const document: BlackboardDoc = {

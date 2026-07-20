@@ -18,6 +18,7 @@
   },
   "exports": {
     ".": "./src/repository.ts",
+    "./limits": "./src/limits.ts",
     "./types": "./src/types.ts",
     "./repository": "./src/repository.ts",
     "./mirk-repository": "./src/mirk-repository.ts"

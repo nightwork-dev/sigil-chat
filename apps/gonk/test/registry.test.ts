@@ -13,11 +13,14 @@ import {
 } from "@gonk/tool-registry";
 import { FileObjectStore } from "@mirk/artifact/fs";
 import { FileGraphRepository } from "@workspace/graph-store/repository";
+import { MemoryBlackboardRepository } from "@workspace/blackboard-store/repository";
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits";
 import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionArtifactStore } from "../src/artifact-store.js";
 import { sigilApprovalProvider } from "../src/registry/approval.js";
+import { registerBlackboardTools } from "../src/registry/blackboard.js";
 import { registerImageTools } from "../src/registry/image.js";
 import {
   createReviewDemoRepository,
@@ -62,6 +65,39 @@ async function makeRegistry(
 }
 
 describe("Sigil Chat Gonk registry", () => {
+  it("bounds the session blackboard at the tool and store boundary", async () => {
+    const registry = new ToolRegistry();
+    const repository = new MemoryBlackboardRepository();
+    registerBlackboardTools(registry, repository);
+    const context = makeBaseContext({
+      host: { resourceScope: "session:thread-1" },
+    });
+
+    const written = await collectToolOutcome(
+      registry.invoke(
+        "sigil-blackboard-write",
+        { content: "Shared note" },
+        context,
+      ),
+    );
+    expect(written).toMatchObject({
+      ok: true,
+      data: { content: "Shared note", sessionId: "thread-1" },
+    });
+
+    const oversized = await collectToolOutcome(
+      registry.invoke(
+        "sigil-blackboard-write",
+        { content: "x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1) },
+        context,
+      ),
+    );
+    expect(oversized).toMatchObject({ ok: false });
+    await expect(repository.read("thread-1")).resolves.toMatchObject({
+      content: "Shared note",
+    });
+  });
+
   it("preserves discovery metadata, schemas, and ordered tool contracts", async () => {
     const { registry } = await makeRegistry();
     const contract = registry.list().map((tool) => {

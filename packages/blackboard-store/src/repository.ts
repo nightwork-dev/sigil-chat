@@ -1,4 +1,5 @@
 import { MirkBlackboardRepository } from "./mirk-repository.js";
+import { assertBlackboardContent } from "./limits.js";
 import type { BlackboardDoc } from "./types.js";
 
 export interface BlackboardRepository {
@@ -35,6 +36,7 @@ export class MemoryBlackboardRepository implements BlackboardRepository {
     content: string,
     updatedBy: string,
   ): Promise<BlackboardDoc> {
+    assertBlackboardContent(content);
     const document: BlackboardDoc = {
       sessionId,
       content,
