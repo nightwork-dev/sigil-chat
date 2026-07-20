@@ -57,7 +57,7 @@ services:
       EVE_ORIGIN: http://eve:3001
       GONK_MCP_URL: http://gonk:8808/mcp
     secrets: [better_auth_secret, gonk_mcp_key]
-    volumes: [web_data:/var/lib/sigil-web, web_scope:/app/.agents]
+    volumes: [web_data:/var/lib/sigil-web, web_scope:/app/.agents, web_appdata:/app/.data]
     expose: ["3000"]
     networks: [backend]
 
@@ -127,6 +127,7 @@ networks:
 volumes:
   web_data: {}
   web_scope: {}
+  web_appdata: {}
   eve_data: {}
   eve_state: {}
   eve_app: {}
