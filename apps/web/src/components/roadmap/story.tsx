@@ -7,7 +7,7 @@
 // the board's column headers and the queue rows share the same vocabulary.
 
 import { createContext, useContext, type ReactNode } from "react";
-import { CheckIcon, GavelIcon, MonitorIcon, UsersIcon } from "lucide-react";
+import { CheckIcon } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { cn } from "@workspace/ui/lib/utils";
 import type {
@@ -67,11 +67,11 @@ const ROUTING_LABEL: Record<Routing, string> = {
 // peer is someone else's; none carries no review and renders nothing.
 const GATE_META: Record<
   ReviewGate,
-  { label: string; icon: typeof GavelIcon; owner: boolean } | null
+  { label: string; owner: boolean } | null
 > = {
-  "browser:owner": { label: "Browser review", icon: MonitorIcon, owner: true },
-  "decision:owner": { label: "Decision", icon: GavelIcon, owner: true },
-  peer: { label: "Peer review", icon: UsersIcon, owner: false },
+  "browser:owner": { label: "Browser review", owner: true },
+  "decision:owner": { label: "Decision", owner: true },
+  peer: { label: "Peer review", owner: false },
   none: null,
 };
 
@@ -148,7 +148,6 @@ function RoutingBadge({ className }: { className?: string }) {
 function Meta({ className }: { className?: string }) {
   const { id, reviewGate, deps } = useStoryContext();
   const gate = GATE_META[reviewGate];
-  const GateIcon = gate?.icon;
   return (
     <div
       className={cn(
@@ -164,9 +163,6 @@ function Meta({ className }: { className?: string }) {
             gate.owner ? "text-info" : "text-muted-foreground",
           )}
         >
-          {GateIcon ? (
-            <GateIcon className="size-2.5" aria-hidden="true" />
-          ) : null}
           {gate.label}
         </span>
       ) : null}
