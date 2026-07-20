@@ -34,23 +34,50 @@ ensureEveHostedPersona(personaRegistry, personaSeed, { scope: "persona", rootKin
 // identity, not the seed we may have written months ago.
 const persona = personaRegistry.get(personaSeed.id) ?? personaSeed
 
-export const sigilMemoryHost = new EveMemoryHost({
-  store: new StoreBackedMemoryRecordStore({ scopeEnv }),
-  persona: {
-    record: persona,
-    authoredBaseId: "sigil-chat-agent-v1",
-    identityFloor: {
-      revision: "sigil-chat-eve-v1",
-      selectedRecordIds: [],
-      caps: { maxRecords: 3, maxContentCharsPerRecord: 300, maxTotalContentChars: 600 },
-      stableSummaryTokenBudget: 80,
-      selectedSelfRecordCap: 3,
-      dynamicTokenBudget: 240,
-      authoredBase: persona.systemPrompt ?? personaSeed.systemPrompt,
-      stableSummary: persona.description ?? personaSeed.description,
+const DEFAULT_PERSONA_ID = process.env.SIGIL_DEFAULT_PERSONA_ID ?? personaSeed.id
+
+/** Every persona in the registry is inhabitable. One host per persona,
+ *  created on demand and cached — the deployment supports as many agents as
+ *  the operator defines, not one hardcoded individual. */
+const hosts = new Map<string, EveMemoryHost>()
+
+export function personaHost(personaId: string = DEFAULT_PERSONA_ID): EveMemoryHost {
+  const cached = hosts.get(personaId)
+  if (cached) return cached
+  const record = personaRegistry.get(personaId)
+  if (!record) throw new Error(`No such persona: ${personaId}`)
+  const host = new EveMemoryHost({
+    store: new StoreBackedMemoryRecordStore({ scopeEnv }),
+    persona: {
+      record,
+      authoredBaseId: `${record.id}-v1`,
+      identityFloor: {
+        revision: `${record.id}-v1`,
+        selectedRecordIds: [],
+        caps: { maxRecords: 3, maxContentCharsPerRecord: 300, maxTotalContentChars: 600 },
+        stableSummaryTokenBudget: 80,
+        selectedSelfRecordCap: 3,
+        dynamicTokenBudget: 240,
+        authoredBase: record.systemPrompt ?? personaSeed.systemPrompt,
+        stableSummary: record.description ?? personaSeed.description,
+      },
     },
-  },
-})
+  })
+  hosts.set(personaId, host)
+  return host
+}
+
+export function listPersonas() {
+  return personaRegistry.list().map((p) => ({
+    id: p.id,
+    name: p.name ?? p.id,
+    description: p.description ?? "",
+  }))
+}
+
+/** Default-persona host, for call sites that have not yet been given a
+ *  session persona. New code should call personaHost(sessionPersonaId). */
+export const sigilMemoryHost = personaHost()
 
 /**
  * The consumer supplies Eve's authenticated session identity; EveMemoryHost
