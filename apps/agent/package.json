@@ -18,9 +18,9 @@
   "dependencies": {
     "@gonk/auth": "0.3.1",
     "@gonk/context": "0.3.1",
-    "@gonk/eve-host": "link:/Users/dr/Dev/platform/gonk-worktrees/rion-mem2-host-integration/packages/framework/eve-host",
-    "@gonk/memory": "link:/Users/dr/Dev/platform/gonk-worktrees/rion-mem2-host-integration/packages/capabilities/memory",
-    "@gonk/persona": "link:/Users/dr/Dev/platform/gonk-worktrees/rion-mem2-host-integration/packages/capabilities/persona",
+    "@gonk/eve-host": "file:../../vendor/gonk-eve-host-0.5.0.tgz",
+    "@gonk/memory": "file:../../vendor/gonk-memory-0.5.0.tgz",
+    "@gonk/persona": "file:../../vendor/gonk-persona-0.5.0.tgz",
     "@gonk/retrieval": "0.3.1",
     "@gonk/scope": "0.3.1",
     "@gonk/skills": "0.3.1",

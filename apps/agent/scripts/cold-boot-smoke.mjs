@@ -84,7 +84,7 @@ async function reservePort() {
 }
 
 async function waitForInfoRoute(processHandle, port) {
-  const deadline = Date.now() + 60_000
+  const deadline = Date.now() + Number(process.env.COLD_BOOT_TIMEOUT_MS ?? 60_000)
   const url = `http://127.0.0.1:${port}/eve/v1/info`
 
   while (Date.now() < deadline) {
