@@ -35,7 +35,7 @@ export const artifactKeys = {
 }
 
 export function artifactUrl(id: string, scope: string): string {
-  return `/img/${encodeURIComponent(id)}?scope=${encodeURIComponent(scope)}`
+  return `/img?key=${encodeURIComponent(id)}&scope=${encodeURIComponent(scope)}`
 }
 
 const listArtifactsFn = createServerFn({ method: "GET" })

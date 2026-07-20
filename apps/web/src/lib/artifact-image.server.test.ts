@@ -35,7 +35,9 @@ describe("artifact image authorization", () => {
   it("denies anonymous reads before contacting Gonk", async () => {
     const fetcher = vi.fn<typeof fetch>()
     const response = await readArtifactImage(
-      new Request("https://chat.example.test/img/key?scope=session:thread-1"),
+      new Request(
+        "https://chat.example.test/img?key=uploads%2Fimage.png&scope=session:thread-1",
+      ),
       dependencies({ fetcher, getSession: () => Promise.resolve(null) }),
     )
     expect(response.status).toBe(401)
@@ -45,7 +47,9 @@ describe("artifact image authorization", () => {
   it("hides artifacts from a session the user does not own", async () => {
     const fetcher = vi.fn<typeof fetch>()
     const response = await readArtifactImage(
-      new Request("https://chat.example.test/img/key?scope=session:thread-2"),
+      new Request(
+        "https://chat.example.test/img?key=uploads%2Fimage.png&scope=session:thread-2",
+      ),
       dependencies({ fetcher }),
     )
     expect(response.status).toBe(404)
@@ -55,7 +59,9 @@ describe("artifact image authorization", () => {
   it("rejects unavailable project and persona scopes", async () => {
     for (const scope of ["project:other", "persona:any"]) {
       const response = await readArtifactImage(
-        new Request(`https://chat.example.test/img/key?scope=${scope}`),
+        new Request(
+          `https://chat.example.test/img?key=uploads%2Fimage.png&scope=${scope}`,
+        ),
         dependencies(),
       )
       expect(response.status).toBe(404)
@@ -71,7 +77,9 @@ describe("artifact image authorization", () => {
       ),
     )
     const response = await readArtifactImage(
-      new Request("https://chat.example.test/img/key?scope=session:thread-1"),
+      new Request(
+        "https://chat.example.test/img?key=uploads%2Fimage.png&scope=session:thread-1",
+      ),
       dependencies({ fetcher }),
     )
     expect(response.status).toBe(200)
@@ -82,6 +90,9 @@ describe("artifact image authorization", () => {
     )
     expect(new Headers(init?.headers).get("x-sigil-scope")).toBe(
       "session:thread-1",
+    )
+    expect(fetcher.mock.calls[0]?.[0]).toBe(
+      "https://tools.example.test/img/uploads/image.png",
     )
   })
 })

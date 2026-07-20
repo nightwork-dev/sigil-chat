@@ -30,7 +30,7 @@ export async function readArtifactImage(
   }
 
   const url = new URL(request.url)
-  const key = url.pathname.slice("/img/".length)
+  const key = url.searchParams.get("key") ?? ""
   const scope = url.searchParams.get("scope") ?? ""
   if (!key || key.includes("..")) return new Response(null, { status: 404 })
   try {

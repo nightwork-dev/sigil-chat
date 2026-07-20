@@ -101,7 +101,9 @@ describe("handleArtifactRoute", () => {
         id,
         filename: "brief.md",
         mediaType: "text/markdown",
-        url: expect.stringContaining(`/img/${id}`),
+        url: expect.stringContaining(
+          `/img?key=${encodeURIComponent(id)}`,
+        ),
       }),
     ]);
 

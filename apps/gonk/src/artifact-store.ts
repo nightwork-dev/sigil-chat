@@ -51,7 +51,7 @@ export function imagePublicUrl(key: string, scope: ScopeInput): string {
   const base = process.env.GONK_PUBLIC_URL
   const scopeHeader = formatScopeHeader(scope)
   if (!scopeHeader) throw new Error("Artifact URL requires a valid scope")
-  const path = `/img/${key}?scope=${encodeURIComponent(scopeHeader)}`
+  const path = `/img?key=${encodeURIComponent(key)}&scope=${encodeURIComponent(scopeHeader)}`
   return base ? `${base.replace(/\/$/, "")}${path}` : path
 }
 

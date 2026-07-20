@@ -371,7 +371,7 @@ describe("Sigil Chat Gonk registry", () => {
       ok: true,
       data: {
         artifactId: expect.stringMatching(/^uploads\//),
-        url: expect.stringMatching(/^\/img\/uploads\//),
+        url: expect.stringMatching(/^\/img\?key=uploads%2F/),
         backend: "comfyui:phantom",
         sourceArtifactId: source.id,
         instruction: "Make the coat crimson",
