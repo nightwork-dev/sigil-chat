@@ -14,6 +14,7 @@ import {
   DEFAULT_CODEX_MODEL,
   parsePort,
   readAgentEnvironment,
+  readEmbeddingEnvironment,
   readGonkClientEnvironment,
   readIdentityEnvironment,
   readOptionalSecretFromFile,
@@ -173,6 +174,51 @@ describe("runtime topology", () => {
       personaDir: "/var/lib/example/personas",
       memoryDir: "/workspace/apps/agent/private-memory",
     });
+  });
+
+  it("enables the embedding provider when its configuration is complete", () => {
+    expect(
+      readEmbeddingEnvironment({
+        SIGIL_EMBEDDING_BASE_URL: " http://localhost:1234/v1/ ",
+        SIGIL_EMBEDDING_MODEL: " nomic-embed-text-v1.5 ",
+        SIGIL_EMBEDDING_DIM: "768",
+        SIGIL_EMBEDDING_API_KEY: " dev-key ",
+      }),
+    ).toEqual({
+      enabled: true,
+      baseURL: "http://localhost:1234/v1",
+      model: "nomic-embed-text-v1.5",
+      dim: 768,
+      apiKey: "dev-key",
+    });
+  });
+
+  it("treats a partial embedding configuration as disabled", () => {
+    expect(
+      readEmbeddingEnvironment({
+        SIGIL_EMBEDDING_BASE_URL: "http://localhost:1234/v1",
+      }),
+    ).toEqual({ enabled: false });
+    expect(
+      readEmbeddingEnvironment({
+        SIGIL_EMBEDDING_MODEL: "nomic-embed-text-v1.5",
+      }),
+    ).toEqual({ enabled: false });
+  });
+
+  it("rejects invalid embedding dimensions", () => {
+    for (const dim of ["0", "-1", "768.5", "not-an-integer"]) {
+      expectRuntimeError(
+        () =>
+          readEmbeddingEnvironment({
+            SIGIL_EMBEDDING_BASE_URL: "http://localhost:1234/v1",
+            SIGIL_EMBEDDING_MODEL: "nomic-embed-text-v1.5",
+            SIGIL_EMBEDDING_DIM: dim,
+          }),
+        "INVALID_EMBEDDING_DIM",
+        "SIGIL_EMBEDDING_DIM",
+      );
+    }
   });
 });
 
