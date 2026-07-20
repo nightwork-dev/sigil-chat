@@ -17,6 +17,7 @@ import {
   personaHost,
 } from "../lib/memory"
 import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
+import { requireAuthorizedResourceScope } from "../lib/scope-authorization"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
@@ -45,9 +46,19 @@ export default createOwnedEveChannel({
     // it is not verified and is not a security boundary.
     const rawToolApproval = request.headers.get("x-sigil-tool-approval")
     const toolApproval = parseToolApprovalPreference(rawToolApproval)
-    const resourceScope =
-      request.headers.get("x-sigil-scope")?.trim() ??
-      request.headers.get("x-sigil-session-id")?.trim()
+    let resourceScope: string | undefined
+    try {
+      resourceScope = requireAuthorizedResourceScope({
+        principalId: auth.principalId,
+        request,
+        secret: process.env.GONK_MCP_KEY,
+      })
+    } catch {
+      throw new ForbiddenError({
+        code: "eve_resource_scope_not_authorized",
+        message: "The requested resource scope is not authorized.",
+      })
+    }
     const requestedPersonaId =
       request.headers.get("x-sigil-persona-id")?.trim() || undefined
     if (requestedPersonaId && !hasPersona(requestedPersonaId)) {

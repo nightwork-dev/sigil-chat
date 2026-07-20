@@ -27,6 +27,7 @@
     "@gonk/skills": "0.3.1",
     "@gonk/store": "0.3.1",
     "@workspace/blackboard-store": "workspace:*",
+    "@workspace/agent-contracts": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
     "ai": "^7.0.26",
     "better-sqlite3": "12.10.0",

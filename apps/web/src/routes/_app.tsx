@@ -51,7 +51,7 @@ function AppLayout() {
       accountMenu={<AccountMenu user={user} />}
     >
       <WorkspaceAttentionProvider>
-        <AppAgentSessions>
+        <AppAgentSessions principalId={user.id}>
           <Outlet />
           <ShellAgentHud />
           <ShellOmnibar />

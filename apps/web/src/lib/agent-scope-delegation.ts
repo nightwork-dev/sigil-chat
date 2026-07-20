@@ -1,0 +1,75 @@
+import { createServerFn } from "@tanstack/react-start"
+
+import type { SigilAuthSession } from "./auth/server"
+
+const SCOPE_PROOF_LIFETIME_SECONDS = 5 * 60
+
+interface ScopeProofReceipt {
+  expiresAt: number
+  proof: string
+  subject: string
+}
+
+const issueAgentScopeProof = createServerFn({ method: "POST" })
+  .validator((scope: string) => scope)
+  .handler(async ({ data: scope }): Promise<ScopeProofReceipt> => {
+    const { getSession, requireSession } = await import("./auth/session")
+    const { agentThreadRepository } = await import("./agent-threads.server")
+    const { issueScopeDelegation } =
+      await import("@workspace/agent-contracts/scope-delegation.server")
+    const session = await getSession()
+    const assertSession: (
+      candidate: SigilAuthSession | null,
+    ) => asserts candidate is SigilAuthSession = requireSession
+    assertSession(session)
+    assertAuthorizedScope(scope, session.user.id, (userId, threadId) =>
+      Boolean(agentThreadRepository.get(userId, threadId)),
+    )
+    const secret = process.env.GONK_MCP_KEY?.trim()
+    if (!secret) throw new Error("Agent scope delegation is unavailable.")
+    const expiresAt =
+      Math.floor(Date.now() / 1_000) + SCOPE_PROOF_LIFETIME_SECONDS
+    return {
+      expiresAt,
+      proof: issueScopeDelegation(
+        { expiresAt, scope, subject: session.user.id },
+        secret,
+      ),
+      subject: session.user.id,
+    }
+  })
+
+const proofCache = new Map<string, ScopeProofReceipt>()
+
+export async function getAgentScopeProof(
+  scope: string,
+  principalId: string,
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1_000)
+  const cacheKey = `${principalId}:${scope}`
+  const cached = proofCache.get(cacheKey)
+  if (cached && cached.expiresAt > now + 30) return cached.proof
+  const receipt = await issueAgentScopeProof({ data: scope })
+  if (receipt.subject !== principalId) {
+    throw new Error("Agent scope delegation principal changed.")
+  }
+  proofCache.set(cacheKey, receipt)
+  return receipt.proof
+}
+
+export function assertAuthorizedScope(
+  scope: string,
+  userId: string,
+  ownsThread: (userId: string, threadId: string) => boolean,
+): void {
+  const match = /^(session|project|persona):([^\s:][^\s]*)$/.exec(scope)
+  if (!match) throw new Error("Agent resource scope is invalid.")
+  if (match[1] === "session") {
+    if (!ownsThread(userId, match[2]!)) {
+      throw new Error("Agent session was not found.")
+    }
+    return
+  }
+  if (match[1] === "project" && match[2] === "evidence-room") return
+  throw new Error("Agent resource scope is not available to this application.")
+}

@@ -1,4 +1,8 @@
-import { AGENT_PERSONA_HEADER } from "@/lib/agent-session-scope"
+import {
+  AGENT_PERSONA_HEADER,
+  AGENT_SCOPE_HEADER,
+} from "@/lib/agent-session-scope"
+import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import {
   useCallback,
   useLayoutEffect,
@@ -56,8 +60,15 @@ import {
 } from "@/lib/agent-session-persistence"
 import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projector"
 import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
+import { getAgentScopeProof } from "@/lib/agent-scope-delegation"
 
-export function AppAgentSessions({ children }: { children: ReactNode }) {
+export function AppAgentSessions({
+  children,
+  principalId,
+}: {
+  children: ReactNode
+  principalId: string
+}) {
   const threadsQuery = useAgentThreads()
   const preferenceQuery = useActiveAgentThreadPreference()
   const createThread = useCreateAgentThread()
@@ -127,6 +138,7 @@ export function AppAgentSessions({ children }: { children: ReactNode }) {
         forkThread.mutateAsync({ sourceThreadId: activeThread.id })
       }
       key={activeThread.id}
+      principalId={principalId}
       selectThread={(threadId) => setActiveThread.mutateAsync({ id: threadId })}
       thread={activeThread}
       threads={threads}
@@ -140,6 +152,7 @@ function ActiveAgentSession({
   children,
   createThread,
   forkThread,
+  principalId,
   selectThread,
   thread,
   threads,
@@ -147,6 +160,7 @@ function ActiveAgentSession({
   children: ReactNode
   createThread: (personaId: string) => Promise<unknown>
   forkThread: () => Promise<unknown>
+  principalId: string
   selectThread: (threadId: string) => Promise<unknown>
   thread: AgentThread
   threads: readonly AgentThreadSummary[]
@@ -305,11 +319,16 @@ function ActiveAgentSession({
         }
         turnActive.current = true
         try {
+          const resourceScope = input.headers?.[AGENT_SCOPE_HEADER]
+          const scopeProof = resourceScope
+            ? await getAgentScopeProof(resourceScope, principalId)
+            : undefined
           const result = await eveSession.send({
             ...input,
             headers: {
               ...input.headers,
               [AGENT_PERSONA_HEADER]: thread.personaId,
+              ...(scopeProof ? { [AGENT_SCOPE_PROOF_HEADER]: scopeProof } : {}),
             },
             clientContext: composeClientContext(
               input.clientContext,
@@ -323,7 +342,13 @@ function ActiveAgentSession({
         }
       },
     }),
-    [eveSession, handleSendSuccess, thread.forkSeed, thread.personaId],
+    [
+      eveSession,
+      handleSendSuccess,
+      principalId,
+      thread.forkSeed,
+      thread.personaId,
+    ],
   )
 
   return (
