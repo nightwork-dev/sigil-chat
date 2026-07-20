@@ -8,6 +8,8 @@ describe("app navigation profiles", () => {
 
     expect(items.map((item) => item.to)).not.toContain("/roadmap")
     expect(items.map((item) => item.to)).toContain("/chat")
+    expect(items.map((item) => item.to)).toContain("/capabilities")
+    expect(items.map((item) => item.to)).toContain("/artifacts")
   })
 
   it("makes the roadmap available to an explicit internal workspace profile", () => {

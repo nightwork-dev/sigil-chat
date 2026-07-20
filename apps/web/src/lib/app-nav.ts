@@ -3,6 +3,7 @@
 // (S1.9 ShellOmnibar). Add or reorder product routes here, once.
 
 import {
+  ArchiveIcon,
   BracesIcon,
   FileCheck2Icon,
   LibraryBigIcon,
@@ -10,6 +11,7 @@ import {
   MessageSquareIcon,
   NetworkIcon,
   SettingsIcon,
+  SparklesIcon,
   ActivityIcon,
   UserRoundIcon,
 } from "lucide-react"
@@ -24,8 +26,10 @@ export function buildAppNav(options: {
     items: [
       { to: "/chat", label: "Chat", icon: MessageSquareIcon },
       { to: "/agents", label: "Agent", icon: UserRoundIcon },
+      { to: "/capabilities", label: "Capabilities", icon: SparklesIcon },
       { to: "/studio", label: "Studio", icon: NetworkIcon },
       { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
+      { to: "/artifacts", label: "Artifacts", icon: ArchiveIcon },
       ...(options.internalWorkspaces
         ? [{ to: "/roadmap", label: "Roadmap", icon: MapIcon }]
         : []),

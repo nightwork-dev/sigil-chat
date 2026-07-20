@@ -1,4 +1,4 @@
-// Route: pathless app layout (wraps /chat, /studio, /evidence, /roadmap, /review, and /skills)
+// Route: pathless app layout (wraps the authenticated product workspaces)
 // Tree:
 //   apps/web/src/routes/__root.tsx  — HTML shell, ThemeProvider, QueryClientProvider (no visible chrome)
 //   apps/web/src/routes/_app.tsx    — THIS FILE
