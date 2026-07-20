@@ -64,6 +64,10 @@ services:
   eve:
     <<: *service-hardening
     image: ${SIGIL_EVE_IMAGE:?set SIGIL_EVE_IMAGE to an immutable digest}
+    # The agent host writes runtime caches inside its own package tree
+    # (extension authored-modules), which sits outside the data volumes.
+    # Non-root, cap_drop ALL, and no-new-privileges still apply.
+    read_only: false
     command: ["pnpm", "--filter", "sigil-chat-agent", "exec", "eve", "start", "--host", "0.0.0.0"]
     tmpfs:
       - /tmp:size=64m
