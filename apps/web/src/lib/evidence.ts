@@ -50,9 +50,8 @@ async function gonkArtifactsEndpoint(): Promise<{
   url: string;
   apiKey: string;
 }> {
-  const { readGonkClientEnvironment } = await import(
-    "@workspace/runtime-env/server"
-  );
+  const { readGonkClientEnvironment } =
+    await import("@workspace/runtime-env/server");
   const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
   if (!apiKey) {
     throw new Error(
@@ -87,9 +86,8 @@ const listEvidenceDocumentsFn = createServerFn({ method: "GET" }).handler(
 const listEvidenceDistillsFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<EvidenceDistill[]> => {
     requireSession(await getSession());
-    const { readGonkClientEnvironment } = await import(
-      "@workspace/runtime-env/server"
-    );
+    const { readGonkClientEnvironment } =
+      await import("@workspace/runtime-env/server");
     const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
     if (!apiKey) {
       throw new Error(
@@ -121,7 +119,10 @@ const listEvidenceDistillsFn = createServerFn({ method: "GET" }).handler(
     const distills = await Promise.all(
       distillMetas.map(async (meta): Promise<EvidenceDistill | null> => {
         const content = await fetch(`${imgBase}/img/${meta.id}`, {
-          headers: { authorization: `Bearer ${apiKey}` },
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
+          },
         });
         if (!content.ok) return null;
         try {
@@ -154,9 +155,8 @@ const uploadEvidenceDocumentFn = createServerFn({ method: "POST" })
       );
     }
 
-    const { readGonkClientEnvironment } = await import(
-      "@workspace/runtime-env/server"
-    );
+    const { readGonkClientEnvironment } =
+      await import("@workspace/runtime-env/server");
     const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
     if (!apiKey) {
       throw new Error(

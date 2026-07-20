@@ -6,17 +6,14 @@ import { existsSync } from "node:fs"
 import { resolve } from "node:path"
 import { createSigilMcpHandler } from "./mcp-handler.js"
 import { handleArtifactRoute } from "./artifact-routes.js"
+import { handleArtifactImageRoute } from "./artifact-image-route.js"
 import { readGonkServerEnvironment } from "@workspace/runtime-env/server"
 import {
   createHealthResponse,
   createLivenessResponse,
   isHealthRequestAuthorized,
 } from "./health.js"
-import {
-  artifactPublicUrl,
-  getArtifactStore,
-  getSessionArtifactStore,
-} from "./artifact-store.js"
+import { artifactPublicUrl, getSessionArtifactStore } from "./artifact-store.js"
 import {
   formatScopeHeader,
   normalizeScopeHeaders,
@@ -58,7 +55,10 @@ if (!apiKey) {
 // otherwise); capture it so nested request handlers keep that non-undefined type.
 const serviceBearerKey: string = apiKey
 const handler = createSigilMcpHandler({ apiKey, port })
-const mcpSessionScopes = new Map<string, { bearer: string; scope: ResourceScope }>()
+const mcpSessionScopes = new Map<
+  string,
+  { bearer: string; scope: ResourceScope }
+>()
 
 const server = createServer((request, response) => {
   void handleRequest(request, response)
@@ -112,19 +112,12 @@ async function handleRequest(
       return
     }
     if (pathname.startsWith("/img/")) {
-      if (
-        !isHealthRequestAuthorized(
-          incoming.headers.authorization,
-          serviceBearerKey,
-        )
-      ) {
-        outgoing.writeHead(401, {
-          "content-type": "text/plain; charset=utf-8",
-        })
-        outgoing.end("Unauthorized")
-        return
-      }
-      await serveImage(pathname.slice("/img/".length), outgoing)
+      await serveImage(
+        pathname.slice("/img/".length),
+        incoming.headers.authorization,
+        incoming.headers[SIGIL_SCOPE_HEADER] as string | undefined,
+        outgoing,
+      )
       return
     }
     // Uploads use the same service bearer as reads and MCP.
@@ -151,7 +144,8 @@ async function handleRequest(
       request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
     )
     const remembered = sessionId ? mcpSessionScopes.get(sessionId) : undefined
-    const scope = requestedScope ??
+    const scope =
+      requestedScope ??
       (remembered?.bearer === bearer ? remembered.scope : undefined)
     if (scope && !request.headers.has(SIGIL_SCOPE_HEADER)) {
       const headers = new Headers(request.headers)
@@ -170,9 +164,12 @@ async function handleRequest(
   } catch (error) {
     console.error(error)
     if (!outgoing.headersSent) {
-      outgoing.writeHead(error instanceof RequestBodyTooLargeError ? 413 : 500, {
-        "content-type": "text/plain; charset=utf-8",
-      })
+      outgoing.writeHead(
+        error instanceof RequestBodyTooLargeError ? 413 : 500,
+        {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      )
     }
     outgoing.end(
       error instanceof RequestBodyTooLargeError
@@ -184,37 +181,33 @@ async function handleRequest(
 
 async function serveImage(
   rawKey: string,
+  authorization: string | undefined,
+  scopeHeader: string | undefined,
   outgoing: ServerResponse,
 ): Promise<void> {
-  const store = getArtifactStore()
   const key = decodeURIComponent(rawKey)
-  let info
-  let stream
-  try {
-    // head() first: gives mediaType/size and validates the key (assertObjectKey
-    // throws on traversal attempts like `..`, which we treat as not-found).
-    info = await store.head(key)
-    stream = info ? await store.get(key) : undefined
-  } catch {
-    info = undefined
-    stream = undefined
-  }
-  if (!info || !stream) {
-    outgoing.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
-    outgoing.end("Not found")
+  const result = await handleArtifactImageRoute({
+    apiKey: serviceBearerKey,
+    authorization,
+    id: key,
+    scopeHeader,
+    store: getSessionArtifactStore(),
+  })
+  if (result.status !== 200) {
+    outgoing.writeHead(result.status, {
+      "content-type": "text/plain; charset=utf-8",
+    })
+    outgoing.end(result.status === 401 ? "Unauthorized" : "Not found")
     return
   }
   outgoing.writeHead(200, {
-    "content-type": info.mediaType ?? "application/octet-stream",
-    "content-length": String(info.sizeBytes),
+    "content-type": result.mediaType,
+    "content-length": String(result.bytes.byteLength),
     // Content-addressed key → the bytes never change → cache forever.
     "cache-control": "public, max-age=31536000, immutable",
     // No CORS header: only the authenticated web server proxies these bytes.
   })
-  for await (const chunk of stream) {
-    outgoing.write(Buffer.from(chunk))
-  }
-  outgoing.end()
+  outgoing.end(Buffer.from(result.bytes))
 }
 
 async function toWebRequest(incoming: IncomingMessage): Promise<Request> {
@@ -298,10 +291,9 @@ async function handleUpload(
   try {
     bytes = Buffer.concat(await readIncomingBody(incoming, maxUploadBodyBytes))
   } catch (error) {
-    outgoing.writeHead(
-      error instanceof RequestBodyTooLargeError ? 413 : 400,
-      { "content-type": "text/plain; charset=utf-8" },
-    )
+    outgoing.writeHead(error instanceof RequestBodyTooLargeError ? 413 : 400, {
+      "content-type": "text/plain; charset=utf-8",
+    })
     outgoing.end(
       error instanceof RequestBodyTooLargeError
         ? "Upload body too large"
@@ -337,7 +329,9 @@ async function handleUpload(
     size: artifact.size,
     filename: artifact.filename,
   })
-  outgoing.writeHead(200, { "content-type": "application/json; charset=utf-8" })
+  outgoing.writeHead(200, {
+    "content-type": "application/json; charset=utf-8",
+  })
   outgoing.end(body)
 }
 
@@ -354,7 +348,9 @@ async function handleArtifacts(
       method: incoming.method ?? "GET",
       authorization: incoming.headers.authorization,
       scopeHeader: readHeader(incoming.headers[SIGIL_SCOPE_HEADER]),
-      legacyScopeHeader: readHeader(incoming.headers[SIGIL_SESSION_SCOPE_HEADER]),
+      legacyScopeHeader: readHeader(
+        incoming.headers[SIGIL_SESSION_SCOPE_HEADER],
+      ),
       id,
     },
     { apiKey: serviceBearerKey, store: getSessionArtifactStore() },

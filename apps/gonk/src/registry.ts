@@ -55,7 +55,14 @@ export function createSigilRegistry(
   registerStoryTools(registry, workItems);
   registerSkillTools(registry, skills);
   registerUiCommandTools(registry);
-  registerImageTools(registry, artifacts);
+  registerImageTools(
+    registry,
+    artifacts,
+    undefined,
+    process.env.SIGIL_LOCAL_CODEX_IMAGE_GENERATION === "disabled"
+      ? null
+      : undefined,
+  );
   registerFileTools(registry, artifacts);
   registerEvidenceTools(registry, artifacts);
   registerDistillTools(registry, artifacts);

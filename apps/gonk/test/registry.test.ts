@@ -31,6 +31,7 @@ import { expectedRegistryToolContracts } from "./fixtures/registry-contract.js";
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -65,6 +66,15 @@ async function makeRegistry(
 }
 
 describe("Sigil Chat Gonk registry", () => {
+  it("omits local Codex image generation when production disables it", async () => {
+    vi.stubEnv("SIGIL_LOCAL_CODEX_IMAGE_GENERATION", "disabled");
+    const { registry } = await makeRegistry();
+    const names = registry.list().map((tool) => tool.name);
+
+    expect(names).not.toContain("sigil-generate-image");
+    expect(names).toContain("sigil-edit-image");
+  });
+
   it("bounds the session blackboard at the tool and store boundary", async () => {
     const registry = new ToolRegistry();
     const repository = new MemoryBlackboardRepository();
@@ -429,19 +439,24 @@ describe("Sigil Chat Gonk registry", () => {
     expect(first).toMatchObject({ ok: true });
     expect(second).toMatchObject({ ok: true });
     const firstId = (first as { data: { artifactId: string } }).data.artifactId;
-    const secondId = (second as { data: { artifactId: string } }).data.artifactId;
+    const secondId = (second as { data: { artifactId: string } }).data
+      .artifactId;
     expect(firstId).not.toBe(source.id);
     expect(secondId).not.toBe(source.id);
     expect(secondId).not.toBe(firstId);
 
     const files = await artifacts.listBySession("thread-image-dedupe");
     expect(files).toHaveLength(3);
-    expect(files.find((file) => file.id === firstId)?.provenance).toMatchObject({
-      sourceArtifactId: source.id,
-      instruction: "Preserve every pixel",
-      backend: "test-backend",
-    });
-    expect(files.find((file) => file.id === secondId)?.provenance).toMatchObject({
+    expect(files.find((file) => file.id === firstId)?.provenance).toMatchObject(
+      {
+        sourceArtifactId: source.id,
+        instruction: "Preserve every pixel",
+        backend: "test-backend",
+      },
+    );
+    expect(
+      files.find((file) => file.id === secondId)?.provenance,
+    ).toMatchObject({
       sourceArtifactId: source.id,
       instruction: "Keep it unchanged",
       backend: "test-backend",
@@ -481,7 +496,9 @@ describe("Sigil Chat Gonk registry", () => {
     expect(outcome).toMatchObject({
       ok: false,
       code: "INTERNAL",
-      message: expect.stringContaining("No text-to-image fallback was attempted"),
+      message: expect.stringContaining(
+        "No text-to-image fallback was attempted",
+      ),
     });
     const files = await artifacts.listBySession("thread-inline");
     expect(files).toHaveLength(1);

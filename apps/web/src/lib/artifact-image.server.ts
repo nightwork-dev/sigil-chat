@@ -43,7 +43,12 @@ export async function readArtifactImage(
   if (!apiKey) return new Response(null, { status: 503 })
   const response = await dependencies.fetcher(
     `${new URL(gonkMcpUrl).origin}/img/${key}`,
-    { headers: { authorization: `Bearer ${apiKey}` } },
+    {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "x-sigil-scope": scope,
+      },
+    },
   )
   if (!response.ok || !response.body) {
     return new Response(null, { status: response.status })
@@ -72,7 +77,6 @@ export async function readArtifactImageFromRequest(
     getSession,
     ownsThread: (userId, threadId) =>
       Boolean(agentThreadRepository.get(userId, threadId)),
-    readEnvironment: () =>
-      environment.readGonkClientEnvironment(process.env),
+    readEnvironment: () => environment.readGonkClientEnvironment(process.env),
   })
 }

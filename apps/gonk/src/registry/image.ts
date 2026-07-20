@@ -19,6 +19,8 @@ export interface GenerateImageInput {
   height?: number;
 }
 
+export type ImageGenerationProvider = typeof generateCodexImage;
+
 const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024;
 
@@ -37,7 +39,8 @@ export interface EditImageInput {
 function isGenerateImageInput(value: unknown): value is GenerateImageInput {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (typeof v.prompt !== "string" || v.prompt.trim().length === 0) return false;
+  if (typeof v.prompt !== "string" || v.prompt.trim().length === 0)
+    return false;
   if (v.width !== undefined && typeof v.width !== "number") return false;
   if (v.height !== undefined && typeof v.height !== "number") return false;
   return true;
@@ -47,56 +50,58 @@ export function registerImageTools(
   registry: ToolRegistry,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
   editImage: ImageEditProvider = editImageThroughGateway,
+  generateImage: ImageGenerationProvider | null = generateCodexImage,
 ): void {
-  registry.register({
-    name: "sigil-generate-image",
-    description:
-      "Generate an image from a text prompt using the local Codex login (the same ChatGPT session the agent runs on — no separate API key). Returns the image inline in the chat. Use when the user asks to see an illustration, mockup, diagram sketch, or concept art.",
-    visibility: "always",
-    approval: "write",
-    input: shape<GenerateImageInput>(
-      isGenerateImageInput,
-      "Expected an object with a non-empty string `prompt` (optional numeric `width`/`height`).",
-    ),
-    inputJsonSchema: {
-      type: "object",
-      properties: {
-        prompt: { type: "string", minLength: 1 },
-        width: { type: "integer", minimum: 64, maximum: 2048 },
-        height: { type: "integer", minimum: 64, maximum: 2048 },
+  if (generateImage)
+    registry.register({
+      name: "sigil-generate-image",
+      description:
+        "Generate an image from a text prompt using the local Codex login (the same ChatGPT session the agent runs on — no separate API key). Returns the image inline in the chat. Use when the user asks to see an illustration, mockup, diagram sketch, or concept art.",
+      visibility: "always",
+      approval: "write",
+      input: shape<GenerateImageInput>(
+        isGenerateImageInput,
+        "Expected an object with a non-empty string `prompt` (optional numeric `width`/`height`).",
+      ),
+      inputJsonSchema: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", minLength: 1 },
+          width: { type: "integer", minimum: 64, maximum: 2048 },
+          height: { type: "integer", minimum: 64, maximum: 2048 },
+        },
+        required: ["prompt"],
+        additionalProperties: false,
       },
-      required: ["prompt"],
-      additionalProperties: false,
-    },
-    hints: writeHints,
-    handler: async (input, ctx) => {
-      const width = input.width ?? 1024;
-      const height = input.height ?? 1024;
-      const image = await generateCodexImage({
-        prompt: input.prompt,
-        size: `${width}x${height}`,
-      });
+      hints: writeHints,
+      handler: async (input, ctx) => {
+        const width = input.width ?? 1024;
+        const height = input.height ?? 1024;
+        const image = await generateImage({
+          prompt: input.prompt,
+          size: `${width}x${height}`,
+        });
 
-      const scope = requireResourceScope(undefined, ctx);
-      const stored = await artifacts.putFile(
-        {
-          bytes: image.bytes,
-          filename: "generated-image",
-          mediaType: image.mimeType,
-          scope,
-        },
-        ctx.auth?.principal,
-      );
+        const scope = requireResourceScope(undefined, ctx);
+        const stored = await artifacts.putFile(
+          {
+            bytes: image.bytes,
+            filename: "generated-image",
+            mediaType: image.mimeType,
+            scope,
+          },
+          ctx.auth?.principal,
+        );
 
-      return {
-        data: {
-          url: artifactPublicUrl(stored.id, stored.scope),
-          prompt: image.revisedPrompt ?? input.prompt,
-          mediaType: image.mimeType,
-        },
-      };
-    },
-  });
+        return {
+          data: {
+            url: artifactPublicUrl(stored.id, stored.scope),
+            prompt: image.revisedPrompt ?? input.prompt,
+            mediaType: image.mimeType,
+          },
+        };
+      },
+    });
 
   registry.register({
     name: "sigil-edit-image",

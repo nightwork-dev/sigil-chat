@@ -80,5 +80,8 @@ describe("artifact image authorization", () => {
     expect(new Headers(init?.headers).get("authorization")).toBe(
       "Bearer service-key",
     )
+    expect(new Headers(init?.headers).get("x-sigil-scope")).toBe(
+      "session:thread-1",
+    )
   })
 })
