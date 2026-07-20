@@ -73,7 +73,7 @@ describe("AgentThreadRepository", () => {
       session: { streamIndex: 0 },
       events: [],
       compaction: {
-        policyVersion: "sigil-chat-event-retention-v1",
+        policyVersion: "sigil-chat-event-retention-v2",
         firstRetainedStreamIndex: 0,
         omittedEventCount: 0,
         compactedAt: "2026-07-16T10:00:00.000Z",
@@ -123,7 +123,7 @@ describe("AgentThreadRepository", () => {
     );
   });
 
-  it("persists a bounded redacted event read model with its receipt", () => {
+  it("persists a bounded retained event read model with its receipt", () => {
     const repo = repository();
     const thread = repo.create(USER_A);
     const events = [
@@ -167,7 +167,7 @@ describe("AgentThreadRepository", () => {
       "message.completed",
     ]);
     expect(saved.eve.compaction).toEqual({
-      policyVersion: "sigil-chat-event-retention-v1",
+      policyVersion: "sigil-chat-event-retention-v2",
       firstRetainedStreamIndex: 0,
       omittedEventCount: 1,
       compactedAt: "2026-07-16T10:01:00.000Z",
@@ -284,7 +284,7 @@ describe("AgentThreadRepository", () => {
       session: { streamIndex: 0 },
       events: [],
       compaction: {
-        policyVersion: "sigil-chat-event-retention-v1",
+        policyVersion: "sigil-chat-event-retention-v2",
         firstRetainedStreamIndex: 0,
         omittedEventCount: 0,
         compactedAt: "2026-07-16T10:02:00.000Z",

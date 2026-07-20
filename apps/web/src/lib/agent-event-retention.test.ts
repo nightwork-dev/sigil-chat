@@ -12,7 +12,7 @@ function event(value: unknown): HandleMessageStreamEvent {
 }
 
 describe("agent event retention", () => {
-  it("drops secret-bearing families and redacts retained runtime actions", () => {
+  it("drops secret-bearing families but retains runtime action payloads", () => {
     const events = [
       event({
         type: "message.received",
@@ -141,15 +141,21 @@ describe("agent event retention", () => {
     expect(serialized).toContain("visible user text");
     expect(serialized).toContain("visible assistant text");
     expect(serialized).toContain("review.annotate");
-    expect(serialized).toContain('"redacted":true');
-    for (const secret of [
-      "secret-url",
-      "private chain",
+    // Retention v2: action inputs/outputs and approval prompts persist.
+    for (const retained of [
       "tool-input-secret",
       "approval-input-secret",
       "Always allow",
       "Approve the secret action?",
       "tool-output-secret",
+    ]) {
+      expect(serialized).toContain(retained);
+    }
+    // Still dropped: reasoning, file part URLs, device authorizations,
+    // continuation tokens.
+    for (const secret of [
+      "secret-url",
+      "private chain",
       "https://secret.example",
       "CODE",
       "secret instructions",
@@ -200,7 +206,7 @@ describe("agent event retention", () => {
     expect(byteBound.compaction.omittedEventCount).toBe(5);
   });
 
-  it("replays only the redacted product projection", () => {
+  it("replays retained tool payloads verbatim", () => {
     const retained = sanitizeAndBoundAgentEvents([
       event({
         type: "actions.requested",
@@ -208,7 +214,7 @@ describe("agent event retention", () => {
           actions: [
             {
               callId: "call-1",
-              input: { apiKey: "tool-input-secret" },
+              input: { query: "tool-input-value" },
               kind: "tool-call",
               toolName: "review.annotate",
             },
@@ -224,7 +230,7 @@ describe("agent event retention", () => {
           result: {
             callId: "call-1",
             kind: "tool-result",
-            output: { privateDocument: "tool-output-secret" },
+            output: { document: "tool-output-value" },
             toolName: "review.annotate",
           },
           sequence: 2,
@@ -245,7 +251,7 @@ describe("agent event retention", () => {
         actions: [
           {
             callId: "call-1",
-            input: {},
+            input: { query: "tool-input-value" },
             kind: "tool-call",
             toolName: "review.annotate",
           },
@@ -258,14 +264,86 @@ describe("agent event retention", () => {
         result: {
           callId: "call-1",
           kind: "tool-result",
-          output: null,
+          output: { document: "tool-output-value" },
           toolName: "review.annotate",
         },
       },
     });
-    expect(serialized).not.toContain("tool-input-secret");
-    expect(serialized).not.toContain("tool-output-secret");
     expect(serialized).not.toContain("redacted");
+  });
+
+  it("truncates oversized action payloads instead of evicting the snapshot", () => {
+    const retained = sanitizeAndBoundAgentEvents([
+      event({
+        type: "action.result",
+        data: {
+          result: {
+            callId: "call-1",
+            kind: "tool-result",
+            output: { blob: "x".repeat(80 * 1024) },
+            toolName: "review.annotate",
+          },
+          sequence: 1,
+          status: "completed",
+          stepIndex: 0,
+          turnId: "turn-1",
+        },
+      }),
+    ]);
+
+    expect(retained.events).toHaveLength(1);
+    const first = retained.events[0];
+    expect(first?.type).toBe("action.result");
+    if (first?.type !== "action.result") throw new Error("unreachable");
+    expect(first.data.result.output).toMatchObject({
+      sigilRetentionTruncated: true,
+    });
+    expect(JSON.stringify(retained).length).toBeLessThan(10_000);
+  });
+
+  it("replays v1 redacted records without the redaction marker", () => {
+    const v1Events = [
+      {
+        type: "actions.requested",
+        data: {
+          actions: [
+            {
+              callId: "call-1",
+              input: {},
+              kind: "tool-call",
+              redacted: true,
+              toolName: "review.annotate",
+            },
+          ],
+          redacted: true,
+          sequence: 1,
+          stepIndex: 0,
+          turnId: "turn-1",
+        },
+      },
+      {
+        type: "action.result",
+        data: {
+          redacted: true,
+          result: {
+            callId: "call-1",
+            kind: "tool-result",
+            output: null,
+            redacted: true,
+            toolName: "review.annotate",
+          },
+          sequence: 2,
+          status: "completed",
+          stepIndex: 0,
+          turnId: "turn-1",
+        },
+      },
+    ] as Parameters<typeof agentEventsForReplay>[0];
+
+    const replay = agentEventsForReplay(v1Events);
+
+    expect(replay).toHaveLength(2);
+    expect(JSON.stringify(replay)).not.toContain("redacted");
   });
 });
 

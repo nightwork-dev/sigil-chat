@@ -2,6 +2,16 @@
 
 > Date: 2026-07-16
 > Status: decision accepted; product projection implemented; deployment gates open
+> **Revised 2026-07-20 (owner decision): retention v2 — action payload
+> redaction reversed.** Tool/action inputs and outputs, approval prompts and
+> options, and subagent outputs now persist verbatim (JSON, bounded at 64 KiB
+> per payload with an explicit truncation marker). Rationale: blanket redaction
+> made every rich tool rendering collapse to an empty badge after reload, which
+> read as data loss. The secret-bearing families below (reasoning,
+> authorization challenges, continuation tokens, file part URLs) remain
+> dropped. Narrowed per-tool-family redaction is a roadmap item (RET.1) to
+> revisit with the ownership work. The "Redaction" section below documents v1
+> and is retained for provenance; `agent-event-retention.ts` is authoritative.
 > Owner: Sigil Chat product persistence boundary
 > Related: `AGENT-MULTI-SESSION-SPEC.md`, execution task T6
 

@@ -5,9 +5,10 @@ type AssistantFinishReason = Extract<
   { type: "message.completed" }
 >["data"]["finishReason"]
 
-export const AGENT_EVENT_RETENTION_POLICY = "sigil-chat-event-retention-v1"
+export const AGENT_EVENT_RETENTION_POLICY = "sigil-chat-event-retention-v2"
 export const AGENT_EVENT_MAX_COUNT = 1_000
 export const AGENT_EVENT_MAX_BYTES = 2 * 1024 * 1024
+export const AGENT_ACTION_PAYLOAD_MAX_BYTES = 64 * 1024
 
 export interface AgentEventCompactionReceipt {
   policyVersion: typeof AGENT_EVENT_RETENTION_POLICY
@@ -20,36 +21,64 @@ interface PersistedEventMeta {
   meta?: { at: string }
 }
 
+type LiveActionRequest = Extract<
+  HandleMessageStreamEvent,
+  { type: "actions.requested" }
+>["data"]["actions"][number]
+
+type LiveActionResult = Extract<
+  HandleMessageStreamEvent,
+  { type: "action.result" }
+>["data"]["result"]
+
+type LiveInputRequest = Extract<
+  HandleMessageStreamEvent,
+  { type: "input.requested" }
+>["data"]["requests"][number]
+
+// Retention v2 (owner decision, 2026-07-20): action inputs/outputs are
+// persisted verbatim as JSON, bounded per payload. `redacted?: true` survives
+// only so v1 records still replay; new writes never set it on action events.
+export type RetainedJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | RetainedJsonValue[]
+  | { [key: string]: RetainedJsonValue }
+
 export type PersistedAgentAction =
   | {
       callId: string
-      input: Record<string, never>
+      input: RetainedJsonValue
       kind: "load-skill"
-      redacted: true
+      redacted?: true
     }
   | {
       callId: string
-      input: Record<string, never>
+      input: RetainedJsonValue
       kind: "tool-call"
-      redacted: true
+      redacted?: true
       toolName: string
     }
   | {
       callId: string
-      input: Record<string, never>
+      description?: string
+      input: RetainedJsonValue
       kind: "subagent-call"
       name: string
       nodeId: string
-      redacted: true
+      redacted?: true
       subagentName: string
     }
   | {
       callId: string
-      input: Record<string, never>
+      description?: string
+      input: RetainedJsonValue
       kind: "remote-agent-call"
       name: string
       nodeId: string
-      redacted: true
+      redacted?: true
       remoteAgentName: string
     }
 
@@ -58,23 +87,36 @@ export type PersistedAgentActionResult =
       callId: string
       kind: "load-skill-result"
       name?: string
-      output: null
-      redacted: true
+      output: RetainedJsonValue
+      redacted?: true
     }
   | {
       callId: string
       kind: "tool-result"
-      output: null
-      redacted: true
+      output: RetainedJsonValue
+      redacted?: true
       toolName: string
     }
   | {
       callId: string
       kind: "subagent-result"
-      output: null
-      redacted: true
+      output: RetainedJsonValue
+      redacted?: true
       subagentName: string
     }
+
+export interface PersistedInputRequest {
+  action: {
+    callId: string
+    input: RetainedJsonValue
+    kind: "tool-call"
+    toolName: string
+  }
+  display?: "confirmation" | "select" | "text"
+  options?: Array<{ id: string; label: string }>
+  prompt: string
+  requestId: string
+}
 
 export type PersistedAgentEvent = PersistedEventMeta &
   (
@@ -112,7 +154,7 @@ export type PersistedAgentEvent = PersistedEventMeta &
         type: "actions.requested"
         data: {
           actions: PersistedAgentAction[]
-          redacted: true
+          redacted?: true
           sequence: number
           stepIndex: number
           turnId: string
@@ -121,18 +163,8 @@ export type PersistedAgentEvent = PersistedEventMeta &
     | {
         type: "input.requested"
         data: {
-          redacted: true
-          requests: Array<{
-            action: {
-              callId: string
-              input: Record<string, never>
-              kind: "tool-call"
-              toolName: string
-            }
-            display?: "confirmation" | "select" | "text"
-            prompt: "Input details redacted"
-            requestId: string
-          }>
+          redacted?: true
+          requests: Array<PersistedInputRequest>
           sequence: number
           stepIndex: number
           turnId: string
@@ -141,8 +173,8 @@ export type PersistedAgentEvent = PersistedEventMeta &
     | {
         type: "action.result"
         data: {
-          error?: { code: string; message: "Action failed" }
-          redacted: true
+          error?: { code: string; message: string }
+          redacted?: true
           result: PersistedAgentActionResult
           sequence: number
           status: "completed" | "failed" | "rejected"
@@ -183,7 +215,7 @@ export type PersistedAgentEvent = PersistedEventMeta &
         data: {
           callId: string
           event: PersistedAgentEvent
-          redacted: true
+          redacted?: true
           subagentName: string
         }
       }
@@ -191,8 +223,8 @@ export type PersistedAgentEvent = PersistedEventMeta &
         type: "subagent.completed"
         data: {
           callId: string
-          output: "Output redacted"
-          redacted: true
+          output: RetainedJsonValue
+          redacted?: true
           subagentName: string
         }
       }
@@ -213,8 +245,8 @@ export type PersistedAgentEvent = PersistedEventMeta &
         type: "step.failed"
         data: {
           code: string
-          message: "Model step failed"
-          redacted: true
+          message: string
+          redacted?: true
           sequence: number
           stepIndex: number
           turnId: string
@@ -224,8 +256,8 @@ export type PersistedAgentEvent = PersistedEventMeta &
         type: "turn.failed"
         data: {
           code: string
-          message: "Agent turn failed"
-          redacted: true
+          message: string
+          redacted?: true
           sequence: number
           turnId: string
         }
@@ -234,8 +266,8 @@ export type PersistedAgentEvent = PersistedEventMeta &
         type: "session.failed"
         data: {
           code: string
-          message: "Agent session failed"
-          redacted: true
+          message: string
+          redacted?: true
           sessionId: string
         }
       }
@@ -349,46 +381,24 @@ function sanitizeAgentEvent(
       return retainedEvent({
         type: event.type,
         data: {
-          actions: event.data.actions.map(redactActionRequest),
-          redacted: true,
+          actions: event.data.actions.map(retainActionRequest),
           sequence: event.data.sequence,
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
         ...meta,
       })
-    case "input.requested": {
-      const retained: Extract<
-        PersistedAgentEvent,
-        { type: "input.requested" }
-      > = {
-        type: "input.requested",
+    case "input.requested":
+      return retainedEvent({
+        type: event.type,
         data: {
-          redacted: true,
-          requests: event.data.requests.map((request) => ({
-            action: {
-              callId: request.action.callId,
-              input: {},
-              kind: "tool-call" as const,
-              toolName:
-                "toolName" in request.action
-                  ? request.action.toolName
-                  : "unknown-tool",
-            },
-            ...(normalizeInputDisplay(request.display)
-              ? { display: normalizeInputDisplay(request.display) }
-              : {}),
-            prompt: "Input details redacted",
-            requestId: request.requestId,
-          })),
+          requests: event.data.requests.map(retainInputRequest),
           sequence: event.data.sequence,
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
         ...meta,
-      }
-      return retainedEvent(retained)
-    }
+      })
     case "action.result":
       return retainedEvent({
         type: event.type,
@@ -397,12 +407,11 @@ function sanitizeAgentEvent(
             ? {
                 error: {
                   code: event.data.error.code,
-                  message: "Action failed",
+                  message: event.data.error.message,
                 },
               }
             : {}),
-          redacted: true,
-          result: redactActionResult(event.data.result),
+          result: retainActionResult(event.data.result),
           sequence: event.data.sequence,
           status: event.data.status,
           stepIndex: event.data.stepIndex,
@@ -446,7 +455,6 @@ function sanitizeAgentEvent(
         data: {
           callId: event.data.callId,
           event: child,
-          redacted: true,
           subagentName: event.data.subagentName,
         },
         ...meta,
@@ -457,8 +465,7 @@ function sanitizeAgentEvent(
         type: event.type,
         data: {
           callId: event.data.callId,
-          output: "Output redacted",
-          redacted: true,
+          output: boundPayload(event.data.output),
           subagentName: event.data.subagentName,
         },
         ...meta,
@@ -479,8 +486,7 @@ function sanitizeAgentEvent(
         type: event.type,
         data: {
           code: event.data.code,
-          message: "Model step failed",
-          redacted: true,
+          message: event.data.message,
           sequence: event.data.sequence,
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
@@ -492,8 +498,7 @@ function sanitizeAgentEvent(
         type: event.type,
         data: {
           code: event.data.code,
-          message: "Agent turn failed",
-          redacted: true,
+          message: event.data.message,
           sequence: event.data.sequence,
           turnId: event.data.turnId,
         },
@@ -504,8 +509,7 @@ function sanitizeAgentEvent(
         type: event.type,
         data: {
           code: event.data.code,
-          message: "Agent session failed",
-          redacted: true,
+          message: event.data.message,
           sessionId: event.data.sessionId,
         },
         ...meta,
@@ -616,12 +620,7 @@ function replayAgentEvent(
         type: event.type,
         data: {
           requests: event.data.requests.map(
-            ({ action, display, prompt, requestId }) => ({
-              action,
-              ...(display ? { display } : {}),
-              prompt,
-              requestId,
-            }),
+            (request) => structuredClone(request) as unknown as LiveInputRequest,
           ),
           sequence: event.data.sequence,
           stepIndex: event.data.stepIndex,
@@ -676,7 +675,7 @@ function replayAgentEvent(
         type: event.type,
         data: {
           callId: event.data.callId,
-          output: event.data.output,
+          output: event.data.output as never,
           subagentName: event.data.subagentName,
         },
         ...meta,
@@ -706,107 +705,127 @@ function replayAgentEvent(
   }
 }
 
-type ActionRequest = Extract<
-  HandleMessageStreamEvent,
-  { type: "actions.requested" }
->["data"]["actions"][number]
-
-function redactActionRequest(action: ActionRequest): PersistedAgentAction {
+function retainActionRequest(action: LiveActionRequest): PersistedAgentAction {
+  const input = boundPayload(action.input)
   switch (action.kind) {
     case "load-skill":
-      return {
-        callId: action.callId,
-        input: {},
-        kind: action.kind,
-        redacted: true,
-      }
+      return { callId: action.callId, input, kind: action.kind }
     case "tool-call":
       return {
         callId: action.callId,
-        input: {},
+        input,
         kind: action.kind,
-        redacted: true,
         toolName: action.toolName,
       }
     case "subagent-call":
       return {
         callId: action.callId,
-        input: {},
+        description: action.description,
+        input,
         kind: action.kind,
         name: action.name,
         nodeId: action.nodeId,
-        redacted: true,
         subagentName: action.subagentName,
       }
     case "remote-agent-call":
       return {
         callId: action.callId,
-        input: {},
+        description: action.description,
+        input,
         kind: action.kind,
         name: action.name,
         nodeId: action.nodeId,
-        redacted: true,
         remoteAgentName: action.remoteAgentName,
       }
   }
 }
 
-function replayActionRequest(action: PersistedAgentAction): ActionRequest {
-  const { redacted: _redacted, ...request } = action
-  if (
-    request.kind === "subagent-call" ||
-    request.kind === "remote-agent-call"
-  ) {
-    return { ...request, description: "Details redacted" }
+function retainInputRequest(request: LiveInputRequest): PersistedInputRequest {
+  const persisted = jsonClone(request) as unknown as PersistedInputRequest
+  return {
+    ...persisted,
+    action: {
+      callId: request.action.callId,
+      input: boundPayload(request.action.input),
+      kind: "tool-call",
+      toolName:
+        "toolName" in request.action ? request.action.toolName : "unknown-tool",
+    },
   }
-  return request
 }
 
-type ActionResult = Extract<
-  HandleMessageStreamEvent,
-  { type: "action.result" }
->["data"]["result"]
+function replayActionRequest(action: PersistedAgentAction): LiveActionRequest {
+  const { redacted: _redacted, ...request } = action
+  if (
+    (request.kind === "subagent-call" ||
+      request.kind === "remote-agent-call") &&
+    !request.description
+  ) {
+    // v1 records redacted the description; keep their replay shape valid.
+    return {
+      ...request,
+      description: "Details redacted",
+    } as LiveActionRequest
+  }
+  return request as LiveActionRequest
+}
 
-function redactActionResult(result: ActionResult): PersistedAgentActionResult {
+function retainActionResult(
+  result: LiveActionResult,
+): PersistedAgentActionResult {
+  const output = boundPayload(result.output)
   switch (result.kind) {
     case "load-skill-result":
       return {
         callId: result.callId,
         kind: result.kind,
         ...(result.name ? { name: result.name } : {}),
-        output: null,
-        redacted: true,
+        output,
       }
     case "tool-result":
       return {
         callId: result.callId,
         kind: result.kind,
-        output: null,
-        redacted: true,
+        output,
         toolName: result.toolName,
       }
     case "subagent-result":
       return {
         callId: result.callId,
         kind: result.kind,
-        output: null,
-        redacted: true,
+        output,
         subagentName: result.subagentName,
       }
   }
 }
 
-function replayActionResult(result: PersistedAgentActionResult): ActionResult {
+function replayActionResult(
+  result: PersistedAgentActionResult,
+): LiveActionResult {
   const { redacted: _redacted, ...value } = result
-  return value
+  return value as LiveActionResult
 }
 
-function normalizeInputDisplay(
-  value: unknown,
-): "confirmation" | "select" | "text" | undefined {
-  return value === "confirmation" || value === "select" || value === "text"
-    ? value
-    : undefined
+// One oversized tool payload must not evict the rest of the transcript from
+// the snapshot budget, so payloads above the cap persist as an explicit
+// truncation marker instead of the raw value.
+function boundPayload(value: unknown): RetainedJsonValue {
+  if (value === undefined || value === null) return null
+  const bytes = serializedBytes(value)
+  if (bytes > AGENT_ACTION_PAYLOAD_MAX_BYTES) {
+    return {
+      approximateBytes: bytes,
+      sigilRetentionTruncated: true,
+    }
+  }
+  return jsonClone(value)
+}
+
+function jsonClone(value: unknown): RetainedJsonValue {
+  const serialized = JSON.stringify(value)
+  return serialized === undefined
+    ? null
+    : (JSON.parse(serialized) as RetainedJsonValue)
 }
 
 function retainedEvent(value: PersistedAgentEvent): PersistedAgentEvent {
