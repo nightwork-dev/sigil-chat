@@ -10,6 +10,7 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmr[c] ./
 COPY patches ./patches
+COPY vendor ./vendor
 COPY apps/agent/package.json apps/agent/package.json
 COPY apps/gonk/package.json apps/gonk/package.json
 COPY apps/web/package.json apps/web/package.json
