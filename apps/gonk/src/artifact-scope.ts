@@ -5,7 +5,12 @@ export const SIGIL_SCOPE_AUTH_INFO_KEY = "sigilResourceScope"
 /** Legacy auth-info key retained for host adapters during the transition. */
 export const SIGIL_SESSION_SCOPE_AUTH_INFO_KEY = "sigilSessionScope"
 
-export const RESOURCE_SCOPE_TIERS = ["session", "project", "persona"] as const
+export const RESOURCE_SCOPE_TIERS = [
+  "session",
+  "workspace",
+  "project",
+  "persona",
+] as const
 export type ResourceScopeTier = (typeof RESOURCE_SCOPE_TIERS)[number]
 
 export interface ResourceScope {

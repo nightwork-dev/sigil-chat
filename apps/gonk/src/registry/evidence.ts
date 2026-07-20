@@ -125,7 +125,7 @@ export function registerEvidenceTools(
   registry.register({
     name: "sigil-evidence-ask",
     description:
-      "Find BM25-ranked passages in the current session, project, or persona artifacts for a question. Returns structured citations with exact quotes and text offsets; when no passage matches, returns no-evidence and explicitly forbids invented citations.",
+      "Find BM25-ranked passages in the current session, workspace, project, or persona artifacts for a question. Returns structured citations with exact quotes and text offsets; when no passage matches, returns no-evidence and explicitly forbids invented citations.",
     visibility: "always",
     approval: "read",
     input: shape<EvidenceAskInput>(

@@ -1,7 +1,10 @@
 import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
+import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
+import { ProjectRegistry } from "./project-registry"
 import { requireAuthorizedResourceScope } from "./scope-authorization"
+import { WorkspaceRegistry } from "./workspace-registry"
 
 const SECRET = "test-only-scope-authorization-secret"
 
@@ -11,6 +14,18 @@ function request(scope: string, subject: string, secret = SECRET) {
   return new Request("http://agent.test", {
     headers: { "x-sigil-scope": scope, "x-sigil-scope-proof": proof },
   })
+}
+
+function registries(): {
+  projects: ProjectRegistry
+  workspaces: WorkspaceRegistry
+} {
+  const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+  const workspaces = new WorkspaceRegistry({
+    projects,
+    store: memoryKv(new Map()),
+  })
+  return { projects, workspaces }
 }
 
 describe("Eve resource-scope authorization", () => {
@@ -44,4 +59,93 @@ describe("Eve resource-scope authorization", () => {
       }),
     ).toThrow("NOT_AUTHORIZED")
   })
+
+  it("allows a registered project member and rejects a non-member", () => {
+    const stores = registries()
+    stores.projects.upsert({
+      id: "project-1",
+      name: "Project One",
+      description: "A registered project.",
+      members: [{ principalId: "user-member", role: "member" }],
+      settings: {},
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-member",
+    })
+
+    expect(
+      requireAuthorizedResourceScope({
+        principalId: "user-member",
+        request: request("project:project-1", "user-member"),
+        secret: SECRET,
+        registries: stores,
+      }),
+    ).toBe("project:project-1")
+    expect(() =>
+      requireAuthorizedResourceScope({
+        principalId: "user-outsider",
+        request: request("project:project-1", "user-outsider"),
+        secret: SECRET,
+        registries: stores,
+      }),
+    ).toThrow("NOT_AUTHORIZED")
+  })
+
+  it("uses a workspace's parent-project membership", () => {
+    const stores = registries()
+    stores.projects.upsert({
+      id: "project-1",
+      name: "Project One",
+      description: "A registered project.",
+      members: [{ principalId: "user-member", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-member",
+    })
+    stores.workspaces.upsert({
+      id: "workspace-1",
+      projectId: "project-1",
+      name: "Workspace One",
+      description: "A registered workspace.",
+      status: "active",
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-member",
+    })
+
+    expect(
+      requireAuthorizedResourceScope({
+        principalId: "user-member",
+        request: request("workspace:workspace-1", "user-member"),
+        secret: SECRET,
+        registries: stores,
+      }),
+    ).toBe("workspace:workspace-1")
+  })
+
+  it("keeps an unregistered scope possession-gated", () => {
+    expect(
+      requireAuthorizedResourceScope({
+        principalId: "user-1",
+        request: request("project:legacy-project", "user-1"),
+        secret: SECRET,
+        registries: registries(),
+      }),
+    ).toBe("project:legacy-project")
+  })
 })
+
+function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
+  return {
+    delete: (key) => void values.delete(key),
+    entries: (prefix = "") =>
+      [...values.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => ({ key, value })),
+    get: (key) => values.get(key),
+    list: (prefix = "") =>
+      [...values.keys()].filter((key) => key.startsWith(prefix)),
+    patch: () => {
+      throw new Error("not implemented")
+    },
+    set: (key, value) => void values.set(key, value),
+  }
+}

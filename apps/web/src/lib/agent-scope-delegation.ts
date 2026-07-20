@@ -22,6 +22,8 @@ const issueAgentScopeProof = createServerFn({ method: "POST" })
       candidate: SigilAuthSession | null,
     ) => asserts candidate is SigilAuthSession = requireSession
     assertSession(session)
+    const { assertAuthorizedScope } =
+      await import("./agent-scope-authorization.server")
     assertAuthorizedScope(scope, session.user.id, (userId, threadId) =>
       Boolean(agentThreadRepository.get(userId, threadId)),
     )
@@ -55,21 +57,4 @@ export async function getAgentScopeProof(
   }
   proofCache.set(cacheKey, receipt)
   return receipt.proof
-}
-
-export function assertAuthorizedScope(
-  scope: string,
-  userId: string,
-  ownsThread: (userId: string, threadId: string) => boolean,
-): void {
-  const match = /^(session|project|persona):([^\s:][^\s]*)$/.exec(scope)
-  if (!match) throw new Error("Agent resource scope is invalid.")
-  if (match[1] === "session") {
-    if (!ownsThread(userId, match[2]!)) {
-      throw new Error("Agent session was not found.")
-    }
-    return
-  }
-  if (match[1] === "project" && match[2] === "evidence-room") return
-  throw new Error("Agent resource scope is not available to this application.")
 }

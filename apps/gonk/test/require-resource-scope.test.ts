@@ -30,6 +30,13 @@ describe("requireResourceScope", () => {
     expect(scope).toEqual({ tier: "session", id: "thread-123" });
   });
 
+  it("accepts workspace resource scopes", () => {
+    expect(requireResourceScope(undefined, hostCtx("workspace:feature-1"))).toEqual({
+      tier: "workspace",
+      id: "feature-1",
+    });
+  });
+
   it("throws when neither host nor request supplies a scope", () => {
     expect(() => requireResourceScope(undefined, hostCtx())).toThrow();
   });

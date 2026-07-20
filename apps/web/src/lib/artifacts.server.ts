@@ -1,7 +1,7 @@
 import { readGonkClientEnvironment } from "@workspace/runtime-env/server"
 
 import { AGENT_SCOPE_HEADER } from "./agent-session-scope"
-import { assertAuthorizedScope } from "./agent-scope-delegation"
+import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import type { SigilAuthSession } from "./auth/server"
 import type { ArtifactPreview, ArtifactRecord } from "./artifacts"
 
