@@ -27,13 +27,21 @@ test("runbook proves model readiness only after device login", () => {
   assert.ok(edge > readiness)
 })
 
-test("update command leaves the public edge stopped", () => {
+test("update command stops the public edge before replacing services", () => {
   const updateScript = readFileSync(
     resolve(directory, "update-images.sh"),
     "utf8",
   )
+  assert.ok(
+    updateScript.indexOf("stop edge") <
+      updateScript.indexOf("up -d migrate web gonk eve"),
+  )
   assert.match(updateScript, /up -d migrate web gonk eve/)
-  assert.doesNotMatch(updateScript, /up -d --remove-orphans/)
+  const dockerInvocations = updateScript
+    .split("\n")
+    .filter((line) => line.startsWith("docker compose"))
+    .join("\n")
+  assert.doesNotMatch(dockerInvocations, /up(?: -d)? edge/)
 })
 
 test("production services share writable blackboard storage", () => {

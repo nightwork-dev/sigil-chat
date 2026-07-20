@@ -18,6 +18,7 @@ const digest = "b".repeat(64);
 test("updates all image digests and preserves a rollback manifest", () => {
   const directory = mkdtempSync(join(tmpdir(), "sigil-update-images-"));
   const binDirectory = join(directory, "bin");
+  const dockerLog = join(directory, "docker.log");
   mkdirSync(binDirectory);
 
   for (const name of [
@@ -28,9 +29,11 @@ test("updates all image digests and preserves a rollback manifest", () => {
     copyFileSync(join(sourceDir, name), join(directory, name));
   }
   chmodSync(join(directory, "update-images.sh"), 0o755);
-  writeFileSync(join(binDirectory, "docker"), "#!/bin/sh\nexit 0\n", {
-    mode: 0o755,
-  });
+  writeFileSync(
+    join(binDirectory, "docker"),
+    '#!/bin/sh\nprintf "%s\\n" "$*" >> "$SIGIL_DOCKER_LOG"\n',
+    { mode: 0o755 },
+  );
 
   const targets = ["EVE", "GONK", "MIGRATE", "WEB"];
   const oldLines = targets.map(
@@ -55,6 +58,7 @@ test("updates all image digests and preserves a rollback manifest", () => {
       ...process.env,
       DEPLOY_ENV: deployEnv,
       PATH: `${binDirectory}:${process.env.PATH}`,
+      SIGIL_DOCKER_LOG: dockerLog,
     },
   });
 
@@ -66,5 +70,21 @@ test("updates all image digests and preserves a rollback manifest", () => {
       .split("\n")
       .sort(),
     oldLines.sort(),
+  );
+
+  const invocations = readFileSync(dockerLog, "utf8").trim().split("\n");
+  const stopEdge = invocations.findIndex((line) => line.endsWith("stop edge"));
+  const replacePrivateServices = invocations.findIndex((line) =>
+    line.endsWith("up -d migrate web gonk eve"),
+  );
+  assert.ok(stopEdge >= 0, "update must stop the public edge");
+  assert.ok(
+    replacePrivateServices > stopEdge,
+    "edge must stop before private services are replaced",
+  );
+  assert.equal(
+    invocations.some((line) => /up(?: -d)? edge$/.test(line)),
+    false,
+    "update must leave edge stopped for the readiness gate",
   );
 });

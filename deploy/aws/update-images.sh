@@ -26,6 +26,7 @@ done
 rm -f "$deploy_env.bak"
 
 docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" pull
+docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" stop edge
 docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" up -d migrate web gonk eve
 docker compose --env-file "$deploy_env" -f "$script_dir/compose.yaml" ps
 
