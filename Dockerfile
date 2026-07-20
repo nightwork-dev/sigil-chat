@@ -29,6 +29,7 @@ ENV GONK_MCP_URL=http://gonk:8808/mcp
 RUN pnpm --filter web build
 
 FROM source AS eve-build
+ENV GONK_MCP_URL=http://gonk:8808/mcp
 RUN pnpm --filter sigil-chat-agent build
 
 FROM source AS migrate
