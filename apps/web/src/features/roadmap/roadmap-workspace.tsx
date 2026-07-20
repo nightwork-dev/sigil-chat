@@ -99,18 +99,21 @@ function storyTarget(story: StoryData): AttentionSelection {
 
 export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
   const [addressedOnly, setAddressedOnly] = useState(false)
-  const stories = useStories(undefined, {
+  const allStoriesQuery = useStories()
+  const addressedStoriesQuery = useStories(undefined, {
     viewerId: viewer.id,
     enabled: addressedOnly,
   })
+  const stories = addressedOnly ? addressedStoriesQuery : allStoriesQuery
   const reviews = useReviews()
   const isMobile = useIsMobile()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [pane, setPane] = useState<AsidePane>("queue")
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  const allStories = stories.data ?? []
-  const grouped = groupByStatus(allStories)
+  const boardStories = stories.data ?? []
+  const allStories = allStoriesQuery.data ?? []
+  const grouped = groupByStatus(boardStories)
   const ownerReviews = orderReviews(
     (reviews.data ?? []).filter((review) => review.assignee === "Owner"),
   )
@@ -191,7 +194,7 @@ export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
           <p className="p-4 text-sm text-muted-foreground">Loading the roadmap…</p>
         ) : stories.error ? (
           <p className="p-4 text-sm text-destructive">Could not load the roadmap.</p>
-        ) : allStories.length === 0 ? (
+        ) : boardStories.length === 0 ? (
           <Empty className="m-4 border">
             <EmptyHeader>
               <EmptyTitle>

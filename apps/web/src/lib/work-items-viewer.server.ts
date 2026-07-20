@@ -5,7 +5,6 @@ export interface AuthenticatedWorkItemsViewer {
   id: string;
   role: "owner" | "member";
   username: string | null;
-  user: SigilAuthSession["user"];
 }
 
 /** The only viewer identity accepted by roadmap filtering and comment writes. */
@@ -17,6 +16,5 @@ export function authenticatedWorkItemsViewer(
     id: session.user.id,
     role: session.user.role,
     username: session.user.username ?? null,
-    user: session.user,
   };
 }

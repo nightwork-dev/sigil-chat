@@ -12,14 +12,17 @@ import {
   type Store,
 } from "@gonk/store";
 
-import type { SigilAuthSession } from "@/lib/auth/server";
-
 const SENDER_HOST = "sigil-chat";
 const PRESENCE_SESSION_ID = "sigil-chat-roadmap";
 
 export interface StoryCommentReference {
   storyId: string;
   commentId: string;
+}
+
+export interface AuthenticatedMentionViewer {
+  role: "owner" | "member";
+  username: string | null;
 }
 
 export type MentionDepositResult =
@@ -39,7 +42,7 @@ export function createStoryCommentMentionEnvelope(input: {
   reference: StoryCommentReference;
   selector: string;
   recipientHost: string;
-  viewer: SigilAuthSession["user"];
+  viewer: AuthenticatedMentionViewer;
 }): CommsEnvelope {
   return buildEnvelope({
     from: {
@@ -79,7 +82,7 @@ function openRecipientStore(entry: PresenceEntry): Store {
 export function depositStoryCommentMention(input: {
   reference: StoryCommentReference;
   selector: string;
-  viewer: SigilAuthSession["user"];
+  viewer: AuthenticatedMentionViewer;
   now?: number;
 }): MentionDepositResult {
   const now = input.now ?? Date.now();

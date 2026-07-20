@@ -1,9 +1,19 @@
-import { envelopeBody } from "@gonk/comms";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  deliverMessage,
+  envelopeBody,
+  listWaitingMessages,
+} from "@gonk/comms";
+import { FsScopeStore } from "@gonk/scope";
+import { createStoreProvider, mirkBackendFactory } from "@gonk/store";
 import { describe, expect, it } from "vitest";
 
 import {
   createStoryCommentMentionEnvelope,
   selectMentionRecipient,
+  storyCommentReferenceBody,
 } from "./story-comment-mentions.server";
 
 describe("story comment comms deposit", () => {
@@ -13,9 +23,6 @@ describe("story comment comms deposit", () => {
       selector: "coordinator",
       recipientHost: "pi",
       viewer: {
-        id: "principal-1",
-        email: "owner@example.test",
-        name: "Owner",
         role: "owner",
         username: "reviewer-one",
       },
@@ -32,6 +39,49 @@ describe("story comment comms deposit", () => {
       }),
     );
     expect(envelopeBody(envelope)).not.toContain("feedback body");
+  });
+
+  it("writes the reference envelope through the canonical durable inbox seam", () => {
+    const root = mkdtempSync(join(tmpdir(), "sigil-comment-inbox-"));
+    try {
+      const scope = new FsScopeStore({
+        cwd: root,
+        homeRoot: root,
+        sessionId: "recipient-session",
+        sessionHome: join(root, "recipient-session"),
+      });
+      const store = createStoreProvider(scope, {
+        backendFactory: mirkBackendFactory(scope),
+      });
+      const envelope = createStoryCommentMentionEnvelope({
+        reference: { storyId: "S1.7", commentId: "comment-42" },
+        selector: "analysis",
+        recipientHost: "pi",
+        viewer: {
+          role: "owner",
+          username: "reviewer-one",
+        },
+      });
+
+      deliverMessage({
+        recipientScope: store,
+        envelope,
+        clock: { now: () => 42 },
+      });
+
+      const [item] = listWaitingMessages(store);
+      expect(item?.kind).toBe("message");
+      expect(item?.message).toMatchObject({
+        kind: "coordination",
+        intent: "for_context",
+        body: storyCommentReferenceBody({
+          storyId: "S1.7",
+          commentId: "comment-42",
+        }),
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("selects one newest matching live persona and never fans out", () => {

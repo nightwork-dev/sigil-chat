@@ -26,13 +26,6 @@ describe("authenticated work-items viewer", () => {
       id: "principal-1",
       role: "member",
       username: "reviewer-two",
-      user: {
-        id: "principal-1",
-        email: "member@example.test",
-        name: "Member",
-        role: "member",
-        username: "reviewer-two",
-      },
     });
   });
 });

@@ -206,7 +206,7 @@ const addCommentFn = createServerFn({ method: "POST" })
         await depositStoryCommentMention({
           reference: { storyId: comment.storyId, commentId: comment.id },
           selector,
-          viewer: viewer.user,
+          viewer,
         });
       } catch {
         // The durable domain comment is authoritative. A missing/unavailable
@@ -235,15 +235,16 @@ export function useStories(
   return useQuery({
     // Unfiltered board stays on the base key so mutation reconciliation
     // (reconcileWorkItems) updates it in place; filtered views get a sub-key.
-    queryKey: addressedTo?.enabled
+    queryKey: addressedTo
       ? workItemKeys.addressed(addressedTo.viewerId, filter)
       : filter
         ? workItemKeys.list(filter)
         : workItemKeys.all(),
     queryFn: () =>
       listStoriesFn({
-        data: { filter, addressedToMe: addressedTo?.enabled ?? false },
+        data: { filter, addressedToMe: addressedTo !== undefined },
       }),
+    enabled: addressedTo?.enabled ?? true,
     refetchOnMount: "always",
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
