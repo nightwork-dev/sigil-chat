@@ -4,11 +4,10 @@ import {
   ContextContributorRegistry,
   type ContextContributor,
 } from "@gonk/context"
-import type { AuthorizationRequest } from "@gonk/auth"
 import type { ManagedSkillRegistry } from "@gonk/skills"
 import { eveChannel } from "eve/channels/eve"
 import {
-  createRetrievalContextContributor,
+  createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
   createSkillContextContributor,
 } from "./sigil-context"
@@ -21,6 +20,38 @@ const SESSION_AUTH = {
 }
 
 describe("Sigil Eve context integration", () => {
+  it("does not advertise retrieval when the default compiler has no retrieval source", async () => {
+    const compiler = createDefaultSigilContextCompiler({
+      agentProjectRoot: process.cwd(),
+      tokenCounter,
+    })
+
+    const result = await compiler.compile({
+      requestId: "default-retrieval-source-check",
+      audience: "model",
+      auth: {
+        principal: {
+          id: "user-1",
+          kind: "human",
+          identity: { issuer: "test", subject: "user-1", method: "session" },
+          roles: [],
+          scopes: [],
+        },
+        authorize: () => ({ outcome: "allow", reason: "test policy" }),
+      },
+      maxTokens: 1_000,
+      query: "find project context",
+      requestedContributorIds: ["sigil.retrieval"],
+    })
+
+    expect(result.status).toBe("ready")
+    expect(result.receipt.selected).toEqual([])
+    expect(result.receipt.dropped).toContainEqual({
+      reason: "contributor-failed",
+      contributorId: "sigil.retrieval",
+    })
+  })
+
   it("adds deterministically selected authorized skill context to the next model turn", async () => {
     const channel = testChannel({
       compiler: compilerWith([
@@ -272,84 +303,6 @@ describe("Sigil Eve context integration", () => {
 
     expect(response.status).toBe(204)
     expect(send).not.toHaveBeenCalled()
-  })
-
-  it("passes the captured request auth through retrieval instead of widening from principal", async () => {
-    const observedOutcomes: string[] = []
-    const registry = new ContextContributorRegistry()
-    registry.register(
-      createRetrievalContextContributor({
-        authForRequestId: () => ({
-          principal: {
-            id: "user-1",
-            kind: "human",
-            identity: { issuer: "test", subject: "user-1", method: "session" },
-            roles: [],
-            scopes: [],
-          },
-          authorize: (request: AuthorizationRequest) => ({
-            outcome:
-              request.resource.target === "retrieval-probe" ? "deny" : "allow",
-            reason: "test policy",
-          }),
-        }),
-        engine: {
-          async search(request) {
-            const decision = await request.auth.authorize({
-              action: "retrieval.content.resolve",
-              resource: {
-                kind: "retrieval-resource",
-                target: "retrieval-probe",
-              },
-            })
-            observedOutcomes.push(decision.outcome)
-            return {
-              hits: [],
-              receipt: {
-                kind: "retrieval-search",
-                receiptVersion: 1,
-                requestId: request.requestId,
-                timestamp: new Date(0).toISOString(),
-                mode: "lexical",
-                purpose: "agent-recall",
-                outcome: "success",
-                sources: [],
-                visibleHits: [],
-                drops: [],
-              },
-            }
-          },
-          async resolve() {
-            throw new Error("resolve should not be reached")
-          },
-        },
-      }),
-    )
-
-    const compiler = new ContextCompiler({
-      registry,
-      tokenCounter,
-      configVersion: "test",
-    })
-
-    await compiler.compile({
-      requestId: "retrieval-auth-request",
-      audience: "model",
-      auth: {
-        principal: {
-          id: "user-1",
-          kind: "human",
-          identity: { issuer: "test", subject: "user-1", method: "session" },
-          roles: [],
-          scopes: [],
-        },
-        authorize: () => ({ outcome: "allow", reason: "outer policy" }),
-      },
-      maxTokens: 1_000,
-      query: "find retrieval context",
-    })
-
-    expect(observedOutcomes).toEqual(["deny"])
   })
 })
 

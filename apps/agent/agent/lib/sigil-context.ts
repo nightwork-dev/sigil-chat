@@ -21,12 +21,6 @@ import type {
   ManagedSkillSummary,
 } from "@gonk/skills"
 import { FilesystemManagedSkillRegistry } from "@gonk/skills"
-import {
-  canonicalResourceKey,
-  type RetrievalEngine,
-  type RetrievalResourceRef,
-  type RetrievalHit,
-} from "@gonk/retrieval"
 import type { UserContent } from "ai"
 import type { EveMessageContext, EveMessageResult } from "eve/channels/eve"
 
@@ -34,7 +28,6 @@ type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
 const DEFAULT_MAX_CONTEXT_TOKENS = 12_000
 const SKILL_CONTEXT_CONTRIBUTOR_ID = "sigil.skills"
-const RETRIEVAL_CONTEXT_CONTRIBUTOR_ID = "sigil.retrieval"
 
 export interface SigilContextOptions {
   compiler?: ContextCompiler
@@ -271,66 +264,6 @@ export function createSkillContextContributor(options: {
   }
 }
 
-export function createRetrievalContextContributor(options: {
-  engine: Pick<RetrievalEngine, "search" | "resolve">
-  authForRequestId: (requestId: string) => AuthContext | undefined
-  limit?: number
-}): ContextContributor {
-  return {
-    id: RETRIEVAL_CONTEXT_CONTRIBUTOR_ID,
-    async discover(request) {
-      if (request.query === undefined || request.query.trim().length === 0) {
-        return []
-      }
-      const auth = options.authForRequestId(request.requestId)
-      if (auth === undefined) throw new Error("Missing request auth")
-
-      const result = await options.engine.search({
-        requestId: request.requestId,
-        auth,
-        text: request.query,
-        mode: "lexical",
-        limit: options.limit ?? 5,
-        purpose: "agent-recall",
-      })
-
-      return result.hits.map(retrievalHitToCandidate)
-    },
-    async resolve(request) {
-      const hit = retrievalResourceFromCandidate(request.candidate)
-      if (hit === null) return null
-      const auth = options.authForRequestId(request.requestId)
-      if (auth === undefined) return null
-
-      const result = await options.engine.resolve({
-        requestId: request.requestId,
-        auth,
-        resource: hit,
-      })
-
-      if (result.status !== "resolved") return null
-
-      return {
-        candidateId: request.candidate.candidateId,
-        contributorId: request.candidate.contributorId,
-        resourceKey: request.candidate.resourceKey,
-        revision: result.value.resource.revision,
-        necessity: request.candidate.necessity,
-        priority: request.candidate.priority,
-        audience: request.audience,
-        content: `Retrieved context: ${result.value.label}\n${result.value.content}`,
-        resource: {
-          kind: "retrieval-resource",
-          target: request.candidate.resourceKey,
-          tenantId: result.value.tenantId,
-          workspaceId: result.value.workspaceId,
-          metadata: { sourceId: result.value.resource.sourceId },
-        },
-      }
-    },
-  }
-}
-
 export function toGonkAuthContext(
   auth: EveMessageContext["eve"]["caller"],
 ): AuthContext | null {
@@ -394,9 +327,6 @@ function authorizeSigilContextRequest(
     "context.use",
     "skill.discover",
     "skill.read",
-    "retrieval.source.discover",
-    "retrieval.hit.read",
-    "retrieval.content.resolve",
   ])
 
   if (!allowedActions.has(request.action)) {
@@ -488,41 +418,6 @@ function skillDetailToResolvedCandidate(
       scope: skill.scope,
       metadata: { contentHash: skill.contentHash },
     },
-  }
-}
-
-function retrievalHitToCandidate(hit: RetrievalHit): ContextCandidate {
-  const resourceKey = canonicalResourceKey(hit.resource)
-  return {
-    candidateId: `retrieval:${resourceKey}`,
-    contributorId: RETRIEVAL_CONTEXT_CONTRIBUTOR_ID,
-    resourceKey,
-    revisionHint: hit.resource.revision,
-    necessity: "optional",
-    priority: Math.max(1, Math.round(hit.scores.final * 100)),
-    estimatedTokens: 500,
-    estimateQuality: "fallback",
-  }
-}
-
-function retrievalResourceFromCandidate(
-  candidate: ContextCandidate,
-): RetrievalResourceRef | null {
-  try {
-    const [sourceId, kind, id, revision, fragment] = JSON.parse(
-      candidate.resourceKey,
-    ) as [string, string, string, string, unknown]
-    return {
-      sourceId,
-      kind,
-      id,
-      revision,
-      ...(fragment === null
-        ? {}
-        : { fragment: fragment as RetrievalResourceRef["fragment"] }),
-    }
-  } catch {
-    return null
   }
 }
 

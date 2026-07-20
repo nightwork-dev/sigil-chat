@@ -52,9 +52,6 @@ importers:
       '@gonk/persona':
         specifier: 0.5.1-mem2.5
         version: 0.5.1-mem2.5
-      '@gonk/retrieval':
-        specifier: 0.3.1
-        version: 0.3.1(sqlite-vec@0.1.9)
       '@gonk/scope':
         specifier: 0.3.1
         version: 0.3.1
@@ -1375,9 +1372,6 @@ packages:
 
   '@gonk/persona@0.5.1-mem2.5':
     resolution: {integrity: sha512-3cFu72vj2CmqDu+bjD1rqBQZKKENkCkt48Ug+REPCgcHUaGW4fT9eb0l5tJV5urxBadjNd4BqQnxn3rmY23Oiw==}
-
-  '@gonk/retrieval@0.3.1':
-    resolution: {integrity: sha512-dZU9sTT2IvfdI0ZeTPUVbVOw4uBF9HuINLIo5iMn5e+vChbBw6mGy1q4o1i+ctQ5Qq7YmGKrGm64SrvyU5Rtcg==}
 
   '@gonk/scope@0.3.1':
     resolution: {integrity: sha512-/QVfPn5XImVQat6GsThXbo1fRLPx2ULKylDqiE8AUCyVQf1RiV7cX91m0DjAn0dYuqwcnw/I+NSibFHDf9u5Wg==}
@@ -7494,15 +7488,6 @@ snapshots:
       '@gonk/scope': 0.3.1
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       yaml: 2.9.0
-
-  '@gonk/retrieval@0.3.1(sqlite-vec@0.1.9)':
-    dependencies:
-      '@gonk/auth': 0.3.1
-      '@gonk/context': 0.3.1
-      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
-      '@standard-schema/spec': 1.1.0
-    transitivePeerDependencies:
-      - sqlite-vec
 
   '@gonk/scope@0.3.1':
     dependencies:

@@ -68,15 +68,17 @@ Two things happen here that matter if you're customizing the agent:
   the client-declared `x-sigil-tool-approval` preference to auth attributes;
   that preference remains non-authoritative (see `adding-a-tool.md`).
 - **`onMessage`** is built by `createSigilEveOnMessage()` from
-  `apps/agent/agent/lib/sigil-context.ts` — this compiles server-side skill
-  and retrieval context (via `@gonk/context`, `@gonk/skills`,
-  `@gonk/retrieval`) into the message before Eve sends it to the model. Two
-  env vars gate it: `SIGIL_CONTEXT_REQUIRED_SKILLS` and
+  `apps/agent/agent/lib/sigil-context.ts` — this compiles server-side managed
+  skill context (via `@gonk/context` and `@gonk/skills`) into the message
+  before Eve sends it to the model. Retrieval is not registered because this
+  template has no production retrieval source; add a source-backed contributor
+  when the application has one rather than advertising an empty default. Two
+  env vars gate the current compiler: `SIGIL_CONTEXT_REQUIRED_SKILLS` and
   `SIGIL_CONTEXT_PINNED_RESOURCE_KEYS`, both comma-separated lists read by
   `readCsvEnv()` in `eve.ts`. This is distinct from the client-side attention
   context covered in `building-workspaces.md` — this file compiles
-  *server-owned* context (skills, retrieval hits); the client sends its own
-  *application* context (selections, attachments) separately as
+  *server-owned* managed skills; the client sends its own *application*
+  context (selections, attachments) separately as
   `clientContext` on the send call.
 
 ## `connections/` — adding a second MCP connection
