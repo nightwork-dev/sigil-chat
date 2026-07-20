@@ -124,6 +124,19 @@ export function KanbanBoard<T>({
       const hit = targetList.indexOf(String(over.id))
       newIndex = hit === -1 ? targetList.length : hit
     }
+    // Direction-aware adjustment for same-column moves: when a card is dragged
+    // DOWNWARD onto a later card, it should land AFTER that card (not before).
+    // The raw `hit` is "insert before the hovered card," which is correct for
+    // upward moves but off-by-one for downward moves. Compare the dragged
+    // card's original position to the hovered card's to decide before/after.
+    // (Cross-column moves keep `hit` — there's no "original position" to
+    // compare against in the target column.)
+    if (sameColumn && !overIsColumn && String(over.id) !== draggedId) {
+      const overOriginal = sourceRaw.indexOf(String(over.id))
+      if (overOriginal !== -1 && originalIndex < overOriginal && newIndex === targetList.indexOf(String(over.id))) {
+        newIndex += 1
+      }
+    }
     // Same-column no-op: the card would land exactly where it started.
     if (sameColumn && newIndex === originalIndex) return
     onMove(draggedId, fromColumnId, toColumnId, newIndex)
