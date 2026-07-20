@@ -86,7 +86,7 @@ async function handleRequest(
       `http://${incoming.headers.host ?? `127.0.0.1:${port}`}`,
     ).pathname
     if (pathname === "/health") {
-      const health = createHealthResponse()
+      const health = await createHealthResponse()
       outgoing.writeHead(health.status, Object.fromEntries(health.headers))
       outgoing.end(await health.text())
       return
