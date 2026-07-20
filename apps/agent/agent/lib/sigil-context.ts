@@ -94,6 +94,7 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     }
 
     const blocks: string[] = []
+    const compiledContent = compiled.content.trim()
     if (options.identityFloor || options.recallLatestTurn) {
       const principalId = requireNonBlankCallerPrincipal(caller.principalId)
       const personaId = requireCallerPersona(caller)
@@ -117,10 +118,24 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
             query: messageToQuery(message),
           })
           ?.trim()
-        if (recalled) blocks.push(recalled)
+        if (recalled) {
+          const candidate = [
+            ...blocks,
+            recalled,
+            ...(compiledContent ? [compiledContent] : []),
+          ].join("\n\n")
+          if (
+            await contextFitsBudget(
+              candidate,
+              options.maxTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
+              options.model,
+            )
+          ) {
+            blocks.push(recalled)
+          }
+        }
       }
     }
-    const compiledContent = compiled.content.trim()
     if (compiledContent.length > 0) blocks.push(compiledContent)
 
     // S3.2: inject the session's shared blackboard every turn so a user (or

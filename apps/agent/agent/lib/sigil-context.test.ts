@@ -186,6 +186,22 @@ describe("Sigil Eve context integration", () => {
     expect(JSON.stringify(payload)).not.toContain("Relevant memory")
   })
 
+  it("omits recall when it would exceed the turn context budget", async () => {
+    const channel = testChannel({
+      compiler: compilerWith([]),
+      identityFloor: () => "STABLE_IDENTITY_FLOOR",
+      maxTokens: 20,
+      recallLatestTurn: () => `RECALL_MARKER ${"x".repeat(200)}`,
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "hello" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).toContain("STABLE_IDENTITY_FLOOR")
+    expect(JSON.stringify(payload)).not.toContain("RECALL_MARKER")
+  })
+
   it("injects the session blackboard into every turn (S3.2)", async () => {
     const channel = testChannel({
       auth: {
@@ -377,6 +393,7 @@ function testChannel(options: {
     personaId: string
     principalId: string
   }) => string
+  maxTokens?: number
   pinnedResourceKeys?: readonly string[]
   readBlackboard?: (sessionId: string) => Promise<string>
   recallLatestTurn?: SigilContextOptions["recallLatestTurn"]
@@ -386,6 +403,7 @@ function testChannel(options: {
     onMessage: createSigilEveOnMessage({
       compiler: options.compiler,
       identityFloor: options.identityFloor,
+      maxTokens: options.maxTokens,
       pinnedResourceKeys: options.pinnedResourceKeys,
       readBlackboard: options.readBlackboard,
       recallLatestTurn: options.recallLatestTurn,
