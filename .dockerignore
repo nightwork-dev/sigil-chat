@@ -1,0 +1,17 @@
+.git
+.github
+.omx
+.data
+**/.data
+**/.eve
+**/.output
+**/dist
+**/node_modules
+docs.local
+*.local
+*.local.*
+deploy/aws/deploy.env.local
+deploy/aws/terraform/.terraform
+deploy/aws/terraform/*.tfstate*
+deploy/aws/terraform/plan.tfplan
+deploy/aws/terraform/plan.txt

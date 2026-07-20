@@ -8,11 +8,9 @@ FROM node:24-bookworm-slim AS dependencies
 RUN corepack enable && corepack prepare pnpm@9.0.6 --activate
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmr[c] ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY patches ./patches
-COPY vendor ./vendor
 COPY apps/agent/package.json apps/agent/package.json
-COPY apps/agent/vendor apps/agent/vendor
 COPY apps/gonk/package.json apps/gonk/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages ./packages

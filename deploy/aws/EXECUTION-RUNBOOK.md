@@ -76,37 +76,47 @@ CDK, modules, or workspaces for DEP.2.
 
    Expected: the answer is exactly `$EIP`.
 
-7. Deliver the reviewed source and wait for user-data's Docker installation.
+7. Wait for user-data's Docker installation and copy only the deployment files.
 
    ```bash
    until ssh -o StrictHostKeyChecking=accept-new -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" 'docker compose version'; do sleep 10; done
-   rsync -az --delete --exclude .git --exclude .env --exclude .data --exclude node_modules --exclude .output --exclude docs.local \
-     -e "ssh -i $HOME/.ssh/sigil-chat-deploy/id_ed25519" ./ ubuntu@"$EIP":/tmp/sigil-chat-source/
+   rsync -az deploy/aws/ -e "ssh -i $HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP":/tmp/sigil-chat-deploy/
    ```
 
    Expected: Docker Compose prints its version. Rsync must not list `.env`,
    `.data`, `node_modules`, `.output`, or `docs.local`.
 
-8. Build three images and create host-only secret files without starting Caddy.
+8. Download the four-image digest manifest from the successful `prod` workflow,
+   create host-only secret files, and install the deployment directory.
 
    ```bash
    ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \
-     "sudo /tmp/sigil-chat-source/deploy/aws/provision-host.sh --source-dir /tmp/sigil-chat-source --public-host '$PUBLIC_HOST' --mode prepare"
+     "sudo /tmp/sigil-chat-deploy/provision-host.sh --public-host '$PUBLIC_HOST' --mode prepare"
    ```
 
-   Expected: three image builds finish; final output is `Prepared images and
-   local deployment environment at /opt/sigil-chat/deploy`. No secret prints.
+   Expected: the deployment environment exists at `/opt/sigil-chat/deploy`.
+   Copy the downloaded `sigil-images.env` there:
 
-9. Start private services and Caddy, then make the external TLS check.
+   ```bash
+   scp -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" sigil-images.env ubuntu@"$EIP":/tmp/sigil-images.env
+   ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \
+     'sudo install -m 0600 /tmp/sigil-images.env /opt/sigil-chat/deploy/sigil-images.env'
+   ```
+
+   No secret prints or enters the image manifest.
+
+9. Validate and pull all four immutable images, start private services and
+   Caddy, then make the external TLS check.
 
    ```bash
    ssh -i "$HOME/.ssh/sigil-chat-deploy/id_ed25519" ubuntu@"$EIP" \
-     "sudo /tmp/sigil-chat-source/deploy/aws/provision-host.sh --source-dir /tmp/sigil-chat-source --public-host '$PUBLIC_HOST' --mode launch"
+     "sudo /opt/sigil-chat/deploy/update-images.sh /opt/sigil-chat/deploy/sigil-images.env"
    curl --fail --show-error --connect-timeout 15 "https://$PUBLIC_HOST/healthz"
    ```
 
    Expected: `web`, `eve`, `gonk`, and `edge` are running; curl prints `ok`.
-   No Eve or Gonk port is public.
+   The update command validates all four digests before Docker runs. No Eve or
+   Gonk port is public.
 
 10. Complete device auth as the Eve service identity, then verify app login,
     model response, and a container restart from a phone.

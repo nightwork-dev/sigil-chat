@@ -97,8 +97,8 @@ resource "aws_instance" "sigil_chat" {
   user_data_replace_on_change = true
 
   metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
+    http_endpoint = "enabled"
+    http_tokens   = "required"
     # 2, not 1: containers sit one bridge-hop from IMDS; the instance role's
     # credentials must be reachable from inside the gonk/eve containers.
     http_put_response_hop_limit = 2
