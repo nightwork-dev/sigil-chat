@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import type { BlackboardDoc } from "@workspace/blackboard-store/types";
+import type { SigilAuthSession } from "./auth/server";
 
 const readBlackboardFn = createServerFn({ method: "GET" })
   .validator((input: { sessionId: string }) => input)
   .handler(async ({ data }): Promise<BlackboardDoc> => {
+    await requireOwnedThread(data.sessionId);
     const { blackboardRepository } =
       await import("@workspace/blackboard-store");
     return blackboardRepository.read(data.sessionId);
@@ -12,16 +14,13 @@ const readBlackboardFn = createServerFn({ method: "GET" })
 
 const writeBlackboardFn = createServerFn({ method: "POST" })
   .validator(
-    (input: { sessionId: string; content: string; updatedBy: string }) => input,
+    (input: { sessionId: string; content: string }) => input,
   )
   .handler(async ({ data }): Promise<BlackboardDoc> => {
+    await requireOwnedThread(data.sessionId);
     const { blackboardRepository } =
       await import("@workspace/blackboard-store");
-    return blackboardRepository.write(
-      data.sessionId,
-      data.content,
-      data.updatedBy,
-    );
+    return blackboardRepository.write(data.sessionId, data.content, "user");
   });
 
 export const blackboardKeys = {
@@ -47,7 +46,6 @@ export function useWriteBlackboard() {
     mutationFn: (input: {
       sessionId: string;
       content: string;
-      updatedBy: string;
     }) => writeBlackboardFn({ data: input }),
     onSuccess: (document) => {
       queryClient.setQueryData(
@@ -59,4 +57,17 @@ export function useWriteBlackboard() {
       });
     },
   });
+}
+
+async function requireOwnedThread(sessionId: string): Promise<void> {
+  const { getSession, requireSession } = await import("./auth/session");
+  const { agentThreadRepository } = await import("./agent-threads.server");
+  const session = await getSession();
+  const assertSession: (
+    candidate: SigilAuthSession | null,
+  ) => asserts candidate is SigilAuthSession = requireSession;
+  assertSession(session);
+  if (!agentThreadRepository.get(session.user.id, sessionId)) {
+    throw new Error("Agent session was not found.");
+  }
 }

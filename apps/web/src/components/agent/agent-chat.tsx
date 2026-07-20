@@ -90,6 +90,7 @@ import {
   sessionResourceScope,
 } from "@/lib/agent-session-scope"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
+import { SessionBlackboard } from "@/components/agent/session-blackboard"
 import type { ToolApprovalMode } from "@/lib/agent-tool-approval"
 
 export interface AgentChatProps {
@@ -244,6 +245,9 @@ export function AgentChat({
         showApprovalMode ||
         showNewSession ? (
           <div className="flex shrink-0 items-center gap-1">
+            {threadControls?.activeThreadId ? (
+              <SessionBlackboard sessionId={threadControls.activeThreadId} />
+            ) : null}
             {showContextPrivacy ? (
               <ContextTray.Root attention={attention}>
                 <ContextTray.Trigger className="max-sm:h-11" />
