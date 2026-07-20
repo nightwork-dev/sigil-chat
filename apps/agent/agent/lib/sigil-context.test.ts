@@ -60,6 +60,26 @@ describe("Sigil Eve context integration", () => {
     expect(JSON.stringify(payload)).not.toContain("AUTHORIZED_EDITORIAL_CONTEXT")
   })
 
+  it("uses a non-blank provisional identity when Eve has not assigned a session id yet", async () => {
+    const identities: Array<{ eveSessionId: string; principalId: string }> = []
+    const channel = testChannel({
+      compiler: compilerWith([]),
+      identityFloor: (identity) => {
+        identities.push(identity)
+        return "IDENTITY_FLOOR"
+      },
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "hello" })
+
+    expect(identities).toEqual([
+      { eveSessionId: "new:user-1", principalId: "user-1" },
+    ])
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).toContain("IDENTITY_FLOOR")
+  })
+
   it("injects the session blackboard into every turn (S3.2)", async () => {
     const channel = testChannel({
       auth: {
@@ -319,6 +339,7 @@ describe("Sigil Eve context integration", () => {
 function testChannel(options: {
   auth?: typeof SESSION_AUTH
   compiler: ContextCompiler
+  identityFloor?: (input: { eveSessionId: string; principalId: string }) => string
   pinnedResourceKeys?: readonly string[]
   readBlackboard?: (sessionId: string) => Promise<string>
 }) {
@@ -326,6 +347,7 @@ function testChannel(options: {
     auth: [() => options.auth ?? SESSION_AUTH],
     onMessage: createSigilEveOnMessage({
       compiler: options.compiler,
+      identityFloor: options.identityFloor,
       pinnedResourceKeys: options.pinnedResourceKeys,
       readBlackboard: options.readBlackboard,
     }),
