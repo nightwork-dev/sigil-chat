@@ -60,6 +60,11 @@ const getStoryFn = createServerFn({ method: "GET" })
 const upsertStoryFn = createServerFn({ method: "POST" })
   .validator((input: { story: Story; expectedRevision?: number }) => input)
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { requireWorkItemsMutationAccess } = await import(
+      "@/lib/work-items-access.server"
+    );
+    requireWorkItemsMutationAccess(await getSession());
     const { workItemsRepository } = await import("@workspace/work-items-store");
     return workItemsRepository.upsertStory(data.story, data.expectedRevision);
   });
@@ -70,6 +75,11 @@ const transitionStoryFn = createServerFn({ method: "POST" })
       input,
   )
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { requireWorkItemsMutationAccess } = await import(
+      "@/lib/work-items-access.server"
+    );
+    requireWorkItemsMutationAccess(await getSession());
     const { workItemsRepository } = await import("@workspace/work-items-store");
     return workItemsRepository.transitionStory(
       data.id,
@@ -89,6 +99,11 @@ const assignReviewFn = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { requireWorkItemsMutationAccess } = await import(
+      "@/lib/work-items-access.server"
+    );
+    requireWorkItemsMutationAccess(await getSession());
     const { workItemsRepository } = await import("@workspace/work-items-store");
     return workItemsRepository.assignReview(
       data.id,
@@ -112,6 +127,11 @@ const decideReviewFn = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { requireWorkItemsMutationAccess } = await import(
+      "@/lib/work-items-access.server"
+    );
+    requireWorkItemsMutationAccess(await getSession());
     const { workItemsRepository } = await import("@workspace/work-items-store");
     return workItemsRepository.decideReview(
       data.reviewId,
