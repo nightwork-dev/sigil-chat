@@ -43,6 +43,10 @@ export const sigilMemoryHost = new EveMemoryHost({
   },
 })
 
+/**
+ * The consumer supplies Eve's authenticated session identity; EveMemoryHost
+ * alone translates it into persona's host-neutral executionSessionId.
+ */
 export function memoryTurn(eveSessionId: string, principalId: string): TrustedMemoryTurn {
   return { eveSessionId, channelId: "sigil-chat", principalId }
 }
