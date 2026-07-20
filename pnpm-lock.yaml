@@ -104,6 +104,9 @@ importers:
       '@gonk/auth':
         specifier: 0.3.1
         version: 0.3.1
+      '@gonk/image-gen':
+        specifier: 0.5.0
+        version: 0.5.0
       '@gonk/scope':
         specifier: 0.3.1
         version: 0.3.1
@@ -1366,6 +1369,9 @@ packages:
     resolution: {integrity: sha512-KU53NdzoijDNQ6hAIjSGWWSiFJPfOV5cRFwN1vN7ER9easahSPnQiYjIh5rG5dU+n0Ncdfs2YDjqgFoFzjwo7w==}
     peerDependencies:
       eve: '*'
+
+  '@gonk/image-gen@0.5.0':
+    resolution: {integrity: sha512-DphBQst1Dxk0UUJWU2U5gH5EYdoStATQUWqj3T695A869O9H2A7WLzZAEv2iPoqxp8gumtZk9JOdOtMdxM+5Mg==}
 
   '@gonk/memory@0.5.1-mem2.5':
     resolution: {integrity: sha512-eFFk3c+BpnjdjyFMc/UCjUlAngfuxuGNDllrLe3HGYZ5fQ0VqTye4X8X+kixblEWt0LHVTk7hkJa7uqkN6ClUw==}
@@ -7471,6 +7477,10 @@ snapshots:
       - '@gonk/scope'
       - supports-color
       - zod
+
+  '@gonk/image-gen@0.5.0':
+    dependencies:
+      '@gonk/scope': 0.3.1
 
   '@gonk/memory@0.5.1-mem2.5':
     dependencies:

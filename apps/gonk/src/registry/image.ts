@@ -9,7 +9,7 @@ import {
   imagePublicUrl,
   type SessionArtifactStore,
 } from "../artifact-store.js";
-import { generateCodexImage } from "./codex-image.js";
+import { generateCodexImage } from "./image-provider.js";
 import {
   editImageThroughGateway,
   type ImageEditProvider,
