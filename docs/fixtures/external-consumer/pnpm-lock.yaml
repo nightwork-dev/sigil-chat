@@ -27,8 +27,8 @@ importers:
         specifier: 0.1.0
         version: 0.1.0(@gonk/scope@0.3.1)(zod@4.4.3)
       eve:
-        specifier: 0.24.4
-        version: 0.24.4(ai@7.0.31(zod@4.4.3))
+        specifier: 0.25.2
+        version: 0.25.2(ai@7.0.31(zod@4.4.3))
       tsx:
         specifier: 4.21.0
         version: 4.21.0
@@ -558,8 +558,8 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
-  eve@0.24.4:
-    resolution: {integrity: sha512-RDZuhj8K8rStfuyTWE5AFl1qMqspuze3m05KqIhIPjef7jFwZoPfk9AgQzEIYX+8LIRRzj1e7oyye+84630JuQ==}
+  eve@0.25.2:
+    resolution: {integrity: sha512-TT6zdOfUSZNte9qWpGOGlzVpz91lIRFFpSxe+feTrxWnUlY5jNnUo46zt3AmRIdlauIlIw2k5JU5kQB2hUO57w==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
@@ -1429,7 +1429,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.24.4(ai@7.0.31(zod@4.4.3)):
+  eve@0.25.2(ai@7.0.31(zod@4.4.3)):
     dependencies:
       ai: 7.0.31(zod@4.4.3)
       nitro: 3.0.260610-beta

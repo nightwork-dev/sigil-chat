@@ -4,21 +4,32 @@ This is the release contract for a generated Sigil Chat application consumed out
 
 The companion [clean-room fixture](../fixtures/external-consumer/) is the executable proof. It must never gain `workspace:`, `file:`, `@workspace/*`, or Sigil Chat `apps/*` dependencies.
 
-## Supported train
+## Current application train
 
-| Surface                  | Exact version                                                                                                                                               | Compatibility status                                                                                                                                                   |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sigil CLI command        | `sigil@0.1.0`                                                                                                                                                    | Local `npx` command surface only. It does not make Sigil Design component or application source an npm dependency.                                                     |
-| Chat application source  | Not an npm package                                                                                                                                               | The Chat overlay is source-owned application material; npm-distributed overlays are unsupported. A separate source-generation proof is required.                       |
-| Eve host                 | `eve@0.24.4`                                                                                                                                                | **Verified:** fixture installs and boots this host.                                                                                                                    |
-| Eve adapter              | `@zigil/agent-eve@0.1.0`                                                                                                                                    | Declared pair with `@zigil/agent-surface@0.1.0`; not exercised by the headless fixture.                                                                                |
-| Agent surface            | `@zigil/agent-surface@0.1.0`                                                                                                                                | Declared neutral session/catalog contract; no fixture UI consumer.                                                                                                     |
-| React adapter            | `@zigil/agent-react@0.1.0`                                                                                                                                  | Declared React `19` peer train; no fixture UI consumer.                                                                                                                |
-| React Query adapter      | `@zigil/agent-react-query@0.1.0`                                                                                                                            | Declared React `19` + React Query `5` peer train; no fixture UI consumer.                                                                                              |
-| Gonk MCP adapter         | `@zigil/agent-gonk@0.1.0`                                                                                                                                   | **Verified:** fixture mounts and calls the authenticated MCP boundary.                                                                                                 |
-| Gonk contracts           | `@gonk/auth`, `@gonk/context`, `@gonk/retrieval`, `@gonk/scope`, `@gonk/skills`, `@gonk/store`, `@gonk/tool-registry`, `@gonk/tool-registry-mcp` at `0.3.1` | **Verified subset:** fixture installs `auth`, `context`, `scope`, `tool-registry`, and `tool-registry-mcp`; remaining declared packages need their own consumer proof. |
+This matrix is derived from the application manifests and lockfile. “Public”
+means that the exact version resolves from `https://registry.npmjs.org` without
+a workspace link, file dependency, tarball, or private registry.
 
-The reference app currently resolves Eve `0.24.4`, `@zigil/agent-gonk@0.1.0`, and the Gonk `0.3.1` train. The matrix records the intended release train; its status column distinguishes the proven headless boundary from unexercised UI and source-generation rows.
+| Surface                      | Exact application version                                                                                             | Public status  | Consumer evidence                                                                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Eve host process             | `eve@0.25.2`                                                                                                          | Public         | Clean-room fixture install, typecheck, MCP smoke, and independent Eve boot.                                                                                  |
+| Web compatibility dependency | `eve@0.24.4`                                                                                                          | Public         | Present through the current web adapter graph; it is not the deployed host version. This split remains a compatibility finding.                              |
+| Gonk Core                    | `@gonk/auth`, `context`, `retrieval`, `scope`, `skills`, `store`, `tool-registry`, and `tool-registry-mcp` at `0.3.1` | Public         | The fixture exercises `auth`, `context`, `scope`, `tool-registry`, and `tool-registry-mcp`. Retrieval, skills, and store remain unexercised by this fixture. |
+| Gonk Eve host                | `@gonk/eve-host@0.5.1-mem2.6`                                                                                         | **Not public** | Full external application install is blocked until publication.                                                                                              |
+| Gonk memory                  | `@gonk/memory@0.5.1-mem2.5`                                                                                           | **Not public** | Full external application install is blocked until publication.                                                                                              |
+| Gonk persona                 | `@gonk/persona@0.5.1-mem2.5`                                                                                          | **Not public** | Full external application install is blocked until publication.                                                                                              |
+| Gonk MCP adapter             | `@zigil/agent-gonk@0.1.0`                                                                                             | Public         | Fixture mounts and calls authenticated Streamable HTTP MCP.                                                                                                  |
+| Eve adapter                  | `@zigil/agent-eve@0.1.5`                                                                                              | **Not public** | Application uses it; the public registry currently exposes only `0.1.0`.                                                                                     |
+| Agent surface                | `@zigil/agent-surface@0.1.1`                                                                                          | **Not public** | Application uses it; the public registry currently exposes only `0.1.0`.                                                                                     |
+| React adapter                | `@zigil/agent-react@0.1.1`                                                                                            | **Not public** | Application uses it; the public registry currently exposes only `0.1.0`.                                                                                     |
+| React Query adapter          | `@zigil/agent-react-query@0.1.1`                                                                                      | **Not public** | Application uses it; the public registry currently exposes only `0.1.0`.                                                                                     |
+| Chat application source      | Not an npm package                                                                                                    | Not applicable | Consumer-owned source; npm-distributed Chat application source is unsupported.                                                                               |
+
+The executable fixture therefore proves the strongest honest subset of the
+current train: Eve `0.25.2`, the Gonk Core `0.3.1` MCP/context boundary, and
+`@zigil/agent-gonk@0.1.0`. It does not substitute older packages for the
+unpublished rows and does not claim the full application can yet install from
+public npm.
 
 ## Supported boundary
 
@@ -29,41 +40,44 @@ The reference app currently resolves Eve `0.24.4`, `@zigil/agent-gonk@0.1.0`, an
 
 Not supported: importing Sigil Chat's `apps/*`, `packages/*`, generated route tree, `@workspace/*` packages, or its session/auth/persistence policy. The reference checkout is not a starter kit.
 
-## Release checklist
+## Public release checklist
 
-Use **one** local registry: `http://localhost:4873`. Do not start a second Verdaccio process or substitute a different local registry while validating this train.
-
-1. Confirm the designated registry is reachable: `curl --fail http://localhost:4873/-/ping`.
-2. Publish only the exact runtime-contract package set. Do not publish or install Sigil Design components or Chat application source as npm packages. No `workspace:`, `link:`, `file:`, prerelease tag, or caret range is release evidence.
-3. For each changed public package, add a changeset naming the package, smallest semver-justified bump, and changed export. Breaking export/type/behavior changes are major; additive compatible exports minor; compatible repairs patch.
-4. Inspect each tarball before publication: declared exports only; no workspace links or private fixture state.
-5. From a new temporary directory, install the fixture with `npm_config_registry=http://localhost:4873`; run `pnpm install`, inspect the lockfile for the exact resolved train, then run `pnpm verify:contract`, `pnpm smoke`, and typecheck. Capture unabridged output and exit codes. Treat generated-app source proof as a separate source-generation concern, not npm-install evidence.
-6. Record `npm view <package> version --registry http://localhost:4873`, the generated lockfile, and clean-room results in the release report.
+1. Publish only the exact missing runtime-contract versions shown above. Do
+   not publish Sigil Design components or Chat application source as npm
+   packages.
+2. For each package, add a changeset naming the package, the smallest
+   semver-justified bump, and the changed export or behavior.
+3. Inspect every `npm pack --dry-run` result: declared exports only; no
+   `workspace:`, `link:`, `file:`, local paths, credentials, private fixture
+   state, or undeclared runtime dependency.
+4. Verify the exact version with `npm view <name>@<version> version
+--registry=https://registry.npmjs.org` after publication.
+5. Copy this fixture to a new temporary directory outside the monorepo and run
+   `pnpm install --ignore-workspace --frozen-lockfile
+--registry=https://registry.npmjs.org`, `pnpm verify:contract`,
+   `pnpm typecheck`, and `pnpm smoke`.
+6. Add the newly public packages to the fixture only when it has a real
+   consumer path for them. A successful install of an unused dependency is
+   not compatibility evidence.
 
 ### Required publish order
 
-The Gonk train comes first. Publish and verify the complete `@gonk/*@0.3.1`
-train from the `7245017` release input, then install that train before building
-or publishing `@zigil/agent-gonk@0.1.0`: its declaration build imports
-`@gonk/tool-registry/security`. Next publish the exact `@zigil/agent-surface`,
-`agent-eve`, `agent-react`, and `agent-react-query` `0.1.0` packages, then
-`@zigil/agent-gonk@0.1.0`. `sigil@0.1.0` is a local `npx` command surface;
-it is not a source-distribution channel. Chat application source is never an
-npm package.
+Publish the three Gonk host capabilities first: persona and memory before
+Eve-host, because the host consumes their contracts. Verify their public
+tarballs in a clean install. Then publish the four newer `@zigil` adapter
+versions, building each against public dependencies only. `@zigil/agent-gonk`
+and the Gonk Core `0.3.1` packages are already public and do not need a
+gratuitous republish. Chat application source is never an npm package.
 
-## Current release evidence — 2026-07-19
+## Current public-registry evidence — 2026-07-20
 
-The designated launchd-managed registry is live at `localhost:4873` and owns
-the only listener on port 4873. A fresh copied fixture installed the exact
-pinned dependencies from it, passed `verify:contract` and `typecheck`, and
-completed the authenticated MCP `initialize` plus `tools/call` smoke. The
-initial unavailable-registry result is superseded by this captured proof.
+The fixture lockfile and verification commands use the public npm registry
+only. The exact public subset installs without parent-workspace resolution,
+passes the static contract and TypeScript checks, completes authenticated MCP
+`initialize` plus `tools/call`, compiles the application-owned context
+contributor, and boots Eve `0.25.2` independently.
 
-No replacement registry was started and no workspace-linked substitute was
-used. The copied fixture's Eve host also booted successfully at
-`http://127.0.0.1:2000/` with its authored instructions.
-
-`sigil@0.1.0` was published to the designated local registry as the CLI command
-surface. The attempted `@sigil-design/chat-overlay@0.1.0` and `0.1.1` releases
-were removed: Chat application source must not be npm-installed from Sigil
-Design. Do not reintroduce that package as a release target.
+Public-registry lookups for the seven versions listed as “Not public” return
+`E404`. That is the current full-train blocker. No private-registry result,
+workspace link, local tarball, or older-version substitution is accepted as a
+replacement for that missing proof.

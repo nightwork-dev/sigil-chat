@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { ContextCompiler, ContextContributorRegistry } from "@gonk/context";
 import { fixtureResourceProvider } from "../gonk/resource-provider.js";
 
@@ -8,7 +9,11 @@ type RpcResponse = {
   headers: Headers;
   result?: { structuredContent?: { value?: unknown } };
 };
-const child = spawn("pnpm", ["gonk"], {
+const tsxCli = fileURLToPath(
+  new URL("../node_modules/tsx/dist/cli.mjs", import.meta.url),
+);
+const child = spawn(process.execPath, [tsxCli, "gonk/server.ts"], {
+  cwd: fileURLToPath(new URL("..", import.meta.url)),
   env: { ...process.env, GONK_MCP_KEY: token, PORT: String(port) },
   stdio: "inherit",
 });
@@ -57,6 +62,8 @@ try {
 } finally {
   child.kill("SIGTERM");
 }
+
+console.log("external-consumer fixture smoke verified");
 
 async function initialize() {
   let lastError: unknown;
