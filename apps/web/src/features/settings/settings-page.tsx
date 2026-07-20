@@ -93,7 +93,7 @@ export function SettingsPage({
             <AccountSection user={user} />
           </TabsContent>
           <TabsContent value="security">
-            <SecuritySection userId={user.id} />
+            <SecuritySection isOwner={user.role === "owner"} userId={user.id} />
           </TabsContent>
           <TabsContent value="appearance">
             <AppearanceSection userId={user.id} />

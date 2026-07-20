@@ -61,8 +61,10 @@ Local development defaults to `file:.data/sigil-chat.db` and maintains an
 owner-only `.data/auth-secret`. Production must provide `SIGIL_DATABASE_URL`
 and a `BETTER_AUTH_SECRET` of at least 32 characters plus a stable
 `SIGIL_INSTALLATION_ID`; server startup fails closed while the latest committed
-migration is absent. Registration closes after the first owner unless the server
-is started with `SIGIL_AUTH_REGISTRATION=open`.
+migration is absent. Owner-issued member invitations are single-use and expire
+within 24 hours; production also requires a stable
+`SIGIL_INVITE_TOKEN_PEPPER_FILE`. Registration closes after the first owner
+unless the server is started with `SIGIL_AUTH_REGISTRATION=open`.
 
 The browser obtains a five-minute, Eve-audience JWT from the authenticated web
 session. Eve verifies it against the web app's JWKS and binds every created Eve

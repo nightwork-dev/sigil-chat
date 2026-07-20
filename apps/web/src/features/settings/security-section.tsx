@@ -14,6 +14,7 @@ import { SectionHeader } from "@workspace/ui/components/section-header"
 
 import { authClient } from "@/lib/auth/client"
 import { useAuthSessions, useRevokeSession } from "@/lib/auth/sessions"
+import { InvitesSection } from "./invites-section"
 
 function formatTimestamp(value: string): string {
   const date = new Date(value)
@@ -212,7 +213,13 @@ function SessionsList({ userId }: { userId: string }) {
   )
 }
 
-export function SecuritySection({ userId }: { userId: string }) {
+export function SecuritySection({
+  isOwner,
+  userId,
+}: {
+  isOwner: boolean
+  userId: string
+}) {
   return (
     <div className="flex max-w-xl flex-col gap-6 p-4">
       <section className="rounded-lg border border-border p-3">
@@ -222,6 +229,7 @@ export function SecuritySection({ userId }: { userId: string }) {
         <SectionHeader>Active sessions</SectionHeader>
         <SessionsList userId={userId} />
       </section>
+      {isOwner ? <InvitesSection /> : null}
     </div>
   )
 }
