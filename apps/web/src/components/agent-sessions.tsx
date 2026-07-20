@@ -1,3 +1,4 @@
+import { AGENT_PERSONA_HEADER } from "@/lib/agent-session-scope"
 import {
   useCallback,
   useLayoutEffect,
@@ -54,6 +55,7 @@ import {
   createSingleWriteSessionPersistence,
 } from "@/lib/agent-session-persistence"
 import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projector"
+import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
 
 export function AppAgentSessions({ children }: { children: ReactNode }) {
   const threadsQuery = useAgentThreads()
@@ -120,7 +122,7 @@ export function AppAgentSessions({ children }: { children: ReactNode }) {
 
   return (
     <ActiveAgentSession
-      createThread={() => createThread.mutateAsync({})}
+      createThread={(personaId) => createThread.mutateAsync({ personaId })}
       forkThread={() =>
         forkThread.mutateAsync({ sourceThreadId: activeThread.id })
       }
@@ -143,7 +145,7 @@ function ActiveAgentSession({
   threads,
 }: {
   children: ReactNode
-  createThread: () => Promise<unknown>
+  createThread: (personaId: string) => Promise<unknown>
   forkThread: () => Promise<unknown>
   selectThread: (threadId: string) => Promise<unknown>
   thread: AgentThread
@@ -260,7 +262,9 @@ function ActiveAgentSession({
           : {}),
       })),
       createThread: async () => {
-        await persistence.current.afterPersisted(createThread)
+        await persistence.current.afterPersisted(() =>
+          createThread(thread.personaId),
+        )
       },
       forkActiveThread: async () => {
         await persistence.current.afterPersisted(forkThread)
@@ -269,7 +273,14 @@ function ActiveAgentSession({
         await persistence.current.afterPersisted(() => selectThread(threadId))
       },
     }),
-    [createThread, forkThread, selectThread, thread.id, threads],
+    [
+      createThread,
+      forkThread,
+      selectThread,
+      thread.id,
+      thread.personaId,
+      threads,
+    ],
   )
 
   const eveSession = useEveRuntimeSession({
@@ -296,6 +307,10 @@ function ActiveAgentSession({
         try {
           const result = await eveSession.send({
             ...input,
+            headers: {
+              ...input.headers,
+              [AGENT_PERSONA_HEADER]: thread.personaId,
+            },
             clientContext: composeClientContext(
               input.clientContext,
               thread.forkSeed,
@@ -308,7 +323,7 @@ function ActiveAgentSession({
         }
       },
     }),
-    [eveSession, handleSendSuccess, thread.forkSeed],
+    [eveSession, handleSendSuccess, thread.forkSeed, thread.personaId],
   )
 
   return (
@@ -322,8 +337,10 @@ function ActiveAgentSession({
         </div>
       ) : null}
       <AgentRuntimeSessionProvider session={session}>
-        <AgentOutcomeProjector session={session} />
-        {children}
+        <AgentPersonaSessionProvider personaId={thread.personaId}>
+          <AgentOutcomeProjector session={session} />
+          {children}
+        </AgentPersonaSessionProvider>
       </AgentRuntimeSessionProvider>
     </AgentThreadControlsProvider>
   )

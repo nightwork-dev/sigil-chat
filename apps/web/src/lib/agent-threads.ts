@@ -52,11 +52,15 @@ const getAgentThreadFn = createServerFn({ method: "GET" })
   });
 
 const createAgentThreadFn = createServerFn({ method: "POST" })
-  .validator((input: { title?: string }) => input)
+  .validator((input: { personaId: string; title?: string }) => input)
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
+    const { personaRegistry } = await import("@/lib/agent-profile.server");
+    if (!personaRegistry.exists(data.personaId)) {
+      throw new Error(`Persona ${data.personaId} was not found.`);
+    }
     return agentThreadRepository.create(session.user.id, data);
   });
 
@@ -196,7 +200,7 @@ export function useActiveAgentThreadPreference() {
 export function useCreateAgentThread() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { title?: string } = {}) =>
+    mutationFn: (input: { personaId: string; title?: string }) =>
       createAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
       cacheThread(queryClient, thread);
@@ -346,6 +350,7 @@ function upsertThread(
 function projectCachedThreadSummary(thread: AgentThread): AgentThreadSummary {
   return {
     id: thread.id,
+    personaId: thread.personaId,
     title: thread.title,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,

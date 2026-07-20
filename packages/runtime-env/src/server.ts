@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   readRuntimeTopology,
   RuntimeEnvironmentError,
@@ -24,6 +25,11 @@ export interface AgentRuntimeEnvironment {
 export interface StorageRuntimeEnvironment {
   graphPath: string | undefined;
   reviewPath: string | undefined;
+}
+
+export interface IdentityRuntimeEnvironment {
+  personaDir: string;
+  memoryDir: string;
 }
 
 export function readAgentEnvironment(
@@ -53,6 +59,29 @@ export function readStorageEnvironment(
     reviewPath: parseOptionalStoragePath(
       env.SIGIL_CHAT_REVIEW_PATH,
       "SIGIL_CHAT_REVIEW_PATH",
+    ),
+  };
+}
+
+/** Resolve the identity store shared by the web and Eve workspace packages.
+ * Local package scripts run from apps/<host>, so their common default is the
+ * repository-level .data directory. Deployments should provide explicit
+ * mounted paths through SIGIL_PERSONA_DIR and SIGIL_MEMORY_DIR. */
+export function readIdentityEnvironment(
+  env: RuntimeEnvironment,
+  cwd: string = process.cwd(),
+): IdentityRuntimeEnvironment {
+  const sharedDataDir = resolve(cwd, "../..", ".data");
+  return {
+    personaDir: resolve(
+      cwd,
+      parseOptionalStoragePath(env.SIGIL_PERSONA_DIR, "SIGIL_PERSONA_DIR") ??
+        resolve(sharedDataDir, "persona"),
+    ),
+    memoryDir: resolve(
+      cwd,
+      parseOptionalStoragePath(env.SIGIL_MEMORY_DIR, "SIGIL_MEMORY_DIR") ??
+        resolve(sharedDataDir, "memory"),
     ),
   };
 }

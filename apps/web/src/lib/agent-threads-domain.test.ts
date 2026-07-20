@@ -52,6 +52,7 @@ function repository() {
   let timeIndex = 0;
   let id = 0;
   return new AgentThreadRepository({
+    defaultPersonaId: "agent-a",
     threads: new MemoryKv(),
     preferences: new MemoryKv(),
     now: () => new Date(timestamps[timeIndex++] ?? timestamps.at(-1)),
@@ -63,7 +64,10 @@ describe("AgentThreadRepository", () => {
   it("creates independently resumable threads and lists newest first", () => {
     const repo = repository();
     const first = repo.create(USER_A, { title: "Launch review" });
-    const second = repo.create(USER_A, { title: "Incident analysis" });
+    const second = repo.create(USER_A, {
+      personaId: "agent-b",
+      title: "Incident analysis",
+    });
 
     expect(first.eve).toEqual({
       session: { streamIndex: 0 },
@@ -80,6 +84,8 @@ describe("AgentThreadRepository", () => {
       first.id,
     ]);
     expect(repo.getActivePreference(USER_A).activeThreadId).toBe(second.id);
+    expect(first.personaId).toBe("agent-a");
+    expect(second.personaId).toBe("agent-b");
   });
 
   it("ensures one default active thread for first-load query paths", () => {
@@ -94,6 +100,27 @@ describe("AgentThreadRepository", () => {
       status: "active",
     });
     expect(repo.ensureActive(USER_A)).toHaveLength(1);
+  });
+
+  it("projects legacy threads through the configured default persona", () => {
+    const threads = new MemoryKv<AgentThread>();
+    const preferences = new MemoryKv<AgentThreadPreference>();
+    const repo = new AgentThreadRepository({
+      defaultPersonaId: "agent-default",
+      threads,
+      preferences,
+      createId: () => "thread-legacy",
+      now: () => new Date("2026-07-16T10:00:00.000Z"),
+    });
+    const created = repo.create(USER_A, { personaId: "agent-old" });
+    const legacy = structuredClone(created) as Partial<AgentThread>;
+    delete legacy.personaId;
+    threads.set(`thread:${created.id}`, legacy as AgentThread);
+
+    expect(repo.get(USER_A, created.id)?.personaId).toBe("agent-default");
+    expect(threads.get(`thread:${created.id}`)?.personaId).toBe(
+      "agent-default",
+    );
   });
 
   it("persists a bounded redacted event read model with its receipt", () => {
@@ -252,6 +279,7 @@ describe("AgentThreadRepository", () => {
     });
 
     expect(fork.forkedFrom).toBe(source.id);
+    expect(fork.personaId).toBe(source.personaId);
     expect(fork.eve).toEqual({
       session: { streamIndex: 0 },
       events: [],
@@ -379,7 +407,11 @@ describe("AgentThreadRepository", () => {
       activeThreadId: "legacy",
       updatedAt: "2026-07-16T10:00:00.000Z",
     } as unknown as AgentThreadPreference);
-    const repo = new AgentThreadRepository({ threads, preferences });
+    const repo = new AgentThreadRepository({
+      defaultPersonaId: "agent-a",
+      threads,
+      preferences,
+    });
 
     expect(() => repo.claimLegacyRecords([USER_A, "user-b"])).toThrow(
       LegacyAgentThreadClaimRefusedError,

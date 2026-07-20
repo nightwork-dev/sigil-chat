@@ -10,6 +10,7 @@ import {
   MessageSquareIcon,
   NetworkIcon,
   SettingsIcon,
+  UserRoundIcon,
 } from "lucide-react"
 import type { NavModel } from "@workspace/ui/components/layouts/nav"
 
@@ -17,6 +18,7 @@ export const appNav: NavModel = {
   brand: { label: "Sigil Chat", to: "/chat" },
   items: [
     { to: "/chat", label: "Chat", icon: MessageSquareIcon },
+    { to: "/agents", label: "Agent", icon: UserRoundIcon },
     { to: "/studio", label: "Studio", icon: NetworkIcon },
     { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
     { to: "/roadmap", label: "Roadmap", icon: MapIcon },

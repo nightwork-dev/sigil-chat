@@ -45,6 +45,7 @@ const harness = vi.hoisted(() => ({
   // overlapping-send guard.
   pendingSend: null as Promise<AgentTurnResult> | null,
   eveSendCallCount: 0,
+  lastEveSendInput: null as { headers?: Record<string, string> } | null,
 }));
 
 let repository: AgentThreadRepository;
@@ -57,8 +58,9 @@ vi.mock("@zigil/agent-eve", () => ({
       capabilities: { reset: true, stop: true, streaming: true },
       data: { messages: [] },
       status: "idle",
-      send: () => {
+      send: (input: { headers?: Record<string, string> }) => {
         harness.eveSendCallCount += 1;
+        harness.lastEveSendInput = input;
         if (harness.pendingSend) return harness.pendingSend;
         if (harness.nextSnapshot) callbacks.onFinish?.(harness.nextSnapshot);
         return Promise.resolve(
@@ -103,7 +105,7 @@ vi.mock("@/lib/agent-threads", () => ({
     },
   }),
   useCreateAgentThread: () => ({
-    mutateAsync: (input: { title?: string }) =>
+    mutateAsync: (input: { personaId?: string; title?: string }) =>
       Promise.resolve(repository.create(TEST_USER_ID, input)),
   }),
   useForkAgentThread: () => ({
@@ -173,6 +175,7 @@ beforeEach(() => {
   harness.sendResult = null;
   harness.pendingSend = null;
   harness.eveSendCallCount = 0;
+  harness.lastEveSendInput = null;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -206,6 +209,9 @@ describe("AppAgentSessions persistence call site", () => {
     expect(harness.expectedRevisions).toEqual([
       { operation: "snapshot", revision: thread.revision },
     ]);
+    expect(harness.lastEveSendInput?.headers).toMatchObject({
+      "x-sigil-persona-id": "agent-a",
+    });
     expect(repository.get(TEST_USER_ID, thread.id)).toMatchObject({
       forkSeed: thread.forkSeed,
       revision: thread.revision + 1,
@@ -224,6 +230,7 @@ describe("AppAgentSessions persistence call site", () => {
     await act(async () => {
       harness.nextSnapshot = snapshot(2);
       await harness.session?.send({
+        headers: { "x-sigil-persona-id": "agent-b" },
         message: "Name the rollback owner",
       });
     });
@@ -362,6 +369,7 @@ function snapshot(streamIndex: number): EveAgentStoreSnapshot<EveMessageData> {
 
 function createRepository(): AgentThreadRepository {
   return new AgentThreadRepository({
+    defaultPersonaId: "agent-a",
     createId: (() => {
       let id = 0;
       return () => `thread-${++id}`;

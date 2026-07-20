@@ -14,7 +14,7 @@ import {
 } from "./sigil-context"
 
 const SESSION_AUTH = {
-  attributes: {},
+  attributes: { sigilPersonaId: "agent-a" } as Record<string, string>,
   authenticator: "test",
   principalId: "user-1",
   principalType: "user",
@@ -38,7 +38,9 @@ describe("Sigil Eve context integration", () => {
     expect(send).toHaveBeenCalledOnce()
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("Client context:")
-    expect(JSON.stringify(payload)).toContain("Managed skill: editorial-readiness")
+    expect(JSON.stringify(payload)).toContain(
+      "Managed skill: editorial-readiness",
+    )
     expect(JSON.stringify(payload)).toContain("AUTHORIZED_EDITORIAL_CONTEXT")
   })
 
@@ -57,11 +59,17 @@ describe("Sigil Eve context integration", () => {
     expect(response.status).toBe(202)
     expect(send).toHaveBeenCalledOnce()
     const [payload] = firstSendCall(send)
-    expect(JSON.stringify(payload)).not.toContain("AUTHORIZED_EDITORIAL_CONTEXT")
+    expect(JSON.stringify(payload)).not.toContain(
+      "AUTHORIZED_EDITORIAL_CONTEXT",
+    )
   })
 
   it("uses a non-blank provisional identity when Eve has not assigned a session id yet", async () => {
-    const identities: Array<{ eveSessionId: string; principalId: string }> = []
+    const identities: Array<{
+      eveSessionId: string
+      personaId: string
+      principalId: string
+    }> = []
     const channel = testChannel({
       compiler: compilerWith([]),
       identityFloor: (identity) => {
@@ -74,7 +82,11 @@ describe("Sigil Eve context integration", () => {
     await postSession(channel, send, { message: "hello" })
 
     expect(identities).toEqual([
-      { eveSessionId: "new:user-1", principalId: "user-1" },
+      {
+        eveSessionId: "new:user-1",
+        personaId: "agent-a",
+        principalId: "user-1",
+      },
     ])
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("IDENTITY_FLOOR")
@@ -84,7 +96,10 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: { sigilResourceScope: "session:sess-1" },
+        attributes: {
+          sigilPersonaId: "agent-a",
+          sigilResourceScope: "session:sess-1",
+        },
       },
       compiler: compilerWith([]),
       readBlackboard: async (sessionId) =>
@@ -106,7 +121,10 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: { sigilResourceScope: "project:proj-1" },
+        attributes: {
+          sigilPersonaId: "agent-a",
+          sigilResourceScope: "project:proj-1",
+        },
       },
       compiler: compilerWith([]),
       readBlackboard: async () => "SHOULD_NOT_APPEAR",
@@ -197,7 +215,6 @@ describe("Sigil Eve context integration", () => {
     expect(response.status).toBe(204)
     expect(send).not.toHaveBeenCalled()
   })
-
 
   it("fails closed for unsupported principal types", async () => {
     const channel = testChannel({
@@ -339,7 +356,11 @@ describe("Sigil Eve context integration", () => {
 function testChannel(options: {
   auth?: typeof SESSION_AUTH
   compiler: ContextCompiler
-  identityFloor?: (input: { eveSessionId: string; principalId: string }) => string
+  identityFloor?: (input: {
+    eveSessionId: string
+    personaId: string
+    principalId: string
+  }) => string
   pinnedResourceKeys?: readonly string[]
   readBlackboard?: (sessionId: string) => Promise<string>
 }) {
@@ -388,7 +409,9 @@ async function postSession(
   )
 }
 
-function compilerWith(contributors: Parameters<ContextContributorRegistry["register"]>[0][]) {
+function compilerWith(
+  contributors: Parameters<ContextContributorRegistry["register"]>[0][],
+) {
   const registry = new ContextContributorRegistry()
   for (const contributor of contributors) registry.register(contributor)
   return new ContextCompiler({
@@ -400,7 +423,10 @@ function compilerWith(contributors: Parameters<ContextContributorRegistry["regis
 
 const tokenCounter = {
   async count(input: { content: string }) {
-    return { tokens: Math.max(1, Math.ceil(input.content.length / 4)), quality: "fallback" as const }
+    return {
+      tokens: Math.max(1, Math.ceil(input.content.length / 4)),
+      quality: "fallback" as const,
+    }
   },
 }
 

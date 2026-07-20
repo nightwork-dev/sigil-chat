@@ -23,6 +23,7 @@ export interface AgentThreadForkSeed {
 export interface AgentThread {
   members: string[];
   id: string;
+  personaId: string;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -45,6 +46,7 @@ export interface AgentThreadPreference {
 
 export interface AgentThreadSummary {
   id: string;
+  personaId: string;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -63,6 +65,7 @@ export interface AgentThreadKvStore<T> {
 export interface AgentThreadRepositoryOptions {
   threads: AgentThreadKvStore<AgentThread>;
   preferences: AgentThreadKvStore<AgentThreadPreference>;
+  defaultPersonaId: string;
   now?: () => Date;
   createId?: () => string;
 }
@@ -110,12 +113,14 @@ export class AgentThreadNotFoundError extends Error {
 export class AgentThreadRepository {
   private readonly threads: AgentThreadKvStore<AgentThread>;
   private readonly preferences: AgentThreadKvStore<AgentThreadPreference>;
+  private readonly defaultPersonaId: string;
   private readonly now: () => Date;
   private readonly createId: () => string;
 
   constructor(options: AgentThreadRepositoryOptions) {
     this.threads = options.threads;
     this.preferences = options.preferences;
+    this.defaultPersonaId = normalizePersonaId(options.defaultPersonaId);
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? (() => crypto.randomUUID());
   }
@@ -123,7 +128,7 @@ export class AgentThreadRepository {
   list(userId: string, includeArchived = false): AgentThread[] {
     return this.threads
       .entries(THREAD_KEY_PREFIX)
-      .map(({ value }) => cloneThread(value))
+      .map(({ value }) => this.normalizeThread(value))
       .filter((thread) => isMember(thread.members, userId))
       .filter((thread) => includeArchived || thread.status === "active")
       .sort(
@@ -139,17 +144,22 @@ export class AgentThreadRepository {
   }
 
   get(userId: string, id: string): AgentThread | undefined {
-    const thread = this.threads.get(threadKey(id));
+    const stored = this.threads.get(threadKey(id));
+    const thread = stored ? this.normalizeThread(stored) : undefined;
     return thread && isMember(thread.members, userId)
       ? cloneThread(thread)
       : undefined;
   }
 
-  create(userId: string, input: { title?: string } = {}): AgentThread {
+  create(
+    userId: string,
+    input: { personaId?: string; title?: string } = {},
+  ): AgentThread {
     const timestamp = this.now().toISOString();
     const thread: AgentThread = {
       members: [userId],
       id: this.createId(),
+      personaId: normalizePersonaId(input.personaId ?? this.defaultPersonaId),
       title: normalizeTitle(input.title),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -235,6 +245,7 @@ export class AgentThreadRepository {
     const fork: AgentThread = {
       members: [...source.members],
       id: this.createId(),
+      personaId: source.personaId,
       title: normalizeTitle(input.title ?? `${source.title} — fork`),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -311,7 +322,8 @@ export class AgentThreadRepository {
   }
 
   private require(userId: string, id: string): AgentThread {
-    const thread = this.threads.get(threadKey(id));
+    const stored = this.threads.get(threadKey(id));
+    const thread = stored ? this.normalizeThread(stored) : undefined;
     if (!thread || !isMember(thread.members, userId))
       throw new AgentThreadNotFoundError(id);
     return cloneThread(thread);
@@ -319,6 +331,17 @@ export class AgentThreadRepository {
 
   private write(thread: AgentThread) {
     this.threads.set(threadKey(thread.id), cloneThread(thread));
+  }
+
+  private normalizeThread(thread: AgentThread): AgentThread {
+    const hasPersonaId =
+      typeof thread.personaId === "string" && thread.personaId.trim()
+    const normalized = cloneThread({
+      ...thread,
+      personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
+    });
+    if (!hasPersonaId) this.threads.set(threadKey(thread.id), normalized);
+    return normalized;
   }
 
   claimLegacyRecords(userIds: readonly string[]): LegacyClaimResult {
@@ -367,6 +390,7 @@ export function projectAgentThreadSummary(
 ): AgentThreadSummary {
   return {
     id: thread.id,
+    personaId: thread.personaId,
     title: thread.title,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
@@ -438,6 +462,13 @@ function trimmedForkMessage(
 function normalizeTitle(title?: string): string {
   const normalized = title?.trim();
   return normalized || DEFAULT_THREAD_TITLE;
+}
+
+function normalizePersonaId(personaId: string): string {
+  const normalized = personaId.trim();
+  if (!normalized)
+    throw new Error("Agent thread persona id must be non-empty.");
+  return normalized;
 }
 
 function threadKey(id: string): string {

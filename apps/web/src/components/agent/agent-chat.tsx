@@ -1,5 +1,12 @@
 import { useCallback, useState, type ReactNode } from "react"
 import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover"
+import {
   AlertTriangleIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -75,6 +82,9 @@ import {
 } from "@workspace/ui/components/tool-renderer-registry"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
+import { useAgentRoster } from "@/lib/agent-profile"
+import { useCreateAgentThread } from "@/lib/agent-threads"
+import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import {
   AGENT_SCOPE_HEADER,
   sessionResourceScope,
@@ -110,6 +120,11 @@ export function AgentChat({
   statusLine = null,
 }: AgentChatProps) {
   const session = useAppAgentSession(providedSession)
+  const personaId = useAgentPersonaSession()
+  const roster = useAgentRoster()
+  const personaName = roster.data?.find(
+    (persona) => persona.id === personaId,
+  )?.name
   const attention = useAttention()
   const threadControls = useAgentThreadControls()
   const [input, setInput] = useState("")
@@ -217,7 +232,11 @@ export function AgentChat({
               </span>
             ) : null}
             {threadControls ? (
-              <AgentSessionSwitcher busy={busy} controls={threadControls} />
+              <AgentSessionSwitcher
+                busy={busy}
+                controls={threadControls}
+                personaName={personaName ?? personaId ?? undefined}
+              />
             ) : null}
           </div>
         ) : null}
@@ -266,17 +285,7 @@ export function AgentChat({
                   >
                     <GitForkIcon />
                   </Button>
-                  <Button
-                    aria-label="Create agent session"
-                    className="max-sm:size-11"
-                    disabled={busy}
-                    onClick={() => void threadControls.createThread()}
-                    size="icon-xs"
-                    title="New session"
-                    variant="ghost"
-                  >
-                    <PlusIcon />
-                  </Button>
+                  <NewSessionPersonaPicker busy={busy} />
                 </>
               ) : (
                 <Button
@@ -349,12 +358,76 @@ export function AgentChat({
   )
 }
 
+function NewSessionPersonaPicker({ busy }: { busy: boolean }) {
+  const [open, setOpen] = useState(false)
+  const roster = useAgentRoster()
+  const createThread = useCreateAgentThread()
+  const disabled = busy || createThread.isPending
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger
+        disabled={disabled}
+        render={
+          <Button
+            aria-label="Create agent session"
+            className="max-sm:size-11"
+            size="icon-xs"
+            title="New session"
+            variant="ghost"
+          />
+        }
+      >
+        <PlusIcon />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 gap-2 p-2">
+        <PopoverHeader className="px-2 pb-1 pt-1">
+          <PopoverTitle>Choose an agent</PopoverTitle>
+        </PopoverHeader>
+        {roster.isPending ? (
+          <p className="px-2 py-3 text-muted-foreground">Loading agents…</p>
+        ) : roster.isError ? (
+          <p className="px-2 py-3 text-destructive">Agents are unavailable.</p>
+        ) : roster.data.length === 0 ? (
+          <p className="px-2 py-3 text-muted-foreground">
+            No agents are available.
+          </p>
+        ) : (
+          <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+            {roster.data.map((persona) => (
+              <button
+                className="flex min-h-11 flex-col rounded-md px-3 py-2 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={disabled}
+                key={persona.id}
+                onClick={() =>
+                  createThread.mutate(
+                    { personaId: persona.id },
+                    { onSuccess: () => setOpen(false) },
+                  )
+                }
+                type="button"
+              >
+                <span className="font-medium">{persona.name}</span>
+                <span className="line-clamp-1 text-muted-foreground">
+                  {persona.description || persona.id}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function AgentSessionSwitcher({
   busy,
   controls,
+  personaName,
 }: {
   busy: boolean
   controls: NonNullable<ReturnType<typeof useAgentThreadControls>>
+  personaName?: string
 }) {
   const activeThread = controls.threads.find(
     (thread) => thread.id === controls.activeThreadId,
@@ -376,6 +449,7 @@ function AgentSessionSwitcher({
       >
         <MessageSquareTextIcon />
         <span className="min-w-0 truncate max-sm:sr-only">
+          {personaName ? `${personaName} · ` : ""}
           {activeThread?.title ?? "Conversation history"}
         </span>
       </SheetTrigger>

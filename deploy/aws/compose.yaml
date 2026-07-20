@@ -56,8 +56,14 @@ services:
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
       EVE_ORIGIN: http://eve:3001
       GONK_MCP_URL: http://gonk:8808/mcp
+      SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
+      SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
     secrets: [better_auth_secret, gonk_mcp_key]
-    volumes: [web_data:/var/lib/sigil-web, web_scope:/app/.agents, web_appdata:/app/.data]
+    volumes:
+      - web_data:/var/lib/sigil-web
+      - web_scope:/app/.agents
+      - web_appdata:/app/.data
+      - eve_identity:/var/lib/sigil-identity:ro
     expose: ["3000"]
     networks: [backend]
 
