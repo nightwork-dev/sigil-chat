@@ -350,6 +350,65 @@ describe("Sigil Chat Gonk registry", () => {
     });
   });
 
+  it("keeps derivation identity and provenance when edited bytes deduplicate", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-dedupe-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const sourceBytes = new Uint8Array([1, 2, 3]);
+    const source = await artifacts.putFile({
+      bytes: sourceBytes,
+      filename: "portrait.png",
+      mediaType: "image/png",
+      scope: "thread-image-dedupe",
+    });
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(registry, artifacts, async () => ({
+      bytes: sourceBytes,
+      mediaType: "image/png",
+      backend: "test-backend",
+    }));
+
+    const first = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        { sourceArtifactId: source.id, instruction: "Preserve every pixel" },
+        makeBaseContext({ host: { sessionScope: "thread-image-dedupe" } }),
+      ),
+    );
+    const second = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        { sourceArtifactId: source.id, instruction: "Keep it unchanged" },
+        makeBaseContext({ host: { sessionScope: "thread-image-dedupe" } }),
+      ),
+    );
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    const firstId = (first as { data: { artifactId: string } }).data.artifactId;
+    const secondId = (second as { data: { artifactId: string } }).data.artifactId;
+    expect(firstId).not.toBe(source.id);
+    expect(secondId).not.toBe(source.id);
+    expect(secondId).not.toBe(firstId);
+
+    const files = await artifacts.listBySession("thread-image-dedupe");
+    expect(files).toHaveLength(3);
+    expect(files.find((file) => file.id === firstId)?.provenance).toMatchObject({
+      sourceArtifactId: source.id,
+      instruction: "Preserve every pixel",
+      backend: "test-backend",
+    });
+    expect(files.find((file) => file.id === secondId)?.provenance).toMatchObject({
+      sourceArtifactId: source.id,
+      instruction: "Keep it unchanged",
+      backend: "test-backend",
+    });
+  });
+
   it("persists an inline edit source and fails loudly without a backend", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-fail-"));
     temporaryDirectories.push(directory);

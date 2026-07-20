@@ -73,6 +73,27 @@ export function uploadKeyFor(
   return `uploads/${digest}.${ext}`
 }
 
+function derivedUploadKeyFor(
+  bytes: Uint8Array,
+  mediaType: string,
+  filename: string | undefined,
+  provenance: ArtifactProvenance,
+): string {
+  const contentDigest = createHash("sha256").update(bytes).digest("hex")
+  const derivationDigest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        backend: provenance.backend,
+        instruction: provenance.instruction,
+        kind: provenance.kind,
+        sourceArtifactId: provenance.sourceArtifactId,
+      }),
+    )
+    .digest("hex")
+  const ext = EXT_BY_MIME[mediaType] ?? extensionFromFilename(filename) ?? "bin"
+  return `uploads/${contentDigest}-derived-${derivationDigest}.${ext}`
+}
+
 export interface SessionArtifactMetadata {
   readonly id: string
   readonly filename: string
@@ -152,7 +173,14 @@ export class SessionArtifactStore {
     await this.assertScopeAccess(principal, scope)
 
     return this.withScopeLock(scope, async () => {
-      const id = uploadKeyFor(input.bytes, input.mediaType, input.filename)
+      const id = input.provenance
+        ? derivedUploadKeyFor(
+            input.bytes,
+            input.mediaType,
+            input.filename,
+            input.provenance,
+          )
+        : uploadKeyFor(input.bytes, input.mediaType, input.filename)
       const existing = (await this.listByScope(scope, principal)).find(
         (artifact) => artifact.id === id,
       )
