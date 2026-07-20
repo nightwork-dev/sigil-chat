@@ -159,11 +159,13 @@ services:
       SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
       SIGIL_ARTIFACT_DIR: /var/lib/sigil-gonk/artifacts
       SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      CODEX_HOME: /var/lib/sigil-codex
     secrets: [gonk_mcp_key]
     volumes:
       - gonk_data:/var/lib/sigil-gonk
       - gonk_scope:/app/.agents
       - blackboard_data:/var/lib/sigil-blackboard
+      - codex_auth:/var/lib/sigil-codex:ro
     expose: ["8808"]
     healthcheck:
       test:

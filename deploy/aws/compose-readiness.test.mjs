@@ -49,14 +49,15 @@ test("production services share writable blackboard storage", () => {
   assert.match(compose, /SIGIL_ARTIFACT_DIR: \/var\/lib\/sigil-gonk\/artifacts/)
 })
 
-test("only Eve receives the persistent Codex credential volume", () => {
+test("Eve and Gonk share the persistent Codex credential volume", () => {
   const eveStart = compose.indexOf("\n  eve:")
   const gonkStart = compose.indexOf("\n  gonk:")
   const eve = compose.slice(eveStart, gonkStart)
   const gonk = compose.slice(gonkStart, compose.indexOf("\n  edge:"))
   assert.match(eve, /CODEX_HOME: \/var\/lib\/sigil-codex/)
   assert.match(eve, /codex_auth:\/var\/lib\/sigil-codex/)
-  assert.doesNotMatch(gonk, /CODEX_HOME|codex_auth/)
+  assert.match(gonk, /CODEX_HOME: \/var\/lib\/sigil-codex/)
+  assert.match(gonk, /codex_auth:\/var\/lib\/sigil-codex:ro/)
 })
 
 test("production image disables KVM tools during Eve compilation", () => {
