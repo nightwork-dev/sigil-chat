@@ -230,7 +230,7 @@ resource "aws_ssm_document" "deploy_release" {
         name: downloadManifest
         inputs:
           sourceType: S3
-          sourceInfo: '{"path":"s3://${aws_s3_bucket.artifacts.bucket}/releases/{{ ReleaseSha }}/sigil-images.env"}'
+          sourceInfo: '{"path":"https://s3.${var.aws_region}.amazonaws.com/${aws_s3_bucket.artifacts.bucket}/releases/{{ ReleaseSha }}/sigil-images.env"}'
           destinationPath: '/opt/sigil-chat/releases/{{ ReleaseSha }}'
       - action: aws:runShellScript
         name: deployRelease

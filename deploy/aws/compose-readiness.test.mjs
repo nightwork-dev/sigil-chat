@@ -6,6 +6,10 @@ import test from "node:test"
 const directory = new URL(".", import.meta.url).pathname
 const compose = readFileSync(resolve(directory, "compose.yaml"), "utf8")
 const runbook = readFileSync(resolve(directory, "EXECUTION-RUNBOOK.md"), "utf8")
+const releaseTerraform = readFileSync(
+  resolve(directory, "terraform/release.tf"),
+  "utf8",
+)
 
 test("fresh deployment orders containers on Eve liveness, not model auth", () => {
   const eveService = compose.slice(
@@ -25,6 +29,15 @@ test("runbook proves model readiness only after device login", () => {
   assert.ok(login >= 0)
   assert.ok(readiness > login)
   assert.ok(edge > readiness)
+})
+
+test("SSM downloads release manifests from an HTTPS S3 URL", () => {
+  assert.match(releaseTerraform, /sourceType: S3/)
+  assert.match(
+    releaseTerraform,
+    /sourceInfo: '\{"path":"https:\/\/s3\.\$\{var\.aws_region\}\.amazonaws\.com\//,
+  )
+  assert.doesNotMatch(releaseTerraform, /sourceInfo: '\{"path":"s3:\/\//)
 })
 
 test("update command stops the public edge before replacing services", () => {
