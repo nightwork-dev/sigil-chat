@@ -76,7 +76,7 @@ describe("Sigil Chat Gonk registry", () => {
     const written = await collectToolOutcome(
       registry.invoke(
         "sigil-blackboard-write",
-        { content: "Shared note" },
+        { content: "Shared note", expectedRevision: "" },
         context,
       ),
     );
@@ -88,7 +88,10 @@ describe("Sigil Chat Gonk registry", () => {
     const oversized = await collectToolOutcome(
       registry.invoke(
         "sigil-blackboard-write",
-        { content: "x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1) },
+        {
+          content: "x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1),
+          expectedRevision: "",
+        },
         context,
       ),
     );

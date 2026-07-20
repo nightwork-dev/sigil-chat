@@ -23,6 +23,7 @@ import type {
 import { FilesystemManagedSkillRegistry } from "@gonk/skills"
 import type { UserContent } from "ai"
 import type { EveMessageContext, EveMessageResult } from "eve/channels/eve"
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
 
 type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
@@ -105,14 +106,20 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       const sessionId = sessionIdFromScope(readScopeAttribute(ctx.eve.caller))
       if (sessionId !== null) {
         try {
-          const blackboard = (await options.readBlackboard(sessionId)).trim()
-          if (blackboard.length > 0) {
-            blocks.push(
-              `## Shared blackboard (session scratch space)\n` +
-                `A scratch space you and the user both edit; it persists across ` +
-                `the session. Update it with the sigil-blackboard-write tool. ` +
-                `Current contents:\n\n${blackboard}`,
-            )
+          const block = blackboardContextBlock(
+            await options.readBlackboard(sessionId),
+          )
+          if (block) {
+            const withBlackboard = [...blocks, block].join("\n\n")
+            if (
+              await contextFitsBudget(
+                withBlackboard,
+                options.maxTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
+                options.model,
+              )
+            ) {
+              blocks.push(block)
+            }
           }
         } catch {
           // Blackboard context is best-effort; a read failure is not fatal.
@@ -125,6 +132,31 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       context: blocks.length > 0 ? blocks : undefined,
     }
   }
+}
+
+export function blackboardContextBlock(content: string): string | undefined {
+  const blackboard = content.trim()
+  if (
+    blackboard.length === 0 ||
+    blackboard.length > MAX_BLACKBOARD_CONTENT_CHARS
+  ) {
+    return undefined
+  }
+  return (
+    `## Shared blackboard (session scratch space)\n` +
+    `A scratch space you and the user both edit; it persists across ` +
+    `the session. Update it with the sigil-blackboard-write tool. ` +
+    `Current contents:\n\n${blackboard}`
+  )
+}
+
+export async function contextFitsBudget(
+  content: string,
+  maxTokens: number,
+  model?: string,
+): Promise<boolean> {
+  const count = await fallbackTokenCounter.count({ content, model })
+  return count.tokens <= maxTokens
 }
 
 function requireNonBlankCallerPrincipal(value: string | undefined): string {

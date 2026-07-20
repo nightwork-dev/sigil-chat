@@ -771,13 +771,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-blackboard-write",
     description:
-      "Replace the shared markdown blackboard for the current session. Use an empty content string to clear it.",
+      "Replace the shared markdown blackboard for the current session after reading it. Pass the read result's revision as expectedRevision; use an empty content string to clear it.",
     visibility: "always",
     approval: "write",
     schema: {
       type: "object",
-      required: ["content"],
-      properties: ["content"],
+      required: ["content", "expectedRevision"],
+      properties: ["content", "expectedRevision"],
       additionalProperties: false,
     },
     mcpAnnotations: {

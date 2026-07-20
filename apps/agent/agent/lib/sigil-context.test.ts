@@ -5,8 +5,11 @@ import {
   type ContextContributor,
 } from "@gonk/context"
 import type { ManagedSkillRegistry } from "@gonk/skills"
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
 import { eveChannel } from "eve/channels/eve"
 import {
+  blackboardContextBlock,
+  contextFitsBudget,
   createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
   createSkillContextContributor,
@@ -20,6 +23,18 @@ const SESSION_AUTH = {
 }
 
 describe("Sigil Eve context integration", () => {
+  it("omits oversized legacy blackboards from turn context", () => {
+    expect(
+      blackboardContextBlock("x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1)),
+    ).toBeUndefined()
+    expect(blackboardContextBlock("Shared note")).toContain("Shared note")
+  })
+
+  it("keeps appended context inside the turn budget", async () => {
+    await expect(contextFitsBudget("x".repeat(100), 24)).resolves.toBe(false)
+    await expect(contextFitsBudget("x".repeat(100), 25)).resolves.toBe(true)
+  })
+
   it("does not advertise retrieval when the default compiler has no retrieval source", async () => {
     const compiler = createDefaultSigilContextCompiler({
       agentProjectRoot: process.cwd(),
