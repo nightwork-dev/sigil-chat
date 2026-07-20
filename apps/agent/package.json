@@ -18,9 +18,9 @@
   "dependencies": {
     "@gonk/auth": "0.3.1",
     "@gonk/context": "0.3.1",
-    "@gonk/eve-host": "file:../../vendor/gonk-eve-host-0.5.0.tgz",
-    "@gonk/memory": "file:../../vendor/gonk-memory-0.5.0.tgz",
-    "@gonk/persona": "file:../../vendor/gonk-persona-0.5.0.tgz",
+    "@gonk/eve-host": "0.5.1-mem2.6",
+    "@gonk/memory": "0.5.1-mem2.5",
+    "@gonk/persona": "0.5.1-mem2.5",
     "@gonk/retrieval": "0.3.1",
     "@gonk/scope": "0.3.1",
     "@gonk/skills": "0.3.1",

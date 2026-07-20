@@ -4,15 +4,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@gonk/memory': file:./vendor/gonk-memory-0.5.0.tgz
-  '@gonk/persona': file:./vendor/gonk-persona-0.5.0.tgz
-  '@gonk/eve-host': file:./vendor/gonk-eve-host-0.5.0.tgz
-
 patchedDependencies:
-  '@gonk/eve-host@0.5.0':
-    hash: 7l7xdogbnebhalrqybcra4zzda
-    path: patches/@gonk__eve-host@0.5.0.patch
   eve@0.25.2:
     hash: gxkscaahtzi5fyieukg7diml4i
     path: patches/eve@0.25.2.patch
@@ -52,14 +44,14 @@ importers:
         specifier: 0.3.1
         version: 0.3.1
       '@gonk/eve-host':
-        specifier: file:./vendor/gonk-eve-host-0.5.0.tgz
-        version: file:apps/agent/vendor/gonk-eve-host-0.5.0.tgz(patch_hash=7l7xdogbnebhalrqybcra4zzda)(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
+        specifier: 0.5.1-mem2.6
+        version: 0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
       '@gonk/memory':
-        specifier: file:./vendor/gonk-memory-0.5.0.tgz
-        version: file:apps/agent/vendor/gonk-memory-0.5.0.tgz
+        specifier: 0.5.1-mem2.5
+        version: 0.5.1-mem2.5
       '@gonk/persona':
-        specifier: file:./vendor/gonk-persona-0.5.0.tgz
-        version: file:apps/agent/vendor/gonk-persona-0.5.0.tgz
+        specifier: 0.5.1-mem2.5
+        version: 0.5.1-mem2.5
       '@gonk/retrieval':
         specifier: 0.3.1
         version: 0.3.1(sqlite-vec@0.1.9)
@@ -1361,22 +1353,19 @@ packages:
   '@gonk/context@0.3.1':
     resolution: {integrity: sha512-uxMwkTQOMf31EXBmQC+LRruivV4NsTWTYuMUKUlTbOijpHEttcEnLzSWV/ij48ja+oEgnKv0yvx3Hln+8D9ofA==}
 
-  '@gonk/embedding@0.5.0':
-    resolution: {integrity: sha512-LCjzu8TeWLwcSpWdd8qr9A6TpszwTJufQ5yUBaqc50giZEfkrUNzB+xlA34cwBwAQJLuntLVs6CDfno4GmIJZA==}
+  '@gonk/embedding@0.5.1-mem2.5':
+    resolution: {integrity: sha512-4N6uWJjOQh5pMOl7vt3gCqeifkBO23aKxph05/HDOmCLf/iHzX/SWxFmJxW/RvUhsi536wBGUT9K+LazNKtxtQ==}
 
-  '@gonk/eve-host@file:apps/agent/vendor/gonk-eve-host-0.5.0.tgz':
-    resolution: {integrity: sha512-LdCyfLPi5nZ3ZLWEGYe5vjik1cNUmOMEJm3TcwdLn7X/+3RzHD3ErjOcSzBoL6w3m7f0kZ0o1uxgRo5cCHE9qw==, tarball: file:apps/agent/vendor/gonk-eve-host-0.5.0.tgz}
-    version: 0.5.0
+  '@gonk/eve-host@0.5.1-mem2.6':
+    resolution: {integrity: sha512-KU53NdzoijDNQ6hAIjSGWWSiFJPfOV5cRFwN1vN7ER9easahSPnQiYjIh5rG5dU+n0Ncdfs2YDjqgFoFzjwo7w==}
     peerDependencies:
       eve: '*'
 
-  '@gonk/memory@file:apps/agent/vendor/gonk-memory-0.5.0.tgz':
-    resolution: {integrity: sha512-raEXqltQR5my4uFVzP59EuTOgOGiBCqtD2E6fh3KGTQ31u3+MOeMd/9XyF53siKZmMILEAK6zOTD9eaWreIkpQ==, tarball: file:apps/agent/vendor/gonk-memory-0.5.0.tgz}
-    version: 0.5.0
+  '@gonk/memory@0.5.1-mem2.5':
+    resolution: {integrity: sha512-eFFk3c+BpnjdjyFMc/UCjUlAngfuxuGNDllrLe3HGYZ5fQ0VqTye4X8X+kixblEWt0LHVTk7hkJa7uqkN6ClUw==}
 
-  '@gonk/persona@file:apps/agent/vendor/gonk-persona-0.5.0.tgz':
-    resolution: {integrity: sha512-nJUR9cJ0sfKHeCuTJhwesX5d84wjL/sysrr+3H+OL6L4QAy6Tts1FrhblWjHOnMGivpAja1D5LjE9JJQ1Xvvsg==, tarball: file:apps/agent/vendor/gonk-persona-0.5.0.tgz}
-    version: 0.5.0
+  '@gonk/persona@0.5.1-mem2.5':
+    resolution: {integrity: sha512-3cFu72vj2CmqDu+bjD1rqBQZKKENkCkt48Ug+REPCgcHUaGW4fT9eb0l5tJV5urxBadjNd4BqQnxn3rmY23Oiw==}
 
   '@gonk/retrieval@0.3.1':
     resolution: {integrity: sha512-dZU9sTT2IvfdI0ZeTPUVbVOw4uBF9HuINLIo5iMn5e+vChbBw6mGy1q4o1i+ctQ5Qq7YmGKrGm64SrvyU5Rtcg==}
@@ -7448,15 +7437,15 @@ snapshots:
       '@gonk/auth': 0.3.1
       '@standard-schema/spec': 1.1.0
 
-  '@gonk/embedding@0.5.0':
+  '@gonk/embedding@0.5.1-mem2.5':
     dependencies:
       '@gonk/scope': 0.3.1
 
-  '@gonk/eve-host@file:apps/agent/vendor/gonk-eve-host-0.5.0.tgz(patch_hash=7l7xdogbnebhalrqybcra4zzda)(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
+  '@gonk/eve-host@0.5.1-mem2.6(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
     dependencies:
       '@gonk/auth': 0.3.1
-      '@gonk/memory': file:apps/agent/vendor/gonk-memory-0.5.0.tgz
-      '@gonk/persona': file:apps/agent/vendor/gonk-persona-0.5.0.tgz
+      '@gonk/memory': 0.5.1-mem2.5
+      '@gonk/persona': 0.5.1-mem2.5
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
       eve: 0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -7466,9 +7455,9 @@ snapshots:
       - supports-color
       - zod
 
-  '@gonk/memory@file:apps/agent/vendor/gonk-memory-0.5.0.tgz':
+  '@gonk/memory@0.5.1-mem2.5':
     dependencies:
-      '@gonk/embedding': 0.5.0
+      '@gonk/embedding': 0.5.1-mem2.5
       '@gonk/scope': 0.3.1
       '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
       '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -7477,7 +7466,7 @@ snapshots:
     optionalDependencies:
       sqlite-vec: 0.1.9
 
-  '@gonk/persona@file:apps/agent/vendor/gonk-persona-0.5.0.tgz':
+  '@gonk/persona@0.5.1-mem2.5':
     dependencies:
       '@gonk/scope': 0.3.1
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)

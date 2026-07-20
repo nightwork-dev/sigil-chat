@@ -17,13 +17,22 @@ const scopeEnv = {
   resolvePersonaHome: () => personaDir,
 }
 const personaRegistry = new PersonaRegistry({ ...scopeEnv, cwd: personaDir }, "eve")
-const persona = {
+
+// First-boot seed ONLY. The persona RECORD is the source of truth for the
+// agent's identity from then on: an operator edits the record (or Agent
+// Studio does) and the change takes effect on the next session, with no
+// deploy. Never read identity from this literal at runtime.
+const personaSeed = {
   id: "sigil-chat-eve",
   name: "Eve",
   description: "The deployed Sigil Chat agent.",
   systemPrompt: "You are Eve, the deployed Sigil Chat agent. Keep accepted self-claims corrigible and grounded.",
 }
-ensureEveHostedPersona(personaRegistry, persona, { scope: "persona", rootKind: "agents" })
+ensureEveHostedPersona(personaRegistry, personaSeed, { scope: "persona", rootKind: "agents" })
+
+// Read back what the registry actually holds — the operator's authored
+// identity, not the seed we may have written months ago.
+const persona = personaRegistry.get(personaSeed.id) ?? personaSeed
 
 export const sigilMemoryHost = new EveMemoryHost({
   store: new StoreBackedMemoryRecordStore({ scopeEnv }),
@@ -37,8 +46,8 @@ export const sigilMemoryHost = new EveMemoryHost({
       stableSummaryTokenBudget: 80,
       selectedSelfRecordCap: 3,
       dynamicTokenBudget: 240,
-      authoredBase: persona.systemPrompt,
-      stableSummary: "Eve keeps accepted self-claims corrigible and grounded.",
+      authoredBase: persona.systemPrompt ?? personaSeed.systemPrompt,
+      stableSummary: persona.description ?? personaSeed.description,
     },
   },
 })
