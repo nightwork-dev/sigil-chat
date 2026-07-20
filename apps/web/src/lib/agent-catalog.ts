@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
 export type AgentCatalogOrigin = "eve-authored" | "eve-declared";
@@ -41,11 +41,25 @@ export interface AgentToolCatalogItem {
   runtimeStatus: "callable";
 }
 
+export interface AgentConnectionCatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  protocol: string;
+}
+
 export interface AgentCatalog {
   agent: {
     name: string;
     model?: string;
+    instructions: {
+      loaded: boolean;
+      name?: string;
+      lines: number;
+      dynamicResolvers: number;
+    };
   };
+  connections: readonly AgentConnectionCatalogItem[];
   skills: readonly AgentSkillCatalogItem[];
   subagents: readonly AgentSubagentCatalogItem[];
   tools: readonly AgentToolCatalogItem[];
@@ -87,6 +101,11 @@ interface EveAgentInfo {
       id?: unknown;
     };
   };
+  connections?: unknown;
+  instructions?: {
+    static?: unknown;
+    dynamic?: unknown;
+  };
   skills?: {
     static?: unknown;
     dynamic?: unknown;
@@ -100,16 +119,37 @@ interface EveAgentInfo {
   };
 }
 
+interface EveConnectionInfo {
+  connectionName?: unknown;
+  description?: unknown;
+  protocol?: unknown;
+}
+
+interface EveInstructionsInfo {
+  name?: unknown;
+  markdown?: unknown;
+}
+
+async function loadAgentRuntimeCatalog(): Promise<AgentCatalog> {
+  const { joinRuntimeUrl, readRuntimeTopology } =
+    await import("@workspace/runtime-env/topology");
+  const { getEveBearerToken } = await import("./auth/session");
+  const origin = readRuntimeTopology(process.env).eveOrigin;
+
+  return fetchAgentCatalogFromEve(
+    joinRuntimeUrl(origin, "/eve/v1/info"),
+    await getEveBearerToken(),
+  );
+}
+
+const fetchAgentRuntimeCatalogFn = createServerFn({ method: "GET" }).handler(
+  loadAgentRuntimeCatalog,
+);
+
 const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<AgentCatalog> => {
-    const { joinRuntimeUrl, readRuntimeTopology } = await import(
-      "@workspace/runtime-env/topology"
-    );
-    const { getEveBearerToken } = await import("./auth/session");
-    const { readGonkClientEnvironment } = await import(
-      "@workspace/runtime-env/server"
-    );
-    const origin = readRuntimeTopology(process.env).eveOrigin;
+    const { readGonkClientEnvironment } =
+      await import("@workspace/runtime-env/server");
     const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
     if (!apiKey) {
       throw new Error(
@@ -117,10 +157,7 @@ const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
       );
     }
     const [catalog, tools] = await Promise.all([
-      fetchAgentCatalogFromEve(
-        joinRuntimeUrl(origin, "/eve/v1/info"),
-        await getEveBearerToken(),
-      ),
+      loadAgentRuntimeCatalog(),
       fetchGonkToolCatalog(gonkMcpUrl, apiKey),
     ]);
     return { ...catalog, tools };
@@ -203,7 +240,9 @@ export async function fetchGonkToolCatalog(
     }
     const result = (payload as { result?: unknown }).result;
     if (typeof result !== "object" || result === null) {
-      throw new Error("Gonk returned an MCP tool catalog response without a result.");
+      throw new Error(
+        "Gonk returned an MCP tool catalog response without a result.",
+      );
     }
     const tools = (result as { tools?: unknown }).tools;
     if (!Array.isArray(tools)) {
@@ -214,14 +253,16 @@ export async function fetchGonkToolCatalog(
       const tool = candidate as McpToolInfo;
       const name = stringValue(tool.name, "");
       if (!name) return [];
-      return [{
-        id: `gonk__${name}`,
-        name,
-        description: stringValue(tool.description, "Application tool"),
-        origin: "gonk" as const,
-        availability: "available" as const,
-        runtimeStatus: "callable" as const,
-      }];
+      return [
+        {
+          id: `gonk__${name}`,
+          name,
+          description: stringValue(tool.description, "Application tool"),
+          origin: "gonk" as const,
+          availability: "available" as const,
+          runtimeStatus: "callable" as const,
+        },
+      ];
     });
   } finally {
     await fetcher(url, { method: "DELETE", headers: sessionHeaders }).catch(
@@ -260,6 +301,59 @@ function stringValue(value: unknown, fallback: string): string {
 
 function countValue(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function lineCount(value: unknown): number {
+  if (typeof value !== "string" || value.length === 0) return 0;
+  const withoutTerminalNewline = value.replace(/\r?\n$/u, "");
+  return withoutTerminalNewline.length === 0
+    ? 0
+    : withoutTerminalNewline.split(/\r?\n/u).length;
+}
+
+function projectConnections(
+  value: EveAgentInfo["connections"],
+): AgentConnectionCatalogItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((candidate, index) => {
+    if (typeof candidate !== "object" || candidate === null) return [];
+    const connection = candidate as EveConnectionInfo;
+    const name = stringValue(
+      connection.connectionName,
+      `connection-${index + 1}`,
+    );
+    return [
+      {
+        id: name,
+        name,
+        description: stringValue(connection.description, "Agent connection"),
+        protocol: stringValue(connection.protocol, "connection"),
+      },
+    ];
+  });
+}
+
+function projectInstructions(
+  value: EveAgentInfo["instructions"],
+): AgentCatalog["agent"]["instructions"] {
+  const staticInstructions =
+    typeof value?.static === "object" && value.static !== null
+      ? (value.static as EveInstructionsInfo)
+      : null;
+  const dynamicResolvers = Array.isArray(value?.dynamic)
+    ? value.dynamic.length
+    : 0;
+
+  return {
+    loaded: staticInstructions !== null,
+    name:
+      staticInstructions === null
+        ? undefined
+        : stringValue(staticInstructions.name, "Agent instructions"),
+    lines: lineCount(staticInstructions?.markdown),
+    dynamicResolvers,
+  };
 }
 
 function safeLogicalPath(value: unknown): string | undefined {
@@ -349,7 +443,9 @@ export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
         typeof info.agent?.model?.id === "string"
           ? info.agent.model.id
           : undefined,
+      instructions: projectInstructions(info.instructions),
     },
+    connections: projectConnections(info.connections),
     skills: projectSkills(info.skills),
     subagents: projectSubagents(info.subagents),
     tools: [],
@@ -369,13 +465,31 @@ export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
 export const agentCatalogKeys = {
   all: () => ["agent-catalog"] as const,
   info: () => ["agent-catalog", "eve-info"] as const,
+  full: () => ["agent-catalog", "eve-info-and-gonk-tools"] as const,
 };
 
-export function useAgentCatalog() {
-  return useQuery({
+export function agentRuntimeCatalogQueryOptions() {
+  return queryOptions({
     queryKey: agentCatalogKeys.info(),
+    queryFn: () => fetchAgentRuntimeCatalogFn(),
+    staleTime: 5_000,
+    retry: false,
+  });
+}
+
+export function agentCatalogQueryOptions() {
+  return queryOptions({
+    queryKey: agentCatalogKeys.full(),
     queryFn: () => fetchAgentCatalogFn(),
     staleTime: 5_000,
     retry: false,
   });
+}
+
+export function useAgentRuntimeCatalog() {
+  return useQuery(agentRuntimeCatalogQueryOptions());
+}
+
+export function useAgentCatalog() {
+  return useQuery(agentCatalogQueryOptions());
 }

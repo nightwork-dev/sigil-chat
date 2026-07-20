@@ -3,9 +3,9 @@
 //   apps/web/src/routes/__root.tsx               — HTML shell, ThemeProvider, QueryClientProvider (no visible chrome)
 //   apps/web/src/routes/_app.tsx                  — default collapsible sidebar, breadcrumb bar, and theme picker
 //   apps/web/src/routes/_app/agents.$personaId.tsx — THIS FILE
-// Content: AgentProfileView — the read-only Agent Studio profile (portrait/
-// identity header, self-model, memory panes, sessions). $personaId selects
-// the registry-backed persona rendered by the page.
+// Content: AgentProfileView — the read-only Agent Studio profile (portrait,
+// loaded Eve configuration, self-model, memory panes, and sessions).
+// $personaId selects the registry-backed persona rendered by the page.
 
 import { createFileRoute } from "@tanstack/react-router"
 

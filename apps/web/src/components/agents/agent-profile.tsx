@@ -3,9 +3,10 @@
 // The Agent Studio profile: the deployed persona rendered as a continuous
 // individual, not an admin table. Compound Root/Parts over the read-only
 // AgentProfile contract (@/lib/agent-profile) — a portrait/identity header,
-// the accepted self-model, two memory panes (accepted vs. unmistakably
-// pending candidates), and the session list (ephemera in the persona's life,
-// not its identity).
+// a separately authenticated safe projection of Eve's loaded configuration,
+// the accepted self-model, two memory panes (accepted vs. unmistakably pending
+// candidates), and the session list (ephemera in the persona's life, not its
+// identity).
 //
 // Privacy constraint: relationship-kind memory records
 // render as SHAPE ONLY — kind + subject-class + relative time — never
@@ -27,6 +28,7 @@ import { Spinner } from "@workspace/ui/components/spinner"
 import { Button } from "@workspace/ui/components/button"
 
 import { useAgentProfile, type AgentProfile as AgentProfileData } from "@/lib/agent-profile"
+import { useAgentRuntimeCatalog, type AgentCatalog, type AgentSubagentCatalogItem } from "@/lib/agent-catalog"
 import {
   useAgentThreads,
   useCreateAgentThread,
@@ -130,6 +132,137 @@ function SelfModel({ className }: { className?: string }) {
       </CardContent>
     </Card>
   )
+}
+
+// ─── Loaded configuration: safe Eve inspection projection ─────────────────
+
+export function AgentConfiguration({
+  catalog,
+  className,
+}: {
+  catalog: AgentCatalog
+  className?: string
+}) {
+  const instructions = catalog.agent.instructions
+
+  return (
+    <Card data-slot="agent-configuration" className={className}>
+      <CardHeader>
+        <CardTitle>Loaded configuration</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y divide-border px-4">
+        <section className="grid gap-4 pb-4 sm:grid-cols-2">
+          <ConfigurationValue label="Model">
+            <span className="font-mono text-xs">{catalog.agent.model ?? "Not reported"}</span>
+          </ConfigurationValue>
+          <ConfigurationValue label="Instructions">
+            <span>{instructions.loaded ? instructions.name : "Not loaded"}</span>
+            {instructions.loaded && (
+              <span className="text-xs text-muted-foreground">
+                {instructions.lines} {instructions.lines === 1 ? "line" : "lines"}
+                {instructions.dynamicResolvers > 0 && ` · ${instructions.dynamicResolvers} dynamic`}
+              </span>
+            )}
+          </ConfigurationValue>
+        </section>
+
+        <ConfigurationList count={catalog.connections.length} empty="No connections loaded." label="Connections">
+          {catalog.connections.map((connection) => (
+            <div key={connection.id} className="flex items-start justify-between gap-4 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{connection.name}</p>
+                <p className="text-sm text-muted-foreground">{connection.description}</p>
+              </div>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{connection.protocol}</span>
+            </div>
+          ))}
+        </ConfigurationList>
+
+        <ConfigurationList count={catalog.subagents.length} empty="No subagents loaded." label="Subagents">
+          {catalog.subagents.map((subagent) => (
+            <div key={subagent.id} className="py-2.5">
+              <p className="text-sm font-medium text-foreground">{subagent.name}</p>
+              <p className="text-sm text-muted-foreground">{subagent.description}</p>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                {subagentCapabilitySummary(subagent)}
+              </p>
+            </div>
+          ))}
+        </ConfigurationList>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Configuration({ className }: { className?: string }) {
+  const catalog = useAgentRuntimeCatalog()
+
+  if (catalog.isPending) {
+    return (
+      <Card className={className}>
+        <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+          <Spinner className="size-3.5" /> Loading configuration…
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (catalog.isError) {
+    return (
+      <Card className={className}>
+        <CardContent className="py-6 text-sm text-muted-foreground">
+          Loaded configuration is unavailable right now.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return <AgentConfiguration catalog={catalog.data} className={className} />
+}
+
+function ConfigurationValue({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <div className="flex flex-col text-sm text-foreground">{children}</div>
+    </div>
+  )
+}
+
+function ConfigurationList({
+  children,
+  count,
+  empty,
+  label,
+}: {
+  children: ReactNode
+  count: number
+  empty: string
+  label: string
+}) {
+  return (
+    <section className="py-4 last:pb-0">
+      <div className="mb-1 flex items-baseline justify-between gap-4">
+        <h3 className="text-xs font-medium text-muted-foreground">{label}</h3>
+        <span className="font-mono text-[10px] text-muted-foreground">{count}</span>
+      </div>
+      {count === 0 ? (
+        <p className="py-2 text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <div className="divide-y divide-border/60">{children}</div>
+      )}
+    </section>
+  )
+}
+
+function subagentCapabilitySummary(subagent: AgentSubagentCatalogItem) {
+  const summary = subagent.summary
+  return [
+    summary.instructions ? "instructions loaded" : "no instructions",
+    `${summary.skills} ${summary.skills === 1 ? "skill" : "skills"}`,
+    `${summary.tools} ${summary.tools === 1 ? "tool" : "tools"}`,
+    `${summary.connections} ${summary.connections === 1 ? "connection" : "connections"}`,
+  ].join(" · ")
 }
 
 function ClaimRow({ record }: { record: MemoryRecord }) {
@@ -319,6 +452,7 @@ export function AgentProfileView({ personaId }: { personaId: string }) {
   return (
     <AgentProfile.Root profile={data}>
       <AgentProfile.Header />
+      <AgentProfile.Configuration />
       <AgentProfile.SelfModel />
       <AgentProfile.Memory />
       <AgentProfile.Sessions />
@@ -326,4 +460,4 @@ export function AgentProfileView({ personaId }: { personaId: string }) {
   )
 }
 
-export const AgentProfile = { Root, Header, SelfModel, Memory, Sessions }
+export const AgentProfile = { Root, Header, Configuration, SelfModel, Memory, Sessions }
