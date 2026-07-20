@@ -1,0 +1,14 @@
+// Route: /labs
+// Tree:
+//   apps/web/src/routes/__root.tsx  — HTML shell and theme/query providers (no visible chrome)
+//   apps/web/src/routes/labs.tsx    — experimental labs boundary (no visible chrome)
+//   apps/web/src/routes/labs.index.tsx — THIS FILE
+// Content: LabsIndex — compact directory for the isolated gaze and hands experiments
+
+import { createFileRoute } from "@tanstack/react-router"
+
+import { LabsIndex } from "@/features/labs/labs-index"
+
+export const Route = createFileRoute("/labs/")({
+  component: LabsIndex,
+})

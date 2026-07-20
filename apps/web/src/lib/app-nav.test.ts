@@ -16,6 +16,7 @@ describe("app navigation profiles", () => {
     const items = buildAppNav({ internalWorkspaces: true }).items
 
     expect(items.map((item) => item.to)).toContain("/roadmap")
+    expect(items.map((item) => item.to)).toContain("/labs")
   })
 
   it("exposes system status only in owner navigation", () => {
