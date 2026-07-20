@@ -1,6 +1,6 @@
 // The authenticated artifact-resource API consumed exclusively through the web
 // app's server functions (never the browser directly). GET lists a scope's
-// durable artifacts with their /img content URLs; DELETE removes an artifact
+// durable artifacts with their authenticated media URLs; DELETE removes an artifact
 // from that scope's manifest (the content-addressed blob is shared and stays).
 //
 // The logic is a pure function over a small request shape so it is unit-testable

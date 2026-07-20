@@ -28,7 +28,7 @@ function dependencies(
           key: "artifact-key",
           mediaType: "image/png",
           size: 5,
-          url: "/img/artifact-key",
+          url: "/api/media/artifact?key=artifact-key&scope=session%3Athread-1",
         }),
       ),
     ),
@@ -83,7 +83,7 @@ describe("attachment upload authorization", () => {
           key: "artifact-key",
           mediaType: "image/png",
           size: 5,
-          url: "/img/artifact-key",
+          url: "/api/media/artifact?key=artifact-key&scope=session%3Athread-1",
         }),
       ),
     )

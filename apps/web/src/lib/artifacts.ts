@@ -5,8 +5,9 @@ import { createServerFn } from "@tanstack/react-start"
  * The browser-facing read model for the existing Gonk artifact manifest.
  *
  * This deliberately does not introduce an artifact index: each query is a
- * server-side, session-authorized proxy to the same `/artifacts` and `/img`
- * endpoints used by the Evidence Room and chat attachments. That keeps the
+ * server-side, session-authorized proxy to the same `/artifacts` and internal
+ * Gonk `/img` endpoints
+ * used by the Evidence Room and chat attachments. That keeps the
  * artifact surface honest about the scopes the product can currently authorize.
  */
 export interface ArtifactRecord {

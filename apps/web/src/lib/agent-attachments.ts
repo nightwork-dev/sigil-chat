@@ -11,7 +11,7 @@ import { createServerFn } from "@tanstack/react-start";
  * on the web app's own Node process (which already receives `GONK_MCP_KEY`
  * via `turbo.json`'s `globalPassThroughEnv`, the same way `apps/agent`
  * does), reads the key server-side, and proxies the raw bytes to Gonk's
- * authenticated `/upload` route. `/img/<key>` reads are session-gated
+ * authenticated `/upload` route. `/api/media/artifact` reads are session-gated
  * (content-addressed, unguessable) and are proxied same-origin by the web app
  * (vite.config.ts), so the browser never talks to Gonk directly for either the
  * read or the write — only this write path is bearer-gated.
