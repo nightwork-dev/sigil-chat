@@ -358,6 +358,7 @@ async function postSession(
       receive: async () => {
         throw new Error("receive should not be called")
       },
+      cancel: async () => ({ status: "no_active_turn" }),
       params: {},
       waitUntil: () => {},
       requestIp: null,

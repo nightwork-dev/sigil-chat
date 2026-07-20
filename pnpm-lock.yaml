@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  eve@0.24.4:
-    hash: lxwtbs4wpcmfawr56efypxx7ru
-    path: patches/eve@0.24.4.patch
+  eve@0.25.2:
+    hash: gxkscaahtzi5fyieukg7diml4i
+    path: patches/eve@0.25.2.patch
 
 importers:
 
@@ -43,18 +43,27 @@ importers:
       '@gonk/context':
         specifier: 0.3.1
         version: 0.3.1
+      '@gonk/eve-host':
+        specifier: file:../../vendor/gonk-eve-host-0.5.0.tgz
+        version: file:vendor/gonk-eve-host-0.5.0.tgz(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)
+      '@gonk/memory':
+        specifier: file:../../vendor/gonk-memory-0.5.0.tgz
+        version: file:vendor/gonk-memory-0.5.0.tgz
+      '@gonk/persona':
+        specifier: file:../../vendor/gonk-persona-0.5.0.tgz
+        version: file:vendor/gonk-persona-0.5.0.tgz
       '@gonk/retrieval':
         specifier: 0.3.1
-        version: 0.3.1
+        version: 0.3.1(sqlite-vec@0.1.9)
       '@gonk/scope':
         specifier: 0.3.1
         version: 0.3.1
       '@gonk/skills':
         specifier: 0.3.1
-        version: 0.3.1
+        version: 0.3.1(sqlite-vec@0.1.9)
       '@gonk/store':
         specifier: 0.3.1
-        version: 0.3.1
+        version: 0.3.1(sqlite-vec@0.1.9)
       '@workspace/blackboard-store':
         specifier: workspace:*
         version: link:../../packages/blackboard-store
@@ -68,8 +77,8 @@ importers:
         specifier: 12.10.0
         version: 12.10.0
       eve:
-        specifier: 0.24.4
-        version: 0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        specifier: 0.25.2
+        version: 0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       jose:
         specifier: ^6.1.3
         version: 6.2.1
@@ -103,7 +112,7 @@ importers:
         version: 0.3.1
       '@gonk/skills':
         specifier: 0.3.1
-        version: 0.3.1
+        version: 0.3.1(sqlite-vec@0.1.9)
       '@gonk/tool-registry':
         specifier: 0.3.1
         version: 0.3.1(@gonk/scope@0.3.1)
@@ -112,10 +121,10 @@ importers:
         version: 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
       '@mirk/artifact':
         specifier: ^0.1.0
-        version: 0.1.0(better-sqlite3@12.10.0)
+        version: 0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@mirk/store':
         specifier: ^0.7.0
-        version: 0.7.0(better-sqlite3@12.10.0)
+        version: 0.7.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@workspace/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts
@@ -167,10 +176,10 @@ importers:
         version: 0.3.1
       '@gonk/skills':
         specifier: 0.3.1
-        version: 0.3.1
+        version: 0.3.1(sqlite-vec@0.1.9)
       '@gonk/store':
         specifier: 0.3.1
-        version: 0.3.1
+        version: 0.3.1(sqlite-vec@0.1.9)
       '@libsql/client':
         specifier: ^0.15.15
         version: 0.15.15
@@ -251,7 +260,7 @@ importers:
         version: 1.6.23(@tanstack/react-start@1.168.26(crossws@0.4.10(srvx@0.11.22))(esbuild@0.27.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(rolldown@1.2.0)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(better-sqlite3@12.10.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@3.2.6(@types/debug@4.1.13)(@types/node@25.3.0)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.32.0)(msw@2.12.11(@types/node@25.3.0)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.9.0))
       eve:
         specifier: 0.24.4
-        version: 0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       kysely:
         specifier: ^0.28.17
         version: 0.28.17
@@ -331,7 +340,7 @@ importers:
     dependencies:
       '@mirk/store-markdown':
         specifier: 0.1.0
-        version: 0.1.0(better-sqlite3@12.10.0)
+        version: 0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
@@ -714,7 +723,7 @@ importers:
     dependencies:
       '@mirk/store-markdown':
         specifier: 0.1.0
-        version: 0.1.0(better-sqlite3@12.10.0)
+        version: 0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@workspace/file-store-core':
         specifier: workspace:*
         version: link:../file-store-core
@@ -1343,6 +1352,29 @@ packages:
 
   '@gonk/context@0.3.1':
     resolution: {integrity: sha512-uxMwkTQOMf31EXBmQC+LRruivV4NsTWTYuMUKUlTbOijpHEttcEnLzSWV/ij48ja+oEgnKv0yvx3Hln+8D9ofA==}
+
+  '@gonk/embedding@0.5.0':
+    resolution: {integrity: sha512-LCjzu8TeWLwcSpWdd8qr9A6TpszwTJufQ5yUBaqc50giZEfkrUNzB+xlA34cwBwAQJLuntLVs6CDfno4GmIJZA==}
+
+  '@gonk/eve-host@file:vendor/gonk-eve-host-0.5.0.tgz':
+    resolution: {integrity: sha512-LdCyfLPi5nZ3ZLWEGYe5vjik1cNUmOMEJm3TcwdLn7X/+3RzHD3ErjOcSzBoL6w3m7f0kZ0o1uxgRo5cCHE9qw==, tarball: file:vendor/gonk-eve-host-0.5.0.tgz}
+    version: 0.5.0
+    peerDependencies:
+      eve: '*'
+
+  '@gonk/memory@0.5.0':
+    resolution: {integrity: sha512-9GSSjArqgZl6Pk+Jw5lWliITCH2FWewjOOubxpHaBw+NoeWoh9NYd4C5OwCBXTN/Kals5Doa7RTAFA0r8Cgwqw==}
+
+  '@gonk/memory@file:vendor/gonk-memory-0.5.0.tgz':
+    resolution: {integrity: sha512-oHvktfcsfrYflogPXzNgS4J4jDjzpIxZSX59abpCEZviwDzYUvNUDs+NEyKfG2Wcf/MmhDwFnLZFKgczgEegtg==, tarball: file:vendor/gonk-memory-0.5.0.tgz}
+    version: 0.5.0
+
+  '@gonk/persona@0.5.0':
+    resolution: {integrity: sha512-/OipEUvk+rNB0RwE1sm2X3cjlId5RYzZGv0OozZ8kjltzaO+7UjBMAu5d9r1SCratNQ9uhiqudPudO5Rn4SvkQ==}
+
+  '@gonk/persona@file:vendor/gonk-persona-0.5.0.tgz':
+    resolution: {integrity: sha512-nJUR9cJ0sfKHeCuTJhwesX5d84wjL/sysrr+3H+OL6L4QAy6Tts1FrhblWjHOnMGivpAja1D5LjE9JJQ1Xvvsg==, tarball: file:vendor/gonk-persona-0.5.0.tgz}
+    version: 0.5.0
 
   '@gonk/retrieval@0.3.1':
     resolution: {integrity: sha512-dZU9sTT2IvfdI0ZeTPUVbVOw4uBF9HuINLIo5iMn5e+vChbBw6mGy1q4o1i+ctQ5Qq7YmGKrGm64SrvyU5Rtcg==}
@@ -2716,6 +2748,9 @@ packages:
   '@types/babel__traverse@7.28.0':
     resolution: {integrity: sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q==}
 
+  '@types/better-sqlite3@7.6.13':
+    resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -4058,6 +4093,26 @@ packages:
 
   eve@0.24.4:
     resolution: {integrity: sha512-RDZuhj8K8rStfuyTWE5AFl1qMqspuze3m05KqIhIPjef7jFwZoPfk9AgQzEIYX+8LIRRzj1e7oyye+84630JuQ==}
+    engines: {node: '>=24'}
+    hasBin: true
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+      ai: ^7.0.26
+      braintrust: ^3.0.0
+      just-bash: ^3.0.0
+      microsandbox: ^0.5.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+      braintrust:
+        optional: true
+      just-bash:
+        optional: true
+      microsandbox:
+        optional: true
+
+  eve@0.25.2:
+    resolution: {integrity: sha512-TT6zdOfUSZNte9qWpGOGlzVpz91lIRFFpSxe+feTrxWnUlY5jNnUo46zt3AmRIdlauIlIw2k5JU5kQB2hUO57w==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
@@ -5964,6 +6019,34 @@ packages:
   sql.js@1.14.1:
     resolution: {integrity: sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==}
 
+  sqlite-vec-darwin-arm64@0.1.9:
+    resolution: {integrity: sha512-jSsZpE42OfBkGL/ItyJTVCUwl6o6Ka3U5rc4j+UBDIQzC1ulSSKMEhQLthsOnF/MdAf1MuAkYhkdKmmcjaIZQg==}
+    cpu: [arm64]
+    os: [darwin]
+
+  sqlite-vec-darwin-x64@0.1.9:
+    resolution: {integrity: sha512-KDlVyqQT7pnOhU1ymB9gs7dMbSoVmKHitT+k1/xkjarcX8bBqPxWrGlK/R+C5WmWkfvWwyq5FfXfiBYCBs6PlA==}
+    cpu: [x64]
+    os: [darwin]
+
+  sqlite-vec-linux-arm64@0.1.9:
+    resolution: {integrity: sha512-5wXVJ9c9kR4CHm/wVqXb/R+XUHTdpZ4nWbPHlS+gc9qQFVHs92Km4bPnCKX4rtcPMzvNis+SIzMJR1SCEwpuUw==}
+    cpu: [arm64]
+    os: [linux]
+
+  sqlite-vec-linux-x64@0.1.9:
+    resolution: {integrity: sha512-w3tCH8xK2finW8fQJ/m8uqKodXUZ9KAuAar2UIhz4BHILfpE0WM/MTGCRfa7RjYbrYim5Luk3guvMOGI7T7JQA==}
+    cpu: [x64]
+    os: [linux]
+
+  sqlite-vec-windows-x64@0.1.9:
+    resolution: {integrity: sha512-y3gEIyy/17bq2QFPQOWLE68TYWcRZkBQVA2XLrTPHNTOp55xJi/BBBmOm40tVMDMjtP+Elpk6UBUXdaq+46b0Q==}
+    cpu: [x64]
+    os: [win32]
+
+  sqlite-vec@0.1.9:
+    resolution: {integrity: sha512-L7XJWRIBNvR9O5+vh1FQ+IGkh/3D2AzVksW5gdtk28m78Hy8skFD0pqReKH1Yp0/BUKRGcffgKvyO/EON5JXpA==}
+
   srvx@0.11.18:
     resolution: {integrity: sha512-7/EW5sPdC1bU7iq1tgTvCZqUQDkJdsqIVzYqBv7SuBfQQ10oWkKj4KYNOw0H4Ig26bXuUYDA7XTKxB+/HC5SRw==}
     engines: {node: '>=20.16.0'}
@@ -7363,11 +7446,63 @@ snapshots:
       '@gonk/auth': 0.3.1
       '@standard-schema/spec': 1.1.0
 
-  '@gonk/retrieval@0.3.1':
+  '@gonk/embedding@0.5.0':
+    dependencies:
+      '@gonk/scope': 0.3.1
+
+  '@gonk/eve-host@file:vendor/gonk-eve-host-0.5.0.tgz(@gonk/scope@0.3.1)(eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)))(zod@4.4.3)':
+    dependencies:
+      '@gonk/auth': 0.3.1
+      '@gonk/memory': 0.5.0
+      '@gonk/persona': 0.5.0
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
+      eve: 0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - '@gonk/scope'
+      - supports-color
+      - zod
+
+  '@gonk/memory@0.5.0':
+    dependencies:
+      '@gonk/embedding': 0.5.0
+      '@gonk/scope': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@types/better-sqlite3': 7.6.13
+      better-sqlite3: 12.10.0
+    optionalDependencies:
+      sqlite-vec: 0.1.9
+
+  '@gonk/memory@file:vendor/gonk-memory-0.5.0.tgz':
+    dependencies:
+      '@gonk/embedding': 0.5.0
+      '@gonk/scope': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@types/better-sqlite3': 7.6.13
+      better-sqlite3: 12.10.0
+    optionalDependencies:
+      sqlite-vec: 0.1.9
+
+  '@gonk/persona@0.5.0':
+    dependencies:
+      '@gonk/scope': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      yaml: 2.9.0
+
+  '@gonk/persona@file:vendor/gonk-persona-0.5.0.tgz':
+    dependencies:
+      '@gonk/scope': 0.3.1
+      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      yaml: 2.9.0
+
+  '@gonk/retrieval@0.3.1(sqlite-vec@0.1.9)':
     dependencies:
       '@gonk/auth': 0.3.1
       '@gonk/context': 0.3.1
-      '@gonk/store': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
       '@standard-schema/spec': 1.1.0
     transitivePeerDependencies:
       - sqlite-vec
@@ -7377,23 +7512,23 @@ snapshots:
       '@gonk/utils': 0.3.1
       yaml: 2.9.0
 
-  '@gonk/skills@0.3.1':
+  '@gonk/skills@0.3.1(sqlite-vec@0.1.9)':
     dependencies:
       '@gonk/auth': 0.3.1
       '@gonk/context': 0.3.1
       '@gonk/scope': 0.3.1
-      '@gonk/store': 0.3.1
+      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       '@standard-schema/spec': 1.1.0
       yaml: 2.9.0
     transitivePeerDependencies:
       - sqlite-vec
 
-  '@gonk/store@0.3.1':
+  '@gonk/store@0.3.1(sqlite-vec@0.1.9)':
     dependencies:
       '@gonk/scope': 0.3.1
       '@gonk/utils': 0.3.1
-      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)
+      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       better-sqlite3: 12.10.0
     transitivePeerDependencies:
       - sqlite-vec
@@ -7667,29 +7802,31 @@ snapshots:
 
   '@mediapipe/tasks-vision@0.10.35': {}
 
-  '@mirk/artifact@0.1.0(better-sqlite3@12.10.0)':
+  '@mirk/artifact@0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     dependencies:
-      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)
+      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@noble/hashes': 2.2.0
     transitivePeerDependencies:
       - better-sqlite3
       - sqlite-vec
 
-  '@mirk/store-markdown@0.1.0(better-sqlite3@12.10.0)':
+  '@mirk/store-markdown@0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     dependencies:
-      '@mirk/store': 0.7.0(better-sqlite3@12.10.0)
+      '@mirk/store': 0.7.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       yaml: 2.9.0
     transitivePeerDependencies:
       - better-sqlite3
       - sqlite-vec
 
-  '@mirk/store@0.6.1(better-sqlite3@12.10.0)':
+  '@mirk/store@0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     optionalDependencies:
       better-sqlite3: 12.10.0
+      sqlite-vec: 0.1.9
 
-  '@mirk/store@0.7.0(better-sqlite3@12.10.0)':
+  '@mirk/store@0.7.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     optionalDependencies:
       better-sqlite3: 12.10.0
+      sqlite-vec: 0.1.9
 
   '@mixmark-io/domino@2.2.0': {}
 
@@ -8739,6 +8876,10 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.0
 
+  '@types/better-sqlite3@7.6.13':
+    dependencies:
+      '@types/node': 25.3.0
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -9172,7 +9313,7 @@ snapshots:
   '@zigil/agent-eve@0.1.5(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(react@19.2.4)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))':
     dependencies:
       '@zigil/agent-surface': 0.1.1
-      eve: 0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+      eve: 0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       react: 19.2.4
     transitivePeerDependencies:
       - '@azure/app-configuration'
@@ -10151,7 +10292,54 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.24.4(patch_hash=lxwtbs4wpcmfawr56efypxx7ru)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.24.4(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)):
+    dependencies:
+      ai: 7.0.29(zod@4.4.3)
+      nitro: 3.0.260610-beta(@libsql/client@0.15.15)(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+    optionalDependencies:
+      just-bash: 3.1.0
+      microsandbox: 0.6.6
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@netlify/blobs'
+      - '@netlify/runtime'
+      - '@planetscale/database'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/functions'
+      - '@vercel/kv'
+      - '@vercel/queue'
+      - aws4fetch
+      - better-sqlite3
+      - chokidar
+      - dotenv
+      - drizzle-orm
+      - giget
+      - idb-keyval
+      - ioredis
+      - jiti
+      - lru-cache
+      - miniflare
+      - mongodb
+      - mysql2
+      - rollup
+      - sqlite3
+      - uploadthing
+      - vite
+      - wrangler
+      - xml2js
+      - zephyr-agent
+
+  eve@0.25.2(patch_hash=gxkscaahtzi5fyieukg7diml4i)(@libsql/client@0.15.15)(ai@7.0.29(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.29(zod@4.4.3)
       nitro: 3.0.260610-beta(@libsql/client@0.15.15)(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(jiti@2.7.0)(lru-cache@11.5.2)(rollup@4.59.0)(vite@7.3.1(@types/node@25.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -12368,6 +12556,30 @@ snapshots:
   sprintf-js@1.1.3: {}
 
   sql.js@1.14.1: {}
+
+  sqlite-vec-darwin-arm64@0.1.9:
+    optional: true
+
+  sqlite-vec-darwin-x64@0.1.9:
+    optional: true
+
+  sqlite-vec-linux-arm64@0.1.9:
+    optional: true
+
+  sqlite-vec-linux-x64@0.1.9:
+    optional: true
+
+  sqlite-vec-windows-x64@0.1.9:
+    optional: true
+
+  sqlite-vec@0.1.9:
+    optionalDependencies:
+      sqlite-vec-darwin-arm64: 0.1.9
+      sqlite-vec-darwin-x64: 0.1.9
+      sqlite-vec-linux-arm64: 0.1.9
+      sqlite-vec-linux-x64: 0.1.9
+      sqlite-vec-windows-x64: 0.1.9
+    optional: true
 
   srvx@0.11.18: {}
 

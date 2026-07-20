@@ -9,6 +9,7 @@ import {
   readSigilEveAuthEnvironment,
 } from "../lib/eve-auth"
 import { MirkEveSessionOwnerStore } from "../lib/eve-session-owners"
+import { memoryTurn, sigilMemoryHost } from "../lib/memory"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
@@ -22,6 +23,8 @@ const onMessage = createSigilEveOnMessage({
   // S3.2: the session's shared blackboard rides every turn.
   readBlackboard: async (sessionId) =>
     (await blackboardRepository.read(sessionId)).content,
+  identityFloor: ({ eveSessionId, principalId }) =>
+    sigilMemoryHost.identityAtSessionStart(memoryTurn(eveSessionId, principalId)).markdown,
 })
 
 export default createOwnedEveChannel({

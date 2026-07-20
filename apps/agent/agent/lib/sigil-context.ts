@@ -51,6 +51,8 @@ export interface SigilContextOptions {
    * a turn. Session is resolved from the caller's resource scope.
    */
   readBlackboard?: (sessionId: string) => Promise<string>
+  /** Host-owned identity projection. It is injected before tools run. */
+  identityFloor?: (input: { eveSessionId: string; principalId: string }) => string
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -60,6 +62,8 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
   ): Promise<EveMessageResult> => {
     const auth = toGonkAuthContext(ctx.eve.caller)
     if (auth === null) return null
+    const caller = ctx.eve.caller
+    if (caller === null) return null
 
     const compiler =
       options.createCompiler?.(auth) ??
@@ -81,6 +85,12 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     }
 
     const blocks: string[] = []
+    if (options.identityFloor) {
+      const principalId = caller.principalId
+      const eveSessionId = ctx.eve.sessionId ?? `new:${principalId}`
+      const identity = options.identityFloor({ eveSessionId, principalId }).trim()
+      if (identity.length > 0) blocks.push(identity)
+    }
     const compiledContent = compiled.content.trim()
     if (compiledContent.length > 0) blocks.push(compiledContent)
 
