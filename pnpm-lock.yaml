@@ -1366,7 +1366,7 @@ packages:
     resolution: {integrity: sha512-9GSSjArqgZl6Pk+Jw5lWliITCH2FWewjOOubxpHaBw+NoeWoh9NYd4C5OwCBXTN/Kals5Doa7RTAFA0r8Cgwqw==}
 
   '@gonk/memory@file:vendor/gonk-memory-0.5.0.tgz':
-    resolution: {integrity: sha512-oHvktfcsfrYflogPXzNgS4J4jDjzpIxZSX59abpCEZviwDzYUvNUDs+NEyKfG2Wcf/MmhDwFnLZFKgczgEegtg==, tarball: file:vendor/gonk-memory-0.5.0.tgz}
+    resolution: {integrity: sha512-raEXqltQR5my4uFVzP59EuTOgOGiBCqtD2E6fh3KGTQ31u3+MOeMd/9XyF53siKZmMILEAK6zOTD9eaWreIkpQ==, tarball: file:vendor/gonk-memory-0.5.0.tgz}
     version: 0.5.0
 
   '@gonk/persona@0.5.0':
