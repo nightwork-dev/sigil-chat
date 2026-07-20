@@ -52,4 +52,19 @@ describe("production MCP handler boundary", () => {
 
     expect(response.status).toBe(403)
   })
+
+  it("automatically allows the hostname injected by Portless", async () => {
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      port: 8808,
+      portlessUrl: "http://sigil-chat-roadmap-gonk.localhost:1355",
+    })
+    handlers.push(handler)
+
+    const response = await handler.handle(
+      initializeRequest("sigil-chat-roadmap-gonk.localhost:1355"),
+    )
+
+    expect(response.status).toBe(200)
+  })
 })

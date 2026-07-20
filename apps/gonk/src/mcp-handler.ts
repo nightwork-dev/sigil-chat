@@ -15,9 +15,13 @@ import { createSigilRegistry } from "./registry.js"
 export function createSigilMcpHandler({
   apiKey,
   port,
+  portlessUrl = process.env.PORTLESS_URL,
+  configuredAllowedHosts = process.env.GONK_ALLOWED_HOSTS,
 }: {
   apiKey: string
   port: number
+  portlessUrl?: string
+  configuredAllowedHosts?: string
 }) {
   return createAgentWebMcpHandler({
     source: createSigilRegistry(),
@@ -27,8 +31,9 @@ export function createSigilMcpHandler({
       `127.0.0.1:${port}`,
       `localhost:${port}`,
       "sigil-chat-gonk.localhost:1355",
+      ...(portlessUrl ? [new URL(portlessUrl).host] : []),
       // Deployment hostnames (e.g. compose service names) join via env.
-      ...(process.env.GONK_ALLOWED_HOSTS?.split(",").map((h) => h.trim())
+      ...(configuredAllowedHosts?.split(",").map((h) => h.trim())
         .filter(Boolean) ?? []),
     ],
     authenticate: async (request) => {
