@@ -1357,7 +1357,7 @@ packages:
     resolution: {integrity: sha512-LCjzu8TeWLwcSpWdd8qr9A6TpszwTJufQ5yUBaqc50giZEfkrUNzB+xlA34cwBwAQJLuntLVs6CDfno4GmIJZA==}
 
   '@gonk/eve-host@file:vendor/gonk-eve-host-0.5.0.tgz':
-    resolution: {integrity: sha512-RbW/d7DlKstHC6ojEdKKDoAUrgt2e5V6nzmTu/FvHFPLbx/P+3MiYFAuyBl1LebiCaS812d/VXWVejMct0PcOQ==, tarball: file:vendor/gonk-eve-host-0.5.0.tgz}
+    resolution: {integrity: sha512-LdCyfLPi5nZ3ZLWEGYe5vjik1cNUmOMEJm3TcwdLn7X/+3RzHD3ErjOcSzBoL6w3m7f0kZ0o1uxgRo5cCHE9qw==, tarball: file:vendor/gonk-eve-host-0.5.0.tgz}
     version: 0.5.0
     peerDependencies:
       eve: '*'
