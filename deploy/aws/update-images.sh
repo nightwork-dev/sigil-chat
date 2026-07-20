@@ -11,7 +11,7 @@ if [[ -z "$manifest" || ! -f "$manifest" ]]; then
   exit 64
 fi
 
-node "$script_dir/verify-release.mjs" "$manifest"
+"$script_dir/verify-release.sh" "$manifest"
 test -f "$deploy_env"
 
 grep '^SIGIL_\(EVE\|GONK\|MIGRATE\|WEB\)_IMAGE=' "$deploy_env" > "$previous_images"

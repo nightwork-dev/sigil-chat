@@ -32,8 +32,9 @@ install -d -m 0700 -o 10004 -g 10004 /srv/sigil-chat/caddy-data /srv/sigil-chat/
 cp "$script_dir/compose.yaml" /opt/sigil-chat/deploy/compose.yaml
 cp "$script_dir/Caddyfile" /opt/sigil-chat/deploy/Caddyfile
 cp "$script_dir/update-images.sh" /opt/sigil-chat/deploy/update-images.sh
+cp "$script_dir/verify-release.sh" /opt/sigil-chat/deploy/verify-release.sh
 cp "$script_dir/verify-release.mjs" /opt/sigil-chat/deploy/verify-release.mjs
-chmod 0755 /opt/sigil-chat/deploy/update-images.sh
+chmod 0755 /opt/sigil-chat/deploy/update-images.sh /opt/sigil-chat/deploy/verify-release.sh
 
 for secret in better_auth_secret gonk_mcp_key invite_token_pepper; do
   path="/srv/sigil-chat/secrets/$secret"

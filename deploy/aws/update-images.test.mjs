@@ -23,12 +23,14 @@ test("updates all image digests and preserves a rollback manifest", () => {
 
   for (const name of [
     "update-images.sh",
+    "verify-release.sh",
     "verify-release.mjs",
     "compose.yaml",
   ]) {
     copyFileSync(join(sourceDir, name), join(directory, name));
   }
   chmodSync(join(directory, "update-images.sh"), 0o755);
+  chmodSync(join(directory, "verify-release.sh"), 0o755);
   writeFileSync(
     join(binDirectory, "docker"),
     '#!/bin/sh\nprintf "%s\\n" "$*" >> "$SIGIL_DOCKER_LOG"\n',
