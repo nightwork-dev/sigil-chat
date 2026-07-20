@@ -21,20 +21,14 @@ import type {
   ManagedSkillSummary,
 } from "@gonk/skills"
 import { FilesystemManagedSkillRegistry } from "@gonk/skills"
-import {
-  canonicalResourceKey,
-  type RetrievalEngine,
-  type RetrievalResourceRef,
-  type RetrievalHit,
-} from "@gonk/retrieval"
 import type { UserContent } from "ai"
 import type { EveMessageContext, EveMessageResult } from "eve/channels/eve"
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
 
 type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
 const DEFAULT_MAX_CONTEXT_TOKENS = 12_000
 const SKILL_CONTEXT_CONTRIBUTOR_ID = "sigil.skills"
-const RETRIEVAL_CONTEXT_CONTRIBUTOR_ID = "sigil.retrieval"
 
 export interface SigilContextOptions {
   compiler?: ContextCompiler
@@ -52,7 +46,11 @@ export interface SigilContextOptions {
    */
   readBlackboard?: (sessionId: string) => Promise<string>
   /** Host-owned identity projection. It is injected before tools run. */
-  identityFloor?: (input: { eveSessionId: string; principalId: string }) => string
+  identityFloor?: (input: {
+    eveSessionId: string
+    personaId: string
+    principalId: string
+  }) => string
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -87,8 +85,15 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     const blocks: string[] = []
     if (options.identityFloor) {
       const principalId = requireNonBlankCallerPrincipal(caller.principalId)
+      const personaId = requireCallerPersona(caller)
       const eveSessionId = nonBlank(ctx.eve.sessionId) ?? `new:${principalId}`
-      const identity = options.identityFloor({ eveSessionId, principalId }).trim()
+      const identity = options
+        .identityFloor({
+          eveSessionId,
+          personaId,
+          principalId,
+        })
+        .trim()
       if (identity.length > 0) blocks.push(identity)
     }
     const compiledContent = compiled.content.trim()
@@ -98,19 +103,23 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     // agent) edit is visible to the other party on the next turn. Best-effort —
     // never let a blackboard read block a turn.
     if (options.readBlackboard) {
-      const sessionId = sessionIdFromScope(
-        readScopeAttribute(ctx.eve.caller),
-      )
+      const sessionId = sessionIdFromScope(readScopeAttribute(ctx.eve.caller))
       if (sessionId !== null) {
         try {
-          const blackboard = (await options.readBlackboard(sessionId)).trim()
-          if (blackboard.length > 0) {
-            blocks.push(
-              `## Shared blackboard (session scratch space)\n` +
-                `A scratch space you and the user both edit; it persists across ` +
-                `the session. Update it with the sigil-blackboard-write tool. ` +
-                `Current contents:\n\n${blackboard}`,
-            )
+          const block = blackboardContextBlock(
+            await options.readBlackboard(sessionId),
+          )
+          if (block) {
+            const withBlackboard = [...blocks, block].join("\n\n")
+            if (
+              await contextFitsBudget(
+                withBlackboard,
+                options.maxTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
+                options.model,
+              )
+            ) {
+              blocks.push(block)
+            }
           }
         } catch {
           // Blackboard context is best-effort; a read failure is not fatal.
@@ -125,12 +134,48 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
   }
 }
 
+export function blackboardContextBlock(content: string): string | undefined {
+  const blackboard = content.trim()
+  if (
+    blackboard.length === 0 ||
+    blackboard.length > MAX_BLACKBOARD_CONTENT_CHARS
+  ) {
+    return undefined
+  }
+  return (
+    `## Shared blackboard (session scratch space)\n` +
+    `A scratch space you and the user both edit; it persists across ` +
+    `the session. Update it with the sigil-blackboard-write tool. ` +
+    `Current contents:\n\n${blackboard}`
+  )
+}
+
+export async function contextFitsBudget(
+  content: string,
+  maxTokens: number,
+  model?: string,
+): Promise<boolean> {
+  const count = await fallbackTokenCounter.count({ content, model })
+  return count.tokens <= maxTokens
+}
+
 function requireNonBlankCallerPrincipal(value: string | undefined): string {
   const principalId = nonBlank(value)
   if (principalId === undefined) {
-    throw new Error("Eve identity projection requires an authenticated principal.")
+    throw new Error(
+      "Eve identity projection requires an authenticated principal.",
+    )
   }
   return principalId
+}
+
+function requireCallerPersona(caller: EveSessionAuth): string {
+  const value = caller.attributes.sigilPersonaId
+  const personaId = typeof value === "string" ? nonBlank(value) : undefined
+  if (personaId === undefined) {
+    throw new Error("Eve identity projection requires a bound persona.")
+  }
+  return personaId
 }
 
 function nonBlank(value: string | undefined): string | undefined {
@@ -251,66 +296,6 @@ export function createSkillContextContributor(options: {
   }
 }
 
-export function createRetrievalContextContributor(options: {
-  engine: Pick<RetrievalEngine, "search" | "resolve">
-  authForRequestId: (requestId: string) => AuthContext | undefined
-  limit?: number
-}): ContextContributor {
-  return {
-    id: RETRIEVAL_CONTEXT_CONTRIBUTOR_ID,
-    async discover(request) {
-      if (request.query === undefined || request.query.trim().length === 0) {
-        return []
-      }
-      const auth = options.authForRequestId(request.requestId)
-      if (auth === undefined) throw new Error("Missing request auth")
-
-      const result = await options.engine.search({
-        requestId: request.requestId,
-        auth,
-        text: request.query,
-        mode: "lexical",
-        limit: options.limit ?? 5,
-        purpose: "agent-recall",
-      })
-
-      return result.hits.map(retrievalHitToCandidate)
-    },
-    async resolve(request) {
-      const hit = retrievalResourceFromCandidate(request.candidate)
-      if (hit === null) return null
-      const auth = options.authForRequestId(request.requestId)
-      if (auth === undefined) return null
-
-      const result = await options.engine.resolve({
-        requestId: request.requestId,
-        auth,
-        resource: hit,
-      })
-
-      if (result.status !== "resolved") return null
-
-      return {
-        candidateId: request.candidate.candidateId,
-        contributorId: request.candidate.contributorId,
-        resourceKey: request.candidate.resourceKey,
-        revision: result.value.resource.revision,
-        necessity: request.candidate.necessity,
-        priority: request.candidate.priority,
-        audience: request.audience,
-        content: `Retrieved context: ${result.value.label}\n${result.value.content}`,
-        resource: {
-          kind: "retrieval-resource",
-          target: request.candidate.resourceKey,
-          tenantId: result.value.tenantId,
-          workspaceId: result.value.workspaceId,
-          metadata: { sourceId: result.value.resource.sourceId },
-        },
-      }
-    },
-  }
-}
-
 export function toGonkAuthContext(
   auth: EveMessageContext["eve"]["caller"],
 ): AuthContext | null {
@@ -342,7 +327,9 @@ export function toGonkAuthContext(
   return authContextForPrincipal(principal)
 }
 
-function authContextForPrincipal(principal: AuthenticatedPrincipal): AuthContext {
+function authContextForPrincipal(
+  principal: AuthenticatedPrincipal,
+): AuthContext {
   return {
     principal,
     authorize: (request: AuthorizationRequest) =>
@@ -354,12 +341,17 @@ function authorizeSigilContextRequest(
   principal: AuthenticatedPrincipal,
   request: AuthorizationRequest,
 ): AuthorizationDecision {
-  const deniedTargets = asAuthClaimStringList(principal.attributes?.sigilContextDeny)
+  const deniedTargets = asAuthClaimStringList(
+    principal.attributes?.sigilContextDeny,
+  )
   if (
     request.resource.target !== undefined &&
     deniedTargets.includes(request.resource.target)
   ) {
-    return { outcome: "deny", reason: "Context resource denied by server auth." }
+    return {
+      outcome: "deny",
+      reason: "Context resource denied by server auth.",
+    }
   }
 
   const allowedActions = new Set([
@@ -367,9 +359,6 @@ function authorizeSigilContextRequest(
     "context.use",
     "skill.discover",
     "skill.read",
-    "retrieval.source.discover",
-    "retrieval.hit.read",
-    "retrieval.content.resolve",
   ])
 
   if (!allowedActions.has(request.action)) {
@@ -426,7 +415,10 @@ function requiredSkillPlaceholder(skillId: string): ManagedSkillSummary {
   }
 }
 
-function skillMatchesQuery(skill: ManagedSkillSummary, query: string | undefined) {
+function skillMatchesQuery(
+  skill: ManagedSkillSummary,
+  query: string | undefined,
+) {
   if (query === undefined) return false
   const normalizedQuery = query.toLowerCase()
   const terms = [skill.id, skill.name, skill.description]
@@ -461,39 +453,6 @@ function skillDetailToResolvedCandidate(
   }
 }
 
-function retrievalHitToCandidate(hit: RetrievalHit): ContextCandidate {
-  const resourceKey = canonicalResourceKey(hit.resource)
-  return {
-    candidateId: `retrieval:${resourceKey}`,
-    contributorId: RETRIEVAL_CONTEXT_CONTRIBUTOR_ID,
-    resourceKey,
-    revisionHint: hit.resource.revision,
-    necessity: "optional",
-    priority: Math.max(1, Math.round(hit.scores.final * 100)),
-    estimatedTokens: 500,
-    estimateQuality: "fallback",
-  }
-}
-
-function retrievalResourceFromCandidate(
-  candidate: ContextCandidate,
-): RetrievalResourceRef | null {
-  try {
-    const [sourceId, kind, id, revision, fragment] = JSON.parse(
-      candidate.resourceKey,
-    ) as [string, string, string, string, unknown]
-    return {
-      sourceId,
-      kind,
-      id,
-      revision,
-      ...(fragment === null ? {} : { fragment: fragment as RetrievalResourceRef["fragment"] }),
-    }
-  } catch {
-    return null
-  }
-}
-
 function messageToQuery(message: string | UserContent): string {
   if (typeof message === "string") return message
   return message
@@ -502,7 +461,9 @@ function messageToQuery(message: string | UserContent): string {
 }
 
 function skillIdFromResourceKey(resourceKey: string): string | null {
-  return resourceKey.startsWith("skill:") ? resourceKey.slice("skill:".length) : null
+  return resourceKey.startsWith("skill:")
+    ? resourceKey.slice("skill:".length)
+    : null
 }
 
 function estimateTokens(value: string) {
@@ -542,7 +503,8 @@ function resourceMatchesPrincipalBinding(
 ) {
   if (
     resource.tenantId !== undefined &&
-    (principal.tenantId === undefined || resource.tenantId !== principal.tenantId)
+    (principal.tenantId === undefined ||
+      resource.tenantId !== principal.tenantId)
   ) {
     return false
   }

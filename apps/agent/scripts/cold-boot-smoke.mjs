@@ -1,4 +1,5 @@
 import { cpSync, mkdtempSync, rmSync, symlinkSync } from "node:fs"
+import { once } from "node:events"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -24,6 +25,9 @@ try {
     join(appDirectory, "tsconfig.json"),
     join(fixtureDirectory, "tsconfig.json"),
   )
+  cpSync(join(appDirectory, "scripts"), join(fixtureDirectory, "scripts"), {
+    recursive: true,
+  })
   symlinkSync(join(appDirectory, "node_modules"), join(fixtureDirectory, "node_modules"))
 
   const port = await reservePort()
@@ -57,7 +61,10 @@ try {
   }
   throw error
 } finally {
-  child?.kill("SIGTERM")
+  if (child && child.exitCode === null && child.signalCode === null) {
+    child.kill("SIGKILL")
+    await once(child, "exit")
+  }
   rmSync(fixtureDirectory, { force: true, recursive: true })
 }
 

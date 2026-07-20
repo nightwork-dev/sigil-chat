@@ -38,7 +38,7 @@ describe("MemoryWorkItemsRepository", () => {
     expect(initial.stories.find(({ id }) => id === "S1.1")).toMatchObject({
       epicId: "roadmap",
       status: "ready",
-      routing: "pi:luna",
+      routing: "implementation",
       reviewGate: "peer",
       deps: ["S1.0"],
     });
@@ -94,12 +94,13 @@ describe("MemoryWorkItemsRepository", () => {
       unread: false,
       completed: true,
     });
-    expect(decided.document.stories.find(({ id }) => id === "S1.1"))
-      .toMatchObject({
-        reviewDecision: "approved",
-        decidedBy: "Owner",
-        decidedAt: "2026-07-18T20:00:00.000Z",
-      });
+    expect(
+      decided.document.stories.find(({ id }) => id === "S1.1"),
+    ).toMatchObject({
+      reviewDecision: "approved",
+      decidedBy: "Owner",
+      decidedAt: "2026-07-18T20:00:00.000Z",
+    });
 
     const commented = await repository.addComment(
       {
@@ -133,8 +134,9 @@ describe("FileWorkItemsRepository", () => {
     const humanEdit = await human.upsertStory(story, initial.revision);
     expect(humanEdit.changedIds).toEqual(["S0.3"]);
 
-    expect((await agent.get()).stories.find(({ id }) => id === "S0.3"))
-      .toMatchObject({ status: "in-progress" });
+    expect(
+      (await agent.get()).stories.find(({ id }) => id === "S0.3"),
+    ).toMatchObject({ status: "in-progress" });
 
     await expect(
       agent.transitionStory("S0.3", "verify", initial.revision),
@@ -206,7 +208,9 @@ describe("FileWorkItemsRepository", () => {
   it("does not apply a stale mutation", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-work-items-store-"));
     temporaryDirectories.push(directory);
-    const repository = new FileWorkItemsRepository(join(directory, "work.json"));
+    const repository = new FileWorkItemsRepository(
+      join(directory, "work.json"),
+    );
     const initial = await repository.get();
 
     await repository.transitionStory("S0.3", "in-progress", initial.revision);
@@ -228,7 +232,9 @@ describe("FileWorkItemsRepository", () => {
   it("reaps a lock held by a dead process without waiting for the hard stale age", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-work-items-store-"));
     temporaryDirectories.push(directory);
-    const repository = new FileWorkItemsRepository(join(directory, "work.json"));
+    const repository = new FileWorkItemsRepository(
+      join(directory, "work.json"),
+    );
     const initial = await repository.get();
     await writeFile(
       `${repository.filePath}.lock`,
@@ -248,7 +254,9 @@ describe("FileWorkItemsRepository", () => {
   it("reaps an unparseable lock after the hard stale age", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-work-items-store-"));
     temporaryDirectories.push(directory);
-    const repository = new FileWorkItemsRepository(join(directory, "work.json"));
+    const repository = new FileWorkItemsRepository(
+      join(directory, "work.json"),
+    );
     const initial = await repository.get();
     const lockPath = `${repository.filePath}.lock`;
     const old = new Date(Date.now() - 61_000);
@@ -267,7 +275,9 @@ describe("FileWorkItemsRepository", () => {
   it("reports a corrupt work-items store with its file path", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-work-items-store-"));
     temporaryDirectories.push(directory);
-    const repository = new FileWorkItemsRepository(join(directory, "work.json"));
+    const repository = new FileWorkItemsRepository(
+      join(directory, "work.json"),
+    );
     await writeFile(
       repository.filePath,
       JSON.stringify({

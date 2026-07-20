@@ -4,23 +4,69 @@ import {
   ContextContributorRegistry,
   type ContextContributor,
 } from "@gonk/context"
-import type { AuthorizationRequest } from "@gonk/auth"
 import type { ManagedSkillRegistry } from "@gonk/skills"
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
 import { eveChannel } from "eve/channels/eve"
 import {
-  createRetrievalContextContributor,
+  blackboardContextBlock,
+  contextFitsBudget,
+  createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
   createSkillContextContributor,
 } from "./sigil-context"
 
 const SESSION_AUTH = {
-  attributes: {},
+  attributes: { sigilPersonaId: "agent-a" } as Record<string, string>,
   authenticator: "test",
   principalId: "user-1",
   principalType: "user",
 }
 
 describe("Sigil Eve context integration", () => {
+  it("omits oversized legacy blackboards from turn context", () => {
+    expect(
+      blackboardContextBlock("x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1)),
+    ).toBeUndefined()
+    expect(blackboardContextBlock("Shared note")).toContain("Shared note")
+  })
+
+  it("keeps appended context inside the turn budget", async () => {
+    await expect(contextFitsBudget("x".repeat(100), 24)).resolves.toBe(false)
+    await expect(contextFitsBudget("x".repeat(100), 25)).resolves.toBe(true)
+  })
+
+  it("does not advertise retrieval when the default compiler has no retrieval source", async () => {
+    const compiler = createDefaultSigilContextCompiler({
+      agentProjectRoot: process.cwd(),
+      tokenCounter,
+    })
+
+    const result = await compiler.compile({
+      requestId: "default-retrieval-source-check",
+      audience: "model",
+      auth: {
+        principal: {
+          id: "user-1",
+          kind: "human",
+          identity: { issuer: "test", subject: "user-1", method: "session" },
+          roles: [],
+          scopes: [],
+        },
+        authorize: () => ({ outcome: "allow", reason: "test policy" }),
+      },
+      maxTokens: 1_000,
+      query: "find project context",
+      requestedContributorIds: ["sigil.retrieval"],
+    })
+
+    expect(result.status).toBe("ready")
+    expect(result.receipt.selected).toEqual([])
+    expect(result.receipt.dropped).toContainEqual({
+      reason: "contributor-failed",
+      contributorId: "sigil.retrieval",
+    })
+  })
+
   it("adds deterministically selected authorized skill context to the next model turn", async () => {
     const channel = testChannel({
       compiler: compilerWith([
@@ -38,7 +84,9 @@ describe("Sigil Eve context integration", () => {
     expect(send).toHaveBeenCalledOnce()
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("Client context:")
-    expect(JSON.stringify(payload)).toContain("Managed skill: editorial-readiness")
+    expect(JSON.stringify(payload)).toContain(
+      "Managed skill: editorial-readiness",
+    )
     expect(JSON.stringify(payload)).toContain("AUTHORIZED_EDITORIAL_CONTEXT")
   })
 
@@ -57,11 +105,17 @@ describe("Sigil Eve context integration", () => {
     expect(response.status).toBe(202)
     expect(send).toHaveBeenCalledOnce()
     const [payload] = firstSendCall(send)
-    expect(JSON.stringify(payload)).not.toContain("AUTHORIZED_EDITORIAL_CONTEXT")
+    expect(JSON.stringify(payload)).not.toContain(
+      "AUTHORIZED_EDITORIAL_CONTEXT",
+    )
   })
 
   it("uses a non-blank provisional identity when Eve has not assigned a session id yet", async () => {
-    const identities: Array<{ eveSessionId: string; principalId: string }> = []
+    const identities: Array<{
+      eveSessionId: string
+      personaId: string
+      principalId: string
+    }> = []
     const channel = testChannel({
       compiler: compilerWith([]),
       identityFloor: (identity) => {
@@ -74,7 +128,11 @@ describe("Sigil Eve context integration", () => {
     await postSession(channel, send, { message: "hello" })
 
     expect(identities).toEqual([
-      { eveSessionId: "new:user-1", principalId: "user-1" },
+      {
+        eveSessionId: "new:user-1",
+        personaId: "agent-a",
+        principalId: "user-1",
+      },
     ])
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("IDENTITY_FLOOR")
@@ -84,7 +142,10 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: { sigilResourceScope: "session:sess-1" },
+        attributes: {
+          sigilPersonaId: "agent-a",
+          sigilResourceScope: "session:sess-1",
+        },
       },
       compiler: compilerWith([]),
       readBlackboard: async (sessionId) =>
@@ -106,7 +167,10 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: { sigilResourceScope: "project:proj-1" },
+        attributes: {
+          sigilPersonaId: "agent-a",
+          sigilResourceScope: "project:proj-1",
+        },
       },
       compiler: compilerWith([]),
       readBlackboard: async () => "SHOULD_NOT_APPEAR",
@@ -198,7 +262,6 @@ describe("Sigil Eve context integration", () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-
   it("fails closed for unsupported principal types", async () => {
     const channel = testChannel({
       auth: {
@@ -256,90 +319,16 @@ describe("Sigil Eve context integration", () => {
     expect(response.status).toBe(204)
     expect(send).not.toHaveBeenCalled()
   })
-
-  it("passes the captured request auth through retrieval instead of widening from principal", async () => {
-    const observedOutcomes: string[] = []
-    const registry = new ContextContributorRegistry()
-    registry.register(
-      createRetrievalContextContributor({
-        authForRequestId: () => ({
-          principal: {
-            id: "user-1",
-            kind: "human",
-            identity: { issuer: "test", subject: "user-1", method: "session" },
-            roles: [],
-            scopes: [],
-          },
-          authorize: (request: AuthorizationRequest) => ({
-            outcome:
-              request.resource.target === "retrieval-probe" ? "deny" : "allow",
-            reason: "test policy",
-          }),
-        }),
-        engine: {
-          async search(request) {
-            const decision = await request.auth.authorize({
-              action: "retrieval.content.resolve",
-              resource: {
-                kind: "retrieval-resource",
-                target: "retrieval-probe",
-              },
-            })
-            observedOutcomes.push(decision.outcome)
-            return {
-              hits: [],
-              receipt: {
-                kind: "retrieval-search",
-                receiptVersion: 1,
-                requestId: request.requestId,
-                timestamp: new Date(0).toISOString(),
-                mode: "lexical",
-                purpose: "agent-recall",
-                outcome: "success",
-                sources: [],
-                visibleHits: [],
-                drops: [],
-              },
-            }
-          },
-          async resolve() {
-            throw new Error("resolve should not be reached")
-          },
-        },
-      }),
-    )
-
-    const compiler = new ContextCompiler({
-      registry,
-      tokenCounter,
-      configVersion: "test",
-    })
-
-    await compiler.compile({
-      requestId: "retrieval-auth-request",
-      audience: "model",
-      auth: {
-        principal: {
-          id: "user-1",
-          kind: "human",
-          identity: { issuer: "test", subject: "user-1", method: "session" },
-          roles: [],
-          scopes: [],
-        },
-        authorize: () => ({ outcome: "allow", reason: "outer policy" }),
-      },
-      maxTokens: 1_000,
-      query: "find retrieval context",
-    })
-
-    expect(observedOutcomes).toEqual(["deny"])
-  })
 })
 
 function testChannel(options: {
   auth?: typeof SESSION_AUTH
   compiler: ContextCompiler
-  identityFloor?: (input: { eveSessionId: string; principalId: string }) => string
+  identityFloor?: (input: {
+    eveSessionId: string
+    personaId: string
+    principalId: string
+  }) => string
   pinnedResourceKeys?: readonly string[]
   readBlackboard?: (sessionId: string) => Promise<string>
 }) {
@@ -388,7 +377,9 @@ async function postSession(
   )
 }
 
-function compilerWith(contributors: Parameters<ContextContributorRegistry["register"]>[0][]) {
+function compilerWith(
+  contributors: Parameters<ContextContributorRegistry["register"]>[0][],
+) {
   const registry = new ContextContributorRegistry()
   for (const contributor of contributors) registry.register(contributor)
   return new ContextCompiler({
@@ -400,7 +391,10 @@ function compilerWith(contributors: Parameters<ContextContributorRegistry["regis
 
 const tokenCounter = {
   async count(input: { content: string }) {
-    return { tokens: Math.max(1, Math.ceil(input.content.length / 4)), quality: "fallback" as const }
+    return {
+      tokens: Math.max(1, Math.ceil(input.content.length / 4)),
+      quality: "fallback" as const,
+    }
   },
 }
 

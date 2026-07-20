@@ -83,9 +83,9 @@ export function registerDistillTools(
       // distill on later turns. A blackboard hiccup never fails the distill.
       if (scope.tier === "session") {
         try {
-          const current = (await blackboardRepository.read(scope.id)).content;
+          const current = await blackboardRepository.read(scope.id);
           const pointer = `- Distilled "${input.title}" → artifact \`${stored.id}\``;
-          const base = current.trim();
+          const base = current.content.trim();
           const next =
             base.length > 0
               ? `${base}\n${pointer}`
@@ -94,6 +94,7 @@ export function registerDistillTools(
             scope.id,
             next,
             ctx.auth?.principal?.id ?? "agent",
+            current.revision,
           );
         } catch {
           // pointer is best-effort

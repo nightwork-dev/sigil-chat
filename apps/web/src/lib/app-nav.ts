@@ -10,18 +10,38 @@ import {
   MessageSquareIcon,
   NetworkIcon,
   SettingsIcon,
+  ActivityIcon,
+  UserRoundIcon,
 } from "lucide-react"
 import type { NavModel } from "@workspace/ui/components/layouts/nav"
 
-export const appNav: NavModel = {
-  brand: { label: "Sigil Chat", to: "/chat" },
-  items: [
-    { to: "/chat", label: "Chat", icon: MessageSquareIcon },
-    { to: "/studio", label: "Studio", icon: NetworkIcon },
-    { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
-    { to: "/roadmap", label: "Roadmap", icon: MapIcon },
-    { to: "/review", label: "Review", icon: FileCheck2Icon },
-    { to: "/skills", label: "Skills", icon: BracesIcon },
-  ],
-  footer: [{ to: "/settings", label: "Settings", icon: SettingsIcon }],
+export function buildAppNav(options: {
+  internalWorkspaces: boolean
+  owner?: boolean
+}): NavModel {
+  return {
+    brand: { label: "Sigil Chat", to: "/chat" },
+    items: [
+      { to: "/chat", label: "Chat", icon: MessageSquareIcon },
+      { to: "/agents", label: "Agent", icon: UserRoundIcon },
+      { to: "/studio", label: "Studio", icon: NetworkIcon },
+      { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
+      ...(options.internalWorkspaces
+        ? [{ to: "/roadmap", label: "Roadmap", icon: MapIcon }]
+        : []),
+      { to: "/review", label: "Review", icon: FileCheck2Icon },
+      { to: "/skills", label: "Skills", icon: BracesIcon },
+    ],
+    footer: [
+      ...(options.owner
+        ? [{ to: "/status", label: "Status", icon: ActivityIcon }]
+        : []),
+      { to: "/settings", label: "Settings", icon: SettingsIcon },
+    ],
+  }
 }
+
+export const appNav = buildAppNav({
+  internalWorkspaces:
+    import.meta.env.DEV || import.meta.env.VITE_SIGIL_INTERNAL_WORKSPACES === "1",
+})

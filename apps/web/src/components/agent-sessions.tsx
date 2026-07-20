@@ -1,4 +1,9 @@
 import {
+  AGENT_PERSONA_HEADER,
+  AGENT_SCOPE_HEADER,
+} from "@/lib/agent-session-scope"
+import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
+import {
   useCallback,
   useLayoutEffect,
   useMemo,
@@ -54,8 +59,16 @@ import {
   createSingleWriteSessionPersistence,
 } from "@/lib/agent-session-persistence"
 import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projector"
+import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
+import { getAgentScopeProof } from "@/lib/agent-scope-delegation"
 
-export function AppAgentSessions({ children }: { children: ReactNode }) {
+export function AppAgentSessions({
+  children,
+  principalId,
+}: {
+  children: ReactNode
+  principalId: string
+}) {
   const threadsQuery = useAgentThreads()
   const preferenceQuery = useActiveAgentThreadPreference()
   const createThread = useCreateAgentThread()
@@ -120,11 +133,12 @@ export function AppAgentSessions({ children }: { children: ReactNode }) {
 
   return (
     <ActiveAgentSession
-      createThread={() => createThread.mutateAsync({})}
+      createThread={(personaId) => createThread.mutateAsync({ personaId })}
       forkThread={() =>
         forkThread.mutateAsync({ sourceThreadId: activeThread.id })
       }
       key={activeThread.id}
+      principalId={principalId}
       selectThread={(threadId) => setActiveThread.mutateAsync({ id: threadId })}
       thread={activeThread}
       threads={threads}
@@ -138,13 +152,15 @@ function ActiveAgentSession({
   children,
   createThread,
   forkThread,
+  principalId,
   selectThread,
   thread,
   threads,
 }: {
   children: ReactNode
-  createThread: () => Promise<unknown>
+  createThread: (personaId: string) => Promise<unknown>
   forkThread: () => Promise<unknown>
+  principalId: string
   selectThread: (threadId: string) => Promise<unknown>
   thread: AgentThread
   threads: readonly AgentThreadSummary[]
@@ -260,7 +276,9 @@ function ActiveAgentSession({
           : {}),
       })),
       createThread: async () => {
-        await persistence.current.afterPersisted(createThread)
+        await persistence.current.afterPersisted(() =>
+          createThread(thread.personaId),
+        )
       },
       forkActiveThread: async () => {
         await persistence.current.afterPersisted(forkThread)
@@ -269,7 +287,14 @@ function ActiveAgentSession({
         await persistence.current.afterPersisted(() => selectThread(threadId))
       },
     }),
-    [createThread, forkThread, selectThread, thread.id, threads],
+    [
+      createThread,
+      forkThread,
+      selectThread,
+      thread.id,
+      thread.personaId,
+      threads,
+    ],
   )
 
   const eveSession = useEveRuntimeSession({
@@ -294,8 +319,17 @@ function ActiveAgentSession({
         }
         turnActive.current = true
         try {
+          const resourceScope = input.headers?.[AGENT_SCOPE_HEADER]
+          const scopeProof = resourceScope
+            ? await getAgentScopeProof(resourceScope, principalId)
+            : undefined
           const result = await eveSession.send({
             ...input,
+            headers: {
+              ...input.headers,
+              [AGENT_PERSONA_HEADER]: thread.personaId,
+              ...(scopeProof ? { [AGENT_SCOPE_PROOF_HEADER]: scopeProof } : {}),
+            },
             clientContext: composeClientContext(
               input.clientContext,
               thread.forkSeed,
@@ -308,7 +342,13 @@ function ActiveAgentSession({
         }
       },
     }),
-    [eveSession, handleSendSuccess, thread.forkSeed],
+    [
+      eveSession,
+      handleSendSuccess,
+      principalId,
+      thread.forkSeed,
+      thread.personaId,
+    ],
   )
 
   return (
@@ -322,8 +362,10 @@ function ActiveAgentSession({
         </div>
       ) : null}
       <AgentRuntimeSessionProvider session={session}>
-        <AgentOutcomeProjector session={session} />
-        {children}
+        <AgentPersonaSessionProvider personaId={thread.personaId}>
+          <AgentOutcomeProjector session={session} />
+          {children}
+        </AgentPersonaSessionProvider>
       </AgentRuntimeSessionProvider>
     </AgentThreadControlsProvider>
   )

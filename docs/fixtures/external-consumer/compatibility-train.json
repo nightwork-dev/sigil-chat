@@ -1,0 +1,33 @@
+{
+  "verifiedPublicBoundary": {
+    "eve": "0.25.2",
+    "@gonk/auth": "0.3.1",
+    "@gonk/context": "0.3.1",
+    "@gonk/scope": "0.3.1",
+    "@gonk/tool-registry": "0.3.1",
+    "@gonk/tool-registry-mcp": "0.3.1",
+    "@zigil/agent-gonk": "0.1.0"
+  },
+  "applicationTrain": {
+    "eveHost": "0.25.2",
+    "webEveCompatibilityDependency": "0.24.4",
+    "@zigil/agent-eve": "0.1.5",
+    "@zigil/agent-gonk": "0.1.0",
+    "@zigil/agent-react": "0.1.1",
+    "@zigil/agent-react-query": "0.1.1",
+    "@zigil/agent-surface": "0.1.1",
+    "@gonk/core": "0.3.1",
+    "@gonk/eve-host": "0.5.1-mem2.6",
+    "@gonk/memory": "0.5.1-mem2.5",
+    "@gonk/persona": "0.5.1-mem2.5"
+  },
+  "notYetPublic": [
+    "@zigil/agent-eve@0.1.5",
+    "@zigil/agent-react@0.1.1",
+    "@zigil/agent-react-query@0.1.1",
+    "@zigil/agent-surface@0.1.1",
+    "@gonk/eve-host@0.5.1-mem2.6",
+    "@gonk/memory@0.5.1-mem2.5",
+    "@gonk/persona@0.5.1-mem2.5"
+  ]
+}

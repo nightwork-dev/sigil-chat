@@ -14,6 +14,7 @@ import {
   createSigilRequestAuthenticator,
   readSigilEveAuthEnvironment,
   type SigilEveAuthEnvironment,
+  type CreateOwnedEveChannelOptions,
 } from "./eve-auth"
 import { MemoryEveSessionOwnerStore } from "./eve-session-owners"
 
@@ -155,9 +156,72 @@ describe("owned Eve channel", () => {
     await expect(ownerStore.getOwner("session-1")).resolves.toBe("user-1")
   })
 
+  it("binds the selected persona and rejects persona switching on continuation", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    const observedPersonas: string[] = []
+    const channel = makeOwnedChannel(ownerStore, (context) => {
+      const caller = context.eve.caller
+      if (!caller) return null
+      const personaId = caller.attributes.sigilPersonaId
+      if (typeof personaId === "string") observedPersonas.push(personaId)
+      return { auth: caller }
+    })
+    const createRoute = findRoute(channel, "POST", "/eve/v1/session")
+
+    const created = await createRoute.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session",
+        "user-1",
+        { message: "Hello" },
+        "agent-b",
+      ),
+      routeArgs(),
+    )
+
+    expect(created.status).toBe(202)
+    await expect(ownerStore.getBinding("session-1")).resolves.toEqual({
+      personaId: "agent-b",
+      subject: "user-1",
+    })
+    expect(observedPersonas).toEqual(["agent-b"])
+
+    const continueRoute = findRoute(
+      channel,
+      "POST",
+      "/eve/v1/session/:sessionId",
+    )
+    const send = vi.fn()
+    const denied = await continueRoute.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-1",
+        "user-1",
+        { continuationToken: "eve:continuation-1", message: "Switch" },
+        "agent-a",
+      ),
+      routeArgs({ params: { sessionId: "session-1" }, send }),
+    )
+
+    expect(denied.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+
+    const allowedSend = vi.fn(async () => ({ id: "session-1" }))
+    const allowed = await continueRoute.handler(
+      requestFor("POST", "/eve/v1/session/session-1", "user-1", {
+        continuationToken: "eve:continuation-1",
+        message: "Continue",
+      }),
+      routeArgs({ params: { sessionId: "session-1" }, send: allowedSend }),
+    )
+
+    expect(allowed.status).toBe(200)
+    expect(observedPersonas).toEqual(["agent-b", "agent-b"])
+  })
+
   it("allows the owner to continue and rejects a different caller before dispatch", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("session-1", "user-1")
+    await ownerStore.bind("session-1", "user-1", "agent-a")
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
     const allowedSend = vi.fn(async () => ({ id: "session-1" }))
@@ -192,7 +256,7 @@ describe("owned Eve channel", () => {
 
   it("rejects cross-owner event-stream reads before resolving the session", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("session-1", "user-1")
+    await ownerStore.bind("session-1", "user-1", "agent-a")
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "GET", "/eve/v1/session/:sessionId/stream")
     const getSession = vi.fn()
@@ -240,6 +304,7 @@ describe("owned Eve channel", () => {
           subject,
         }
       },
+      defaultPersonaId: "agent-a",
       onMessage: (context) => {
         const caller = context.eve.caller
         if (!caller) return null
@@ -309,13 +374,21 @@ async function signToken(
     .sign(privateKey)
 }
 
-function makeOwnedChannel(ownerStore: MemoryEveSessionOwnerStore) {
+function makeOwnedChannel(
+  ownerStore: MemoryEveSessionOwnerStore,
+  onMessage?: CreateOwnedEveChannelOptions["onMessage"],
+) {
   return createOwnedEveChannel({
     auth: (request) => {
       const subject = request.headers.get("x-test-subject")
       if (!subject) return null
+      const requestedPersonaId = request.headers.get("x-sigil-persona-id")
       return {
-        attributes: {},
+        attributes: {
+          ...(requestedPersonaId
+            ? { sigilRequestedPersonaId: requestedPersonaId }
+            : {}),
+        },
         authenticator: "test",
         issuer: "test",
         principalId: subject,
@@ -323,6 +396,8 @@ function makeOwnedChannel(ownerStore: MemoryEveSessionOwnerStore) {
         subject,
       }
     },
+    defaultPersonaId: "agent-a",
+    onMessage,
     ownerStore,
   })
 }
@@ -343,11 +418,13 @@ function requestFor(
   path: string,
   subject: string,
   body?: unknown,
+  personaId?: string,
 ) {
   return new Request(`http://localhost${path}`, {
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: {
       ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...(personaId ? { "x-sigil-persona-id": personaId } : {}),
       "x-test-subject": subject,
     },
     method,

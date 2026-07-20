@@ -29,7 +29,7 @@ publicly resolvable hostnames, provider account, or deployment command.
 
 | Blocker                                 | Current evidence                                                                                                                           | Required closure                                                                                                          |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| Invite admission                        | Auth supports first-owner bootstrap and an explicit open-registration flag; no invite lifecycle exists.                                    | Atomic invite issue/accept/revoke flow and member/channel-membership creation.                                            |
+| Invite admission                        | The base owner-issued, single-use, expiring, revocable token lifecycle is implemented. Current invites deliberately carry no channel ids because the product does not yet have an explicit channel-membership repository; a non-empty legacy row fails closed. | Keep global member admission atomic. Before issuing any channel-scoped invite, land the S10.5 membership store and make its writes part of the same acceptance transaction. |
 | Membership-complete persistence (S10.5) | The architecture contract requires ownership and membership for channels, snapshots, forks, preferences, and resume-secret references.     | Two-user exact-id denial proof across every record and operation.                                                         |
 | Human principal at Gonk                 | Eve's current MCP connection sends the static `GONK_MCP_KEY` and resource scope, not a verified human principal.                           | Trusted host context at every invocation; absent context denies before tool side effects.                                 |
 | Retention and resume secrets            | Event redaction is implemented, but persisted session state may still contain a raw continuation token and atomic secret rotation is open. | Server-only secret adapter, atomic revision/secret rotation, deletion and production-adapter proof.                       |
@@ -127,6 +127,14 @@ interface InviteRecord {
 }
 ```
 
+The current application issues only deployment-global member invites with
+`channelIds: []`. It does not yet expose channel selection. A row with non-empty
+`channelIds` is rejected rather than partially accepted because channel
+membership is not auth-database-owned yet. This is an intentional fail-closed
+boundary, not evidence that S10.5 is complete. Channel-scoped invites become
+available only after the explicit membership repository exists and acceptance
+can commit the account, memberships, and invite consumption atomically.
+
 The raw token is cryptographically random, displayed once, and never stored.
 Only a versioned keyed digest is persisted. Default lifetime is 24 hours; the
 owner may choose a shorter lifetime, never a longer one for this deployment.
@@ -138,8 +146,10 @@ The shareable link uses a fragment (`/accept-invite#token=...`), not a path or
 query parameter, so the raw token is absent from proxy access logs and referrer
 headers. The browser submits it once in a redacted request body. One database
 transaction locks the invite, verifies digest, expiry, revocation, and unused
-state, creates or admits the Better Auth member, creates every explicit channel
-membership, and marks the invite consumed. Any failure rolls back everything.
+state, creates or admits the Better Auth member, and marks the invite consumed.
+For the current deployment-global invite shape, the explicit membership set is
+empty. A future channel-scoped shape must also create every listed membership
+inside that transaction. Any failure rolls back everything.
 
 Acceptance never grants `owner`, never infers membership from workspace scope,
 and never opens general registration. Replaying, racing, revoking, or accepting
@@ -204,7 +214,10 @@ route.
 
 First-owner bootstrap closes after one serialized success. Admission thereafter
 requires a single-use, expiring, revocable invite; acceptance creates a member
-and explicit channel membership atomically. Open registration is forbidden.
+atomically. Current invites contain no channel scope and non-empty channel ids
+fail closed. Once channel-scoped invites are exposed, acceptance must create the
+member and every explicit channel membership atomically. Open registration is
+forbidden.
 
 > **Proof command/check:** run the invite integration suite covering concurrent
 > bootstrap, closed sign-up, issue, accept, replay, race, expiry, and revocation;

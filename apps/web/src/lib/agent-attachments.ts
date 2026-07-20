@@ -1,8 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
-import { AGENT_SCOPE_HEADER } from "./agent-session-scope";
-
 /**
  * Uploads a chat attachment (image or file) to the Gonk artifact store and
  * returns the served URL plus metadata.
@@ -13,7 +11,7 @@ import { AGENT_SCOPE_HEADER } from "./agent-session-scope";
  * on the web app's own Node process (which already receives `GONK_MCP_KEY`
  * via `turbo.json`'s `globalPassThroughEnv`, the same way `apps/agent`
  * does), reads the key server-side, and proxies the raw bytes to Gonk's
- * authenticated `/upload` route. `/img/<key>` reads stay unauthenticated
+ * authenticated `/upload` route. `/img/<key>` reads are session-gated
  * (content-addressed, unguessable) and are proxied same-origin by the web app
  * (vite.config.ts), so the browser never talks to Gonk directly for either the
  * read or the write — only this write path is bearer-gated.
@@ -26,58 +24,13 @@ export interface UploadedAttachment {
   readonly filename?: string;
 }
 
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-
 const uploadAttachmentFn = createServerFn({ method: "POST" })
   .validator((data: FormData) => data)
   .handler(async ({ data }): Promise<UploadedAttachment> => {
-    const file = data.get("file");
-    const scope = data.get("scope");
-    if (typeof scope !== "string" || scope.trim().length === 0) {
-      throw new Error("Attachment upload requires a resource scope.");
-    }
-    if (!(file instanceof File)) {
-      throw new Error("Attachment upload requires a `file` field.");
-    }
-    if (file.size === 0) {
-      throw new Error("Attachment file is empty.");
-    }
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error(
-        `Attachment is too large (${file.size} bytes; limit ${MAX_ATTACHMENT_BYTES} bytes).`,
-      );
-    }
-
-    const { readGonkClientEnvironment } = await import(
-      "@workspace/runtime-env/server"
-    );
-    const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
-    if (!apiKey) {
-      throw new Error(
-        "GONK_MCP_KEY is not configured for the web app's server process; attachment uploads cannot be authenticated against Gonk.",
-      );
-    }
-    const uploadUrl = gonkMcpUrl.replace(/\/mcp\/?$/, "/upload");
-
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        "content-type": file.type || "application/octet-stream",
-        "x-filename": file.name,
-        [AGENT_SCOPE_HEADER]: scope,
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: bytes,
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Attachment upload failed (${response.status} ${response.statusText})`,
-      );
-    }
-
-    return (await response.json()) as UploadedAttachment;
+    const { uploadAgentAttachmentFromRequest } = await import(
+      "./agent-attachments.server"
+    )
+    return uploadAgentAttachmentFromRequest(data)
   });
 
 export function useUploadAgentAttachment() {

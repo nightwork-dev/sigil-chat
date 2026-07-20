@@ -67,10 +67,10 @@ const storyStatuses: StoryStatus[] = [
 
 const routings: Routing[] = [
   "self",
-  "claude:opus",
-  "claude:sonnet",
-  "pi:luna",
-  "codex",
+  "strategy",
+  "design",
+  "implementation",
+  "research",
 ];
 const commentKinds: StoryComment["kind"][] = [
   "question",

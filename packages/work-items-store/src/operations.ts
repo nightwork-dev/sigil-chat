@@ -85,11 +85,10 @@ export function assignReview(
         }
       : item,
   );
-  return commit(
-    document,
-    { stories, reviews: [...document.reviews, review] },
-    [storyId, reviewId],
-  );
+  return commit(document, { stories, reviews: [...document.reviews, review] }, [
+    storyId,
+    reviewId,
+  ]);
 }
 
 export function decideReview(
@@ -190,10 +189,7 @@ export function sortStories(stories: Story[]): Story[] {
 }
 
 /** Return only the stories matching every provided filter facet. */
-export function filterStories(
-  stories: Story[],
-  filter?: StoryFilter,
-): Story[] {
+export function filterStories(stories: Story[], filter?: StoryFilter): Story[] {
   if (!filter) return stories;
   return stories.filter(
     (story) =>
@@ -364,10 +360,10 @@ function isStoryStatus(value: unknown): value is StoryStatus {
 function isRouting(value: unknown): value is Routing {
   return (
     value === "self" ||
-    value === "claude:opus" ||
-    value === "claude:sonnet" ||
-    value === "pi:luna" ||
-    value === "codex"
+    value === "strategy" ||
+    value === "design" ||
+    value === "implementation" ||
+    value === "research"
   );
 }
 

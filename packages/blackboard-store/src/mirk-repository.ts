@@ -1,11 +1,13 @@
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { MarkdownStore, type MarkdownMutation } from "@mirk/store-markdown";
 
 import type { BlackboardRepository } from "./repository.js";
 import type { BlackboardDoc } from "./types.js";
+import { assertBlackboardContent, BlackboardConflictError } from "./limits.js";
 
 const BLACKBOARD_COLLECTION = "blackboard";
 const DEFAULT_BLACKBOARD_DIR = ".data/blackboard";
@@ -13,6 +15,7 @@ const DEFAULT_BLACKBOARD_DIR = ".data/blackboard";
 interface BlackboardRecord {
   id: string;
   content: string;
+  revision?: string;
   updatedAt: string;
   updatedBy: string;
 }
@@ -28,7 +31,8 @@ export interface MirkBlackboardRepositoryOptions {
 /**
  * A session-keyed blackboard backed by Mirk's published MarkdownStore adapter.
  * Each record is one markdown file named from its session id. The markdown body
- * is the user-visible content; updatedAt and updatedBy stay in YAML frontmatter.
+ * is the user-visible content; revision, updatedAt, and updatedBy stay in YAML
+ * frontmatter.
  */
 export class MirkBlackboardRepository implements BlackboardRepository {
   private readonly dirOption?: string;
@@ -66,31 +70,75 @@ export class MirkBlackboardRepository implements BlackboardRepository {
     sessionId: string,
     content: string,
     updatedBy: string,
+    expectedRevision?: string,
   ): Promise<BlackboardDoc> {
+    assertBlackboardContent(content);
     return this.runExclusive(async () => {
       await this.ensureReady();
-      const document: BlackboardDoc = {
-        sessionId,
-        content,
-        updatedAt: this.now(),
-        updatedBy,
-      };
-      this.requireStore().put(BLACKBOARD_COLLECTION, {
-        id: sessionId,
-        content: document.content,
-        updatedAt: document.updatedAt,
-        updatedBy: document.updatedBy,
-      });
-      const persisted = this.requireStore().getById<BlackboardRecord>(
-        BLACKBOARD_COLLECTION,
-        sessionId,
-      );
-      if (persisted === null)
-        throw new Error(
-          `Blackboard write disappeared for session ${sessionId}.`,
+      return this.withProcessLock(sessionId, async () => {
+        const current = this.requireStore().getById<BlackboardRecord>(
+          BLACKBOARD_COLLECTION,
+          sessionId,
         );
-      return toDocument(persisted);
+        if (
+          expectedRevision !== undefined &&
+          (current?.revision ?? "") !== expectedRevision
+        ) {
+          throw new BlackboardConflictError();
+        }
+        const document: BlackboardDoc = {
+          sessionId,
+          content,
+          revision: randomUUID(),
+          updatedAt: this.now(),
+          updatedBy,
+        };
+        this.requireStore().put(BLACKBOARD_COLLECTION, {
+          id: sessionId,
+          content: document.content,
+          revision: document.revision,
+          updatedAt: document.updatedAt,
+          updatedBy: document.updatedBy,
+        });
+        const persisted = this.requireStore().getById<BlackboardRecord>(
+          BLACKBOARD_COLLECTION,
+          sessionId,
+        );
+        if (persisted === null)
+          throw new Error(
+            `Blackboard write disappeared for session ${sessionId}.`,
+          );
+        return toDocument(persisted);
+      });
     });
+  }
+
+  private async withProcessLock<T>(
+    sessionId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const lockName = createHash("sha256").update(sessionId).digest("hex");
+    const lockDirectory = join(this.directory, ".locks", lockName);
+    await mkdir(dirname(lockDirectory), { recursive: true });
+    const deadline = Date.now() + 5_000;
+    while (true) {
+      try {
+        await mkdir(lockDirectory);
+        break;
+      } catch (error) {
+        if (!isAlreadyExists(error) || Date.now() >= deadline) {
+          throw new Error("Blackboard is busy; retry the write.", {
+            cause: error,
+          });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+    try {
+      return await operation();
+    } finally {
+      await rm(lockDirectory, { recursive: true, force: true });
+    }
   }
 
   private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -124,7 +172,7 @@ export class MirkBlackboardRepository implements BlackboardRepository {
       collections: {
         [BLACKBOARD_COLLECTION]: {
           directory: ".",
-          frontmatterFields: ["updatedAt", "updatedBy"],
+          frontmatterFields: ["revision", "updatedAt", "updatedBy"],
           body: { field: "content" },
           index: false,
         },
@@ -177,6 +225,7 @@ function emptyDocument(sessionId: string): BlackboardDoc {
   return {
     sessionId,
     content: "",
+    revision: "",
     updatedAt: "",
     updatedBy: "",
   };
@@ -186,6 +235,7 @@ function toDocument(record: BlackboardRecord): BlackboardDoc {
   if (
     typeof record.id !== "string" ||
     typeof record.content !== "string" ||
+    (record.revision !== undefined && typeof record.revision !== "string") ||
     typeof record.updatedAt !== "string" ||
     typeof record.updatedBy !== "string"
   ) {
@@ -198,9 +248,18 @@ function toDocument(record: BlackboardRecord): BlackboardDoc {
     // MarkdownStore's body adapter adds one formatting newline around every
     // body. Remove that adapter framing while retaining the markdown content.
     content: record.content.replace(/^\n/, ""),
+    revision: record.revision ?? "",
     updatedAt: record.updatedAt,
     updatedBy: record.updatedBy,
   };
+}
+
+function isAlreadyExists(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "EEXIST"
+  );
 }
 
 function blackboardCommitMessage(mutation: Readonly<MarkdownMutation>): string {

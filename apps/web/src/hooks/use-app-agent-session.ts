@@ -15,7 +15,7 @@ import {
 import { getAttentionPrivacyLevel } from "@zigil/agent-react/context-privacy"
 
 import {
-  getToolApprovalMode,
+  getToolApprovalHeaderValue,
   TOOL_APPROVAL_HEADER,
 } from "@/lib/agent-tool-approval"
 import {
@@ -49,7 +49,7 @@ export function useAppAgentSession(
           : {}),
         headers: {
           ...input.headers,
-          [TOOL_APPROVAL_HEADER]: getToolApprovalMode(),
+          [TOOL_APPROVAL_HEADER]: getToolApprovalHeaderValue(),
         },
       })
       if (result.status === "succeeded") {

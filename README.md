@@ -61,8 +61,10 @@ Local development defaults to `file:.data/sigil-chat.db` and maintains an
 owner-only `.data/auth-secret`. Production must provide `SIGIL_DATABASE_URL`
 and a `BETTER_AUTH_SECRET` of at least 32 characters plus a stable
 `SIGIL_INSTALLATION_ID`; server startup fails closed while the latest committed
-migration is absent. Registration closes after the first owner unless the server
-is started with `SIGIL_AUTH_REGISTRATION=open`.
+migration is absent. Owner-issued member invitations are single-use and expire
+within 24 hours; production also requires a stable
+`SIGIL_INVITE_TOKEN_PEPPER_FILE`. Registration closes after the first owner
+unless the server is started with `SIGIL_AUTH_REGISTRATION=open`.
 
 The browser obtains a five-minute, Eve-audience JWT from the authenticated web
 session. Eve verifies it against the web app's JWKS and binds every created Eve
@@ -70,6 +72,13 @@ session to the verified subject before returning its session id. Until the
 login/setup surface lands, local development can explicitly set
 `SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH=1`; production rejects that bypass. See
 [`.env.example`](.env.example) for the complete auth environment surface.
+
+Image instruction-editing uses the local image gateway's OpenAI-compatible
+`/v1/images/edits` endpoint. It defaults to `http://localhost:4000`; override
+that with `SIGIL_IMAGE_EDIT_GATEWAY_URL` and, when the gateway requires a
+bearer, set `SIGIL_IMAGE_EDIT_GATEWAY_KEY`. The edit tool fails explicitly
+when that backend is unavailable or rejects the request. It never falls back
+to text-to-image generation.
 
 ## Add a tool
 

@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "demo:evidence": "tsx scripts/evidence-demo.ts",
+    "demo:image-edit": "tsx scripts/image-edit-demo.ts",
     "dev": "portless sigil-chat-gonk tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "test": "vitest run",
@@ -13,6 +14,7 @@
   },
   "dependencies": {
     "@gonk/auth": "0.3.1",
+    "@gonk/image-gen": "0.5.0",
     "@gonk/scope": "0.3.1",
     "@gonk/skills": "0.3.1",
     "@gonk/tool-registry": "0.3.1",
@@ -29,7 +31,6 @@
     "@zigil/agent-gonk": "^0.1.0"
   },
   "devDependencies": {
-    "@gonk/tool-orchestrator": "0.3.1",
     "@types/node": "^25.1.0",
     "tsx": "^4.21.0",
     "typescript": "5.9.3",

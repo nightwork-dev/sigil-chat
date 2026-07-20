@@ -18,8 +18,30 @@ x-service-hardening: &service-hardening
       max-file: "3"
 
 services:
+  storage-init:
+    image: ${SIGIL_MIGRATE_IMAGE:?set SIGIL_MIGRATE_IMAGE to an immutable digest}
+    user: "0:0"
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: [no-new-privileges:true]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        install -d -o 10000 -g 10000 -m 0700
+        /var/lib/sigil-blackboard /var/lib/sigil-codex /var/lib/sigil-identity
+    volumes:
+      - blackboard_data:/var/lib/sigil-blackboard
+      - codex_auth:/var/lib/sigil-codex
+      - eve_identity:/var/lib/sigil-identity
+    networks: [backend]
+
   migrate:
     image: ${SIGIL_MIGRATE_IMAGE:?set SIGIL_MIGRATE_IMAGE to an immutable digest}
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
     restart: "no"
     read_only: true
     init: true
@@ -56,19 +78,52 @@ services:
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
       EVE_ORIGIN: http://eve:3001
       GONK_MCP_URL: http://gonk:8808/mcp
-    secrets: [better_auth_secret, gonk_mcp_key]
-    volumes: [web_data:/var/lib/sigil-web, web_scope:/app/.agents, web_appdata:/app/.data]
+      SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
+      SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
+      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_INVITE_TOKEN_PEPPER_FILE: /run/secrets/invite_token_pepper
+    secrets: [better_auth_secret, gonk_mcp_key, invite_token_pepper]
+    volumes:
+      - web_data:/var/lib/sigil-web
+      - web_scope:/app/.agents
+      - web_appdata:/app/.data
+      - eve_identity:/var/lib/sigil-identity:ro
+      - blackboard_data:/var/lib/sigil-blackboard
     expose: ["3000"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     networks: [backend]
 
   eve:
     <<: *service-hardening
     image: ${SIGIL_EVE_IMAGE:?set SIGIL_EVE_IMAGE to an immutable digest}
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
     # The agent host writes runtime caches inside its own package tree
     # (extension authored-modules), which sits outside the data volumes.
     # Non-root, cap_drop ALL, and no-new-privileges still apply.
     read_only: false
-    command: ["pnpm", "--filter", "sigil-chat-agent", "exec", "eve", "start", "--host", "0.0.0.0"]
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "sigil-chat-agent",
+        "exec",
+        "eve",
+        "start",
+        "--host",
+        "0.0.0.0",
+      ]
     tmpfs:
       - /tmp:size=64m
       - /home/sigil/.cache:size=64m
@@ -82,18 +137,46 @@ services:
       SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
       GONK_MCP_URL: http://gonk:8808/mcp
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
-      CODEX_HOME: /var/lib/sigil-eve/codex-home
+      CODEX_HOME: /var/lib/sigil-codex
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
+      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_SANDBOX_MODE: disabled
     secrets: [gonk_mcp_key]
-    volumes: [eve_data:/var/lib/sigil-eve, eve_app:/app/apps/agent, eve_scope:/app/.agents, eve_identity:/var/lib/sigil-identity]
+    volumes:
+      [
+        eve_data:/var/lib/sigil-eve,
+        eve_app:/app/apps/agent,
+        eve_scope:/app/.agents,
+        eve_identity:/var/lib/sigil-identity,
+        codex_auth:/var/lib/sigil-codex,
+        blackboard_data:/var/lib/sigil-blackboard,
+      ]
     expose: ["3001"]
+    healthcheck:
+      # Container ordering needs process liveness, not model credentials. A fresh
+      # deployment obtains Codex device auth only after edge/TLS is available.
+      # Model-aware readiness remains authenticated at /sigil/v1/readiness and
+      # is checked by the owner status surface plus the post-login runbook step.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/eve/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     # edge too: eve needs egress for JWKS-over-HTTPS and model providers
     networks: [edge, backend]
 
   gonk:
     <<: *service-hardening
     image: ${SIGIL_GONK_IMAGE:?set SIGIL_GONK_IMAGE to an immutable digest}
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -102,9 +185,26 @@ services:
       GONK_ALLOWED_HOSTS: gonk:8808
       SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
       SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
+      SIGIL_ARTIFACT_DIR: /var/lib/sigil-gonk/artifacts
+      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_LOCAL_CODEX_IMAGE_GENERATION: disabled
     secrets: [gonk_mcp_key]
-    volumes: [gonk_data:/var/lib/sigil-gonk, gonk_scope:/app/.agents]
+    volumes:
+      - gonk_data:/var/lib/sigil-gonk
+      - gonk_scope:/app/.agents
+      - blackboard_data:/var/lib/sigil-blackboard
     expose: ["8808"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const fs=require('node:fs');const key=fs.readFileSync('/run/secrets/gonk_mcp_key','utf8').trim();fetch('http://127.0.0.1:8808/health',{headers:{authorization:'Bearer '+key}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     networks: [backend]
 
   edge:
@@ -115,10 +215,19 @@ services:
     cap_drop: []
     security_opt: []
     user: "10004:10004"
-    depends_on: [web, eve, gonk]
+    depends_on:
+      web: { condition: service_healthy }
+      eve: { condition: service_healthy }
+      gonk: { condition: service_healthy }
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST}
     ports: ["80:8080", "443:8443"]
+    healthcheck:
+      test:
+        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - /srv/sigil-chat/caddy-data:/data
@@ -141,9 +250,13 @@ volumes:
   eve_scope: {}
   eve_identity: {}
   gonk_data: {}
+  blackboard_data: {}
+  codex_auth: {}
 
 secrets:
   better_auth_secret:
     file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/better_auth_secret
   gonk_mcp_key:
     file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/gonk_mcp_key
+  invite_token_pepper:
+    file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/invite_token_pepper

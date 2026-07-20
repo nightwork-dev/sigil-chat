@@ -11,6 +11,8 @@
     "PORT",
     "SIGIL_CHAT_GRAPH_PATH",
     "SIGIL_CHAT_REVIEW_PATH",
+    "SIGIL_MEMORY_DIR",
+    "SIGIL_PERSONA_DIR",
     "VITE_API_BASE_URL"
   ],
   "tasks": {

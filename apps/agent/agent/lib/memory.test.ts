@@ -8,7 +8,7 @@ describe("Sigil memory turn identity", () => {
         memoryTurn(eveSessionId, "user-1"),
       )
 
-      expect(identity.binding.eveSessionId).toBe("new:user-1")
+      expect(identity.binding.executionSessionId).toBe("new:user-1")
       expect(identity.binding.personaId).toBe("sigil-chat-eve")
       expect(identity.binding.channelId).toBe("sigil-chat")
     }
@@ -19,6 +19,6 @@ describe("Sigil memory turn identity", () => {
       memoryTurn(" eve-session-1 ", " user-1 "),
     )
 
-    expect(identity.binding.eveSessionId).toBe("eve-session-1")
+    expect(identity.binding.executionSessionId).toBe("eve-session-1")
   })
 })

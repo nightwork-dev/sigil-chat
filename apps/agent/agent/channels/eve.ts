@@ -8,8 +8,17 @@ import {
   createSigilRequestAuthenticator,
   readSigilEveAuthEnvironment,
 } from "../lib/eve-auth"
+import { ForbiddenError } from "eve/channels/auth"
 import { MirkEveSessionOwnerStore } from "../lib/eve-session-owners"
-import { memoryTurn, sigilMemoryHost } from "../lib/memory"
+import {
+  DEFAULT_PERSONA_ID,
+  hasPersona,
+  memoryTurn,
+  personaHost,
+} from "../lib/memory"
+import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
+import { requireAuthorizedResourceScope } from "../lib/scope-authorization"
+import { createReadinessRoute } from "../lib/readiness"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
@@ -23,29 +32,50 @@ const onMessage = createSigilEveOnMessage({
   // S3.2: the session's shared blackboard rides every turn.
   readBlackboard: async (sessionId) =>
     (await blackboardRepository.read(sessionId)).content,
-  identityFloor: ({ eveSessionId, principalId }) =>
-    sigilMemoryHost.identityAtSessionStart(memoryTurn(eveSessionId, principalId)).markdown,
+  identityFloor: ({ eveSessionId, personaId, principalId }) =>
+    personaHost(personaId).identityAtSessionStart(
+      memoryTurn(eveSessionId, principalId),
+    ).markdown,
 })
 
-export default createOwnedEveChannel({
+const channel = createOwnedEveChannel({
   auth: async (request) => {
     const auth = await authenticatePrincipal(request)
     if (!auth) return auth
     // Keep this raw header name in sync with the Sigil Chat approval client.
     // This is a client-declared UI preference;
     // it is not verified and is not a security boundary.
-    const toolApproval =
-      request.headers.get("x-sigil-tool-approval") === "always"
-        ? "always"
-        : "ask"
-    const resourceScope =
-      request.headers.get("x-sigil-scope")?.trim() ??
-      request.headers.get("x-sigil-session-id")?.trim()
+    const rawToolApproval = request.headers.get("x-sigil-tool-approval")
+    const toolApproval = parseToolApprovalPreference(rawToolApproval)
+    let resourceScope: string | undefined
+    try {
+      resourceScope = requireAuthorizedResourceScope({
+        principalId: auth.principalId,
+        request,
+        secret: process.env.GONK_MCP_KEY,
+      })
+    } catch {
+      throw new ForbiddenError({
+        code: "eve_resource_scope_not_authorized",
+        message: "The requested resource scope is not authorized.",
+      })
+    }
+    const requestedPersonaId =
+      request.headers.get("x-sigil-persona-id")?.trim() || undefined
+    if (requestedPersonaId && !hasPersona(requestedPersonaId)) {
+      throw new ForbiddenError({
+        code: "eve_persona_not_found",
+        message: "The requested persona is not available.",
+      })
+    }
     return {
       ...auth,
       attributes: {
         ...auth.attributes,
-        sigilToolApproval: toolApproval,
+        sigilToolApproval: JSON.stringify(toolApproval),
+        ...(requestedPersonaId
+          ? { sigilRequestedPersonaId: requestedPersonaId }
+          : {}),
         ...(resourceScope
           ? {
               sigilResourceScope: resourceScope,
@@ -57,8 +87,14 @@ export default createOwnedEveChannel({
     }
   },
   onMessage,
+  defaultPersonaId: DEFAULT_PERSONA_ID,
   ownerStore: eveSessionOwnerStore,
 })
+
+export default {
+  ...channel,
+  routes: [...channel.routes, createReadinessRoute(authenticatePrincipal)],
+}
 
 function readCsvEnv(name: string) {
   return (process.env[name] ?? "")

@@ -44,14 +44,15 @@ export function imageKeyFor(bytes: Uint8Array, mediaType: string): string {
   return `images/${digest}.${ext}`
 }
 
-/** Same-origin path the browser fetches the image from. The web app proxies
- *  `/img/**` to gonk (apps/web/vite.config.ts), so the browser only ever talks
- *  to its own origin — no cross-origin request, no CORS. Set GONK_PUBLIC_URL to
- *  force an absolute URL for a deployment that doesn't front gonk with the web
- *  app's proxy. */
-export function imagePublicUrl(key: string): string {
+/** Same-origin path the browser fetches through the authenticated web route.
+ *  The scope query is location, not authority: web re-authorizes it against the
+ *  current principal before proxying to Gonk. */
+export function imagePublicUrl(key: string, scope: ScopeInput): string {
   const base = process.env.GONK_PUBLIC_URL
-  return base ? `${base.replace(/\/$/, "")}/img/${key}` : `/img/${key}`
+  const scopeHeader = formatScopeHeader(scope)
+  if (!scopeHeader) throw new Error("Artifact URL requires a valid scope")
+  const path = `/img/${key}?scope=${encodeURIComponent(scopeHeader)}`
+  return base ? `${base.replace(/\/$/, "")}${path}` : path
 }
 
 /** Same served URL scheme as {@link imagePublicUrl}, named for the general
@@ -73,6 +74,27 @@ export function uploadKeyFor(
   return `uploads/${digest}.${ext}`
 }
 
+function derivedUploadKeyFor(
+  bytes: Uint8Array,
+  mediaType: string,
+  filename: string | undefined,
+  provenance: ArtifactProvenance,
+): string {
+  const contentDigest = createHash("sha256").update(bytes).digest("hex")
+  const derivationDigest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        backend: provenance.backend,
+        instruction: provenance.instruction,
+        kind: provenance.kind,
+        sourceArtifactId: provenance.sourceArtifactId,
+      }),
+    )
+    .digest("hex")
+  const ext = EXT_BY_MIME[mediaType] ?? extensionFromFilename(filename) ?? "bin"
+  return `uploads/${contentDigest}-derived-${derivationDigest}.${ext}`
+}
+
 export interface SessionArtifactMetadata {
   readonly id: string
   readonly filename: string
@@ -80,6 +102,14 @@ export interface SessionArtifactMetadata {
   readonly size: number
   readonly createdAt: string
   readonly scope: ResourceScope
+  readonly provenance?: ArtifactProvenance
+}
+
+export interface ArtifactProvenance {
+  readonly kind: "image-edit"
+  readonly sourceArtifactId: string
+  readonly instruction: string
+  readonly backend: string
 }
 
 export interface SessionArtifactContent {
@@ -93,6 +123,7 @@ export interface PutSessionArtifactInput {
   readonly mediaType: string
   /** Accepts the old bare session id as well as a tiered scope. */
   readonly scope: ScopeInput
+  readonly provenance?: ArtifactProvenance
 }
 
 export type ScopePrincipal = AuthenticatedPrincipal | undefined
@@ -143,7 +174,14 @@ export class SessionArtifactStore {
     await this.assertScopeAccess(principal, scope)
 
     return this.withScopeLock(scope, async () => {
-      const id = uploadKeyFor(input.bytes, input.mediaType, input.filename)
+      const id = input.provenance
+        ? derivedUploadKeyFor(
+            input.bytes,
+            input.mediaType,
+            input.filename,
+            input.provenance,
+          )
+        : uploadKeyFor(input.bytes, input.mediaType, input.filename)
       const existing = (await this.listByScope(scope, principal)).find(
         (artifact) => artifact.id === id,
       )
@@ -171,6 +209,7 @@ export class SessionArtifactStore {
         size: input.bytes.byteLength,
         createdAt: new Date().toISOString(),
         scope,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
       }
       const artifacts = await this.listByScope(scope, principal)
       await this.writeManifest(scope, [...artifacts, artifact])
@@ -332,7 +371,25 @@ function isStoredArtifactMetadata(
     typeof record.mediaType === "string" &&
     typeof record.size === "number" &&
     typeof record.createdAt === "string" &&
+    (record.provenance === undefined ||
+      isArtifactProvenance(record.provenance)) &&
     normalizeScope(record.scope as ScopeInput | undefined) !== undefined
+  )
+}
+
+function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const record = value as Record<string, unknown>
+  return (
+    record.kind === "image-edit" &&
+    typeof record.sourceArtifactId === "string" &&
+    record.sourceArtifactId.length > 0 &&
+    typeof record.instruction === "string" &&
+    record.instruction.length > 0 &&
+    typeof record.backend === "string" &&
+    record.backend.length > 0
   )
 }
 

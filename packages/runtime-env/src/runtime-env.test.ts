@@ -15,6 +15,7 @@ import {
   parsePort,
   readAgentEnvironment,
   readGonkClientEnvironment,
+  readIdentityEnvironment,
   readOptionalSecretFromFile,
   readGonkServerEnvironment,
   readStorageEnvironment,
@@ -152,6 +153,25 @@ describe("runtime topology", () => {
     ).toEqual({
       graphPath: "./data/graph.json",
       reviewPath: "data/review.json",
+    });
+  });
+
+  it("resolves one shared identity store for sibling app packages", () => {
+    expect(readIdentityEnvironment({}, "/workspace/apps/web")).toEqual({
+      personaDir: "/workspace/.data/persona",
+      memoryDir: "/workspace/.data/memory",
+    });
+    expect(
+      readIdentityEnvironment(
+        {
+          SIGIL_PERSONA_DIR: "/var/lib/example/personas",
+          SIGIL_MEMORY_DIR: "./private-memory",
+        },
+        "/workspace/apps/agent",
+      ),
+    ).toEqual({
+      personaDir: "/var/lib/example/personas",
+      memoryDir: "/workspace/apps/agent/private-memory",
     });
   });
 });

@@ -28,17 +28,21 @@ describe("EveSessionOwnerStore", () => {
       projectRoot: directory,
     })
 
-    await first.bind("session-1", "user-1")
-    await first.bind("session-1", "user-1")
+    await first.bind("session-1", "user-1", "agent-a")
+    await first.bind("session-1", "user-1", "agent-a")
 
     const reopened = new MirkEveSessionOwnerStore({
       cwd: directory,
       projectRoot: directory,
     })
     await expect(reopened.getOwner("session-1")).resolves.toBe("user-1")
-    await expect(reopened.bind("session-1", "user-2")).rejects.toThrow(
-      "already bound to another principal",
-    )
+    await expect(reopened.getBinding("session-1")).resolves.toEqual({
+      personaId: "agent-a",
+      subject: "user-1",
+    })
+    await expect(
+      reopened.bind("session-1", "user-2", "agent-a"),
+    ).rejects.toThrow("already bound to another principal")
   })
 
   it("fails closed when a Mirk owner record is corrupt", async () => {
@@ -52,10 +56,34 @@ describe("EveSessionOwnerStore", () => {
     )
   })
 
+  it("upgrades a legacy subject-only binding when its persona is first known", async () => {
+    const values = new Map<string, unknown>([
+      [
+        "session-1",
+        { sessionId: "session-1", subject: "user-1", version: 1 },
+      ],
+    ])
+    const store = new MirkEveSessionOwnerStore({ store: memoryKv(values) })
+
+    await expect(store.getBinding("session-1")).resolves.toEqual({
+      subject: "user-1",
+    })
+
+    await store.bind("session-1", "user-1", "agent-a")
+
+    await expect(store.getBinding("session-1")).resolves.toEqual({
+      personaId: "agent-a",
+      subject: "user-1",
+    })
+  })
+
   it("rejects rebinding in memory as well as on disk", async () => {
     const store = new MemoryEveSessionOwnerStore()
-    await store.bind("session-1", "user-1")
-    await expect(store.bind("session-1", "user-2")).rejects.toThrow(
+    await store.bind("session-1", "user-1", "agent-a")
+    await expect(store.bind("session-1", "user-1", "agent-b")).rejects.toThrow(
+      "already bound to another principal",
+    )
+    await expect(store.bind("session-1", "user-2", "agent-a")).rejects.toThrow(
       "already bound to another principal",
     )
   })

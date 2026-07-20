@@ -12,11 +12,14 @@
     "@zigil/agent-surface": "^0.1.1"
   },
   "devDependencies": {
+    "@types/node": "^25.1.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.6"
   },
   "exports": {
     "./client-command": "./src/client-command.ts",
+    "./scope-delegation": "./src/scope-delegation.ts",
+    "./scope-delegation.server": "./src/scope-delegation.server.ts",
     "./ui-highlight": "./src/ui-highlight.ts"
   }
 }

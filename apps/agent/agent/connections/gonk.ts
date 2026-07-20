@@ -1,5 +1,6 @@
 import { defineMcpClientConnection } from "eve/connections";
 import { readGonkClientEnvironment } from "@workspace/runtime-env/server";
+import { toolApprovalModeFor } from "../lib/tool-approval-preference";
 
 const { apiKey: token, gonkMcpUrl } = readGonkClientEnvironment(process.env);
 
@@ -8,8 +9,11 @@ export default defineMcpClientConnection({
   description:
     "Application tools generated and governed by the Gonk registry. Includes graph editing, article review inspection and annotations, and semantic UI highlighting. Prefer batched tools for related changes so they use one approval and land together.",
   // This preference is client-declared, not verified, and not a security boundary.
-  approval: ({ session }) =>
-    session.auth.current?.attributes.sigilToolApproval === "always"
+  approval: ({ session, toolName }) =>
+    toolApprovalModeFor(
+      session.auth.current?.attributes.sigilToolApproval,
+      toolName,
+    ) === "always"
       ? "not-applicable"
       : "user-approval",
   headers: ({ session }): Readonly<Record<string, string>> => {

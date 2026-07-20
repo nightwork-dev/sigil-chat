@@ -5,15 +5,10 @@ const root = new URL("..", import.meta.url).pathname;
 const packageJson = JSON.parse(
   await readFile(join(root, "package.json"), "utf8"),
 );
-const exactDependencies = {
-  "@gonk/auth": "0.3.1",
-  "@gonk/context": "0.3.1",
-  "@gonk/scope": "0.3.1",
-  "@gonk/tool-registry": "0.3.1",
-  "@gonk/tool-registry-mcp": "0.3.1",
-  "@zigil/agent-gonk": "0.1.0",
-  eve: "0.24.4",
-};
+const compatibilityTrain = JSON.parse(
+  await readFile(join(root, "compatibility-train.json"), "utf8"),
+);
+const exactDependencies = compatibilityTrain.verifiedPublicBoundary;
 
 for (const [name, version] of Object.entries(exactDependencies)) {
   if (packageJson.dependencies[name] !== version)
@@ -38,6 +33,7 @@ for (const dependencySection of [
 
 const fixtureSources = [
   await readFile(join(root, "package.json"), "utf8"),
+  await readFile(join(root, "compatibility-train.json"), "utf8"),
   ...(await sourceTexts(join(root, "agent"))),
   ...(await sourceTexts(join(root, "gonk"))),
   ...(await sourceTexts(join(root, "scripts"))),

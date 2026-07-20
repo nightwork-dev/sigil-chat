@@ -15,12 +15,7 @@ import { readRuntimeTopology } from "@workspace/runtime-env/topology"
 const rootEnv = resolve(import.meta.dirname, "../../.env")
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv)
 
-const { eveOrigin, gonkMcpUrl } = readRuntimeTopology(process.env)
-// Gonk's browser-facing origin (strip the /mcp path). The web app proxies
-// gonk's public /img reads same-origin (see routeRules below) so the browser
-// never crosses an origin for attachment bytes — gonk stays internal.
-const gonkOrigin = new URL(gonkMcpUrl).origin
-
+const { eveOrigin } = readRuntimeTopology(process.env)
 const config = defineConfig({
   server: {
     // Allow Tailscale-served preview (tailscale serve → this dev server).
@@ -39,12 +34,6 @@ const config = defineConfig({
       routeRules: {
         "/eve/**": {
           proxy: `${eveOrigin}/eve/**`,
-        },
-        // Gonk serves content-addressed image/attachment bytes at /img/**.
-        // Proxy them same-origin so the browser fetches attachments from its
-        // own origin (no CORS on gonk); gonk stays an internal service.
-        "/img/**": {
-          proxy: `${gonkOrigin}/img/**`,
         },
       },
     }),

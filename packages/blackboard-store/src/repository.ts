@@ -1,5 +1,7 @@
 import { MirkBlackboardRepository } from "./mirk-repository.js";
+import { assertBlackboardContent, BlackboardConflictError } from "./limits.js";
 import type { BlackboardDoc } from "./types.js";
+import { randomUUID } from "node:crypto";
 
 export interface BlackboardRepository {
   read(sessionId: string): Promise<BlackboardDoc>;
@@ -7,6 +9,7 @@ export interface BlackboardRepository {
     sessionId: string,
     content: string,
     updatedBy: string,
+    expectedRevision?: string,
   ): Promise<BlackboardDoc>;
 }
 
@@ -24,6 +27,7 @@ export class MemoryBlackboardRepository implements BlackboardRepository {
       document ?? {
         sessionId,
         content: "",
+        revision: "",
         updatedAt: "",
         updatedBy: "",
       },
@@ -34,10 +38,20 @@ export class MemoryBlackboardRepository implements BlackboardRepository {
     sessionId: string,
     content: string,
     updatedBy: string,
+    expectedRevision?: string,
   ): Promise<BlackboardDoc> {
+    assertBlackboardContent(content);
+    const current = this.documents.get(sessionId);
+    if (
+      expectedRevision !== undefined &&
+      (current?.revision ?? "") !== expectedRevision
+    ) {
+      throw new BlackboardConflictError();
+    }
     const document: BlackboardDoc = {
       sessionId,
       content,
+      revision: randomUUID(),
       updatedAt: this.now(),
       updatedBy,
     };

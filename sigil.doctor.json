@@ -49,7 +49,7 @@
     },
     {
       "name": "gonk",
-      "url": "http://sigil-chat-gonk.localhost:1355/health",
+      "url": "http://sigil-chat-gonk.localhost:1355/live",
       "expectedStatuses": [200],
       "timeoutMs": 2000,
       "remediation": "Set GONK_MCP_KEY and start Gonk with pnpm --filter sigil-chat-gonk dev."

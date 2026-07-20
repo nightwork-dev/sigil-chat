@@ -11,4 +11,6 @@ const store = createStoreProvider(scope, {
 export const agentThreadRepository = new AgentThreadRepository({
   threads: store.kv("project", "sigil-chat.agent-threads.v1"),
   preferences: store.kv("project", "sigil-chat.agent-thread-preferences.v1"),
+  defaultPersonaId:
+    process.env.SIGIL_DEFAULT_PERSONA_ID?.trim() || "sigil-chat-eve",
 });

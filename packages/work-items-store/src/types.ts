@@ -10,15 +10,11 @@ export type StoryStatus =
 export type ReviewDecision = "proposed" | "approved" | "changes-requested";
 export type Routing =
   | "self"
-  | "claude:opus"
-  | "claude:sonnet"
-  | "pi:luna"
-  | "codex";
-export type ReviewGate =
-  | "browser:owner"
-  | "decision:owner"
-  | "peer"
-  | "none";
+  | "strategy"
+  | "design"
+  | "implementation"
+  | "research";
+export type ReviewGate = "browser:owner" | "decision:owner" | "peer" | "none";
 
 /**
  * Extraction verdict: every UI-touching

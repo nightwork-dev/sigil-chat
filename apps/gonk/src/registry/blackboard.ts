@@ -7,6 +7,10 @@ import {
   blackboardRepository,
   type BlackboardRepository,
 } from "@workspace/blackboard-store";
+import {
+  assertBlackboardContent,
+  MAX_BLACKBOARD_CONTENT_CHARS,
+} from "@workspace/blackboard-store/limits";
 
 import {
   normalizeScope,
@@ -18,6 +22,7 @@ import { hasOnlyKeys, isRecord, isEmptyObject } from "./validators.js";
 
 interface BlackboardWriteInput {
   content: string;
+  expectedRevision: string;
 }
 
 export function registerBlackboardTools(
@@ -35,25 +40,30 @@ export function registerBlackboardTools(
     ),
     inputJsonSchema: emptyObjectSchema(),
     hints: readHints,
-    handler: async (_input, ctx) => ({
-      data: await repository.read(requireSessionId(ctx)),
-    }),
+    handler: async (_input, ctx) => {
+      const document = await repository.read(requireSessionId(ctx));
+      assertBlackboardContent(document.content);
+      return { data: document };
+    },
   });
 
   registry.register({
     name: "sigil-blackboard-write",
     description:
-      "Replace the shared markdown blackboard for the current session. Use an empty content string to clear it.",
+      "Replace the shared markdown blackboard for the current session after reading it. Pass the read result's revision as expectedRevision; use an empty content string to clear it.",
     visibility: "always",
     approval: "write",
     input: shape<BlackboardWriteInput>(
       isBlackboardWriteInput,
-      "Expected a markdown `content` string; the session comes from the request scope.",
+      "Expected { content: string, expectedRevision: string }; the session comes from the request scope.",
     ),
     inputJsonSchema: {
       type: "object",
-      properties: { content: { type: "string" } },
-      required: ["content"],
+      properties: {
+        content: { type: "string", maxLength: MAX_BLACKBOARD_CONTENT_CHARS },
+        expectedRevision: { type: "string" },
+      },
+      required: ["content", "expectedRevision"],
       additionalProperties: false,
     },
     hints: writeHints,
@@ -62,6 +72,7 @@ export function registerBlackboardTools(
         requireSessionId(ctx),
         input.content,
         ctx.auth?.principal?.id ?? "agent",
+        input.expectedRevision,
       ),
     }),
   });
@@ -70,8 +81,10 @@ export function registerBlackboardTools(
 function isBlackboardWriteInput(value: unknown): value is BlackboardWriteInput {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["content"]) &&
-    typeof value.content === "string"
+    hasOnlyKeys(value, ["content", "expectedRevision"]) &&
+    typeof value.content === "string" &&
+    value.content.length <= MAX_BLACKBOARD_CONTENT_CHARS &&
+    typeof value.expectedRevision === "string"
   );
 }
 

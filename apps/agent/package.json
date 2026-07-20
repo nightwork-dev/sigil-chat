@@ -10,33 +10,35 @@
   "scripts": {
     "build": "eve build",
     "dev": "portless sigil-chat-agent eve dev --no-ui --host 127.0.0.1",
+    "healthcheck": "node scripts/healthcheck.mjs",
     "start": "eve start --host 127.0.0.1",
     "test": "vitest run && pnpm test:cold-boot",
     "test:cold-boot": "node scripts/cold-boot-smoke.mjs",
+    "test:sandbox": "node scripts/sandbox-smoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@gonk/auth": "0.3.1",
     "@gonk/context": "0.3.1",
-    "@gonk/eve-host": "file:../../vendor/gonk-eve-host-0.5.0.tgz",
-    "@gonk/memory": "file:../../vendor/gonk-memory-0.5.0.tgz",
-    "@gonk/persona": "file:../../vendor/gonk-persona-0.5.0.tgz",
-    "@gonk/retrieval": "0.3.1",
+    "@gonk/eve-host": "0.5.1-mem2.6",
+    "@gonk/memory": "0.5.1-mem2.5",
+    "@gonk/persona": "0.5.1-mem2.5",
     "@gonk/scope": "0.3.1",
     "@gonk/skills": "0.3.1",
     "@gonk/store": "0.3.1",
     "@workspace/blackboard-store": "workspace:*",
+    "@workspace/agent-contracts": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
     "ai": "^7.0.26",
     "better-sqlite3": "12.10.0",
     "eve": "0.25.2",
     "jose": "^6.1.3",
     "just-bash": "^3.1.0",
+    "microsandbox": "0.6.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
-    "microsandbox": "^0.6.6",
     "typescript": "5.9.3",
     "vitest": "^3.2.6"
   }

@@ -4,14 +4,29 @@ import type { KvStore } from "@gonk/store/types"
 
 const OWNER_NAMESPACE = "sigil-chat.eve-session-owners.v1"
 
-interface EveSessionOwnerRecord {
+interface EveSessionOwnerRecordV1 {
   sessionId: string
   subject: string
   version: 1
 }
 
+interface EveSessionOwnerRecordV2 {
+  personaId: string
+  sessionId: string
+  subject: string
+  version: 2
+}
+
+type EveSessionOwnerRecord = EveSessionOwnerRecordV1 | EveSessionOwnerRecordV2
+
+export interface EveSessionBinding {
+  personaId?: string
+  subject: string
+}
+
 export interface EveSessionOwnerStore {
-  bind(sessionId: string, subject: string): Promise<void>
+  bind(sessionId: string, subject: string, personaId: string): Promise<void>
+  getBinding(sessionId: string): Promise<EveSessionBinding | undefined>
   getOwner(sessionId: string): Promise<string | undefined>
 }
 
@@ -54,20 +69,47 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
     this.owners = provider.kv("project", OWNER_NAMESPACE)
   }
 
-  async bind(sessionId: string, subject: string): Promise<void> {
+  async bind(
+    sessionId: string,
+    subject: string,
+    personaId: string,
+  ): Promise<void> {
     assertIdentifier("session id", sessionId)
     assertIdentifier("subject", subject)
+    assertIdentifier("persona id", personaId)
 
     await this.runExclusive(() => {
       const existing = this.readRecord(sessionId)
-      if (existing?.subject === subject) return
+      if (
+        existing?.subject === subject &&
+        (existing.version === 1 || existing.personaId === personaId)
+      ) {
+        if (existing.version === 1) {
+          this.owners.set(sessionId, {
+            personaId,
+            sessionId,
+            subject,
+            version: 2,
+          })
+        }
+        return
+      }
       if (existing !== undefined) {
         throw new EveSessionOwnerConflictError(sessionId)
       }
-      this.owners.set(sessionId, { sessionId, subject, version: 1 })
+      this.owners.set(sessionId, {
+        personaId,
+        sessionId,
+        subject,
+        version: 2,
+      })
 
       const persisted = this.readRecord(sessionId)
-      if (persisted?.subject !== subject) {
+      if (
+        persisted?.subject !== subject ||
+        persisted.version !== 2 ||
+        persisted.personaId !== personaId
+      ) {
         throw new Error(
           `Eve session-owner binding did not persist for ${sessionId}.`,
         )
@@ -76,8 +118,17 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
   }
 
   async getOwner(sessionId: string): Promise<string | undefined> {
+    return (await this.getBinding(sessionId))?.subject
+  }
+
+  async getBinding(sessionId: string): Promise<EveSessionBinding | undefined> {
     assertIdentifier("session id", sessionId)
-    return this.readRecord(sessionId)?.subject
+    const record = this.readRecord(sessionId)
+    if (!record) return undefined
+    return {
+      subject: record.subject,
+      ...(record.version === 2 ? { personaId: record.personaId } : {}),
+    }
   }
 
   private readRecord(sessionId: string): EveSessionOwnerRecord | undefined {
@@ -99,18 +150,27 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
 }
 
 export class MemoryEveSessionOwnerStore implements EveSessionOwnerStore {
-  private readonly owners = new Map<string, string>()
+  private readonly owners = new Map<string, EveSessionBinding>()
 
-  async bind(sessionId: string, subject: string): Promise<void> {
+  async bind(
+    sessionId: string,
+    subject: string,
+    personaId: string,
+  ): Promise<void> {
     const existing = this.owners.get(sessionId)
-    if (existing === subject) return
+    if (existing?.subject === subject && existing.personaId === personaId)
+      return
     if (existing !== undefined) {
       throw new EveSessionOwnerConflictError(sessionId)
     }
-    this.owners.set(sessionId, subject)
+    this.owners.set(sessionId, { personaId, subject })
   }
 
   async getOwner(sessionId: string): Promise<string | undefined> {
+    return this.owners.get(sessionId)?.subject
+  }
+
+  async getBinding(sessionId: string): Promise<EveSessionBinding | undefined> {
     return this.owners.get(sessionId)
   }
 }
@@ -121,11 +181,13 @@ function isOwnerRecord(value: unknown): value is EveSessionOwnerRecord {
   }
   const record = value as Record<string, unknown>
   return (
-    record.version === 1 &&
+    (record.version === 1 || record.version === 2) &&
     typeof record.sessionId === "string" &&
     record.sessionId.length > 0 &&
     typeof record.subject === "string" &&
-    record.subject.length > 0
+    record.subject.length > 0 &&
+    (record.version === 1 ||
+      (typeof record.personaId === "string" && record.personaId.length > 0))
   )
 }
 

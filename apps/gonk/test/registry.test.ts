@@ -6,13 +6,22 @@ import {
   FilesystemManagedSkillRegistry,
   type WritableManagedSkillRegistry,
 } from "@gonk/skills";
-import { collectToolOutcome, makeBaseContext } from "@gonk/tool-registry";
+import {
+  collectToolOutcome,
+  makeBaseContext,
+  ToolRegistry,
+} from "@gonk/tool-registry";
 import { FileObjectStore } from "@mirk/artifact/fs";
 import { FileGraphRepository } from "@workspace/graph-store/repository";
+import { MemoryBlackboardRepository } from "@workspace/blackboard-store/repository";
+import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits";
 import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionArtifactStore } from "../src/artifact-store.js";
+import { sigilApprovalProvider } from "../src/registry/approval.js";
+import { registerBlackboardTools } from "../src/registry/blackboard.js";
+import { registerImageTools } from "../src/registry/image.js";
 import {
   createReviewDemoRepository,
   createSigilRegistry,
@@ -22,6 +31,7 @@ import { expectedRegistryToolContracts } from "./fixtures/registry-contract.js";
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -56,6 +66,51 @@ async function makeRegistry(
 }
 
 describe("Sigil Chat Gonk registry", () => {
+  it("omits local Codex image generation when production disables it", async () => {
+    vi.stubEnv("SIGIL_LOCAL_CODEX_IMAGE_GENERATION", "disabled");
+    const { registry } = await makeRegistry();
+    const names = registry.list().map((tool) => tool.name);
+
+    expect(names).not.toContain("sigil-generate-image");
+    expect(names).toContain("sigil-edit-image");
+  });
+
+  it("bounds the session blackboard at the tool and store boundary", async () => {
+    const registry = new ToolRegistry();
+    const repository = new MemoryBlackboardRepository();
+    registerBlackboardTools(registry, repository);
+    const context = makeBaseContext({
+      host: { resourceScope: "session:thread-1" },
+    });
+
+    const written = await collectToolOutcome(
+      registry.invoke(
+        "sigil-blackboard-write",
+        { content: "Shared note", expectedRevision: "" },
+        context,
+      ),
+    );
+    expect(written).toMatchObject({
+      ok: true,
+      data: { content: "Shared note", sessionId: "thread-1" },
+    });
+
+    const oversized = await collectToolOutcome(
+      registry.invoke(
+        "sigil-blackboard-write",
+        {
+          content: "x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1),
+          expectedRevision: "",
+        },
+        context,
+      ),
+    );
+    expect(oversized).toMatchObject({ ok: false });
+    await expect(repository.read("thread-1")).resolves.toMatchObject({
+      content: "Shared note",
+    });
+  });
+
   it("preserves discovery metadata, schemas, and ordered tool contracts", async () => {
     const { registry } = await makeRegistry();
     const contract = registry.list().map((tool) => {
@@ -274,6 +329,180 @@ describe("Sigil Chat Gonk registry", () => {
       code: "INTERNAL",
       message: `Unknown file id for requested scope: ${stored.id}`,
     });
+  });
+
+  it("edits a scoped source image into a new artifact with provenance", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const source = await artifacts.putFile({
+      bytes: new Uint8Array([1, 2, 3]),
+      filename: "portrait.png",
+      mediaType: "image/png",
+      scope: "thread-image",
+    });
+    const editImage = vi.fn(async () => ({
+      bytes: new Uint8Array([4, 5, 6]),
+      mediaType: "image/png",
+      backend: "comfyui:phantom",
+      revisedPrompt: "Make the coat crimson",
+    }));
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(registry, artifacts, editImage);
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        {
+          sourceArtifactId: source.id,
+          instruction: "Make the coat crimson",
+          width: 512,
+          height: 512,
+        },
+        makeBaseContext({ host: { sessionScope: "thread-image" } }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        artifactId: expect.stringMatching(/^uploads\//),
+        url: expect.stringMatching(/^\/img\/uploads\//),
+        backend: "comfyui:phantom",
+        sourceArtifactId: source.id,
+        instruction: "Make the coat crimson",
+      },
+    });
+    expect(editImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceBytes: new Uint8Array([1, 2, 3]),
+        sourceMediaType: "image/png",
+        instruction: "Make the coat crimson",
+        width: 512,
+        height: 512,
+      }),
+    );
+    const files = await artifacts.listBySession("thread-image");
+    expect(files).toHaveLength(2);
+    expect(files[1]).toMatchObject({
+      filename: "portrait-edited.png",
+      provenance: {
+        kind: "image-edit",
+        sourceArtifactId: source.id,
+        instruction: "Make the coat crimson",
+        backend: "comfyui:phantom",
+      },
+    });
+  });
+
+  it("keeps derivation identity and provenance when edited bytes deduplicate", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-dedupe-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const sourceBytes = new Uint8Array([1, 2, 3]);
+    const source = await artifacts.putFile({
+      bytes: sourceBytes,
+      filename: "portrait.png",
+      mediaType: "image/png",
+      scope: "thread-image-dedupe",
+    });
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(registry, artifacts, async () => ({
+      bytes: sourceBytes,
+      mediaType: "image/png",
+      backend: "test-backend",
+    }));
+
+    const first = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        { sourceArtifactId: source.id, instruction: "Preserve every pixel" },
+        makeBaseContext({ host: { sessionScope: "thread-image-dedupe" } }),
+      ),
+    );
+    const second = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        { sourceArtifactId: source.id, instruction: "Keep it unchanged" },
+        makeBaseContext({ host: { sessionScope: "thread-image-dedupe" } }),
+      ),
+    );
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    const firstId = (first as { data: { artifactId: string } }).data.artifactId;
+    const secondId = (second as { data: { artifactId: string } }).data
+      .artifactId;
+    expect(firstId).not.toBe(source.id);
+    expect(secondId).not.toBe(source.id);
+    expect(secondId).not.toBe(firstId);
+
+    const files = await artifacts.listBySession("thread-image-dedupe");
+    expect(files).toHaveLength(3);
+    expect(files.find((file) => file.id === firstId)?.provenance).toMatchObject(
+      {
+        sourceArtifactId: source.id,
+        instruction: "Preserve every pixel",
+        backend: "test-backend",
+      },
+    );
+    expect(
+      files.find((file) => file.id === secondId)?.provenance,
+    ).toMatchObject({
+      sourceArtifactId: source.id,
+      instruction: "Keep it unchanged",
+      backend: "test-backend",
+    });
+  });
+
+  it("persists an inline edit source and fails loudly without a backend", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-fail-"));
+    temporaryDirectories.push(directory);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+    );
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(registry, artifacts, async () => {
+      throw new Error(
+        "Image edit backend is unavailable. No text-to-image fallback was attempted.",
+      );
+    });
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        {
+          inlineImage: {
+            base64: Buffer.from([1, 2, 3]).toString("base64"),
+            mediaType: "image/png",
+            filename: "inline.png",
+          },
+          instruction: "Add a gold halo",
+        },
+        makeBaseContext({ host: { sessionScope: "thread-inline" } }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: expect.stringContaining(
+        "No text-to-image fallback was attempted",
+      ),
+    });
+    const files = await artifacts.listBySession("thread-inline");
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({ filename: "inline.png" });
   });
 
   it("retrieves exact cited passages from session artifacts and fails closed without evidence", async () => {

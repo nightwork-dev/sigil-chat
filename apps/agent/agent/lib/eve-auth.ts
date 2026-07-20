@@ -46,6 +46,7 @@ export interface CreateOwnedEveChannelOptions extends Omit<
   "auth"
 > {
   auth: AuthFn<Request>
+  defaultPersonaId: string
   ownerStore: EveSessionOwnerStore
 }
 
@@ -128,7 +129,7 @@ export function createSigilRequestAuthenticator(
 export function createOwnedEveChannel(
   options: CreateOwnedEveChannelOptions,
 ): EveChannel {
-  const { auth, ownerStore, ...channelOptions } = options
+  const { auth, defaultPersonaId, ownerStore, ...channelOptions } = options
   const callers = new WeakMap<Request, SessionAuthContext>()
   const onMessage = channelOptions.onMessage
   const channel = eveChannel({
@@ -138,18 +139,35 @@ export function createOwnedEveChannel(
       if (!caller) return caller
 
       const subject = principalSubject(caller)
-      callers.set(request, caller)
       const sessionId = sessionIdFromRequest(request)
+      let personaId = requestedPersonaId(caller) ?? defaultPersonaId
       if (sessionId !== undefined) {
-        const owner = await ownerStore.getOwner(sessionId)
-        if (owner !== subject) {
+        const binding = await ownerStore.getBinding(sessionId)
+        if (binding?.subject !== subject) {
           throw new ForbiddenError({
             code: "eve_session_owner_mismatch",
             message: "The authenticated principal does not own this session.",
           })
         }
+        if (binding.personaId === undefined) {
+          // Compatibility migration for sessions created before persona
+          // binding existed. The old runtime could only inhabit its configured
+          // default; lock that fact now so a later default change cannot
+          // silently reinterpret the session.
+          await ownerStore.bind(sessionId, subject, defaultPersonaId)
+        }
+        personaId = binding.personaId ?? defaultPersonaId
+        const requested = requestedPersonaId(caller)
+        if (requested !== undefined && requested !== personaId) {
+          throw new ForbiddenError({
+            code: "eve_session_persona_mismatch",
+            message: "The requested persona does not own this session.",
+          })
+        }
       }
-      return caller
+      const boundCaller = withPersona(caller, personaId)
+      callers.set(request, boundCaller)
+      return boundCaller
     },
     onMessage:
       onMessage === undefined
@@ -199,8 +217,12 @@ function preserveTurnResourceScope(
       ...result.auth,
       attributes: {
         ...result.auth.attributes,
-        ...(typeof resourceScope === "string" ? { sigilResourceScope: resourceScope } : {}),
-        ...(typeof sessionScope === "string" ? { sigilSessionScope: sessionScope } : {}),
+        ...(typeof resourceScope === "string"
+          ? { sigilResourceScope: resourceScope }
+          : {}),
+        ...(typeof sessionScope === "string"
+          ? { sigilSessionScope: sessionScope }
+          : {}),
       },
     },
   }
@@ -227,7 +249,11 @@ function wrapHttpRoute(
                       "Eve created a session without an authenticated owner binding.",
                     )
                   }
-                  await ownerStore.bind(session.id, principalSubject(caller))
+                  await ownerStore.bind(
+                    session.id,
+                    principalSubject(caller),
+                    requiredPersonaId(caller),
+                  )
                   return session
                 },
               }
@@ -280,6 +306,32 @@ function principalFromPayload(
 
 function principalSubject(caller: SessionAuthContext): string {
   return caller.subject?.trim() || caller.principalId.trim()
+}
+
+function requestedPersonaId(caller: SessionAuthContext): string | undefined {
+  const value = caller.attributes.sigilRequestedPersonaId
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+function requiredPersonaId(caller: SessionAuthContext): string {
+  const value = caller.attributes.sigilPersonaId
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Eve session creation requires a bound persona.")
+  }
+  return value.trim()
+}
+
+function withPersona(
+  caller: SessionAuthContext,
+  personaId: string,
+): SessionAuthContext {
+  return {
+    ...caller,
+    attributes: {
+      ...caller.attributes,
+      sigilPersonaId: personaId,
+    },
+  }
 }
 
 function sessionIdFromRequest(request: Request): string | undefined {

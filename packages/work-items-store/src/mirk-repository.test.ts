@@ -1,5 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { cp, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -92,7 +99,9 @@ describe("MirkWorkItemsRepository", () => {
       body: "Mirk now owns the backing.",
       createdAt: NOW,
     });
-    expect(reopened.reviews.find(({ id }) => id === "review-S0.3-3")).toMatchObject({
+    expect(
+      reopened.reviews.find(({ id }) => id === "review-S0.3-3"),
+    ).toMatchObject({
       decision: "changes-requested",
       completed: true,
       unread: false,
@@ -112,7 +121,9 @@ describe("MirkWorkItemsRepository", () => {
       sourceDirectory &&
       resolve(sourceDirectory) === resolve(resolveRoadmapDir())
     )
-      throw new Error("Round-trip verification must never use the live roadmap.");
+      throw new Error(
+        "Round-trip verification must never use the live roadmap.",
+      );
 
     const legacyDirectory = await makeDirectory();
     const mirkDirectory = sourceDirectory ?? (await makeDirectory());
@@ -126,7 +137,8 @@ describe("MirkWorkItemsRepository", () => {
       await legacy.get();
       await cp(legacyDirectory, mirkDirectory, {
         recursive: true,
-        filter: (source) => !source.includes("/.git/") && !source.endsWith("/.git"),
+        filter: (source) =>
+          !source.includes("/.git/") && !source.endsWith("/.git"),
       });
       await rm(join(mirkDirectory, ".git"), { recursive: true, force: true });
     }
@@ -178,8 +190,14 @@ describe("MirkWorkItemsRepository", () => {
       const actual = await readFile(join(mirkDirectory, name), "utf8");
       if (expected !== actual) storyDiffs.push(name);
     }
-    const oldReviews = await readFile(join(legacyDirectory, "_reviews.md"), "utf8");
-    const mirkReviews = await readFile(join(mirkDirectory, "_reviews.md"), "utf8");
+    const oldReviews = await readFile(
+      join(legacyDirectory, "_reviews.md"),
+      "utf8",
+    );
+    const mirkReviews = await readFile(
+      join(mirkDirectory, "_reviews.md"),
+      "utf8",
+    );
     if (process.env.S15B_LEGACY_SNAPSHOT)
       await cp(legacyDirectory, process.env.S15B_LEGACY_SNAPSHOT, {
         recursive: true,
@@ -196,7 +214,8 @@ describe("MirkWorkItemsRepository", () => {
     console.log(
       JSON.stringify({
         stories: (await mirk.list()).length,
-        storyIdsMatch: (await mirk.list()).map(({ id }) => id).join(",") ===
+        storyIdsMatch:
+          (await mirk.list()).map(({ id }) => id).join(",") ===
           (await legacy.list()).map(({ id }) => id).join(","),
         storyFilesCompared: storyNames.length,
         storyDiff: storyDiffs.length === 0 ? "none" : storyDiffs,
@@ -224,7 +243,7 @@ describe("MirkWorkItemsRepository", () => {
         "epicTitle: Ideas",
         `title: ${id} title`,
         `status: ${status}`,
-        "routing: claude:opus",
+        "routing: strategy",
         "reviewGate: decision:owner",
         "deps: []",
         "authoredBy: Owner",
@@ -259,7 +278,10 @@ describe("MirkWorkItemsRepository", () => {
     // corrupt one is dropped rather than taking everything down with it.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const ids = (
-      await new MirkWorkItemsRepository({ dir: directory, now: () => NOW }).list()
+      await new MirkWorkItemsRepository({
+        dir: directory,
+        now: () => NOW,
+      }).list()
     ).map((story) => story.id);
     warn.mockRestore();
 

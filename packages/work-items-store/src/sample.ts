@@ -10,7 +10,9 @@ const seedStories: Story[] = [
     epicTitle: "Foundation",
     title: "Verify the integration baseline",
     intent: "Keep a small lifecycle story available for local roadmap demos.",
-    acceptanceCriteria: ["The story can transition through the repository lifecycle."],
+    acceptanceCriteria: [
+      "The story can transition through the repository lifecycle.",
+    ],
     status: "ready",
     routing: "self",
     reviewGate: "none",
@@ -39,10 +41,13 @@ const seedStories: Story[] = [
     epicId: "roadmap",
     epicTitle: "Roadmap",
     title: "Persist roadmap stories",
-    intent: "Exercise story updates, transitions, comments, and review assignment.",
-    acceptanceCriteria: ["Roadmap mutations persist and reject stale revisions."],
+    intent:
+      "Exercise story updates, transitions, comments, and review assignment.",
+    acceptanceCriteria: [
+      "Roadmap mutations persist and reject stale revisions.",
+    ],
     status: "ready",
-    routing: "pi:luna",
+    routing: "implementation",
     reviewGate: "peer",
     deps: ["S1.0"],
     authoredBy: "Template",
@@ -58,7 +63,8 @@ const seedReviews: ReviewItem[] = [
     assignee: "Owner",
     gate: "browser:owner",
     title: "Confirm the integration baseline",
-    summary: "Verify the local integration before closing the foundation story.",
+    summary:
+      "Verify the local integration before closing the foundation story.",
     unread: true,
     completed: false,
     createdAt: SEED_TIMESTAMP,

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import {
+  AtSignIcon,
   CheckIcon,
   InboxIcon,
   LayoutListIcon,
@@ -67,6 +68,7 @@ import {
 } from "@workspace/ui/components/sheet"
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
 import { cn } from "@workspace/ui/lib/utils"
+import type { CurrentSessionUser } from "@/lib/auth/route-guard"
 
 type AsidePane = "queue" | "detail"
 
@@ -95,16 +97,23 @@ function storyTarget(story: StoryData): AttentionSelection {
   }
 }
 
-export function RoadmapWorkspace() {
-  const stories = useStories()
+export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
+  const [addressedOnly, setAddressedOnly] = useState(false)
+  const allStoriesQuery = useStories()
+  const addressedStoriesQuery = useStories(undefined, {
+    viewerId: viewer.id,
+    enabled: addressedOnly,
+  })
+  const stories = addressedOnly ? addressedStoriesQuery : allStoriesQuery
   const reviews = useReviews()
   const isMobile = useIsMobile()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [pane, setPane] = useState<AsidePane>("queue")
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  const allStories = stories.data ?? []
-  const grouped = groupByStatus(allStories)
+  const boardStories = stories.data ?? []
+  const allStories = allStoriesQuery.data ?? []
+  const grouped = groupByStatus(boardStories)
   const ownerReviews = orderReviews(
     (reviews.data ?? []).filter((review) => review.assignee === "Owner"),
   )
@@ -159,10 +168,19 @@ export function RoadmapWorkspace() {
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] grid-cols-1 overflow-hidden bg-background md:grid-cols-[minmax(0,1fr)_380px]">
       <section aria-label="Story board" className="flex min-h-0 flex-col overflow-hidden">
-        {/* Phone-only bar: the review queue / story detail live in a sheet here,
-            so give a way to reach the queue without selecting a card first. */}
-        <div className="flex items-center justify-end gap-2 border-b border-border px-3 py-2 md:hidden">
-          <Button size="sm" variant="outline" onClick={openQueue}>
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+          <Button
+            size="sm"
+            variant={addressedOnly ? "secondary" : "outline"}
+            aria-pressed={addressedOnly}
+            onClick={() => setAddressedOnly((current) => !current)}
+          >
+            <AtSignIcon />
+            Addressed to me
+          </Button>
+          {/* On phones the review queue / story detail live in a sheet, so keep
+              the queue reachable without selecting a card first. */}
+          <Button size="sm" variant="outline" className="md:hidden" onClick={openQueue}>
             <InboxIcon />
             Review queue
             {pendingCount > 0 ? (
@@ -176,12 +194,16 @@ export function RoadmapWorkspace() {
           <p className="p-4 text-sm text-muted-foreground">Loading the roadmap…</p>
         ) : stories.error ? (
           <p className="p-4 text-sm text-destructive">Could not load the roadmap.</p>
-        ) : allStories.length === 0 ? (
+        ) : boardStories.length === 0 ? (
           <Empty className="m-4 border">
             <EmptyHeader>
-              <EmptyTitle>No stories yet</EmptyTitle>
+              <EmptyTitle>
+                {addressedOnly ? "Nothing addressed to you" : "No stories yet"}
+              </EmptyTitle>
               <EmptyDescription>
-                The work-items store seeds the roadmap on first read.
+                {addressedOnly
+                  ? "Stories with feedback for your role or mention handle appear here."
+                  : "The work-items store seeds the roadmap on first read."}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -654,7 +676,6 @@ function StoryComments({ story }: { story: StoryData }) {
       .mutateAsync({
         storyId: story.id,
         kind,
-        author: "Owner",
         body: body.trim(),
         addressee: addressee === "general" ? undefined : addressee,
       })
