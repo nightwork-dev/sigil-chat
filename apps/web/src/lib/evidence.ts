@@ -19,8 +19,7 @@ const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json";
  * to Gonk directly, never becomes
  * an MCP client, and never sees `GONK_MCP_KEY`. This web process holds the key
  * (via turbo `globalPassThroughEnv`) and forwards it to Gonk's authenticated
- * `/artifacts` + `/upload` routes; `/img/<key>` reads stay unauthenticated and
- * are proxied same-origin (vite.config.ts).
+ * `/artifacts`, `/upload`, and `/img/<key>` routes.
  */
 export const EVIDENCE_ROOM_SCOPE = "project:evidence-room";
 
@@ -117,11 +116,13 @@ const listEvidenceDistillsFn = createServerFn({ method: "GET" }).handler(
       (artifact) => artifact.mediaType === DISTILL_MEDIA_TYPE,
     );
 
-    // Each distill's bytes are the DistilledArtifact JSON; read them from the
-    // content-addressed /img route (unauthenticated, but the bearer is harmless).
+    // Each distill's bytes are DistilledArtifact JSON. This server-side read
+    // uses the same service bearer as every other Gonk artifact operation.
     const distills = await Promise.all(
       distillMetas.map(async (meta): Promise<EvidenceDistill | null> => {
-        const content = await fetch(`${imgBase}/img/${meta.id}`);
+        const content = await fetch(`${imgBase}/img/${meta.id}`, {
+          headers: { authorization: `Bearer ${apiKey}` },
+        });
         if (!content.ok) return null;
         try {
           const distilled = (await content.json()) as DistilledArtifact;

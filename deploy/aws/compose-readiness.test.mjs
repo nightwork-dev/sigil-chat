@@ -39,7 +39,9 @@ test("update command leaves the public edge stopped", () => {
 test("production services share writable blackboard storage", () => {
   for (const serviceName of ["web", "eve", "gonk"]) {
     const start = compose.indexOf(`\n  ${serviceName}:`)
-    const next = compose.indexOf("\n  ", start + 4)
+    const nextMatch = /\n  [a-z][a-z-]+:/g
+    nextMatch.lastIndex = start + serviceName.length + 4
+    const next = nextMatch.exec(compose)?.index ?? compose.length
     const service = compose.slice(start, next)
     assert.match(service, /SIGIL_BLACKBOARD_DIR: \/var\/lib\/sigil-blackboard/)
     assert.match(service, /blackboard_data:\/var\/lib\/sigil-blackboard/)

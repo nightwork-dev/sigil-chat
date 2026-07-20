@@ -71,6 +71,11 @@ credential state contained in the dedicated `codex_auth` Docker volume. After
 model readiness passes, activate the public edge. Device auth is a human
 interaction and is never automated or stored in this repository.
 
+The credential volume mounts into Eve only. Gonk's local Codex-backed image
+generation provider is unavailable in this hardened deployment profile until
+the agent host exposes a delegated provider boundary; web, Gonk, sandboxes,
+and backup jobs never receive the raw Codex credential.
+
 ```bash
 docker compose --env-file deploy.env.local exec eve codex login --device-auth
 docker compose --env-file deploy.env.local exec eve pnpm --filter sigil-chat-agent healthcheck

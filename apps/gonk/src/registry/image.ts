@@ -1,12 +1,7 @@
 import { shape, type ToolRegistry } from "@gonk/tool-registry";
-import { ObjectAlreadyExistsError } from "@mirk/artifact";
-
 import {
   artifactPublicUrl,
-  getArtifactStore,
   getSessionArtifactStore,
-  imageKeyFor,
-  imagePublicUrl,
   type SessionArtifactStore,
 } from "../artifact-store.js";
 import { generateCodexImage } from "./image-provider.js";
@@ -74,7 +69,7 @@ export function registerImageTools(
       additionalProperties: false,
     },
     hints: writeHints,
-    handler: async (input) => {
+    handler: async (input, ctx) => {
       const width = input.width ?? 1024;
       const height = input.height ?? 1024;
       const image = await generateCodexImage({
@@ -82,23 +77,20 @@ export function registerImageTools(
         size: `${width}x${height}`,
       });
 
-      // Persist the bytes in the artifact store and hand back a served URL —
-      // NOT a base64 data URL (which would bloat every message in the
-      // transcript). The key is a content hash, so identical images dedupe.
-      const key = imageKeyFor(image.bytes, image.mimeType);
-      try {
-        await getArtifactStore().put(key, image.bytes, {
+      const scope = requireResourceScope(undefined, ctx);
+      const stored = await artifacts.putFile(
+        {
+          bytes: image.bytes,
+          filename: "generated-image",
           mediaType: image.mimeType,
-          ifAbsent: true,
-        });
-      } catch (error) {
-        // Identical bytes already stored — reuse the existing object.
-        if (!(error instanceof ObjectAlreadyExistsError)) throw error;
-      }
+          scope,
+        },
+        ctx.auth?.principal,
+      );
 
       return {
         data: {
-          url: imagePublicUrl(key),
+          url: artifactPublicUrl(stored.id, stored.scope),
           prompt: image.revisedPrompt ?? input.prompt,
           mediaType: image.mimeType,
         },
@@ -222,7 +214,7 @@ export function registerImageTools(
       return {
         data: {
           artifactId: stored.id,
-          url: artifactPublicUrl(stored.id),
+          url: artifactPublicUrl(stored.id, stored.scope),
           mediaType: stored.mediaType,
           backend: edited.backend,
           sourceArtifactId,

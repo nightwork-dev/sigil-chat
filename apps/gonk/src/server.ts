@@ -111,17 +111,23 @@ async function handleRequest(
       outgoing.end(await health.text())
       return
     }
-    // Serve generated/attached image bytes. Deliberately UNauthenticated (before
-    // the /mcp bearer gate): a browser <img src> can't send the MCP key, and the
-    // key is a content hash (unguessable, immutable), not a capability.
     if (pathname.startsWith("/img/")) {
+      if (
+        !isHealthRequestAuthorized(
+          incoming.headers.authorization,
+          serviceBearerKey,
+        )
+      ) {
+        outgoing.writeHead(401, {
+          "content-type": "text/plain; charset=utf-8",
+        })
+        outgoing.end("Unauthorized")
+        return
+      }
       await serveImage(pathname.slice("/img/".length), outgoing)
       return
     }
-    // Unlike /img (unauthenticated read of content-addressed, unguessable
-    // bytes), /upload is a WRITE path: an unauthenticated version would let
-    // anything reachable via the Portless proxy use this process as an open
-    // file drop. Require the same bearer key that gates /mcp.
+    // Uploads use the same service bearer as reads and MCP.
     if (pathname === "/upload") {
       await handleUpload(incoming, outgoing)
       return
@@ -203,9 +209,7 @@ async function serveImage(
     "content-length": String(info.sizeBytes),
     // Content-addressed key → the bytes never change → cache forever.
     "cache-control": "public, max-age=31536000, immutable",
-    // No CORS header: the web app proxies /img same-origin (apps/web/
-    // vite.config.ts), so the browser fetches these bytes from its own origin.
-    // Gonk is an internal service, not a cross-origin browser endpoint.
+    // No CORS header: only the authenticated web server proxies these bytes.
   })
   for await (const chunk of stream) {
     outgoing.write(Buffer.from(chunk))
@@ -327,7 +331,7 @@ async function handleUpload(
   }
 
   const body = JSON.stringify({
-    url: artifactPublicUrl(artifact.id),
+    url: artifactPublicUrl(artifact.id, artifact.scope),
     key: artifact.id,
     mediaType: artifact.mediaType,
     size: artifact.size,

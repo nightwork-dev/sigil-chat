@@ -21,10 +21,6 @@
 		reverse_proxy eve:3001
 	}
 
-	handle /img/* {
-		reverse_proxy gonk:8808
-	}
-
 	handle {
 		reverse_proxy web:3000
 	}

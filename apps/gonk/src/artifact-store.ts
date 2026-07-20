@@ -44,14 +44,15 @@ export function imageKeyFor(bytes: Uint8Array, mediaType: string): string {
   return `images/${digest}.${ext}`
 }
 
-/** Same-origin path the browser fetches the image from. The web app proxies
- *  `/img/**` to gonk (apps/web/vite.config.ts), so the browser only ever talks
- *  to its own origin — no cross-origin request, no CORS. Set GONK_PUBLIC_URL to
- *  force an absolute URL for a deployment that doesn't front gonk with the web
- *  app's proxy. */
-export function imagePublicUrl(key: string): string {
+/** Same-origin path the browser fetches through the authenticated web route.
+ *  The scope query is location, not authority: web re-authorizes it against the
+ *  current principal before proxying to Gonk. */
+export function imagePublicUrl(key: string, scope: ScopeInput): string {
   const base = process.env.GONK_PUBLIC_URL
-  return base ? `${base.replace(/\/$/, "")}/img/${key}` : `/img/${key}`
+  const scopeHeader = formatScopeHeader(scope)
+  if (!scopeHeader) throw new Error("Artifact URL requires a valid scope")
+  const path = `/img/${key}?scope=${encodeURIComponent(scopeHeader)}`
+  return base ? `${base.replace(/\/$/, "")}${path}` : path
 }
 
 /** Same served URL scheme as {@link imagePublicUrl}, named for the general

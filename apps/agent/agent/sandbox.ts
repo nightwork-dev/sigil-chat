@@ -3,14 +3,16 @@ import { justbash } from "eve/sandbox/just-bash";
 import { microsandbox } from "eve/sandbox/microsandbox";
 
 const networkPolicy = "deny-all" as const;
+const sandboxDisabled = process.env.SIGIL_SANDBOX_MODE === "disabled";
 
 export default defineSandbox({
   backend: () => {
-    if (process.env.SIGIL_SANDBOX_MODE === "disabled") {
+    if (sandboxDisabled) {
       return justbash({ autoInstall: false });
     }
     return microsandbox({ networkPolicy, pullPolicy: "if-missing" });
   },
-  description:
-    "A persistent per-session workspace inside a network-isolated local VM.",
+  description: sandboxDisabled
+    ? "A non-executable virtual workspace; production shell and write tools are disabled."
+    : "A persistent per-session workspace inside a network-isolated local VM.",
 });

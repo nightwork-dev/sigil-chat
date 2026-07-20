@@ -65,7 +65,7 @@ export async function handleArtifactRoute(
         mediaType: artifact.mediaType,
         size: artifact.size,
         createdAt: artifact.createdAt,
-        url: artifactPublicUrl(artifact.id),
+        url: artifactPublicUrl(artifact.id, artifact.scope),
       })),
     }
   }
