@@ -61,6 +61,10 @@ reports/
 .agents/*
 !.agents/index.md
 !.agents/skills/
+# Nested .agents/ dirs (e.g. under apps/web/public) are per-app runtime scratch
+# state (session/store SQLite), not the root instructions tree — ignore them
+# wholesale without touching the root .agents/* allowlist above.
+apps/**/.agents/
 .omc
 .playwright-mcp
 traces/
