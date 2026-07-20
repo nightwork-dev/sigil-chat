@@ -7,7 +7,11 @@ import { resolve } from "node:path"
 import { createSigilMcpHandler } from "./mcp-handler.js"
 import { handleArtifactRoute } from "./artifact-routes.js"
 import { readGonkServerEnvironment } from "@workspace/runtime-env/server"
-import { createHealthResponse } from "./health.js"
+import {
+  createHealthResponse,
+  createLivenessResponse,
+  isHealthRequestAuthorized,
+} from "./health.js"
 import {
   artifactPublicUrl,
   getArtifactStore,
@@ -86,15 +90,16 @@ async function handleRequest(
       `http://${incoming.headers.host ?? `127.0.0.1:${port}`}`,
     ).pathname
     if (pathname === "/live") {
-      outgoing.writeHead(200, {
-        "cache-control": "no-store",
-        "content-type": "application/json; charset=utf-8",
-      })
-      outgoing.end(JSON.stringify({ status: "live" }))
+      await writeWebResponse(outgoing, createLivenessResponse())
       return
     }
     if (pathname === "/health") {
-      if (incoming.headers.authorization !== `Bearer ${serviceBearerKey}`) {
+      if (
+        !isHealthRequestAuthorized(
+          incoming.headers.authorization,
+          serviceBearerKey,
+        )
+      ) {
         outgoing.writeHead(401, {
           "content-type": "text/plain; charset=utf-8",
         })

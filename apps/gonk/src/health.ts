@@ -11,6 +11,20 @@ type HealthArtifactStore = Pick<
 const probeScope = { tier: "session", id: "service-health" } as const
 const probeBytes = new TextEncoder().encode("sigil-chat-gonk-health-v1")
 
+export function isHealthRequestAuthorized(
+  authorization: string | undefined,
+  serviceBearerKey: string,
+): boolean {
+  return authorization === `Bearer ${serviceBearerKey}`
+}
+
+export function createLivenessResponse(): Response {
+  return Response.json(
+    { status: "live" },
+    { headers: { "cache-control": "no-store" } },
+  )
+}
+
 export async function createHealthResponse(
   artifacts: HealthArtifactStore = getSessionArtifactStore(),
 ): Promise<Response> {
