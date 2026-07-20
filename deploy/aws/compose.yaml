@@ -65,6 +65,17 @@ services:
       - web_appdata:/app/.data
       - eve_identity:/var/lib/sigil-identity:ro
     expose: ["3000"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     networks: [backend]
 
   eve:
@@ -74,7 +85,17 @@ services:
     # (extension authored-modules), which sits outside the data volumes.
     # Non-root, cap_drop ALL, and no-new-privileges still apply.
     read_only: false
-    command: ["pnpm", "--filter", "sigil-chat-agent", "exec", "eve", "start", "--host", "0.0.0.0"]
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "sigil-chat-agent",
+        "exec",
+        "eve",
+        "start",
+        "--host",
+        "0.0.0.0",
+      ]
     tmpfs:
       - /tmp:size=64m
       - /home/sigil/.cache:size=64m
@@ -92,8 +113,25 @@ services:
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
     secrets: [gonk_mcp_key]
-    volumes: [eve_data:/var/lib/sigil-eve, eve_app:/app/apps/agent, eve_scope:/app/.agents, eve_identity:/var/lib/sigil-identity]
+    volumes:
+      [
+        eve_data:/var/lib/sigil-eve,
+        eve_app:/app/apps/agent,
+        eve_scope:/app/.agents,
+        eve_identity:/var/lib/sigil-identity,
+      ]
     expose: ["3001"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/eve/v1/info').then(r=>process.exit(r.ok||r.status===401?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     # edge too: eve needs egress for JWKS-over-HTTPS and model providers
     networks: [edge, backend]
 
@@ -111,6 +149,17 @@ services:
     secrets: [gonk_mcp_key]
     volumes: [gonk_data:/var/lib/sigil-gonk, gonk_scope:/app/.agents]
     expose: ["8808"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8808/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     networks: [backend]
 
   edge:
@@ -121,10 +170,19 @@ services:
     cap_drop: []
     security_opt: []
     user: "10004:10004"
-    depends_on: [web, eve, gonk]
+    depends_on:
+      web: { condition: service_healthy }
+      eve: { condition: service_healthy }
+      gonk: { condition: service_healthy }
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST}
     ports: ["80:8080", "443:8443"]
+    healthcheck:
+      test:
+        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - /srv/sigil-chat/caddy-data:/data

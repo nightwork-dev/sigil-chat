@@ -13,7 +13,9 @@
 		-Server
 	}
 
-	respond /healthz "ok" 200
+	handle /healthz {
+		reverse_proxy web:3000
+	}
 
 	handle /eve/* {
 		reverse_proxy eve:3001
