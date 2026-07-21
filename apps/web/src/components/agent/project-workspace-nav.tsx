@@ -17,6 +17,7 @@ import {
   type WorkspaceContainmentLookup,
 } from "@/lib/agent-thread-containers"
 import type { AgentThreadSummary } from "@/lib/agent-threads-domain"
+import { useActiveContainer } from "@/lib/active-container"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 
 /**
@@ -38,6 +39,7 @@ export function ProjectWorkspaceNav({
   threads: readonly AgentThreadSummary[]
 }) {
   const nav = useProjectWorkspaceNav()
+  const container = useActiveContainer()
   const [selectedProjectId, setSelectedProjectId] = useState<string>()
 
   const lookup: WorkspaceContainmentLookup = useMemo(() => {
@@ -45,8 +47,14 @@ export function ProjectWorkspaceNav({
     return { getWorkspaceProjectId: (id) => byId.get(id) }
   }, [nav.data?.workspaces])
 
+  // §3.2 — the global active container is the default filter (the chrome
+  // switcher changes what this drawer shows); a local override still wins
+  // for in-drawer browsing, and the personal project is the final fallback.
   const activeProjectId =
-    selectedProjectId ?? nav.data?.personalProjectId ?? undefined
+    selectedProjectId ??
+    container.projectId ??
+    nav.data?.personalProjectId ??
+    undefined
 
   if (nav.isPending) {
     return (

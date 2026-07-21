@@ -131,7 +131,24 @@ export function SidebarShell({
   actions,
   children,
   accountMenu,
-}: ShellSlots & { accountMenu?: ReactNode }) {
+  workspaceSwitcher,
+  breadcrumbContext,
+}: ShellSlots & {
+  accountMenu?: ReactNode
+  /**
+   * App-owned container switcher (e.g. Project ▸ Workspace), rendered in the
+   * sidebar header above the nav items. The shell owns the slot and nothing of
+   * its content — the portable package stays app-agnostic (the accountMenu
+   * precedent). Hidden when the rail collapses to icons, like the brand label.
+   */
+  workspaceSwitcher?: ReactNode
+  /**
+   * App-owned context segment rendered before the surface crumb in the
+   * breadcrumb bar (e.g. `Project › Workspace`). Read-only; the shell adds
+   * the separators.
+   */
+  breadcrumbContext?: ReactNode
+}) {
   const active = useActiveNav([...nav.items, ...(nav.footer ?? [])])
 
   return (
@@ -152,6 +169,12 @@ export function SidebarShell({
         </SidebarHeader>
 
         <Separator className="mx-0 w-full" />
+
+        {workspaceSwitcher ? (
+          <div className="px-2 pt-2 group-data-[collapsible=icon]:hidden">
+            {workspaceSwitcher}
+          </div>
+        ) : null}
 
         <SidebarContent>
           <SidebarGroup>
@@ -179,6 +202,7 @@ export function SidebarShell({
           <Separator orientation="vertical" className="h-4 md:hidden" />
           <Breadcrumb>
             <BreadcrumbList>
+              {breadcrumbContext}
               <BreadcrumbItem>
                 <BreadcrumbPage className="text-xs">{active?.label ?? nav.brand?.label ?? "Home"}</BreadcrumbPage>
               </BreadcrumbItem>

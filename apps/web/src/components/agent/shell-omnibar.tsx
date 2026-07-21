@@ -31,7 +31,8 @@ import {
 import { appNav } from "@/lib/app-nav"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
-import { useAgentThreads } from "@/lib/agent-threads"
+import { useAgentThreads, useSetActiveAgentThread } from "@/lib/agent-threads"
+import { useActiveContainer } from "@/lib/active-container"
 import { openAgentHud } from "@/lib/agent-hud-open"
 
 export function ShellOmnibar() {
@@ -42,6 +43,8 @@ export function ShellOmnibar() {
 
   const projectNav = useProjectWorkspaceNav()
   const threads = useAgentThreads()
+  const container = useActiveContainer()
+  const setActiveThread = useSetActiveAgentThread()
 
   useHotkey("Mod+K", () => setOpen((prev) => !prev), {
     meta: { name: "Toggle command palette" },
@@ -109,30 +112,46 @@ export function ShellOmnibar() {
             </CommandGroup>
           ) : null}
 
-          {/* Session switching — recent threads (§3.3). */}
+          {/* Session switching — threads in the ACTIVE workspace first
+              (§3.3: sessions listed are scoped to the active workspace);
+              selecting one activates it, not just navigates. */}
           {!hasQuery && threads.data && threads.data.length > 0 ? (
             <CommandGroup heading="Sessions">
-              {threads.data.slice(0, 5).map((thread) => (
-                <CommandItem
-                  key={thread.id}
-                  value={thread.title}
-                  onSelect={() => go("/chat")}
-                >
-                  <MessageSquareIcon className="size-4 text-muted-foreground" />
-                  <span className="min-w-0 truncate">{thread.title}</span>
-                </CommandItem>
-              ))}
+              {threads.data
+                .filter(
+                  (thread) =>
+                    !container.workspaceId ||
+                    thread.workspaceId === container.workspaceId,
+                )
+                .slice(0, 5)
+                .map((thread) => (
+                  <CommandItem
+                    key={thread.id}
+                    value={thread.title}
+                    onSelect={() => {
+                      setActiveThread.mutate({ id: thread.id })
+                      go("/chat")
+                    }}
+                  >
+                    <MessageSquareIcon className="size-4 text-muted-foreground" />
+                    <span className="min-w-0 truncate">{thread.title}</span>
+                  </CommandItem>
+                ))}
             </CommandGroup>
           ) : null}
 
-          {/* Project switching (§3.3). */}
+          {/* Project switching (§3.3) — selects the active container (Level 1),
+              not just a navigation target. */}
           {!hasQuery && projectNav.data ? (
             <CommandGroup heading="Projects">
               {projectNav.data.projects.map((project) => (
                 <CommandItem
                   key={project.id}
                   value={project.name}
-                  onSelect={() => go("/chat")}
+                  onSelect={() => {
+                    container.selectProject(project.id)
+                    go("/chat")
+                  }}
                 >
                   <FolderIcon className="size-4 text-muted-foreground" />
                   {project.name}
@@ -141,8 +160,29 @@ export function ShellOmnibar() {
             </CommandGroup>
           ) : null}
 
+          {/* Workspace switching — the workspaces inside the active project. */}
+          {!hasQuery && projectNav.data ? (
+            <CommandGroup heading="Workspaces">
+              {projectNav.data.workspaces
+                .filter((w) => w.projectId === container.projectId)
+                .map((workspace) => (
+                  <CommandItem
+                    key={workspace.id}
+                    value={workspace.name}
+                    onSelect={() => {
+                      container.selectWorkspace(workspace.id)
+                      go("/chat")
+                    }}
+                  >
+                    <FolderIcon className="size-4 text-muted-foreground" />
+                    {workspace.name}
+                  </CommandItem>
+                ))}
+            </CommandGroup>
+          ) : null}
+
           {/* Surface navigation. */}
-          <CommandGroup heading="Workspaces">
+          <CommandGroup heading="Surfaces">
             {appNav.items.map((item) => {
               const Icon = item.icon
               return (

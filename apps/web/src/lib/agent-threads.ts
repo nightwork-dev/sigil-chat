@@ -208,6 +208,44 @@ const setActiveAgentThreadFn = createServerFn({ method: "POST" })
     return agentThreadRepository.setActive(session.user.id, data.id);
   });
 
+// §3.1 — the active container selection. Read is the plain preference read
+// (getActiveAgentThreadPreferenceFn already returns the whole preference);
+// write validates membership + containment against the registries before
+// persisting — the domain store deliberately does not know the registry.
+const setActiveContainerFn = createServerFn({ method: "POST" })
+  .validator((input: { projectId?: string; workspaceId?: string }) => input)
+  .handler(async ({ data }) => {
+    const { agentThreadRepository } =
+      await import("@/lib/agent-threads.server");
+    const { loadProjectWorkspaceNav } = await import(
+      "@/lib/agent-thread-containers.server"
+    );
+    const session = await requireThreadSession();
+    const nav = loadProjectWorkspaceNav(session.user.id);
+
+    const memberProjectIds = new Set(nav.projects.map((p) => p.id));
+    let projectId = data.projectId;
+    if (data.workspaceId) {
+      const workspace = nav.workspaces.find((w) => w.id === data.workspaceId);
+      if (!workspace) {
+        throw new Error(
+          `Workspace ${data.workspaceId} is not visible to this principal.`,
+        );
+      }
+      // Containment is authoritative — the project is derived, never trusted
+      // from the client (mirrors the thread.workspaceId rule in the domain).
+      projectId = workspace.projectId;
+    }
+    if (projectId && !memberProjectIds.has(projectId)) {
+      throw new Error(`Project ${projectId} is not visible to this principal.`);
+    }
+
+    return agentThreadRepository.setActiveContainer(session.user.id, {
+      projectId,
+      workspaceId: data.workspaceId,
+    });
+  });
+
 export const agentThreadKeys = {
   all: (principalId: string) => ["agent-threads", principalId] as const,
   lists: (principalId: string) =>
@@ -244,6 +282,18 @@ export function useActiveAgentThreadPreference() {
   return useQuery({
     queryKey: agentThreadKeys.preference(principalId),
     queryFn: () => getActiveAgentThreadPreferenceFn(),
+  });
+}
+
+export function useSetActiveContainer() {
+  const principalId = useAgentPrincipalId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { projectId?: string; workspaceId?: string }) =>
+      setActiveContainerFn({ data: input }),
+    onSuccess: (preference) => {
+      queryClient.setQueryData(agentThreadKeys.preference(principalId), preference);
+    },
   });
 }
 

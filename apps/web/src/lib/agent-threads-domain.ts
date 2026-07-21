@@ -49,6 +49,17 @@ export interface AgentThread {
 export interface AgentThreadPreference {
   members: string[];
   activeThreadId?: string;
+  /**
+   * The principal's active container selection (PRODUCT-CHROME-REWORK-SPEC
+   * §3.1) — the global "where am I" every scoped surface reads. Both fields
+   * are optional: no selection resolves to the principal's personal project.
+   * A workspace selection always implies its containing project (derived via
+   * the registry, validated by the server fn — the domain store does not
+   * know the registry); a project-only selection means "project scope, no
+   * specific workspace."
+   */
+  activeProjectId?: string;
+  activeWorkspaceId?: string;
   updatedAt: string;
 }
 
@@ -333,9 +344,39 @@ export class AgentThreadRepository {
         throw new Error(`Archived agent thread ${id} cannot be active.`);
       }
     }
+    // Read the raw stored preference — NOT getActivePreference, whose
+    // not-found fallback stamps updatedAt with this.now(): a clock-consuming
+    // read that would shift timestamps for every subsequent write.
+    const existing = this.preferences.get(activeThreadKey(userId));
     const preference: AgentThreadPreference = {
+      ...existing,
       members: [userId],
       activeThreadId: id,
+      updatedAt,
+    };
+    this.preferences.set(activeThreadKey(userId), preference);
+    return structuredClone(preference);
+  }
+
+  /**
+   * Persist the principal's active container selection. Membership and
+   * containment are validated by the server fn (it has the registries);
+   * this layer only enforces shape — a workspace selection clears a stale
+   * project field is NOT done here, both are stored verbatim (see the
+   * preference interface for the derivation rule).
+   */
+  setActiveContainer(
+    userId: string,
+    container: { projectId?: string; workspaceId?: string },
+    updatedAt = this.now().toISOString(),
+  ): AgentThreadPreference {
+    // Same raw-read rule as setActive (see the comment there).
+    const existing = this.preferences.get(activeThreadKey(userId));
+    const preference: AgentThreadPreference = {
+      ...existing,
+      members: [userId],
+      activeProjectId: container.projectId,
+      activeWorkspaceId: container.workspaceId,
       updatedAt,
     };
     this.preferences.set(activeThreadKey(userId), preference);

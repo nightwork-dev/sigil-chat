@@ -19,8 +19,11 @@ import { fetchCurrentSession } from "@/lib/auth/route-guard"
 import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
+import { WorkspaceSwitcher } from "@/components/agent/workspace-switcher"
+import { ContainerBreadcrumb } from "@/components/agent/container-breadcrumb"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
+import { ActiveContainerProvider } from "@/lib/active-container"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -45,21 +48,29 @@ function AppLayout() {
     owner: user.role === "owner",
   })
 
+  // Provider order: ActiveContainer wraps SidebarShell because the shell's
+  // workspaceSwitcher / breadcrumbContext slots are evaluated as props,
+  // OUTSIDE the shell's children — the provider must be above the shell for
+  // the slot content to read the selection (§3.1).
   return (
-    <SidebarShell
-      nav={nav}
-      actions={<ThemePicker variant="compact" />}
-      accountMenu={<AccountMenu user={user} />}
-    >
-      <WorkspaceAttentionProvider>
-        <AgentPrincipalProvider principalId={user.id}>
-          <AppAgentSessions principalId={user.id}>
-            <Outlet />
-            <ShellAgentHud />
-            <ShellOmnibar />
-          </AppAgentSessions>
-        </AgentPrincipalProvider>
-      </WorkspaceAttentionProvider>
-    </SidebarShell>
+    <AgentPrincipalProvider principalId={user.id}>
+      <ActiveContainerProvider>
+        <SidebarShell
+          nav={nav}
+          actions={<ThemePicker variant="compact" />}
+          accountMenu={<AccountMenu user={user} />}
+          workspaceSwitcher={<WorkspaceSwitcher />}
+          breadcrumbContext={<ContainerBreadcrumb />}
+        >
+          <WorkspaceAttentionProvider>
+            <AppAgentSessions principalId={user.id}>
+              <Outlet />
+              <ShellAgentHud />
+              <ShellOmnibar />
+            </AppAgentSessions>
+          </WorkspaceAttentionProvider>
+        </SidebarShell>
+      </ActiveContainerProvider>
+    </AgentPrincipalProvider>
   )
 }
