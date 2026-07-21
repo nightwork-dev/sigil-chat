@@ -3,22 +3,25 @@
 // Honesty rule: a live page never shows fixture records as if they were real.
 // Scoped work comes from SC.5's permission-filtered server queries. Live
 // artifacts come from the existing authenticated Gonk artifact manifest. Agent
-// activity/attention remains empty until a durable per-scope source exists.
+// Activity and attention project the durable retained session event stream.
 // The explicit `?fixtures=1` review flag is the only path that enables the
 // Northstar data needed to exercise the rich state matrix.
 
 import type { ArtifactRecord } from "@/lib/artifacts"
+import type { HomeSignals } from "@/lib/home-signals"
 import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 import type { Story } from "@workspace/work-items-store/types"
 
 import {
   fixtureAgents,
+  fixtureActivity,
   fixtureArtifactRows,
   fixtureAttention,
   fixtureResources,
   fixtureWorkSource,
 } from "./fixtures"
 import type {
+  ActivityItem,
   AgentRow,
   AttentionItem,
   ResourceRow,
@@ -31,6 +34,7 @@ export interface HomeRouteSources {
   readonly agents: readonly AgentRow[]
   readonly resources: readonly ResourceRow[]
   readonly artifacts: readonly ResourceRow[]
+  readonly activity: readonly ActivityItem[]
   readonly attention: readonly AttentionItem[]
 }
 
@@ -106,15 +110,19 @@ export function routeSources(
   live: {
     readonly resources?: readonly ResourceRow[]
     readonly artifacts?: readonly ResourceRow[]
+    readonly signals?: HomeSignals
+    readonly viaProjectId?: string
   } = {},
 ): HomeRouteSources {
+  const signals = homeRowsFromSignals(live.signals, agents, live.viaProjectId)
   if (!fixtures) {
     return {
       work,
       agents,
       resources: live.resources ?? [],
       artifacts: live.artifacts ?? [],
-      attention: [],
+      activity: signals.activity,
+      attention: signals.attention,
     }
   }
   return {
@@ -122,6 +130,35 @@ export function routeSources(
     agents: agents.length > 0 ? agents : fixtureAgents,
     resources: fixtureResources,
     artifacts: fixtureArtifactRows,
+    activity: fixtureActivity,
     attention: fixtureAttention,
+  }
+}
+
+export function homeRowsFromSignals(
+  signals: HomeSignals | undefined,
+  agents: readonly AgentRow[],
+  viaProjectId?: string,
+): Pick<HomeRouteSources, "activity" | "attention"> {
+  if (!signals) return { activity: [], attention: [] }
+  const agentName = (personaId: string) =>
+    agents.find((agent) => agent.personaId === personaId)?.name ?? personaId
+  const href = (threadId: string) =>
+    `/sessions/${threadId}${viaProjectId ? `?via=${encodeURIComponent(viaProjectId)}` : ""}`
+  return {
+    activity: signals.activity.map((item) => ({
+      id: item.id,
+      agentName: agentName(item.agentPersonaId),
+      summary: item.summary,
+      occurredAt: item.occurredAt,
+      href: href(item.threadId),
+    })),
+    attention: signals.attention.map((item) => ({
+      id: item.id,
+      agentName: agentName(item.agentPersonaId),
+      subject: item.body,
+      notedFromName: undefined,
+      href: href(item.threadId),
+    })),
   }
 }

@@ -11,6 +11,7 @@
 // never read by server code.
 
 import type {
+  ActivityItem,
   AgentRow,
   AttentionItem,
   ProjectHomeView,
@@ -187,6 +188,16 @@ export const fixtureAttention: readonly AttentionItem[] = [
   },
 ]
 
+export const fixtureActivity: readonly ActivityItem[] = [
+  {
+    id: "activity-1",
+    agentName: "Neve Laine",
+    summary: "Replied in Draft launch offers",
+    occurredAt: "2026-07-21T12:00:00.000Z",
+    href: `/sessions/${NORTHSTAR.draftOffers}`,
+  },
+]
+
 export const fixtureResources: readonly ResourceRow[] = [
   {
     id: "res-offer-brief",
@@ -234,6 +245,7 @@ export const emptyProjectHome: ProjectHomeView = {
   agents: [],
   resources: [],
   work: [],
+  activity: [],
   attention: [],
 }
 
@@ -250,5 +262,6 @@ export const archivedWorkspaceHome: WorkspaceHomeView = {
   agents: [],
   resources: [],
   work: [],
+  activity: [],
   attention: [],
 }

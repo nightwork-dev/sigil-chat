@@ -17,6 +17,7 @@ import type {
 } from "@/lib/agent-threads-domain";
 import type { SigilAuthSession } from "@/lib/auth/server";
 import { useAgentPrincipalId } from "@/lib/agent-principal";
+import { invalidateHomeSignals } from "@/lib/home-signals";
 
 export type {
   AgentThread,
@@ -97,17 +98,19 @@ async function requireWorkspaceMembership(
   userId: string,
   workspaceId: string,
 ): Promise<void> {
-  const { getProjectWorkspaceRegistries } = await import(
-    "../../../agent/agent/lib/project-workspace-registries"
-  );
-  const { assertRegisteredScopeMembership } = await import(
-    "../../../agent/agent/lib/scope-authorization"
-  );
+  const { getProjectWorkspaceRegistries } =
+    await import("../../../agent/agent/lib/project-workspace-registries");
+  const { assertRegisteredScopeMembership } =
+    await import("../../../agent/agent/lib/scope-authorization");
   const registries = getProjectWorkspaceRegistries();
   if (!registries.workspaces.get(workspaceId)) {
     throw new Error(`Workspace ${workspaceId} was not found.`);
   }
-  assertRegisteredScopeMembership(`workspace:${workspaceId}`, userId, registries);
+  assertRegisteredScopeMembership(
+    `workspace:${workspaceId}`,
+    userId,
+    registries,
+  );
 }
 
 const renameAgentThreadFn = createServerFn({ method: "POST" })
@@ -206,9 +209,7 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
     legacyContainerProjection,
     loadProjectWorkspaceNav,
     resolveScopePerspective,
-  } = await import(
-    "@/lib/agent-thread-containers.server"
-  );
+  } = await import("@/lib/agent-thread-containers.server");
   const nav = loadProjectWorkspaceNav(session.user.id);
   const resolved = resolveScopePerspective(preference.activePerspective, nav);
   if (!resolved) {
@@ -258,9 +259,7 @@ const setActiveContainerFn = createServerFn({ method: "POST" })
       legacyContainerProjection,
       loadProjectWorkspaceNav,
       resolveScopePerspective,
-    } = await import(
-      "@/lib/agent-thread-containers.server"
-    );
+    } = await import("@/lib/agent-thread-containers.server");
     const session = await requireThreadSession();
     const nav = loadProjectWorkspaceNav(session.user.id);
 
@@ -338,10 +337,12 @@ export function useSetActiveContainer() {
       projectId?: string;
       workspaceId?: string;
       perspective?: ScopePerspective;
-    }) =>
-      setActiveContainerFn({ data: input }),
+    }) => setActiveContainerFn({ data: input }),
     onSuccess: (preference) => {
-      queryClient.setQueryData(agentThreadKeys.preference(principalId), preference);
+      queryClient.setQueryData(
+        agentThreadKeys.preference(principalId),
+        preference,
+      );
     },
   });
 }
@@ -350,16 +351,14 @@ export function useCreateAgentThread() {
   const queryClient = useQueryClient();
   const principalId = useAgentPrincipalId();
   return useMutation({
-    mutationFn: (
-      input: {
-        personaId: string;
-        title?: string;
-        workspaceId?: string;
-        sessionKind?: "workspace" | "personal";
-        initialPerspective?: ScopePerspective;
-        additionalContextScopeIds?: string[];
-      },
-    ) => createAgentThreadFn({ data: input }),
+    mutationFn: (input: {
+      personaId: string;
+      title?: string;
+      workspaceId?: string;
+      sessionKind?: "workspace" | "personal";
+      initialPerspective?: ScopePerspective;
+      additionalContextScopeIds?: string[];
+    }) => createAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
       cacheThread(queryClient, principalId, thread);
       cacheActivePreference(queryClient, principalId, {
@@ -380,7 +379,10 @@ export function useRebindAgentThreadWorkspace() {
       workspaceId?: string;
       expectedRevision?: number;
     }) => rebindAgentThreadWorkspaceFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
+    onSuccess: async (thread) => {
+      cacheThread(queryClient, principalId, thread);
+      await invalidateHomeSignals(queryClient, principalId);
+    },
   });
 }
 
@@ -393,7 +395,10 @@ export function useRenameAgentThread() {
       title: string;
       expectedRevision?: number;
     }) => renameAgentThreadFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
+    onSuccess: async (thread) => {
+      cacheThread(queryClient, principalId, thread);
+      await invalidateHomeSignals(queryClient, principalId);
+    },
   });
 }
 
@@ -408,6 +413,7 @@ export function useArchiveAgentThread() {
       await queryClient.invalidateQueries({
         queryKey: agentThreadKeys.preference(principalId),
       });
+      await invalidateHomeSignals(queryClient, principalId);
     },
   });
 }
@@ -433,6 +439,7 @@ export function useDeleteAgentThread() {
       await queryClient.invalidateQueries({
         queryKey: agentThreadKeys.preference(principalId),
       });
+      await invalidateHomeSignals(queryClient, principalId);
     },
   });
 }
@@ -446,7 +453,10 @@ export function useSaveAgentThreadSnapshot() {
       snapshot: AgentThreadSnapshot;
       expectedRevision?: number;
     }) => saveAgentThreadSnapshotFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
+    onSuccess: async (thread) => {
+      cacheThread(queryClient, principalId, thread);
+      await invalidateHomeSignals(queryClient, principalId);
+    },
   });
 }
 

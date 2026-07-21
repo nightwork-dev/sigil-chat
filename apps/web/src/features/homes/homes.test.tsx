@@ -21,6 +21,7 @@ import {
   archivedWorkspaceHome,
   emptyProjectHome,
   fixtureAgents,
+  fixtureActivity,
   fixtureArtifactRows,
   fixtureAttention,
   fixtureResources,
@@ -115,6 +116,7 @@ const projectView: ProjectHomeView = {
   agents: fixtureAgents,
   resources: fixtureResources,
   work: fixtureWorkSource.summariesForScope(NORTHSTAR.commerce),
+  activity: fixtureActivity,
   attention: fixtureAttention,
 }
 
@@ -144,6 +146,7 @@ const sharedWorkspaceView: WorkspaceHomeView = {
   agents: fixtureAgents,
   resources: fixtureResources,
   work: fixtureWorkSource.summariesForScope(NORTHSTAR.holidayLaunch),
+  activity: fixtureActivity,
   attention: fixtureAttention,
 }
 
@@ -165,6 +168,7 @@ const sessionView: SessionHomeView = {
   workspaceName: "Holiday Launch",
   artifacts: fixtureArtifactRows,
   commitments: fixtureWorkSource.commitmentsForSession(NORTHSTAR.draftOffers),
+  activity: fixtureActivity,
   attention: fixtureAttention,
 }
 
@@ -211,7 +215,9 @@ describe("project home", () => {
   })
 
   it("labels a mounted resource with its home, quietly", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     expect(el.textContent).toContain("Shared from Checkout Reliability")
   })
 

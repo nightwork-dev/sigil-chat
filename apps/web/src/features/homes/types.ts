@@ -95,6 +95,14 @@ export interface ResourceRow {
   readonly mountedFromName?: string
 }
 
+export interface ActivityItem {
+  readonly id: string
+  readonly agentName: string
+  readonly summary: string
+  readonly occurredAt: string
+  readonly href?: string
+}
+
 /** Scoped-work summary — the shape SC.5's durable board query will serve. */
 export interface WorkSummaryItem {
   readonly id: string
@@ -125,6 +133,7 @@ export interface ProjectHomeView {
    *  into the project, identity-deduped upstream (spec §8.1, §11.1). */
   readonly resources: readonly ResourceRow[]
   readonly work: readonly WorkSummaryItem[]
+  readonly activity: readonly ActivityItem[]
   readonly attention: readonly AttentionItem[]
 }
 
@@ -135,6 +144,7 @@ export interface WorkspaceHomeView {
   readonly agents: readonly AgentRow[]
   readonly resources: readonly ResourceRow[]
   readonly work: readonly WorkSummaryItem[]
+  readonly activity: readonly ActivityItem[]
   readonly attention: readonly AttentionItem[]
 }
 
@@ -145,6 +155,7 @@ export interface SessionHomeView {
   readonly ownership?: OwnershipLabel
   readonly artifacts: readonly ResourceRow[]
   readonly commitments: readonly WorkSummaryItem[]
+  readonly activity: readonly ActivityItem[]
   readonly attention: readonly AttentionItem[]
 }
 

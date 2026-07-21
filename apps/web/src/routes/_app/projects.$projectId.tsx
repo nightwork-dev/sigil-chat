@@ -12,6 +12,7 @@ import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
 import { useArtifacts } from "@/lib/artifacts"
+import { useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { buildProjectHome } from "@/features/homes/home-view-model"
 import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
@@ -53,6 +54,11 @@ function ProjectHomeRoute() {
       ? artifactScopeForHome("project", projectId)
       : null
   const artifacts = useArtifacts(artifactScope)
+  const signals = useHomeSignals(
+    "project",
+    projectId,
+    !fixtures && access.data === "readable",
+  )
 
   const state: HomeState<ProjectHomeView> = useMemo(() => {
     const homeNav = fixtures ? fixtureNav : nav.data
@@ -60,10 +66,7 @@ function ProjectHomeRoute() {
     if (!fixtures && access.data === "denied") {
       return { kind: "denied", discoverable: true }
     }
-    if (
-      !fixtures &&
-      (access.data === "not-found" || access.isError)
-    ) {
+    if (!fixtures && (access.data === "not-found" || access.isError)) {
       return { kind: "not-found" }
     }
     if (
@@ -74,7 +77,8 @@ function ProjectHomeRoute() {
       (!fixtures &&
         Boolean(artifactScope) &&
         !artifacts.data &&
-        !artifacts.isError)
+        !artifacts.isError) ||
+      (!fixtures && !signals.data && !signals.isError)
     ) {
       return { kind: "loading" }
     }
@@ -94,6 +98,8 @@ function ProjectHomeRoute() {
       }),
       {
         resources: artifactRowsFromRecords(artifacts.data ?? []),
+        signals: signals.data,
+        viaProjectId: projectId,
       },
     )
     const view = buildProjectHome(
@@ -103,6 +109,7 @@ function ProjectHomeRoute() {
         work: sources.work,
         agents: sources.agents,
         resources: sources.resources,
+        activity: sources.activity,
         attention: sources.attention,
       },
       projectId,
@@ -118,6 +125,8 @@ function ProjectHomeRoute() {
     scopedWork.isError,
     artifacts.data,
     artifacts.isError,
+    signals.data,
+    signals.isError,
     artifactScope,
     access.data,
     access.isError,
