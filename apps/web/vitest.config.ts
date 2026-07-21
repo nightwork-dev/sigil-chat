@@ -7,7 +7,7 @@ export default defineConfig({
     include: [
       "src/lib/**/*.test.ts", "src/lib/**/*.test.tsx",
       "src/components/**/*.test.ts",
-      "src/features/**/*.test.ts",
+      "src/features/**/*.test.ts", "src/features/**/*.test.tsx",
     ],
     environment: "node",
   },

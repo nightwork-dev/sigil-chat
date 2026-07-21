@@ -498,7 +498,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       .map((file) => join(this.directory, file))
       .filter(existsSync);
     if (sources.length === 0) return operation();
-    const hidden = sources.map((source, index) =>
+    const hidden = sources.map((_source, index) =>
       join(this.directory, `.${index}.${process.pid}.${Date.now()}.tmp`),
     );
     await Promise.all(sources.map((source, index) => rename(source, hidden[index])));
