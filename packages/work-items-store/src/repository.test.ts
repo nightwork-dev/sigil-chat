@@ -132,7 +132,8 @@ describe("MemoryWorkItemsRepository", () => {
       createdAt: "2026-07-21T00:00:00.000Z",
     };
     parent.revision = 1;
-    document = (await repository.upsertStory(parent, document.revision)).document;
+    document = (await repository.upsertStory(parent, document.revision))
+      .document;
 
     const child = await seedStory("S1.0");
     child.kind = "task";
@@ -146,7 +147,8 @@ describe("MemoryWorkItemsRepository", () => {
       createdAt: "2026-07-21T00:00:00.000Z",
     };
     child.revision = 2;
-    document = (await repository.upsertStory(child, document.revision)).document;
+    document = (await repository.upsertStory(child, document.revision))
+      .document;
 
     const mountedOnly = await seedStory("S1.1");
     mountedOnly.kind = "task";
@@ -160,9 +162,8 @@ describe("MemoryWorkItemsRepository", () => {
       createdAt: "2026-07-21T00:00:00.000Z",
     };
     mountedOnly.revision = 1;
-    document = (
-      await repository.upsertStory(mountedOnly, document.revision)
-    ).document;
+    document = (await repository.upsertStory(mountedOnly, document.revision))
+      .document;
     document = (
       await repository.transitionStory("S0.3", "in-progress", document.revision)
     ).document;
@@ -178,10 +179,11 @@ describe("MemoryWorkItemsRepository", () => {
       groupBy: "scope" as const,
       revision: 1,
     };
-    document = (await repository.upsertBoardView(view, document.revision)).document;
-    expect(await repository.listBoardViews({ ownerScopeId: "project-a" })).toEqual([
-      view,
-    ]);
+    document = (await repository.upsertBoardView(view, document.revision))
+      .document;
+    expect(
+      await repository.listBoardViews({ ownerScopeId: "project-a" }),
+    ).toEqual([view]);
 
     const result = queryBoardView(document.stories, view, {
       resolve: (roots, traversal) => {
@@ -196,16 +198,158 @@ describe("MemoryWorkItemsRepository", () => {
     });
 
     expect(result.items.map(({ story }) => story.id)).toEqual(["S0.3", "S1.0"]);
-    expect(result.items.find(({ story }) => story.id === "S0.3")).toMatchObject({
-      group: "workspace-a",
-      childProgress: { total: 1, shipped: 1 },
-      // Child completion is derived progress only; it does not ship its parent.
-      story: { status: "in-progress", revision: 2 },
+    expect(result.items.find(({ story }) => story.id === "S0.3")).toMatchObject(
+      {
+        group: "workspace-a",
+        childProgress: { total: 1, shipped: 1 },
+        // Child completion is derived progress only; it does not ship its parent.
+        story: { status: "in-progress", revision: 2 },
+      },
+    );
+    expect(result.items.find(({ story }) => story.id === "S1.0")).toMatchObject(
+      {
+        group: "workspace-b",
+        matchedScopeIds: ["workspace-b", "project-a"],
+      },
+    );
+  });
+
+  it("proposes idea-stage feature requests with agent provenance and blocks reshaped duplicates", async () => {
+    const repository = new MemoryWorkItemsRepository();
+    const created = await repository.proposeFeatureRequest(
+      {
+        problem: "Users cannot save filtered evidence boards.",
+        desiredOutcome:
+          "Let users keep a durable board view for repeated evidence review.",
+        evidence: ["Repeated sessions rebuild the same filter set."],
+        sourceRefs: ["artifact:evidence-42"],
+        proposedSponsorPrincipalId: "user-sponsor",
+      },
+      {
+        actorPrincipalId: "user-1",
+        agentSessionId: "thread-1",
+        currentScopeId: "workspace-a",
+        now: "2026-07-21T22:00:00.000Z",
+      },
+    );
+
+    expect(created).toMatchObject({
+      outcome: "created",
+      changedIds: ["FR.1"],
+      workItem: {
+        id: "FR.1",
+        kind: "feature-request",
+        homeScopeId: "workspace-a",
+        status: "idea",
+        title: "Users cannot save filtered evidence boards",
+        provenance: {
+          origin: "agent",
+          actorPrincipalId: "user-1",
+          agentSessionId: "thread-1",
+          proposedSponsorPrincipalId: "user-sponsor",
+          sourceRefs: ["artifact:evidence-42"],
+          createdAt: "2026-07-21T22:00:00.000Z",
+        },
+      },
     });
-    expect(result.items.find(({ story }) => story.id === "S1.0")).toMatchObject({
-      group: "workspace-b",
-      matchedScopeIds: ["workspace-b", "project-a"],
+    expect(created.outcome === "created" && created.workItem).toMatchObject({
+      acceptanceCriteria: [],
+      reviewGate: "none",
     });
+
+    const exactDuplicate = await repository.proposeFeatureRequest(
+      {
+        problem: "users   cannot SAVE filtered evidence boards!",
+        desiredOutcome: "Try to sneak past exact normalization.",
+      },
+      {
+        actorPrincipalId: "user-1",
+        currentScopeId: "workspace-a",
+        now: "2026-07-21T22:01:00.000Z",
+      },
+    );
+    expect(exactDuplicate).toMatchObject({
+      outcome: "duplicate",
+      changedIds: [],
+      candidates: [
+        {
+          reason: "exact-normalized-title",
+          workItem: { id: "FR.1" },
+        },
+      ],
+    });
+    await expect(repository.get()).resolves.toMatchObject({ revision: 1 });
+
+    const fuzzyDuplicate = await repository.proposeFeatureRequest(
+      {
+        problem: "Users cannot save filtered evidence board.",
+        desiredOutcome: "Singular wording should still block.",
+      },
+      {
+        actorPrincipalId: "user-1",
+        currentScopeId: "workspace-a",
+        now: "2026-07-21T22:02:00.000Z",
+      },
+    );
+    expect(fuzzyDuplicate).toMatchObject({
+      outcome: "duplicate",
+      changedIds: [],
+      candidates: [
+        {
+          reason: "similar-title",
+          workItem: { id: "FR.1" },
+        },
+      ],
+    });
+    await expect(repository.get()).resolves.toMatchObject({ revision: 1 });
+  });
+
+  it("records sponsorship decisions separately from agent proposals", async () => {
+    const repository = new MemoryWorkItemsRepository();
+    const created = await repository.proposeFeatureRequest(
+      {
+        problem: "Evidence cards need stable labels.",
+        desiredOutcome: "Cards remain recognizable across chat turns.",
+        proposedSponsorPrincipalId: "user-sponsor",
+      },
+      {
+        actorPrincipalId: "user-1",
+        currentScopeId: "workspace-a",
+        now: "2026-07-21T22:05:00.000Z",
+      },
+    );
+    if (created.outcome !== "created") throw new Error("Expected create.");
+
+    const decision = await repository.recordSponsorshipDecision(
+      {
+        id: "sponsorship-FR.1-user-sponsor-1",
+        workItemId: created.workItem.id,
+        sponsorPrincipalId: "user-sponsor",
+        decision: "confirmed",
+        decidedByPrincipalId: "user-sponsor",
+        decidedAt: "2026-07-21T22:06:00.000Z",
+        revision: 1,
+      },
+      created.document.revision,
+    );
+
+    expect(decision.changedIds).toEqual(["sponsorship-FR.1-user-sponsor-1"]);
+    await expect(
+      repository.listSponsorshipDecisions({
+        workItemId: created.workItem.id,
+        sponsorPrincipalId: "user-sponsor",
+      }),
+    ).resolves.toEqual([
+      {
+        id: "sponsorship-FR.1-user-sponsor-1",
+        workItemId: "FR.1",
+        sponsorPrincipalId: "user-sponsor",
+        decision: "confirmed",
+        decidedByPrincipalId: "user-sponsor",
+        decidedAt: "2026-07-21T22:06:00.000Z",
+        revision: 1,
+      },
+    ]);
   });
 });
 

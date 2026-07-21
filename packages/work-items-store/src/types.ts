@@ -1,28 +1,14 @@
 export type StoryStatus =
-  | "idea"
-  | "spec"
-  | "ready"
-  | "in-progress"
-  | "verify"
-  | "shipped"
-  | "blocked";
+  "idea" | "spec" | "ready" | "in-progress" | "verify" | "shipped" | "blocked";
 
 export type ReviewDecision = "proposed" | "approved" | "changes-requested";
 export type Routing =
-  | "self"
-  | "strategy"
-  | "design"
-  | "implementation"
-  | "research";
+  "self" | "strategy" | "design" | "implementation" | "research";
 export type ReviewGate = "browser:owner" | "decision:owner" | "peer" | "none";
 
 /** The durable product-work categories defined by the scoped-work contract. */
 export type WorkKind =
-  | "feature-request"
-  | "story"
-  | "task"
-  | "defect"
-  | "decision";
+  "feature-request" | "story" | "task" | "defect" | "decision";
 
 /** A non-owning scope participation relation for one work item. */
 export interface ScopeBinding {
@@ -47,11 +33,7 @@ export interface WorkProvenance {
  * X-story, or is app-domain. Defaults to "pending" for UI work.
  */
 export type ExtractionVerdict =
-  | "pending"
-  | "consumed"
-  | "extracted"
-  | "app-domain"
-  | `candidate:${string}`;
+  "pending" | "consumed" | "extracted" | "app-domain" | `candidate:${string}`;
 
 export interface Story {
   id: string;
@@ -120,6 +102,66 @@ export interface BoardView {
   revision: number;
 }
 
+export interface WorkSponsorshipDecision {
+  id: string;
+  workItemId: string;
+  sponsorPrincipalId: string;
+  decision: "confirmed" | "declined";
+  decidedByPrincipalId: string;
+  decidedAt: string;
+  revision: number;
+}
+
+export interface WorkSponsorshipDecisionFilter {
+  workItemId?: string;
+  sponsorPrincipalId?: string;
+}
+
+export interface FeatureRequestProposalInput {
+  problem: string;
+  desiredOutcome: string;
+  evidence?: string[];
+  sourceRefs?: string[];
+  intendedScopeId?: string;
+  proposedSponsorPrincipalId?: string;
+}
+
+export interface FeatureRequestProposalContext {
+  actorPrincipalId: string;
+  agentSessionId?: string;
+  currentScopeId: string;
+  now: string;
+}
+
+export interface FeatureRequestDuplicateCandidate {
+  workItem: Story;
+  reason: "exact-normalized-title" | "similar-title";
+  score: number;
+}
+
+export interface FeatureRequestDuplicateDecision {
+  outcome: "clear" | "duplicate";
+  normalizedTitle: string;
+  threshold: number;
+  candidates: FeatureRequestDuplicateCandidate[];
+}
+
+export type FeatureRequestProposalResult =
+  | {
+      outcome: "created";
+      document: WorkItemsDocument;
+      workItem: Story;
+      duplicateDecision: FeatureRequestDuplicateDecision;
+      changedIds: string[];
+    }
+  | {
+      outcome: "duplicate";
+      document: WorkItemsDocument;
+      duplicateDecision: FeatureRequestDuplicateDecision;
+      candidates: FeatureRequestDuplicateCandidate[];
+      changedIds: [];
+    };
+
 export interface BoardViewFilter {
   ownerScopeId?: string;
   ownerPrincipalId?: string;
@@ -136,7 +178,10 @@ export interface BoardScopeMatch {
 }
 
 export interface BoardTraversalResolver {
-  resolve(roots: readonly string[], traversal: BoardTraversal): readonly BoardScopeMatch[];
+  resolve(
+    roots: readonly string[],
+    traversal: BoardTraversal,
+  ): readonly BoardScopeMatch[];
 }
 
 export interface ChildProgress {
@@ -202,6 +247,7 @@ export interface WorkItemsDocument {
   boardViews: BoardView[];
   comments: StoryComment[];
   reviews: ReviewItem[];
+  sponsorshipDecisions: WorkSponsorshipDecision[];
   history: WorkItemsDocument[];
 }
 

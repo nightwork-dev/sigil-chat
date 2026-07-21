@@ -93,6 +93,7 @@ export function createWorkItemsDocument(): WorkItemsDocument {
     boardViews: [],
     comments: [],
     reviews: structuredClone(seedReviews),
+    sponsorshipDecisions: [],
     history: [],
   };
 }

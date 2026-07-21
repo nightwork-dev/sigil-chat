@@ -8,6 +8,10 @@ import type {
   BoardView,
   BoardViewFilter,
   ChildProgress,
+  FeatureRequestDuplicateDecision,
+  FeatureRequestProposalContext,
+  FeatureRequestProposalInput,
+  FeatureRequestProposalResult,
   ReviewAssignment,
   ReviewDecision,
   ReviewGate,
@@ -19,9 +23,11 @@ import type {
   StoryStatus,
   WorkItemsDocument,
   WorkItemsMutationResult,
+  WorkSponsorshipDecision,
 } from "./types.js";
 
 const MAX_HISTORY_ENTRIES = 100;
+const FEATURE_REQUEST_DUPLICATE_THRESHOLD = 0.82;
 
 // ---------------------------------------------------------------------------
 // Pure document mutations. These operate on a WorkItemsDocument and return the
@@ -59,7 +65,9 @@ export function upsertBoardView(
 ): WorkItemsMutationResult {
   assertRevision(document, expectedRevision);
   assertBoardView(view);
-  const existingIndex = document.boardViews.findIndex(({ id }) => id === view.id);
+  const existingIndex = document.boardViews.findIndex(
+    ({ id }) => id === view.id,
+  );
   const boardViews = [...document.boardViews];
   if (existingIndex === -1) boardViews.push(structuredClone(view));
   else boardViews[existingIndex] = structuredClone(view);
@@ -77,7 +85,8 @@ export function filterBoardViews(
         view.ownerScopeId === filter.ownerScopeId) &&
       (filter.ownerPrincipalId === undefined ||
         view.ownerPrincipalId === filter.ownerPrincipalId) &&
-      (filter.visibility === undefined || view.visibility === filter.visibility),
+      (filter.visibility === undefined ||
+        view.visibility === filter.visibility),
   );
 }
 
@@ -106,7 +115,8 @@ export function queryBoardView(
   const items: BoardQueryItem[] = [];
   for (const story of stories) {
     const matchedScopeIds = matchingScopeIds(story, resultScopeIds);
-    if (matchedScopeIds.length === 0 || !matchesBoardFilters(story, view)) continue;
+    if (matchedScopeIds.length === 0 || !matchesBoardFilters(story, view))
+      continue;
     const childProgress = progressFor(childrenByParent.get(story.id));
     items.push({
       story: structuredClone(story),
@@ -134,7 +144,9 @@ export function transitionStory(
           ...item,
           status,
           updatedAt: now(),
-          ...(item.revision === undefined ? {} : { revision: item.revision + 1 }),
+          ...(item.revision === undefined
+            ? {}
+            : { revision: item.revision + 1 }),
         }
       : item,
   );
@@ -170,7 +182,9 @@ export function assignReview(
           assignee: assignment.assignee,
           reviewDecision: "proposed" as const,
           updatedAt: timestamp,
-          ...(item.revision === undefined ? {} : { revision: item.revision + 1 }),
+          ...(item.revision === undefined
+            ? {}
+            : { revision: item.revision + 1 }),
         }
       : item,
   );
@@ -210,7 +224,9 @@ export function decideReview(
           decidedBy,
           decidedAt: timestamp,
           updatedAt: timestamp,
-          ...(item.revision === undefined ? {} : { revision: item.revision + 1 }),
+          ...(item.revision === undefined
+            ? {}
+            : { revision: item.revision + 1 }),
         }
       : item,
   );
@@ -239,6 +255,139 @@ export function addComment(
     document,
     { comments: [...document.comments, structuredClone(comment)] },
     [comment.id],
+  );
+}
+
+export function proposeFeatureRequest(
+  document: WorkItemsDocument,
+  input: FeatureRequestProposalInput,
+  context: FeatureRequestProposalContext,
+  expectedRevision?: number,
+): FeatureRequestProposalResult {
+  assertRevision(document, expectedRevision);
+  assertFeatureRequestProposalInput(input);
+  assertFeatureRequestProposalContext(context);
+  const title = titleFromProblem(input.problem);
+  const homeScopeId = input.intendedScopeId?.trim() || context.currentScopeId;
+  const duplicateDecision = decideFeatureRequestDuplicates(document, {
+    title,
+    homeScopeId,
+  });
+  if (duplicateDecision.outcome === "duplicate") {
+    return {
+      outcome: "duplicate",
+      document: structuredClone(document),
+      duplicateDecision,
+      candidates: duplicateDecision.candidates,
+      changedIds: [],
+    };
+  }
+  const story: Story = {
+    id: nextFeatureRequestId(document),
+    kind: "feature-request",
+    homeScopeId,
+    provenance: {
+      origin: "agent",
+      actorPrincipalId: context.actorPrincipalId,
+      ...(context.agentSessionId
+        ? { agentSessionId: context.agentSessionId }
+        : {}),
+      ...(input.proposedSponsorPrincipalId
+        ? {
+            proposedSponsorPrincipalId: input.proposedSponsorPrincipalId.trim(),
+          }
+        : {}),
+      ...(input.sourceRefs && input.sourceRefs.length > 0
+        ? { sourceRefs: input.sourceRefs.map((reference) => reference.trim()) }
+        : {}),
+      createdAt: context.now,
+    },
+    revision: 1,
+    epicId: "feature-requests",
+    epicTitle: "Feature requests",
+    title,
+    intent: featureRequestIntent(input),
+    acceptanceCriteria: [],
+    status: "idea",
+    routing: "strategy",
+    reviewGate: "none",
+    deps: [],
+    authoredBy: context.actorPrincipalId,
+    createdAt: context.now,
+    updatedAt: context.now,
+  };
+  const result = commit(document, { stories: [...document.stories, story] }, [
+    story.id,
+  ]);
+  return {
+    outcome: "created",
+    document: result.document,
+    workItem: structuredClone(story),
+    duplicateDecision,
+    changedIds: result.changedIds,
+  };
+}
+
+export function decideFeatureRequestDuplicates(
+  document: WorkItemsDocument,
+  input: { title: string; homeScopeId: string },
+): FeatureRequestDuplicateDecision {
+  const normalizedTitle = normalizeDuplicateTitle(input.title);
+  const candidates = document.stories
+    .filter(
+      (story) =>
+        story.kind === "feature-request" &&
+        story.homeScopeId === input.homeScopeId,
+    )
+    .map((workItem) => {
+      const score = titleSimilarity(
+        normalizedTitle,
+        normalizeDuplicateTitle(workItem.title),
+      );
+      return {
+        workItem: structuredClone(workItem),
+        reason:
+          normalizeDuplicateTitle(workItem.title) === normalizedTitle
+            ? "exact-normalized-title"
+            : "similar-title",
+        score,
+      } as const;
+    })
+    .filter(
+      (candidate) =>
+        candidate.reason === "exact-normalized-title" ||
+        candidate.score >= FEATURE_REQUEST_DUPLICATE_THRESHOLD,
+    )
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.workItem.id.localeCompare(right.workItem.id),
+    );
+  return {
+    outcome: candidates.length > 0 ? "duplicate" : "clear",
+    normalizedTitle,
+    threshold: FEATURE_REQUEST_DUPLICATE_THRESHOLD,
+    candidates,
+  };
+}
+
+export function recordSponsorshipDecision(
+  document: WorkItemsDocument,
+  decision: WorkSponsorshipDecision,
+  expectedRevision?: number,
+): WorkItemsMutationResult {
+  assertRevision(document, expectedRevision);
+  assertWorkSponsorshipDecision(decision);
+  findStory(document, decision.workItemId);
+  const existing = document.sponsorshipDecisions.find(
+    (item) => item.id === decision.id,
+  );
+  if (existing)
+    throw new Error(`Sponsorship decision id already exists: ${decision.id}.`);
+  return commit(
+    document,
+    { sponsorshipDecisions: [...document.sponsorshipDecisions, decision] },
+    [decision.id],
   );
 }
 
@@ -316,6 +465,9 @@ export function normalizeWorkItemsDocument(
     boardViews: Array.isArray(document.boardViews)
       ? structuredClone(document.boardViews)
       : [],
+    sponsorshipDecisions: Array.isArray(document.sponsorshipDecisions)
+      ? structuredClone(document.sponsorshipDecisions)
+      : [],
   };
   normalized.history = normalized.history.map((entry) =>
     normalizeWorkItemsDocument(entry),
@@ -341,6 +493,9 @@ export function isWorkItemsDocument(
     !value.comments.every(isStoryComment) ||
     !Array.isArray(value.reviews) ||
     !value.reviews.every(isReviewItem) ||
+    (value.sponsorshipDecisions !== undefined &&
+      (!Array.isArray(value.sponsorshipDecisions) ||
+        !value.sponsorshipDecisions.every(isWorkSponsorshipDecision))) ||
     !Array.isArray(value.history)
   ) {
     return false;
@@ -448,6 +603,33 @@ export function assertBoardView(view: BoardView): void {
     throw new Error(`Invalid board view: ${view.id}.`);
 }
 
+export function assertWorkSponsorshipDecision(
+  decision: WorkSponsorshipDecision,
+): void {
+  if (!isWorkSponsorshipDecision(decision as unknown))
+    throw new Error(`Invalid sponsorship decision: ${decision.id}.`);
+}
+
+export function isWorkSponsorshipDecision(
+  value: unknown,
+): value is WorkSponsorshipDecision {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    typeof value.workItemId === "string" &&
+    value.workItemId.length > 0 &&
+    typeof value.sponsorPrincipalId === "string" &&
+    value.sponsorPrincipalId.length > 0 &&
+    (value.decision === "confirmed" || value.decision === "declined") &&
+    typeof value.decidedByPrincipalId === "string" &&
+    value.decidedByPrincipalId.length > 0 &&
+    typeof value.decidedAt === "string" &&
+    value.decidedAt.length > 0 &&
+    isNonNegativeInteger(value.revision)
+  );
+}
+
 export function isBoardView(value: unknown): value is BoardView {
   return (
     isRecord(value) &&
@@ -510,7 +692,8 @@ function isOptionalScopeBindings(value: unknown): boolean {
           isRecord(binding) &&
           typeof binding.scopeId === "string" &&
           binding.scopeId.length > 0 &&
-          (binding.relation === "mounted-in" || binding.relation === "rolls-up-to"),
+          (binding.relation === "mounted-in" ||
+            binding.relation === "rolls-up-to"),
       ))
   );
 }
@@ -526,7 +709,9 @@ function isOptionalWorkProvenance(value: unknown): boolean {
       isOptionalString(value.proposedSponsorPrincipalId) &&
       (value.sourceRefs === undefined ||
         (Array.isArray(value.sourceRefs) &&
-          value.sourceRefs.every((reference) => typeof reference === "string"))) &&
+          value.sourceRefs.every(
+            (reference) => typeof reference === "string",
+          ))) &&
       typeof value.createdAt === "string" &&
       value.createdAt.length > 0)
   );
@@ -599,8 +784,130 @@ function matchesBoardFilters(story: Story, view: BoardView): boolean {
     (filters.assigneePrincipalId === undefined ||
       filters.assigneePrincipalId === story.assigneePrincipalId) &&
     (filters.sponsorPrincipalId === undefined ||
-      filters.sponsorPrincipalId === story.provenance?.proposedSponsorPrincipalId)
+      filters.sponsorPrincipalId ===
+        story.provenance?.proposedSponsorPrincipalId)
   );
+}
+
+function assertFeatureRequestProposalInput(
+  input: FeatureRequestProposalInput,
+): void {
+  if (
+    typeof input.problem !== "string" ||
+    input.problem.trim().length === 0 ||
+    typeof input.desiredOutcome !== "string" ||
+    input.desiredOutcome.trim().length === 0 ||
+    (input.evidence !== undefined &&
+      (!Array.isArray(input.evidence) ||
+        !input.evidence.every((entry) => entry.trim().length > 0))) ||
+    (input.sourceRefs !== undefined &&
+      (!Array.isArray(input.sourceRefs) ||
+        !input.sourceRefs.every((entry) => entry.trim().length > 0))) ||
+    (input.intendedScopeId !== undefined &&
+      input.intendedScopeId.trim().length === 0) ||
+    (input.proposedSponsorPrincipalId !== undefined &&
+      input.proposedSponsorPrincipalId.trim().length === 0)
+  ) {
+    throw new Error("Invalid feature request proposal.");
+  }
+}
+
+function assertFeatureRequestProposalContext(
+  context: FeatureRequestProposalContext,
+): void {
+  if (
+    context.actorPrincipalId.trim().length === 0 ||
+    context.currentScopeId.trim().length === 0 ||
+    context.now.trim().length === 0 ||
+    (context.agentSessionId !== undefined &&
+      context.agentSessionId.trim().length === 0)
+  ) {
+    throw new Error("Invalid feature request proposal context.");
+  }
+}
+
+function titleFromProblem(problem: string): string {
+  const firstLine = problem
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  const sentence = firstLine?.match(/^(.+?[.!?])(?:\s|$)/)?.[1] ?? firstLine;
+  if (!sentence) throw new Error("Invalid feature request proposal.");
+  return sentence.replace(/[.!?]+$/, "").slice(0, 120);
+}
+
+function featureRequestIntent(input: FeatureRequestProposalInput): string {
+  const lines = [
+    "Problem",
+    input.problem.trim(),
+    "",
+    "Desired outcome",
+    input.desiredOutcome.trim(),
+  ];
+  const evidence = input.evidence?.map((entry) => entry.trim()) ?? [];
+  if (evidence.length > 0) {
+    lines.push("", "Evidence", ...evidence.map((entry) => `- ${entry}`));
+  }
+  return lines.join("\n");
+}
+
+function nextFeatureRequestId(document: WorkItemsDocument): string {
+  const next =
+    document.stories
+      .map(({ id }) => /^FR\.(\d+)$/.exec(id)?.[1])
+      .filter((value): value is string => value !== undefined)
+      .map((value) => Number.parseInt(value, 10))
+      .filter(Number.isInteger)
+      .reduce((max, value) => Math.max(max, value), 0) + 1;
+  return `FR.${next}`;
+}
+
+function normalizeDuplicateTitle(title: string): string {
+  return title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function titleSimilarity(left: string, right: string): number {
+  if (left === right) return 1;
+  if (left.length === 0 || right.length === 0) return 0;
+  const leftTokens = new Set(left.split(" "));
+  const rightTokens = new Set(right.split(" "));
+  const union = new Set([...leftTokens, ...rightTokens]);
+  let intersection = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) intersection += 1;
+  }
+  const tokenScore = union.size === 0 ? 0 : intersection / union.size;
+  const editScore =
+    1 - levenshtein(left, right) / Math.max(left.length, right.length);
+  return Math.max(tokenScore, editScore);
+}
+
+function levenshtein(left: string, right: string): number {
+  const previous = Array.from(
+    { length: right.length + 1 },
+    (_, index) => index,
+  );
+  const current = new Array<number>(right.length + 1);
+  for (let i = 1; i <= left.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + cost,
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[right.length] ?? 0;
 }
 
 function progressFor(children: Story[] | undefined): ChildProgress | undefined {

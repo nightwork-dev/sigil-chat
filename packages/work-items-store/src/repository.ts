@@ -13,6 +13,8 @@ import {
   filterStories,
   normalizeWorkItemsDocument,
   parseWorkItemsDocument,
+  proposeFeatureRequest,
+  recordSponsorshipDecision,
   sortStories,
   transitionStory,
   upsertBoardView,
@@ -22,6 +24,9 @@ import { createWorkItemsDocument } from "./sample.js";
 import type {
   BoardView,
   BoardViewFilter,
+  FeatureRequestProposalContext,
+  FeatureRequestProposalInput,
+  FeatureRequestProposalResult,
   ReviewAssignment,
   ReviewDecision,
   Story,
@@ -30,6 +35,8 @@ import type {
   StoryStatus,
   WorkItemsDocument,
   WorkItemsMutationResult,
+  WorkSponsorshipDecision,
+  WorkSponsorshipDecisionFilter,
 } from "./types.js";
 
 export interface WorkItemsRepository {
@@ -64,18 +71,29 @@ export interface WorkItemsRepository {
     comment: StoryComment,
     expectedRevision?: number,
   ): Promise<WorkItemsMutationResult>;
+  proposeFeatureRequest(
+    input: FeatureRequestProposalInput,
+    context: FeatureRequestProposalContext,
+    expectedRevision?: number,
+  ): Promise<FeatureRequestProposalResult>;
+  recordSponsorshipDecision(
+    decision: WorkSponsorshipDecision,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult>;
+  listSponsorshipDecisions(
+    filter?: WorkSponsorshipDecisionFilter,
+  ): Promise<WorkSponsorshipDecision[]>;
 }
 
 export class MemoryWorkItemsRepository implements WorkItemsRepository {
   private document: WorkItemsDocument;
   private readonly now: () => string;
 
-  constructor(options?: {
-    document?: WorkItemsDocument;
-    now?: () => string;
-  }) {
+  constructor(options?: { document?: WorkItemsDocument; now?: () => string }) {
     this.document = structuredClone(
-      normalizeWorkItemsDocument(options?.document ?? createWorkItemsDocument()),
+      normalizeWorkItemsDocument(
+        options?.document ?? createWorkItemsDocument(),
+      ),
     );
     this.now = options?.now ?? (() => new Date().toISOString());
   }
@@ -172,6 +190,43 @@ export class MemoryWorkItemsRepository implements WorkItemsRepository {
     const result = addComment(this.document, comment, expectedRevision);
     this.document = result.document;
     return structuredClone(result);
+  }
+
+  async proposeFeatureRequest(
+    input: FeatureRequestProposalInput,
+    context: FeatureRequestProposalContext,
+    expectedRevision?: number,
+  ): Promise<FeatureRequestProposalResult> {
+    const result = proposeFeatureRequest(
+      this.document,
+      input,
+      context,
+      expectedRevision,
+    );
+    this.document = result.document;
+    return structuredClone(result);
+  }
+
+  async recordSponsorshipDecision(
+    decision: WorkSponsorshipDecision,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    const result = recordSponsorshipDecision(
+      this.document,
+      decision,
+      expectedRevision,
+    );
+    this.document = result.document;
+    return structuredClone(result);
+  }
+
+  async listSponsorshipDecisions(
+    filter?: WorkSponsorshipDecisionFilter,
+  ): Promise<WorkSponsorshipDecision[]> {
+    return filterSponsorshipDecisions(
+      this.document.sponsorshipDecisions,
+      filter,
+    );
   }
 }
 
@@ -279,6 +334,39 @@ export class FileWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async proposeFeatureRequest(
+    input: FeatureRequestProposalInput,
+    context: FeatureRequestProposalContext,
+    expectedRevision?: number,
+  ): Promise<FeatureRequestProposalResult> {
+    return this.store.withWriteLock(async () => {
+      const result = proposeFeatureRequest(
+        await this.store.read(),
+        input,
+        context,
+        expectedRevision,
+      );
+      if (result.changedIds.length > 0) await this.store.write(result.document);
+      return structuredClone(result);
+    });
+  }
+
+  async recordSponsorshipDecision(
+    decision: WorkSponsorshipDecision,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate((document) =>
+      recordSponsorshipDecision(document, decision, expectedRevision),
+    );
+  }
+
+  async listSponsorshipDecisions(
+    filter?: WorkSponsorshipDecisionFilter,
+  ): Promise<WorkSponsorshipDecision[]> {
+    const document = await this.store.read();
+    return filterSponsorshipDecisions(document.sponsorshipDecisions, filter);
+  }
+
   private async mutate(
     operation: (document: WorkItemsDocument) => WorkItemsMutationResult,
   ): Promise<WorkItemsMutationResult> {
@@ -310,4 +398,19 @@ export function resolveWorkItemsStorePath(
     rootPackageName: "sigil-chat",
     startDirectory,
   });
+}
+
+function filterSponsorshipDecisions(
+  decisions: WorkSponsorshipDecision[],
+  filter?: WorkSponsorshipDecisionFilter,
+): WorkSponsorshipDecision[] {
+  return decisions
+    .filter(
+      (decision) =>
+        (filter?.workItemId === undefined ||
+          decision.workItemId === filter.workItemId) &&
+        (filter?.sponsorPrincipalId === undefined ||
+          decision.sponsorPrincipalId === filter.sponsorPrincipalId),
+    )
+    .map((decision) => structuredClone(decision));
 }

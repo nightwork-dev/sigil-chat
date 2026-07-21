@@ -14,6 +14,9 @@ import {
   filterStories,
   isBoardView,
   isReviewItem,
+  isWorkSponsorshipDecision,
+  proposeFeatureRequest,
+  recordSponsorshipDecision,
   isStory,
   sortStories,
   transitionStory,
@@ -25,6 +28,9 @@ import type { WorkItemsRepository } from "./repository.js";
 import type {
   BoardView,
   BoardViewFilter,
+  FeatureRequestProposalContext,
+  FeatureRequestProposalInput,
+  FeatureRequestProposalResult,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -34,11 +40,14 @@ import type {
   StoryStatus,
   WorkItemsDocument,
   WorkItemsMutationResult,
+  WorkSponsorshipDecision,
+  WorkSponsorshipDecisionFilter,
 } from "./types.js";
 
 const INDEX_FILE = "index.md";
 const REVIEWS_FILE = "_reviews.md";
 const BOARD_VIEWS_FILE = "_board-views.md";
+const SPONSORSHIP_DECISIONS_FILE = "_sponsorship-decisions.md";
 const GIT_IDENTITY = [
   "-c",
   "user.name=Sigil Roadmap",
@@ -149,7 +158,8 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     expectedRevision?: number,
   ): Promise<WorkItemsMutationResult> {
     return this.mutate(
-      (document) => assignReview(document, id, assignment, this.now, expectedRevision),
+      (document) =>
+        assignReview(document, id, assignment, this.now, expectedRevision),
       () => `story ${id}: assign ${assignment.gate} review`,
     );
   }
@@ -162,7 +172,14 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
   ): Promise<WorkItemsMutationResult> {
     return this.mutate(
       (document) =>
-        decideReview(document, reviewId, decision, decidedBy, this.now, expectedRevision),
+        decideReview(
+          document,
+          reviewId,
+          decision,
+          decidedBy,
+          this.now,
+          expectedRevision,
+        ),
       () => `review ${reviewId}: ${decision}`,
     );
   }
@@ -174,6 +191,49 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     return this.mutate(
       (document) => addComment(document, comment, expectedRevision),
       () => `story ${comment.storyId}: comment ${comment.id}`,
+    );
+  }
+
+  async proposeFeatureRequest(
+    input: FeatureRequestProposalInput,
+    context: FeatureRequestProposalContext,
+    expectedRevision?: number,
+  ): Promise<FeatureRequestProposalResult> {
+    return this.runExclusive(async () => {
+      await this.ensureReady();
+      const result = proposeFeatureRequest(
+        await this.readDocument(),
+        input,
+        context,
+        expectedRevision,
+      );
+      if (result.changedIds.length > 0) {
+        await this.persistDocument(result.document);
+        if (result.outcome === "created")
+          this.commit(`feature request ${result.workItem.id}: propose`);
+      }
+      return structuredClone(result);
+    });
+  }
+
+  async recordSponsorshipDecision(
+    decision: WorkSponsorshipDecision,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) =>
+        recordSponsorshipDecision(document, decision, expectedRevision),
+      () => `sponsorship ${decision.id}: ${decision.decision}`,
+    );
+  }
+
+  async listSponsorshipDecisions(
+    filter?: WorkSponsorshipDecisionFilter,
+  ): Promise<WorkSponsorshipDecision[]> {
+    await this.ensureReady();
+    return filterSponsorshipDecisions(
+      (await this.readDocument()).sponsorshipDecisions,
+      filter,
     );
   }
 
@@ -213,7 +273,10 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
   }
 
   private async initialize(): Promise<void> {
-    const dir = resolveRoadmapDir(process.env.SIGIL_ROADMAP_DIR, this.dirOption);
+    const dir = resolveRoadmapDir(
+      process.env.SIGIL_ROADMAP_DIR,
+      this.dirOption,
+    );
     this.resolvedDir = dir;
     await mkdir(dir, { recursive: true });
 
@@ -246,6 +309,7 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
       comments,
       reviews: await this.readReviews(dir),
       boardViews: await this.readBoardViews(dir),
+      sponsorshipDecisions: await this.readSponsorshipDecisions(dir),
       history: [],
     };
   }
@@ -304,6 +368,24 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     });
   }
 
+  private async readSponsorshipDecisions(
+    dir: string,
+  ): Promise<WorkSponsorshipDecision[]> {
+    const path = join(dir, SPONSORSHIP_DECISIONS_FILE);
+    if (!existsSync(path)) return [];
+    const { data } = parseFrontmatter(await readFile(path, "utf8"));
+    const decisions = Array.isArray(data.sponsorshipDecisions)
+      ? data.sponsorshipDecisions
+      : [];
+    return decisions.map((decision, index) => {
+      if (!isWorkSponsorshipDecision(decision))
+        throw new Error(
+          `Roadmap store is corrupt: invalid sponsorship decision at ${SPONSORSHIP_DECISIONS_FILE}[${index}].`,
+        );
+      return decision;
+    });
+  }
+
   private async readRevision(dir: string): Promise<number> {
     const path = join(dir, INDEX_FILE);
     if (!existsSync(path)) return 0;
@@ -343,6 +425,11 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     await writeFile(
       join(dir, BOARD_VIEWS_FILE),
       serializeBoardViews(document.boardViews),
+      "utf8",
+    );
+    await writeFile(
+      join(dir, SPONSORSHIP_DECISIONS_FILE),
+      serializeSponsorshipDecisions(document.sponsorshipDecisions),
       "utf8",
     );
     await writeFile(
@@ -419,7 +506,9 @@ export function assertSafeStoryId(id: string): void {
     id === "index" ||
     !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)
   ) {
-    throw new Error(`Unsafe story id for a filesystem store: ${JSON.stringify(id)}.`);
+    throw new Error(
+      `Unsafe story id for a filesystem store: ${JSON.stringify(id)}.`,
+    );
   }
 }
 
@@ -434,7 +523,8 @@ function serializeStoryMarkdown(
   const frontmatter: Record<string, unknown> = { id: story.id };
   if (story.worktree !== undefined) frontmatter.worktree = story.worktree;
   if (story.kind !== undefined) frontmatter.kind = story.kind;
-  if (story.homeScopeId !== undefined) frontmatter.homeScopeId = story.homeScopeId;
+  if (story.homeScopeId !== undefined)
+    frontmatter.homeScopeId = story.homeScopeId;
   if (story.scopeBindings !== undefined)
     frontmatter.scopeBindings = story.scopeBindings;
   if (story.parentWorkItemId !== undefined)
@@ -520,7 +610,26 @@ function serializeBoardViews(boardViews: BoardView[]): string {
   return `${serializeFrontmatter({ boardViews })}\n# Board views\n\n${list}\n`;
 }
 
-function serializeIndex(document: WorkItemsDocument, generatedAt: string): string {
+function serializeSponsorshipDecisions(
+  sponsorshipDecisions: WorkSponsorshipDecision[],
+): string {
+  const list =
+    sponsorshipDecisions.length > 0
+      ? sponsorshipDecisions
+          .map(
+            (decision) =>
+              `- ${decision.id} · ${decision.workItemId} · ` +
+              `${decision.sponsorPrincipalId} · ${decision.decision}`,
+          )
+          .join("\n")
+      : "_No sponsorship decisions yet._";
+  return `${serializeFrontmatter({ sponsorshipDecisions })}\n# Sponsorship decisions\n\n${list}\n`;
+}
+
+function serializeIndex(
+  document: WorkItemsDocument,
+  generatedAt: string,
+): string {
   const rows = sortStories(document.stories)
     .map(
       (story) =>
@@ -545,8 +654,7 @@ function parseFrontmatter(raw: string): {
   body: string;
 } {
   const normalized = raw.replace(/^﻿/, "");
-  if (!normalized.startsWith("---\n"))
-    return { data: {}, body: normalized };
+  if (!normalized.startsWith("---\n")) return { data: {}, body: normalized };
   const end = normalized.indexOf("\n---", 4);
   if (end === -1) return { data: {}, body: normalized };
   const yamlText = normalized.slice(4, end);
@@ -557,6 +665,21 @@ function parseFrontmatter(raw: string): {
       ? (parsed as Record<string, unknown>)
       : {};
   return { data, body: rest };
+}
+
+function filterSponsorshipDecisions(
+  decisions: WorkSponsorshipDecision[],
+  filter?: WorkSponsorshipDecisionFilter,
+): WorkSponsorshipDecision[] {
+  return decisions
+    .filter(
+      (decision) =>
+        (filter?.workItemId === undefined ||
+          decision.workItemId === filter.workItemId) &&
+        (filter?.sponsorPrincipalId === undefined ||
+          decision.sponsorPrincipalId === filter.sponsorPrincipalId),
+    )
+    .map((decision) => structuredClone(decision));
 }
 
 function bodyOf(raw: string): string {
@@ -596,7 +719,10 @@ function parseCriteria(section: string): string[] {
     .filter((text) => text.length > 0);
 }
 
-function parseCommentsSection(section: string, storyId: string): StoryComment[] {
+function parseCommentsSection(
+  section: string,
+  storyId: string,
+): StoryComment[] {
   const fence = /```(?:yaml)?\n([\s\S]*?)```/.exec(section);
   if (!fence) return [];
   const parsed: unknown = parseYaml(fence[1]);
