@@ -8,6 +8,33 @@ product overview.
 
 Currently authoritative for this product's design/implementation.
 
+- [`AGENT-SURFACE-COORDINATION-SPEC.md`](AGENT-SURFACE-COORDINATION-SPEC.md) —
+  the spatial third of the attention/projection triangle: the agent's presence
+  and output span the whole application surface, not just the current view.
+  Annotations carry a `view` (route + workspace); cross-view annotations
+  surface as honest indicators (route badges + an attention-tile count);
+  `sigil-navigate` / `sigil-guide` let the agent switch the user's view or walk
+  them through highlighted places; and an eventual agent canvas (on sigil-design
+  `packages/canvas`) composes panels of content. Draft product spec.
+
+- [`AGENT-OUTPUT-PROJECTION-SPEC.md`](AGENT-OUTPUT-PROJECTION-SPEC.md) —
+  companion to `AGENT-CONTEXT-AWARENESS-SPEC.md` (the *output* half to that
+  spec's *input* half): how agent actions surface on the canvas, not just the
+  transcript. A part-projection registry renders tool-calls as anchored
+  overlays or ambient panels instead of transcript lines; agent annotation
+  tools (`sigil-annotate`/`pin`/`highlight`) anchor to attention items. Draft
+  product spec.
+
+- [`PRODUCT-CHROME-REWORK-SPEC.md`](PRODUCT-CHROME-REWORK-SPEC.md) —
+  make Projects/Workspaces the visible organizing center of the app shell
+  (two-level chrome: container context + feature surface); elevate the Cmd+K
+  omnibar to fluid project/workspace/session switching *and* as a direct agent
+  input (message mode); and define a family of agent chat-panel variants
+  (dock / sidecar / inline / omnibar / strip) so the one conversation can be
+  presented where a surface needs it. Also closes the consistency gaps
+  (doubled agent presentation on `/review`, Button/Link semantics, the
+  non-owner Agent dead-end). Draft product/UX spec; builds on PROJ.1/PROJ.2.
+
 - [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md) —
   Better Auth username/password accounts, user settings, channel membership,
   owner-scoped application records, and trusted principal propagation from Web
