@@ -18,8 +18,14 @@ import {
   useActiveAgentThreadPreference,
   useSetActiveContainer,
 } from "@/lib/agent-threads";
-import type { ScopePerspective } from "@/lib/agent-threads-domain";
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav";
+import type {
+  AgentThreadPreference,
+  ScopePerspective,
+} from "@/lib/agent-threads-domain";
+import {
+  useProjectWorkspaceNav,
+  type ProjectWorkspaceNavSummary,
+} from "@/lib/project-workspace-nav";
 
 export interface ActiveContainer {
   perspective: ScopePerspective | undefined;
@@ -38,36 +44,51 @@ export interface ActiveContainer {
 
 const ActiveContainerContext = createContext<ActiveContainer | null>(null);
 
+export function resolveActiveContainerSelection(
+  preference: AgentThreadPreference | undefined,
+  nav: ProjectWorkspaceNavSummary | undefined,
+): Pick<
+  ActiveContainer,
+  | "perspective"
+  | "projectId"
+  | "workspaceId"
+  | "projectName"
+  | "workspaceName"
+> {
+  const perspective = preference?.activePerspective;
+  const workspace = nav?.workspaces.find(
+    (entry) => entry.id === perspective?.focusScopeId,
+  );
+  const focusProject = nav?.projects.find(
+    (project) => project.id === perspective?.focusScopeId,
+  );
+  // A directly granted workspace can be visible while its canonical project
+  // is not. Only an already-visible via crumb becomes the legacy project
+  // projection; do not recover a hidden canonical home or substitute personal.
+  const projectId = workspace
+    ? perspective?.viaScopeIds.at(-1)
+    : focusProject?.id ?? nav?.personalProjectId;
+  const project = nav?.projects.find((entry) => entry.id === projectId);
+
+  return {
+    perspective: workspace || focusProject ? perspective : undefined,
+    projectId,
+    workspaceId: workspace?.id,
+    projectName: project?.name,
+    workspaceName: workspace?.name,
+  };
+}
+
 export function ActiveContainerProvider({ children }: { children: ReactNode }) {
   const preference = useActiveAgentThreadPreference();
   const nav = useProjectWorkspaceNav();
   const setActiveContainer = useSetActiveContainer();
 
   const value = useMemo<ActiveContainer>(() => {
-    const pref = preference.data;
-    const data = nav.data;
-
-    const perspective = pref?.activePerspective;
-    const workspace = data?.workspaces.find(
-      (w) => w.id === perspective?.focusScopeId,
-    );
-    const focusProject = data?.projects.find(
-      (project) => project.id === perspective?.focusScopeId,
-    );
-    // Server validation ensures a stored via path is legal. If cached nav no
-    // longer recognizes it, fall back to canonical ownership, then personal.
-    const projectId =
-      workspace
-        ? perspective?.viaScopeIds.at(-1) ?? workspace.homeScopeId
-        : focusProject?.id ?? data?.personalProjectId;
-    const project = data?.projects.find((p) => p.id === projectId);
+    const selection = resolveActiveContainerSelection(preference.data, nav.data);
 
     return {
-      perspective: workspace || focusProject ? perspective : undefined,
-      projectId,
-      workspaceId: workspace?.id,
-      projectName: project?.name,
-      workspaceName: workspace?.name,
+      ...selection,
       isReady: Boolean(preference.data && nav.data),
       selectProject: (pid) =>
         setActiveContainer.mutate({
@@ -77,7 +98,7 @@ export function ActiveContainerProvider({ children }: { children: ReactNode }) {
         setActiveContainer.mutate({
           perspective: {
             focusScopeId: wid,
-            viaScopeIds: projectId ? [projectId] : [],
+            viaScopeIds: selection.projectId ? [selection.projectId] : [],
           },
         }),
       clear: () => setActiveContainer.mutate({}),

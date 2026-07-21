@@ -200,7 +200,11 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
   const preference = agentThreadRepository.getActivePreference(session.user.id);
   if (!preference.activePerspective) return preference;
 
-  const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
+  const {
+    legacyContainerProjection,
+    loadProjectWorkspaceNav,
+    resolveScopePerspective,
+  } = await import(
     "@/lib/agent-thread-containers.server"
   );
   const nav = loadProjectWorkspaceNav(session.user.id);
@@ -210,15 +214,16 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
     // or trying to infer another scope.
     return agentThreadRepository.setActiveContainer(session.user.id, {});
   }
-  if (!resolved.diagnostic) return preference;
-  const workspace = nav.workspaces.find(
-    (entry) => entry.id === resolved.perspective.focusScopeId,
-  );
+  const legacy = legacyContainerProjection(resolved.perspective, nav);
+  if (
+    !resolved.diagnostic &&
+    preference.activeProjectId === legacy.projectId &&
+    preference.activeWorkspaceId === legacy.workspaceId
+  ) {
+    return preference;
+  }
   return agentThreadRepository.setActiveContainer(session.user.id, {
-    projectId: workspace
-      ? resolved.perspective.viaScopeIds.at(-1) ?? workspace.homeScopeId
-      : resolved.perspective.focusScopeId,
-    workspaceId: workspace?.id,
+    ...legacy,
     perspective: resolved.perspective,
   });
 });
@@ -247,7 +252,11 @@ const setActiveContainerFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
+    const {
+      legacyContainerProjection,
+      loadProjectWorkspaceNav,
+      resolveScopePerspective,
+    } = await import(
       "@/lib/agent-thread-containers.server"
     );
     const session = await requireThreadSession();
@@ -270,16 +279,12 @@ const setActiveContainerFn = createServerFn({ method: "POST" })
       throw new Error("Requested scope is not visible to this principal.");
     }
     const perspective = resolved?.perspective;
-    const workspace = perspective
-      ? nav.workspaces.find((entry) => entry.id === perspective.focusScopeId)
-      : undefined;
-    const projectId = workspace
-      ? perspective?.viaScopeIds.at(-1) ?? workspace.homeScopeId
-      : perspective?.focusScopeId;
+    const legacy = perspective
+      ? legacyContainerProjection(perspective, nav)
+      : {};
 
     return agentThreadRepository.setActiveContainer(session.user.id, {
-      projectId,
-      workspaceId: workspace?.id,
+      ...legacy,
       perspective,
     });
   });

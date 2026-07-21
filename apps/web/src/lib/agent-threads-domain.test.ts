@@ -152,6 +152,37 @@ describe("AgentThreadRepository", () => {
     });
   });
 
+  it("persists a direct workspace perspective without a hidden project projection", () => {
+    const preferences = new MemoryKv<AgentThreadPreference>();
+    preferences.set(`active-thread:${USER_A}`, {
+      members: [USER_A],
+      activeProjectId: "project-hidden",
+      activeWorkspaceId: "workspace-b",
+      activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+      updatedAt: "2026-07-21T00:00:00.000Z",
+    });
+    const repo = new AgentThreadRepository({
+      defaultPersonaId: "agent-a",
+      threads: new MemoryKv(),
+      preferences,
+      now: () => new Date("2026-07-21T00:00:00.000Z"),
+    });
+
+    const preference = repo.setActiveContainer(USER_A, {
+      workspaceId: "workspace-b",
+      perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+    });
+
+    expect(preference).toMatchObject({
+      activeWorkspaceId: "workspace-b",
+      activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+    });
+    expect(preference.activeProjectId).toBeUndefined();
+    expect(
+      preferences.get(`active-thread:${USER_A}`)?.activeProjectId,
+    ).toBeUndefined();
+  });
+
   it("keeps the container selection when the active thread changes", () => {
     const repo = repository();
     repo.setActiveContainer(USER_A, {

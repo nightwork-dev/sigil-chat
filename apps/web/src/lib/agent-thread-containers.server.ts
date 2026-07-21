@@ -89,6 +89,27 @@ export interface PerspectiveResolution {
 }
 
 /**
+ * Compatibility fields may only project an already-visible entry crumb. A
+ * workspace's canonical home remains server-side when that project is hidden.
+ */
+export function legacyContainerProjection(
+  perspective: ScopePerspective,
+  nav: ProjectWorkspaceNav,
+): { projectId?: string; workspaceId?: string } {
+  const workspace = nav.workspaces.find(
+    (entry) => entry.id === perspective.focusScopeId,
+  );
+  return workspace
+    ? {
+        ...(perspective.viaScopeIds.at(-1)
+          ? { projectId: perspective.viaScopeIds.at(-1) }
+          : {}),
+        workspaceId: workspace.id,
+      }
+    : { projectId: perspective.focusScopeId };
+}
+
+/**
  * Validates the product's current project/workspace perspective shape. This
  * is display resolution, not authorization: resource access remains checked
  * against real identities elsewhere.
