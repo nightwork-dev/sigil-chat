@@ -140,7 +140,7 @@ const upsertBoardViewFn = createServerFn({ method: "POST" })
     );
     if (existing) boardViewVisibleToViewer(existing, viewer);
     const view = prepareBoardViewForUpsert(data.view, viewer.id, existing);
-    requireBoardViewMutationAccess(session, view);
+    requireBoardViewMutationAccess(session, view, undefined, existing);
     return workItemsRepository.upsertBoardView(
       view,
       data.expectedRevision,

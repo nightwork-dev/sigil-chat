@@ -156,6 +156,29 @@ describe("work-item mutation access", () => {
       prepareBoardViewForUpsert(callerShaped, "user-2", existing),
     ).toThrow("Board view was not found.");
   });
+
+  it("keeps published-to-private and private-to-published updates owner-only", () => {
+    const published = { ...board, visibility: "published" as const };
+    const privateView = { ...board, visibility: "private" as const };
+    const access = scopeAccess(["project-a"]);
+
+    expect(() =>
+      requireBoardViewMutationAccess(
+        session("member"),
+        privateView,
+        access,
+        published,
+      ),
+    ).toThrow("Owner access required");
+    expect(() =>
+      requireBoardViewMutationAccess(
+        session("member"),
+        published,
+        access,
+        privateView,
+      ),
+    ).toThrow("Owner access required");
+  });
 });
 
 function story(id: string, homeScopeId: string): Story {

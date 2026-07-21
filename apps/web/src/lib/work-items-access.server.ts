@@ -191,8 +191,19 @@ export function requireBoardViewMutationAccess(
   session: SigilAuthSession | null,
   view: BoardView,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
+  existing?: BoardView,
 ): SigilAuthSession {
   requireSession(session);
+  // Updates retain the authority required by the persisted surface. Otherwise
+  // a member who can read a published board could submit the same id as a
+  // private board and turn proposed visibility into an authorization bypass.
+  if (existing?.visibility === "published") requireOwner(session);
+  if (
+    existing?.visibility === "private" &&
+    existing.ownerPrincipalId !== session.user.id
+  ) {
+    throw new Error("Board view was not found.");
+  }
   if (
     !access.canAccess({
       principalId: session.user.id,
