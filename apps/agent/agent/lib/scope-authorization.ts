@@ -70,14 +70,32 @@ export function createScopeGrantPolicy(
           input.canonicalHomeScope ??
           canonicalHomeScope(input.resourceScope, registries),
       }
+      const authorityScope = request.canonicalHomeScope ?? request.resourceScope
+      if (
+        parseContainerScope(authorityScope) &&
+        !containerExists(authorityScope, registries)
+      ) {
+        return false
+      }
       if (hasScopeGrant(grants(), request)) return true
       return hasRegisteredScopeMembership(
-        request.canonicalHomeScope ?? request.resourceScope,
+        authorityScope,
         request.principalId,
         registries,
       )
     },
   }
+}
+
+function containerExists(
+  scope: string,
+  registries: ScopeAuthorizationRegistries,
+): boolean {
+  const parsed = parseContainerScope(scope)
+  if (!parsed) return true
+  return parsed.tier === "project"
+    ? registries.projects.get(parsed.id) !== undefined
+    : registries.workspaces.get(parsed.id) !== undefined
 }
 
 export function requireAuthorizedResourceScope(input: {

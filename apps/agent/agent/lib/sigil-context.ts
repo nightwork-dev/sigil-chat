@@ -73,10 +73,9 @@ export interface SigilContextOptions {
     activeResourceScope?: string
     targetAudience: ScopedMemoryAudienceLabel
   }) =>
-    | string
     | ScopedMemoryRecallDelivery
     | undefined
-    | Promise<string | ScopedMemoryRecallDelivery | undefined>
+    | Promise<ScopedMemoryRecallDelivery | undefined>
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -287,21 +286,13 @@ function recallTargetAudience(input: {
 async function authorizeRecallForTarget(input: {
   authorizeMemorySource?: SigilContextOptions["authorizeMemorySource"]
   principalId: string
-  recalled: string | ScopedMemoryRecallDelivery | undefined
+  recalled: ScopedMemoryRecallDelivery | undefined
   targetAudience: ScopedMemoryAudienceLabel
 }): Promise<string | undefined> {
   if (input.recalled === undefined) return undefined
-  if (typeof input.recalled === "string") {
-    const content = input.recalled.trim()
-    if (!content) return undefined
-    return audienceAllowsRecall({
-      recordAudience: { kind: "personal", principalId: input.principalId },
-      targetAudience: input.targetAudience,
-    })
-      ? content
-      : undefined
+  if (typeof input.recalled !== "object" || input.recalled === null) {
+    return undefined
   }
-
   const content = input.recalled.content.trim()
   if (!content || input.recalled.records.length === 0) return undefined
 

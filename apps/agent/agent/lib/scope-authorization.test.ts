@@ -246,6 +246,28 @@ describe("Eve resource-scope authorization", () => {
     ).toThrow("NOT_AUTHORIZED")
   })
 
+  it("rejects stale grants for containers that no longer exist", () => {
+    const stores = registries()
+    const policy = createScopeGrantPolicy({
+      grants: () => [
+        {
+          actions: ["read"],
+          principalId: "user-1",
+          resourceScope: "workspace:deleted-workspace",
+        },
+      ],
+      registries: stores,
+    })
+
+    expect(
+      policy.authorize({
+        action: "read",
+        principalId: "user-1",
+        resourceScope: "workspace:deleted-workspace",
+      }),
+    ).toBe(false)
+  })
+
   it("authorizes memory sources against their live canonical container", () => {
     const stores = registries()
     stores.projects.upsert({

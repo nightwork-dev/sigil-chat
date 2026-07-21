@@ -90,10 +90,6 @@ ensureEveHostedPersona(personaRegistry, personaSeed, {
   rootKind: "agents",
 })
 
-// Read back what the registry actually holds — the operator's authored
-// identity, not the seed we may have written months ago.
-const persona = personaRegistry.get(personaSeed.id) ?? personaSeed
-
 export const DEFAULT_PERSONA_ID =
   process.env.SIGIL_DEFAULT_PERSONA_ID ?? personaSeed.id
 

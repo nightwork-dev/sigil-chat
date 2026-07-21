@@ -154,7 +154,10 @@ describe("Sigil Eve context integration", () => {
       identityFloor: () => "STABLE_IDENTITY_FLOOR",
       recallLatestTurn: (input) => {
         recalls.push(input)
-        return "## Relevant memory\n- The launch code word is marigold."
+        return scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: "## Relevant memory\n- The launch code word is marigold.",
+        })
       },
     })
     const send = vi.fn(async () => session())
@@ -194,7 +197,10 @@ describe("Sigil Eve context integration", () => {
       compiler: compilerWith([]),
       recallLatestTurn: (input) => {
         recalls.push(input)
-        return "## Relevant memory\n- PERSONAL_CONTINUITY"
+        return scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: "## Relevant memory\n- PERSONAL_CONTINUITY",
+        })
       },
     })
     const send = vi.fn(async () => session())
@@ -213,7 +219,12 @@ describe("Sigil Eve context integration", () => {
   })
 
   it("skips recall entirely when the immutable session binding is absent", async () => {
-    const recallLatestTurn = vi.fn(() => "SHOULD_NOT_BE_READ")
+    const recallLatestTurn = vi.fn(() =>
+      scopedRecall({
+        audience: { kind: "personal", principalId: "user-1" },
+        content: "SHOULD_NOT_BE_READ",
+      }),
+    )
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
@@ -366,10 +377,11 @@ describe("Sigil Eve context integration", () => {
     )
   })
 
-  it("allows unlabelled adapter recall only in the principal-private target", async () => {
+  it("rejects unlabelled adapter recall in every target", async () => {
     const personalChannel = testChannel({
       compiler: compilerWith([]),
-      recallLatestTurn: () => "## Relevant memory\n- LEGACY_PRIVATE_RECALL",
+      recallLatestTurn: (() =>
+        "## Relevant memory\n- UNLABELLED_RECALL") as never,
     })
     const sharedChannel = testChannel({
       auth: {
@@ -379,7 +391,8 @@ describe("Sigil Eve context integration", () => {
         },
       },
       compiler: compilerWith([]),
-      recallLatestTurn: () => "## Relevant memory\n- LEGACY_PRIVATE_RECALL",
+      recallLatestTurn: (() =>
+        "## Relevant memory\n- UNLABELLED_RECALL") as never,
     })
     const personalSend = vi.fn(async () => session())
     const sharedSend = vi.fn(async () => session())
@@ -391,11 +404,11 @@ describe("Sigil Eve context integration", () => {
       message: "What do we remember?",
     })
 
-    expect(JSON.stringify(firstSendCall(personalSend)[0])).toContain(
-      "LEGACY_PRIVATE_RECALL",
+    expect(JSON.stringify(firstSendCall(personalSend)[0])).not.toContain(
+      "UNLABELLED_RECALL",
     )
     expect(JSON.stringify(firstSendCall(sharedSend)[0])).not.toContain(
-      "LEGACY_PRIVATE_RECALL",
+      "UNLABELLED_RECALL",
     )
   })
 
@@ -417,7 +430,11 @@ describe("Sigil Eve context integration", () => {
       compiler: compilerWith([]),
       identityFloor: () => "STABLE_IDENTITY_FLOOR",
       maxTokens: 20,
-      recallLatestTurn: () => `RECALL_MARKER ${"x".repeat(200)}`,
+      recallLatestTurn: () =>
+        scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: `RECALL_MARKER ${"x".repeat(200)}`,
+        }),
     })
     const send = vi.fn(async () => session())
 
