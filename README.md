@@ -189,11 +189,11 @@ Agent threads are membership-scoped: every thread record carries
 operations filter by `isMember(thread.members, userId)`
 (`agent-threads-domain.ts`). The active-thread preference is per-principal
 and also carries the active project/workspace container selection
-(PRODUCT-CHROME-REWORK-SPEC §3.1). What remains open: Gonk's registry
-container tools (`apps/gonk/src/registry/containers.ts`) do not yet enforce
-principal membership on mutations — member management and cross-principal
-mutation stay out of scope until that lands (the chrome rework's §5 release
-boundary).
+(PRODUCT-CHROME-REWORK-SPEC §3.1). Gonk's registry container tools
+(`apps/gonk/src/registry/containers.ts`) also enforce project membership on
+workspace access and existing owner authority on project mutation. Project and
+workspace updates use revision-checked, cross-process writes; member-management
+UI remains outside this release.
 
 Session and capability-catalog access is application authorization, not tool
 approval state. `GONK_MCP_KEY` protects the Gonk MCP transport; it does not

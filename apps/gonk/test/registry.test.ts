@@ -911,6 +911,7 @@ describe("Sigil Chat Gonk registry", () => {
         {
           project: {
             ...createdProjectRecord,
+            createdBy: "user-forged",
             members: [
               { principalId: "user-1", role: "owner" },
               { principalId: "user-2", role: "member" },
@@ -923,7 +924,7 @@ describe("Sigil Chat Gonk registry", () => {
     );
     expect(updatedProject).toMatchObject({
       ok: true,
-      data: { project: { revision: 2 } },
+      data: { project: { createdBy: "user-1", revision: 2 } },
     });
     const listedAfterUpdate = await collectToolOutcome(
       registry.invoke("sigil-project-list", {}, context),
@@ -966,6 +967,32 @@ describe("Sigil Chat Gonk registry", () => {
       ok: false,
       code: "INTERNAL",
       message: "Project is not available.",
+    });
+
+    const unauthorizedExistingProject = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        { project: createdProjectRecord },
+        memberContext,
+      ),
+    );
+    const unavailableProject = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        {
+          project: { ...createdProjectRecord, id: "project-missing" },
+          expectedRevision: 2,
+        },
+        memberContext,
+      ),
+    );
+    expect(unauthorizedExistingProject).toMatchObject({
+      ok: false,
+      message: "Project is not available.",
+    });
+    expect(unavailableProject).toMatchObject({
+      ok: false,
+      message: unauthorizedExistingProject.message,
     });
 
     const lastOwnerRemoval = await collectToolOutcome(
@@ -1017,6 +1044,31 @@ describe("Sigil Chat Gonk registry", () => {
       data: { workspaces: [createdWorkspaceRecord] },
     });
 
+    const updatedWorkspace = await collectToolOutcome(
+      registry.invoke(
+        "sigil-workspace-upsert",
+        {
+          workspace: {
+            ...createdWorkspaceRecord,
+            createdBy: "user-forged",
+            description: "An updated focused effort.",
+          },
+          expectedRevision: 1,
+        },
+        context,
+      ),
+    );
+    expect(updatedWorkspace).toMatchObject({
+      ok: true,
+      data: {
+        workspace: {
+          createdBy: "user-1",
+          description: "An updated focused effort.",
+          revision: 2,
+        },
+      },
+    });
+
     const outsiderContext = makeBaseContext({
       auth: humanAuth("user-outsider", "project:project-1"),
     });
@@ -1035,6 +1087,28 @@ describe("Sigil Chat Gonk registry", () => {
       ok: false,
       code: "INTERNAL",
       message: "Workspace is not available.",
+    });
+    const unauthorizedExistingWorkspace = await collectToolOutcome(
+      registry.invoke(
+        "sigil-workspace-upsert",
+        { workspace: createdWorkspaceRecord },
+        outsiderContext,
+      ),
+    );
+    const unavailableWorkspace = await collectToolOutcome(
+      registry.invoke(
+        "sigil-workspace-upsert",
+        { workspace: { ...createdWorkspaceRecord, id: "workspace-missing" } },
+        outsiderContext,
+      ),
+    );
+    expect(unauthorizedExistingWorkspace).toMatchObject({
+      ok: false,
+      message: "Workspace is not available.",
+    });
+    expect(unavailableWorkspace).toMatchObject({
+      ok: false,
+      message: unauthorizedExistingWorkspace.message,
     });
 
     const serviceList = await collectToolOutcome(

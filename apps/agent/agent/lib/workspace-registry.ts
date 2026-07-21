@@ -1,11 +1,18 @@
+import { join } from "node:path"
+
 import { createScope } from "@gonk/scope"
-import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
+import {
+  createStoreProvider,
+  mirkBackendFactory,
+  resolveStoreDir,
+} from "@gonk/store"
 import type { KvStore } from "@gonk/store/types"
 
 import {
   RegistryRevisionConflictError,
   type ProjectRegistry,
   type RegistryUpsertOptions,
+  withRegistryRecordLock,
 } from "./project-registry"
 
 const WORKSPACE_NAMESPACE = "sigil-chat.workspaces.v1"
@@ -50,11 +57,13 @@ type NormalizedWorkspace = Workspace & { readonly homeScopeId: string }
 export class WorkspaceRegistry {
   private readonly projects: Pick<ProjectRegistry, "get">
   private readonly workspaces: KvStore<unknown>
+  private readonly lockDirectory: string | undefined
 
   constructor(options: WorkspaceRegistryOptions) {
     this.projects = options.projects
     if (options.store) {
       this.workspaces = options.store
+      this.lockDirectory = undefined
       return
     }
 
@@ -66,6 +75,10 @@ export class WorkspaceRegistry {
       backendFactory: mirkBackendFactory(scope),
     })
     this.workspaces = provider.kv("project", WORKSPACE_NAMESPACE)
+    this.lockDirectory = join(
+      resolveStoreDir(scope, "project", WORKSPACE_NAMESPACE),
+      ".record-locks",
+    )
   }
 
   get(id: string): Workspace | undefined {
@@ -101,21 +114,25 @@ export class WorkspaceRegistry {
     if (!this.projects.get(normalized.homeScopeId)) {
       throw new Error(`Unknown project id: ${normalized.homeScopeId}.`)
     }
-    const current = this.get(normalized.id)
-    assertExpectedRevision(normalized.id, current, options.expectedRevision)
-    const next = {
-      ...normalized,
-      revision:
-        options.expectedRevision !== undefined
-          ? (current?.revision ?? 0) + 1
-          : (normalized.revision ?? current?.revision ?? 1),
-    }
-    this.workspaces.set(normalized.id, clone(next))
-    const persisted = this.get(normalized.id)
-    if (!persisted) {
-      throw new Error(`Workspace record did not persist for ${normalized.id}.`)
-    }
-    return persisted
+    return withRegistryRecordLock(this.lockDirectory, normalized.id, () => {
+      const current = this.get(normalized.id)
+      assertExpectedRevision(normalized.id, current, options.expectedRevision)
+      const next = {
+        ...normalized,
+        revision:
+          options.expectedRevision !== undefined
+            ? (current?.revision ?? 0) + 1
+            : (normalized.revision ?? current?.revision ?? 1),
+      }
+      this.workspaces.set(normalized.id, clone(next))
+      const persisted = this.get(normalized.id)
+      if (!persisted) {
+        throw new Error(
+          `Workspace record did not persist for ${normalized.id}.`,
+        )
+      }
+      return persisted
+    })
   }
 
   private normalize(workspace: StoredWorkspace): NormalizedWorkspace {

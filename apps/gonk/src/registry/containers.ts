@@ -320,16 +320,21 @@ function updateProject(
   principalId: string,
   expectedRevision: number | undefined,
 ): Project {
-  if (expectedRevision === undefined) {
-    throw new Error("Project revision is required.")
-  }
   if (!hasProjectOwner(current, principalId)) {
     throw new Error("Project is not available.")
+  }
+  if (expectedRevision === undefined) {
+    throw new Error("Project revision is required.")
   }
   if (!project.members.some((member) => member.role === "owner")) {
     throw new Error("Project must keep at least one owner.")
   }
-  return { ...project, id: current.id, createdAt: current.createdAt }
+  return {
+    ...project,
+    id: current.id,
+    createdAt: current.createdAt,
+    createdBy: current.createdBy,
+  }
 }
 
 function createWorkspace(
@@ -357,16 +362,16 @@ function updateWorkspace(
   principalId: string,
   expectedRevision: number | undefined,
 ): Workspace {
+  const currentHome = current.homeScopeId ?? current.projectId
+  if (!containers.projects.hasMember(currentHome, principalId)) {
+    throw new Error("Workspace is not available.")
+  }
   if (expectedRevision === undefined) {
     throw new Error("Workspace revision is required.")
   }
-  const currentHome = current.homeScopeId ?? current.projectId
   const nextHome = workspace.homeScopeId ?? workspace.projectId
   if (currentHome !== nextHome || workspace.projectId !== nextHome) {
     throw new Error("Workspace canonical project cannot change.")
-  }
-  if (!containers.projects.hasMember(currentHome, principalId)) {
-    throw new Error("Workspace is not available.")
   }
   return {
     ...workspace,
@@ -374,6 +379,7 @@ function updateWorkspace(
     projectId: currentHome,
     homeScopeId: currentHome,
     createdAt: current.createdAt,
+    createdBy: current.createdBy,
   }
 }
 

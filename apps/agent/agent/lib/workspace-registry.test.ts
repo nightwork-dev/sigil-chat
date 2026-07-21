@@ -130,6 +130,74 @@ describe("WorkspaceRegistry", () => {
       ),
     ).toThrow("revision conflict")
   })
+
+  it("allows exactly one independently constructed Mirk client to win a revision race", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-workspace-race-"))
+    temporaryDirectories.push(directory)
+    const projects = new ProjectRegistry({
+      cwd: directory,
+      projectRoot: directory,
+    })
+    projects.upsert(project)
+    const seed = new WorkspaceRegistry({
+      cwd: directory,
+      projectRoot: directory,
+      projects,
+    })
+    const created = seed.upsert(workspace)
+    const contenders = [
+      {
+        description: "Update from contender A.",
+        registry: new WorkspaceRegistry({
+          cwd: directory,
+          projectRoot: directory,
+          projects: new ProjectRegistry({
+            cwd: directory,
+            projectRoot: directory,
+          }),
+        }),
+      },
+      {
+        description: "Update from contender B.",
+        registry: new WorkspaceRegistry({
+          cwd: directory,
+          projectRoot: directory,
+          projects: new ProjectRegistry({
+            cwd: directory,
+            projectRoot: directory,
+          }),
+        }),
+      },
+    ]
+
+    const results = await Promise.allSettled(
+      contenders.map(({ description, registry }) =>
+        Promise.resolve().then(() =>
+          registry.upsert(
+            { ...created, description },
+            { expectedRevision: created.revision! },
+          ),
+        ),
+      ),
+    )
+    const winners = results.filter(
+      (result): result is PromiseFulfilledResult<Workspace> =>
+        result.status === "fulfilled",
+    )
+
+    expect(winners).toHaveLength(1)
+    expect(
+      results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1)
+    expect(winners[0].value.revision).toBe(2)
+    expect(
+      new WorkspaceRegistry({
+        cwd: directory,
+        projectRoot: directory,
+        projects,
+      }).get(workspace.id),
+    ).toEqual(winners[0].value)
+  })
 })
 
 function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
