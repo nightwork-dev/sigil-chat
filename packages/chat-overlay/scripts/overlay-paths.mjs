@@ -6,7 +6,6 @@ export const overlayPaths = Object.freeze([
   "apps/gonk",
   "packages/agent-contracts",
   "packages/blackboard-store",
-  "packages/canvas",
   "packages/chat",
   "packages/data",
   "packages/file-store-core",
