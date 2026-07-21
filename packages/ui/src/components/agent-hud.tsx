@@ -19,10 +19,10 @@ import {
   isAgentSessionBusy,
   type AgentApprovalPresentation,
   type AgentForkIntent,
-  type AgentMessagePart,
   type AgentRuntimeSession,
   type AgentThreadControls,
 } from "@zigil/agent-surface/contracts";
+import { MessageParts } from "@workspace/ui/components/part-projection";
 import { Button } from "@workspace/ui/components/button";
 import {
   FloatingDock,
@@ -242,12 +242,7 @@ export function AgentHudConversation({
       <div aria-label="Agent conversation">
         {session.data.messages.map((message) => (
           <article data-role={message.role} key={message.id}>
-            {message.parts.map((part, index) => (
-              <AgentPart
-                key={`${message.id}:${part.type}:${index}`}
-                part={part}
-              />
-            ))}
+            <MessageParts parts={message.parts} />
           </article>
         ))}
       </div>
@@ -425,20 +420,6 @@ function AgentContextInline() {
       </div>
     </details>
   );
-}
-
-function AgentPart({ part }: { readonly part: AgentMessagePart }) {
-  switch (part.type) {
-    case "text":
-    case "reasoning":
-      return <p>{part.text}</p>;
-    case "file":
-      return <p>{part.filename ?? part.mediaType}</p>;
-    case "tool-call":
-      return <p>{`${part.name}: ${part.state}`}</p>;
-    case "authorization":
-      return <p>{`${part.displayName}: ${part.state}`}</p>;
-  }
 }
 
 export const AgentHud = { Root, Trigger, Panel };
