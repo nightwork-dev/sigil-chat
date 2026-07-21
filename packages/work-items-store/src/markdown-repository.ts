@@ -522,15 +522,13 @@ function serializeStoryMarkdown(
 ): string {
   const frontmatter: Record<string, unknown> = { id: story.id };
   if (story.worktree !== undefined) frontmatter.worktree = story.worktree;
-  if (story.kind !== undefined) frontmatter.kind = story.kind;
-  if (story.homeScopeId !== undefined)
-    frontmatter.homeScopeId = story.homeScopeId;
-  if (story.scopeBindings !== undefined)
-    frontmatter.scopeBindings = story.scopeBindings;
+  frontmatter.kind = story.kind;
+  frontmatter.homeScopeId = story.homeScopeId;
+  frontmatter.scopeBindings = story.scopeBindings;
   if (story.parentWorkItemId !== undefined)
     frontmatter.parentWorkItemId = story.parentWorkItemId;
-  if (story.provenance !== undefined) frontmatter.provenance = story.provenance;
-  if (story.revision !== undefined) frontmatter.revision = story.revision;
+  frontmatter.provenance = story.provenance;
+  frontmatter.revision = story.revision;
   frontmatter.epicId = story.epicId;
   frontmatter.epicTitle = story.epicTitle;
   frontmatter.title = story.title;

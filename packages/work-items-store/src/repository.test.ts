@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createWorkItemsDocument } from "./sample";
 import { queryBoardView } from "./operations";
+import type { Story, WorkSponsorshipDecision } from "./types";
 import {
   FileWorkItemsRepository,
   MemoryWorkItemsRepository,
@@ -37,6 +38,14 @@ describe("MemoryWorkItemsRepository", () => {
 
     expect(await repository.list()).toHaveLength(3);
     expect(initial.stories.find(({ id }) => id === "S1.1")).toMatchObject({
+      kind: "story",
+      homeScopeId: "installation:default",
+      scopeBindings: [],
+      provenance: {
+        origin: "principal",
+        actorPrincipalId: "principal:template",
+      },
+      revision: 1,
       epicId: "roadmap",
       status: "ready",
       routing: "implementation",
@@ -203,7 +212,7 @@ describe("MemoryWorkItemsRepository", () => {
         group: "workspace-a",
         childProgress: { total: 1, shipped: 1 },
         // Child completion is derived progress only; it does not ship its parent.
-        story: { status: "in-progress", revision: 2 },
+        story: { status: "in-progress", revision: 3 },
       },
     );
     expect(result.items.find(({ story }) => story.id === "S1.0")).toMatchObject(
@@ -212,6 +221,132 @@ describe("MemoryWorkItemsRepository", () => {
         matchedScopeIds: ["workspace-b", "project-a"],
       },
     );
+  });
+
+  it("rejects records missing canonical scoped-work fields", async () => {
+    const repository = new MemoryWorkItemsRepository();
+    const invalid = (await seedStory("S0.3")) as Partial<Story>;
+    delete invalid.homeScopeId;
+
+    await expect(repository.upsertStory(invalid as Story)).rejects.toThrow(
+      "Invalid story: S0.3",
+    );
+  });
+
+  it("uses declared root order for a multi-root match and renders one card", async () => {
+    const story = await seedStory("S0.3");
+    story.homeScopeId = "workspace-shared";
+    story.scopeBindings = [
+      { scopeId: "project-a", relation: "rolls-up-to" },
+      { scopeId: "project-b", relation: "rolls-up-to" },
+    ];
+    const view = {
+      id: "portfolio",
+      ownerScopeId: "installation:default",
+      name: "Portfolio",
+      visibility: "private" as const,
+      roots: ["project-a", "project-b"],
+      traversal: "self-and-rollups" as const,
+      filters: {},
+      groupBy: "scope" as const,
+      revision: 1,
+    };
+
+    const result = queryBoardView([story, structuredClone(story)], view, {
+      resolve: () => [
+        { scopeId: "workspace-shared", rootScopeId: "project-b" },
+        { scopeId: "workspace-shared", rootScopeId: "project-a" },
+        { scopeId: "project-b", rootScopeId: "project-b" },
+        { scopeId: "project-a", rootScopeId: "project-a" },
+      ],
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      group: "workspace-shared",
+      story: { id: "S0.3" },
+    });
+
+    story.homeScopeId = "workspace-outside-result";
+    const rebound = queryBoardView([story], view, {
+      resolve: () => [
+        { scopeId: "project-b", rootScopeId: "project-b" },
+        { scopeId: "project-a", rootScopeId: "project-a" },
+      ],
+    });
+    expect(rebound.items).toHaveLength(1);
+    expect(rebound.items[0].group).toBe("project-a");
+  });
+
+  it("filters sponsored boards by the latest durable confirmation", async () => {
+    const story = await seedStory("S0.3");
+    story.homeScopeId = "project-a";
+    story.provenance.proposedSponsorPrincipalId = "principal-sponsor";
+    const view = {
+      id: "sponsored",
+      ownerScopeId: "project-a",
+      name: "Sponsored work",
+      visibility: "private" as const,
+      roots: ["project-a"],
+      traversal: "self" as const,
+      filters: { sponsorPrincipalId: "principal-sponsor" },
+      groupBy: "status" as const,
+      revision: 1,
+    };
+    const traversal = {
+      resolve: () => [{ scopeId: "project-a", rootScopeId: "project-a" }],
+    };
+    const confirmed: WorkSponsorshipDecision = {
+      id: "sponsor-1",
+      workItemId: story.id,
+      sponsorPrincipalId: "principal-sponsor",
+      decision: "confirmed",
+      decidedByPrincipalId: "principal-sponsor",
+      decidedAt: "2026-07-21T01:00:00.000Z",
+      revision: 1,
+    };
+
+    expect(queryBoardView([story], view, traversal).items).toEqual([]);
+    expect(
+      queryBoardView([story], view, traversal, [confirmed]).items,
+    ).toHaveLength(1);
+    expect(
+      queryBoardView([story], view, traversal, [
+        confirmed,
+        {
+          ...confirmed,
+          id: "sponsor-2",
+          decision: "declined",
+          decidedAt: "2026-07-21T02:00:00.000Z",
+          revision: 2,
+        },
+      ]).items,
+    ).toEqual([]);
+  });
+
+  it("increments saved-view revisions on update", async () => {
+    const repository = new MemoryWorkItemsRepository();
+    const initial = await repository.get();
+    const view = {
+      id: "board-a",
+      ownerScopeId: "project-a",
+      name: "Board A",
+      visibility: "private" as const,
+      roots: ["project-a"],
+      traversal: "self" as const,
+      filters: {},
+      groupBy: "status" as const,
+      revision: 1,
+    };
+    const created = await repository.upsertBoardView(view, initial.revision);
+    await repository.upsertBoardView(
+      { ...view, name: "Renamed", revision: 1 },
+      created.document.revision,
+    );
+
+    await expect(repository.listBoardViews()).resolves.toEqual([
+      { ...view, name: "Renamed", revision: 2 },
+    ]);
   });
 
   it("proposes idea-stage feature requests with agent provenance and blocks reshaped duplicates", async () => {

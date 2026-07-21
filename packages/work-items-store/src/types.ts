@@ -37,18 +37,13 @@ export type ExtractionVerdict =
 
 export interface Story {
   id: string;
-  /**
-   * Scoped-work fields are optional for legacy external roadmap records. New
-   * scoped records should provide every field below; repositories never invent
-   * a home while reading an older roadmap file.
-   */
-  kind?: WorkKind;
-  homeScopeId?: string;
-  scopeBindings?: ScopeBinding[];
+  kind: WorkKind;
+  homeScopeId: string;
+  scopeBindings: ScopeBinding[];
   parentWorkItemId?: string;
-  provenance?: WorkProvenance;
+  provenance: WorkProvenance;
   /** Per-record optimistic revision, distinct from the document revision. */
-  revision?: number;
+  revision: number;
   /**
    * Workstream this story belongs to (e.g. "sigil-chat-dev"). Used by
    * `list({ worktree })` to scope the board to a single workstream.

@@ -616,14 +616,13 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
 function recordForStory(story: Story): Record<string, unknown> {
   const record: Record<string, unknown> = { id: story.id };
   if (story.worktree !== undefined) record.worktree = story.worktree;
-  if (story.kind !== undefined) record.kind = story.kind;
-  if (story.homeScopeId !== undefined) record.homeScopeId = story.homeScopeId;
-  if (story.scopeBindings !== undefined)
-    record.scopeBindings = story.scopeBindings;
+  record.kind = story.kind;
+  record.homeScopeId = story.homeScopeId;
+  record.scopeBindings = story.scopeBindings;
   if (story.parentWorkItemId !== undefined)
     record.parentWorkItemId = story.parentWorkItemId;
-  if (story.provenance !== undefined) record.provenance = story.provenance;
-  if (story.revision !== undefined) record.revision = story.revision;
+  record.provenance = story.provenance;
+  record.revision = story.revision;
   record.epicId = story.epicId;
   record.epicTitle = story.epicTitle;
   record.title = story.title;

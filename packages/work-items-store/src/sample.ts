@@ -2,9 +2,30 @@ import type { ReviewItem, Story, WorkItemsDocument } from "./types.js";
 
 const SEED_TIMESTAMP = "2026-07-18T00:00:00.000Z";
 const DEFAULT_WORKTREE = "sigil-chat-dev";
+const DEFAULT_HOME_SCOPE = "installation:default";
+
+function scopedSeed(
+  story: Omit<
+    Story,
+    "kind" | "homeScopeId" | "scopeBindings" | "provenance" | "revision"
+  >,
+): Story {
+  return {
+    ...story,
+    kind: "story",
+    homeScopeId: DEFAULT_HOME_SCOPE,
+    scopeBindings: [],
+    provenance: {
+      origin: "principal",
+      actorPrincipalId: "principal:template",
+      createdAt: story.createdAt,
+    },
+    revision: 1,
+  };
+}
 
 const seedStories: Story[] = [
-  {
+  scopedSeed({
     id: "S0.3",
     epicId: "foundation",
     epicTitle: "Foundation",
@@ -20,8 +41,8 @@ const seedStories: Story[] = [
     authoredBy: "Template",
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
-  },
-  {
+  }),
+  scopedSeed({
     id: "S1.0",
     epicId: "roadmap",
     epicTitle: "Roadmap",
@@ -35,8 +56,8 @@ const seedStories: Story[] = [
     authoredBy: "Template",
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
-  },
-  {
+  }),
+  scopedSeed({
     id: "S1.1",
     epicId: "roadmap",
     epicTitle: "Roadmap",
@@ -53,7 +74,7 @@ const seedStories: Story[] = [
     authoredBy: "Template",
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
-  },
+  }),
 ];
 
 const seedReviews: ReviewItem[] = [

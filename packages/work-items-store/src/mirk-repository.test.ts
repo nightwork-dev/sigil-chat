@@ -7,14 +7,11 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  MarkdownWorkItemsRepository,
-  resolveRoadmapDir,
-} from "./markdown-repository.js";
+import { MarkdownWorkItemsRepository } from "./markdown-repository.js";
 import { MirkWorkItemsRepository } from "./mirk-repository.js";
 
 const temporaryDirectories: string[] = [];
@@ -115,45 +112,26 @@ describe("MirkWorkItemsRepository", () => {
     ]);
   });
 
-  it("round-trips a copy of the legacy markdown format byte-for-byte", async () => {
-    const sourceDirectory = process.env.S15B_ROADMAP_COPY;
-    if (
-      sourceDirectory &&
-      resolve(sourceDirectory) === resolve(resolveRoadmapDir())
-    )
-      throw new Error(
-        "Round-trip verification must never use the live roadmap.",
-      );
-
-    const legacyDirectory = await makeDirectory();
-    const mirkDirectory = sourceDirectory ?? (await makeDirectory());
-    if (sourceDirectory) {
-      await cp(sourceDirectory, legacyDirectory, { recursive: true });
-    } else {
-      const legacy = new MarkdownWorkItemsRepository({
-        dir: legacyDirectory,
-        now: () => NOW,
-      });
-      await legacy.get();
-      await cp(legacyDirectory, mirkDirectory, {
-        recursive: true,
-        filter: (source) =>
-          !source.includes("/.git/") && !source.endsWith("/.git"),
-      });
-      await rm(join(mirkDirectory, ".git"), { recursive: true, force: true });
-    }
-
-    const legacy = new MarkdownWorkItemsRepository({
-      dir: legacyDirectory,
+  it("round-trips the canonical markdown format byte-for-byte", async () => {
+    const markdownDirectory = await makeDirectory();
+    const mirkDirectory = await makeDirectory();
+    const markdown = new MarkdownWorkItemsRepository({
+      dir: markdownDirectory,
       now: () => NOW,
     });
-    const initial = await legacy.get();
+    const initial = await markdown.get();
+    await cp(markdownDirectory, mirkDirectory, {
+      recursive: true,
+      filter: (source) =>
+        !source.includes("/.git/") && !source.endsWith("/.git"),
+    });
+    await rm(join(mirkDirectory, ".git"), { recursive: true, force: true });
 
     const mirk = new MirkWorkItemsRepository({
       dir: mirkDirectory,
       now: () => NOW,
     });
-    expect(await mirk.list()).toEqual(await legacy.list());
+    expect(await mirk.list()).toEqual(await markdown.list());
     expect(await mirk.get()).toMatchObject({
       revision: initial.revision,
       comments: initial.comments,
@@ -168,40 +146,35 @@ describe("MirkWorkItemsRepository", () => {
       body: "Byte compatibility is the contract.",
       createdAt: NOW,
     };
-    await legacy.addComment(comment, initial.revision);
+    await markdown.addComment(comment, initial.revision);
     await mirk.addComment(comment, initial.revision);
 
     const storyPath = join("S0.3.md");
-    const oldStory = await readFile(join(legacyDirectory, storyPath), "utf8");
+    const oldStory = await readFile(join(markdownDirectory, storyPath), "utf8");
     const mirkStory = await readFile(join(mirkDirectory, storyPath), "utf8");
-    const oldIndex = await readFile(join(legacyDirectory, "index.md"), "utf8");
+    const oldIndex = await readFile(
+      join(markdownDirectory, "index.md"),
+      "utf8",
+    );
     const mirkIndex = await readFile(join(mirkDirectory, "index.md"), "utf8");
-    const storyNames = sourceDirectory
-      ? ["S0.3.md"]
-      : (await readdir(legacyDirectory)).filter(
-          (name) =>
-            name.endsWith(".md") &&
-            name !== "index.md" &&
-            !name.startsWith("_"),
-        );
+    const storyNames = (await readdir(markdownDirectory)).filter(
+      (name) =>
+        name.endsWith(".md") && name !== "index.md" && !name.startsWith("_"),
+    );
     const storyDiffs: string[] = [];
     for (const name of storyNames) {
-      const expected = await readFile(join(legacyDirectory, name), "utf8");
+      const expected = await readFile(join(markdownDirectory, name), "utf8");
       const actual = await readFile(join(mirkDirectory, name), "utf8");
       if (expected !== actual) storyDiffs.push(name);
     }
     const oldReviews = await readFile(
-      join(legacyDirectory, "_reviews.md"),
+      join(markdownDirectory, "_reviews.md"),
       "utf8",
     );
     const mirkReviews = await readFile(
       join(mirkDirectory, "_reviews.md"),
       "utf8",
     );
-    if (process.env.S15B_LEGACY_SNAPSHOT)
-      await cp(legacyDirectory, process.env.S15B_LEGACY_SNAPSHOT, {
-        recursive: true,
-      });
     expect(storyDiffs).toEqual([]);
     expect(mirkStory).toBe(oldStory);
     expect(mirkIndex).toBe(oldIndex);
@@ -216,7 +189,7 @@ describe("MirkWorkItemsRepository", () => {
         stories: (await mirk.list()).length,
         storyIdsMatch:
           (await mirk.list()).map(({ id }) => id).join(",") ===
-          (await legacy.list()).map(({ id }) => id).join(","),
+          (await markdown.list()).map(({ id }) => id).join(","),
         storyFilesCompared: storyNames.length,
         storyDiff: storyDiffs.length === 0 ? "none" : storyDiffs,
         indexDiff: mirkIndex === oldIndex ? "none" : "different",
@@ -253,7 +226,9 @@ describe("MirkWorkItemsRepository", () => {
       now: () => NOW,
     });
     expect(await reopened.listBoardViews()).toEqual([view]);
-    expect(await readFile(join(directory, "S0.3.md"), "utf8")).toBe(storyBefore);
+    expect(await readFile(join(directory, "S0.3.md"), "utf8")).toBe(
+      storyBefore,
+    );
     expect((await reopened.list()).map(({ id }) => id)).toContain("S0.3");
   });
 
@@ -270,6 +245,14 @@ describe("MirkWorkItemsRepository", () => {
       [
         "---",
         `id: ${id}`,
+        "kind: story",
+        'homeScopeId: "installation:default"',
+        "scopeBindings: []",
+        "provenance:",
+        "  origin: principal",
+        "  actorPrincipalId: principal-test",
+        `  createdAt: ${NOW}`,
+        "revision: 1",
         "epicId: track-x",
         "epicTitle: Ideas",
         `title: ${id} title`,

@@ -50,9 +50,7 @@ export function upsertStory(
     const existing = stories[existingIndex];
     stories[existingIndex] = {
       ...structuredClone(story),
-      ...(existing.revision === undefined
-        ? {}
-        : { revision: existing.revision + 1 }),
+      revision: existing.revision + 1,
     };
   }
   return commit(document, { stories }, [story.id]);
@@ -70,7 +68,12 @@ export function upsertBoardView(
   );
   const boardViews = [...document.boardViews];
   if (existingIndex === -1) boardViews.push(structuredClone(view));
-  else boardViews[existingIndex] = structuredClone(view);
+  else {
+    boardViews[existingIndex] = {
+      ...structuredClone(view),
+      revision: boardViews[existingIndex].revision + 1,
+    };
+  }
   return commit(document, { boardViews }, [view.id]);
 }
 
@@ -99,6 +102,7 @@ export function queryBoardView(
   stories: readonly Story[],
   view: BoardView,
   traversal: BoardTraversalResolver,
+  sponsorshipDecisions: readonly WorkSponsorshipDecision[] = [],
 ): BoardQueryResult {
   assertBoardView(view);
   const matches = orderedScopeMatches(view, traversal);
@@ -113,9 +117,15 @@ export function queryBoardView(
   }
 
   const items: BoardQueryItem[] = [];
+  const seenWorkItemIds = new Set<string>();
   for (const story of stories) {
+    if (seenWorkItemIds.has(story.id)) continue;
+    seenWorkItemIds.add(story.id);
     const matchedScopeIds = matchingScopeIds(story, resultScopeIds);
-    if (matchedScopeIds.length === 0 || !matchesBoardFilters(story, view))
+    if (
+      matchedScopeIds.length === 0 ||
+      !matchesBoardFilters(story, view, sponsorshipDecisions)
+    )
       continue;
     const childProgress = progressFor(childrenByParent.get(story.id));
     items.push({
@@ -144,9 +154,7 @@ export function transitionStory(
           ...item,
           status,
           updatedAt: now(),
-          ...(item.revision === undefined
-            ? {}
-            : { revision: item.revision + 1 }),
+          revision: item.revision + 1,
         }
       : item,
   );
@@ -182,9 +190,7 @@ export function assignReview(
           assignee: assignment.assignee,
           reviewDecision: "proposed" as const,
           updatedAt: timestamp,
-          ...(item.revision === undefined
-            ? {}
-            : { revision: item.revision + 1 }),
+          revision: item.revision + 1,
         }
       : item,
   );
@@ -224,9 +230,7 @@ export function decideReview(
           decidedBy,
           decidedAt: timestamp,
           updatedAt: timestamp,
-          ...(item.revision === undefined
-            ? {}
-            : { revision: item.revision + 1 }),
+          revision: item.revision + 1,
         }
       : item,
   );
@@ -286,6 +290,7 @@ export function proposeFeatureRequest(
     id: nextFeatureRequestId(document),
     kind: "feature-request",
     homeScopeId,
+    scopeBindings: [],
     provenance: {
       origin: "agent",
       actorPrincipalId: context.actorPrincipalId,
@@ -451,28 +456,15 @@ export function assertRevision(
 export function parseWorkItemsDocument(
   value: unknown,
 ): WorkItemsDocument | undefined {
-  if (!isWorkItemsDocument(value, 1)) return undefined;
-  return normalizeWorkItemsDocument(value);
+  return isWorkItemsDocument(value, 1) ? structuredClone(value) : undefined;
 }
 
-/** Additive migration for JSON documents written before saved board views. */
 export function normalizeWorkItemsDocument(
-  value: WorkItemsDocument | Record<string, unknown>,
+  value: WorkItemsDocument,
 ): WorkItemsDocument {
-  const document = value as WorkItemsDocument;
-  const normalized = {
-    ...structuredClone(document),
-    boardViews: Array.isArray(document.boardViews)
-      ? structuredClone(document.boardViews)
-      : [],
-    sponsorshipDecisions: Array.isArray(document.sponsorshipDecisions)
-      ? structuredClone(document.sponsorshipDecisions)
-      : [],
-  };
-  normalized.history = normalized.history.map((entry) =>
-    normalizeWorkItemsDocument(entry),
-  );
-  return normalized;
+  if (!isWorkItemsDocument(value, 1))
+    throw new Error("Invalid work-items document.");
+  return structuredClone(value);
 }
 
 export function isWorkItemsDocument(
@@ -486,16 +478,17 @@ export function isWorkItemsDocument(
     value.revision < 0 ||
     !Array.isArray(value.stories) ||
     !value.stories.every(isStory) ||
-    (value.boardViews !== undefined &&
-      (!Array.isArray(value.boardViews) ||
-        !value.boardViews.every(isBoardView))) ||
+    !hasUniqueIds(value.stories) ||
+    !Array.isArray(value.boardViews) ||
+    !value.boardViews.every(isBoardView) ||
+    !hasUniqueIds(value.boardViews) ||
     !Array.isArray(value.comments) ||
     !value.comments.every(isStoryComment) ||
     !Array.isArray(value.reviews) ||
     !value.reviews.every(isReviewItem) ||
-    (value.sponsorshipDecisions !== undefined &&
-      (!Array.isArray(value.sponsorshipDecisions) ||
-        !value.sponsorshipDecisions.every(isWorkSponsorshipDecision))) ||
+    !Array.isArray(value.sponsorshipDecisions) ||
+    !value.sponsorshipDecisions.every(isWorkSponsorshipDecision) ||
+    !hasUniqueIds(value.sponsorshipDecisions) ||
     !Array.isArray(value.history)
   ) {
     return false;
@@ -511,12 +504,12 @@ export function isStory(value: unknown): value is Story {
     isRecord(value) &&
     typeof value.id === "string" &&
     value.id.length > 0 &&
-    isOptionalWorkKind(value.kind) &&
-    isOptionalString(value.homeScopeId) &&
-    isOptionalScopeBindings(value.scopeBindings) &&
+    isWorkKind(value.kind) &&
+    isNonEmptyString(value.homeScopeId) &&
+    isScopeBindings(value.scopeBindings) &&
     isOptionalString(value.parentWorkItemId) &&
-    isOptionalWorkProvenance(value.provenance) &&
-    isOptionalNonNegativeInteger(value.revision) &&
+    isWorkProvenance(value.provenance) &&
+    isPositiveInteger(value.revision) &&
     isOptionalString(value.worktree) &&
     typeof value.epicId === "string" &&
     value.epicId.length > 0 &&
@@ -663,14 +656,16 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
-function isOptionalNonNegativeInteger(
-  value: unknown,
-): value is number | undefined {
-  return value === undefined || isNonNegativeInteger(value);
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
-function isOptionalWorkKind(value: unknown): boolean {
-  return value === undefined || isWorkKind(value);
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function hasUniqueIds(values: readonly { id: string }[]): boolean {
+  return new Set(values.map(({ id }) => id)).size === values.length;
 }
 
 function isWorkKind(value: unknown): boolean {
@@ -683,37 +678,30 @@ function isWorkKind(value: unknown): boolean {
   );
 }
 
-function isOptionalScopeBindings(value: unknown): boolean {
+function isScopeBindings(value: unknown): boolean {
   return (
-    value === undefined ||
-    (Array.isArray(value) &&
-      value.every(
-        (binding) =>
-          isRecord(binding) &&
-          typeof binding.scopeId === "string" &&
-          binding.scopeId.length > 0 &&
-          (binding.relation === "mounted-in" ||
-            binding.relation === "rolls-up-to"),
-      ))
+    Array.isArray(value) &&
+    value.every(
+      (binding) =>
+        isRecord(binding) &&
+        isNonEmptyString(binding.scopeId) &&
+        (binding.relation === "mounted-in" ||
+          binding.relation === "rolls-up-to"),
+    )
   );
 }
 
-function isOptionalWorkProvenance(value: unknown): boolean {
+function isWorkProvenance(value: unknown): boolean {
   return (
-    value === undefined ||
-    (isRecord(value) &&
-      (value.origin === "principal" || value.origin === "agent") &&
-      typeof value.actorPrincipalId === "string" &&
-      value.actorPrincipalId.length > 0 &&
-      isOptionalString(value.agentSessionId) &&
-      isOptionalString(value.proposedSponsorPrincipalId) &&
-      (value.sourceRefs === undefined ||
-        (Array.isArray(value.sourceRefs) &&
-          value.sourceRefs.every(
-            (reference) => typeof reference === "string",
-          ))) &&
-      typeof value.createdAt === "string" &&
-      value.createdAt.length > 0)
+    isRecord(value) &&
+    (value.origin === "principal" || value.origin === "agent") &&
+    isNonEmptyString(value.actorPrincipalId) &&
+    isOptionalString(value.agentSessionId) &&
+    isOptionalString(value.proposedSponsorPrincipalId) &&
+    (value.sourceRefs === undefined ||
+      (Array.isArray(value.sourceRefs) &&
+        value.sourceRefs.every(isNonEmptyString))) &&
+    isNonEmptyString(value.createdAt)
   );
 }
 
@@ -735,35 +723,43 @@ function orderedScopeMatches(
 ): BoardScopeMatch[] {
   const raw = traversal.resolve(view.roots, view.traversal);
   const rootSet = new Set(view.roots);
-  const seen = new Set<string>();
-  const matches: BoardScopeMatch[] = [];
+  const rootOrder = new Map(view.roots.map((root, index) => [root, index]));
+  const matchesByScope = new Map<string, BoardScopeMatch>();
   for (const match of raw) {
     if (
       !match ||
       typeof match.scopeId !== "string" ||
       typeof match.rootScopeId !== "string" ||
-      !rootSet.has(match.rootScopeId) ||
-      seen.has(match.scopeId)
+      !rootSet.has(match.rootScopeId)
     ) {
       continue;
     }
-    seen.add(match.scopeId);
-    matches.push({ scopeId: match.scopeId, rootScopeId: match.rootScopeId });
-  }
-  // A resolver for `self` is allowed to return no rows; roots remain eligible.
-  if (view.traversal === "self") {
-    for (const root of view.roots) {
-      if (!seen.has(root)) matches.push({ scopeId: root, rootScopeId: root });
+    const existing = matchesByScope.get(match.scopeId);
+    if (
+      existing === undefined ||
+      (rootOrder.get(match.rootScopeId) ?? Number.MAX_SAFE_INTEGER) <
+        (rootOrder.get(existing.rootScopeId) ?? Number.MAX_SAFE_INTEGER)
+    ) {
+      matchesByScope.set(match.scopeId, {
+        scopeId: match.scopeId,
+        rootScopeId: match.rootScopeId,
+      });
     }
   }
-  return matches;
+  // Both traversal modes include their roots. The resolver contributes only
+  // descendants/rollups; omitting a root must never turn `self-and-rollups`
+  // into "rollups but not self."
+  for (const root of view.roots) {
+    if (!matchesByScope.has(root))
+      matchesByScope.set(root, { scopeId: root, rootScopeId: root });
+  }
+  return [...matchesByScope.values()];
 }
 
 function matchingScopeIds(story: Story, resultScopeIds: Set<string>): string[] {
   const matched: string[] = [];
-  if (story.homeScopeId && resultScopeIds.has(story.homeScopeId))
-    matched.push(story.homeScopeId);
-  for (const binding of story.scopeBindings ?? []) {
+  if (resultScopeIds.has(story.homeScopeId)) matched.push(story.homeScopeId);
+  for (const binding of story.scopeBindings) {
     if (
       binding.relation === "rolls-up-to" &&
       resultScopeIds.has(binding.scopeId) &&
@@ -775,18 +771,44 @@ function matchingScopeIds(story: Story, resultScopeIds: Set<string>): string[] {
   return matched;
 }
 
-function matchesBoardFilters(story: Story, view: BoardView): boolean {
+function matchesBoardFilters(
+  story: Story,
+  view: BoardView,
+  sponsorshipDecisions: readonly WorkSponsorshipDecision[],
+): boolean {
   const { filters } = view;
   return (
     (filters.status === undefined || filters.status.includes(story.status)) &&
-    (filters.kind === undefined ||
-      (story.kind !== undefined && filters.kind.includes(story.kind))) &&
+    (filters.kind === undefined || filters.kind.includes(story.kind)) &&
     (filters.assigneePrincipalId === undefined ||
       filters.assigneePrincipalId === story.assigneePrincipalId) &&
     (filters.sponsorPrincipalId === undefined ||
-      filters.sponsorPrincipalId ===
-        story.provenance?.proposedSponsorPrincipalId)
+      hasConfirmedSponsor(
+        story.id,
+        filters.sponsorPrincipalId,
+        sponsorshipDecisions,
+      ))
   );
+}
+
+function hasConfirmedSponsor(
+  workItemId: string,
+  sponsorPrincipalId: string,
+  decisions: readonly WorkSponsorshipDecision[],
+): boolean {
+  const latest = decisions
+    .filter(
+      (decision) =>
+        decision.workItemId === workItemId &&
+        decision.sponsorPrincipalId === sponsorPrincipalId,
+    )
+    .sort(
+      (left, right) =>
+        right.revision - left.revision ||
+        right.decidedAt.localeCompare(left.decidedAt) ||
+        right.id.localeCompare(left.id),
+    )[0];
+  return latest?.decision === "confirmed";
 }
 
 function assertFeatureRequestProposalInput(
@@ -922,7 +944,7 @@ function groupFor(
     case "assignee":
       return story.assigneePrincipalId ?? story.assignee ?? "unassigned";
     case "kind":
-      return story.kind ?? "story";
+      return story.kind;
     case "scope": {
       if (story.homeScopeId && matchedScopeIds.includes(story.homeScopeId))
         return story.homeScopeId;
