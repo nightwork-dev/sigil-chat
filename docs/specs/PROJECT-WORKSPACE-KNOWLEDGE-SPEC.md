@@ -10,9 +10,18 @@
 > shipped on `@gonk/memory` + `@gonk/eve-host`, not the bespoke Mirk collection
 > it proposed)
 
+> **Composition correction (2026-07-21):**
+> [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md)
+> supersedes sections 1–3 where this document assumes a strict universal
+> project → workspace → session hierarchy. Registries and canonical homes
+> remain; shared participation is represented by typed links, active selection
+> carries an entered-via perspective, and principals remain an authorization
+> overlay rather than a container tier. The knowledge decisions in sections
+> 4–6 remain in force.
+
 ## The owner's framing
 
-> Project [My Game] ← Workspace [My Feature] ← Session
+> Project [Commerce Platform] ← Workspace [Checkout Reliability] ← Session
 
 A **project** is a durable body of work with persistent context that outlives
 any conversation. A **workspace** is a focused effort inside it. A **session**

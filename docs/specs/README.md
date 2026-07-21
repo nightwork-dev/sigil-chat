@@ -8,6 +8,22 @@ product overview.
 
 Currently authoritative for this product's design/implementation.
 
+- [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md) —
+  canonical ownership remains singular while typed, ordered scope links enable
+  shared workspaces, resource participation, default contribution, and
+  explicit work rollups. Defines the principal overlay, entered-via
+  perspective, per-resource resolution rules, scope-rooted board views, safe
+  agent-authored feature requests, and the project/workspace/session home-view
+  direction. Draft product and architecture contract; supersedes the strict
+  hierarchy in `PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md` sections 1–3.
+
+- [`PRODUCT-HOMES-IA-PROPOSAL.md`](PRODUCT-HOMES-IA-PROPOSAL.md) —
+  the information-architecture response to the scope contract: Project Home,
+  Workspace Home, and Session as the three orientation layers; breadcrumbs as
+  a visibility-filtered via-path; home-oriented surface navigation; shared
+  workspace ownership cues; and the empty/loading/denied/archived/mobile/
+  keyboard state matrix. Design proposal for the SC.7 implementation slice.
+
 - [`AGENT-SURFACE-COORDINATION-SPEC.md`](AGENT-SURFACE-COORDINATION-SPEC.md) —
   the spatial third of the attention/projection triangle: the agent's presence
   and output span the whole application surface, not just the current view.
