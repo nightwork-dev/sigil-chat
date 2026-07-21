@@ -19,6 +19,11 @@ const rollbackWorkflow = readFileSync(
   resolve(directory, "../../.github/workflows/prod-rollback.yml"),
   "utf8",
 )
+const provisionHost = readFileSync(
+  resolve(directory, "provision-host.sh"),
+  "utf8",
+)
+const deploymentReadme = readFileSync(resolve(directory, "README.md"), "utf8")
 
 test("fresh deployment orders containers on Eve liveness, not model auth", () => {
   const eveService = compose.slice(
@@ -177,6 +182,15 @@ test("storage initialization migrates a legacy Codex login once", () => {
     /\[ -s \/var\/lib\/sigil-eve\/codex-home\/auth\.json \]/,
   )
   assert.match(storageInit, /install -o 10000 -g 10000 -m 0600/)
+})
+
+test("host secrets are readable only by root and the runtime group", () => {
+  assert.match(provisionHost, /chown root:10000 "\$path"/)
+  assert.match(provisionHost, /chmod 0440 "\$path"/)
+  assert.doesNotMatch(provisionHost, /chmod 04(?:00|44) "\$path"/)
+  assert.match(deploymentReadme, /chown root:10000 \/srv\/sigil-chat\/secrets\/\*/)
+  assert.match(deploymentReadme, /chmod 0440 \/srv\/sigil-chat\/secrets\/\*/)
+  assert.doesNotMatch(deploymentReadme, /chmod 0400 \/srv\/sigil-chat\/secrets\/\*/)
 })
 
 test("production image disables KVM tools during Eve compilation", () => {

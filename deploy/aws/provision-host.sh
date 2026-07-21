@@ -48,7 +48,8 @@ for secret in better_auth_secret gonk_mcp_key invite_token_pepper; do
     umask 077
     openssl rand -base64 48 >"$path"
   fi
-  chmod 0444 "$path"
+  chown root:10000 "$path"
+  chmod 0440 "$path"
 done
 
 cat >/opt/sigil-chat/deploy/deploy.env.local <<EOF
