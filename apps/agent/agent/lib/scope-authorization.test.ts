@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest"
 import { ProjectRegistry } from "./project-registry"
 import {
   bindScopeDelegationToActorSession,
+  canReadMemorySource,
   createScopeGrantPolicy,
   requireAuthorizedResourceScope,
 } from "./scope-authorization"
@@ -56,7 +57,9 @@ describe("Eve resource-scope authorization", () => {
     })
 
     expect(delegated).toBeTruthy()
-    expect(readScopeDelegation(delegated!, expiresAt - 1, SECRET)).toMatchObject({
+    expect(
+      readScopeDelegation(delegated!, expiresAt - 1, SECRET),
+    ).toMatchObject({
       actorSessionId: "eve-session-1",
       expiresAt,
       scope: "workspace:workspace-1",
@@ -232,15 +235,59 @@ describe("Eve resource-scope authorization", () => {
     ).toBe(false)
   })
 
-  it("keeps an unregistered scope possession-gated", () => {
-    expect(
+  it("rejects an unregistered project scope even with a valid proof", () => {
+    expect(() =>
       requireAuthorizedResourceScope({
         principalId: "user-1",
-        request: request("project:legacy-project", "user-1"),
+        request: request("project:missing-project", "user-1"),
         secret: SECRET,
         registries: registries(),
       }),
-    ).toBe("project:legacy-project")
+    ).toThrow("NOT_AUTHORIZED")
+  })
+
+  it("authorizes memory sources against their live canonical container", () => {
+    const stores = registries()
+    stores.projects.upsert({
+      id: "project-1",
+      name: "Project One",
+      description: "A registered project.",
+      members: [{ principalId: "user-member", role: "member" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-member",
+    })
+    stores.workspaces.upsert({
+      id: "workspace-1",
+      projectId: "project-1",
+      name: "Workspace One",
+      description: "A registered workspace.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-member",
+    })
+
+    expect(
+      canReadMemorySource({
+        principalId: "user-member",
+        source: { scopeId: "workspace-1", resourceKey: "doc:launch" },
+        registries: stores,
+      }),
+    ).toBe(true)
+    expect(
+      canReadMemorySource({
+        principalId: "user-outsider",
+        source: { scopeId: "workspace-1", resourceKey: "doc:launch" },
+        registries: stores,
+      }),
+    ).toBe(false)
+    expect(
+      canReadMemorySource({
+        principalId: "user-member",
+        source: { scopeId: "missing-workspace" },
+        registries: stores,
+      }),
+    ).toBe(false)
   })
 })
 

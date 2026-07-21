@@ -164,6 +164,29 @@ describe("owned Eve channel", () => {
     await expect(ownerStore.getOwner("session-1")).resolves.toBe("user-1")
   })
 
+  it("rejects session creation without an immutable execution binding", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    const channel = makeOwnedChannel(ownerStore)
+    const send = vi.fn()
+    const route = findRoute(channel, "POST", "/eve/v1/session")
+
+    const response = await route.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session",
+        "user-1",
+        { message: "Hello" },
+        undefined,
+        { omitBinding: true },
+      ),
+      routeArgs({ send }),
+    )
+
+    expect(response.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+    await expect(ownerStore.getOwner("session-1")).resolves.toBeUndefined()
+  })
+
   it("binds the selected persona and rejects persona switching on continuation", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
     const observedPersonas: string[] = []
@@ -242,7 +265,7 @@ describe("owned Eve channel", () => {
 
   it("allows the owner to continue and rejects a different caller before dispatch", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("session-1", "user-1", "agent-a")
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
     const allowedSend = vi.fn(async () => ({ id: "session-1" }))
@@ -277,7 +300,7 @@ describe("owned Eve channel", () => {
 
   it("rejects cross-owner event-stream reads before resolving the session", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("session-1", "user-1", "agent-a")
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "GET", "/eve/v1/session/:sessionId/stream")
     const getSession = vi.fn()
@@ -297,11 +320,11 @@ describe("owned Eve channel", () => {
     const send = vi.fn()
 
     const response = await route.handler(
-      requestFor("POST", "/eve/v1/session/legacy-session", "user-1", {
+      requestFor("POST", "/eve/v1/session/unbound-session", "user-1", {
         continuationToken: "eve:continuation-1",
         message: "Continue",
       }),
-      routeArgs({ params: { sessionId: "legacy-session" }, send }),
+      routeArgs({ params: { sessionId: "unbound-session" }, send }),
     )
 
     expect(response.status).toBe(403)
@@ -310,12 +333,7 @@ describe("owned Eve channel", () => {
 
   it("rejects a different application thread or home on continuation", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind(
-      "session-1",
-      "user-1",
-      "agent-a",
-      executionBindingFor("agent-a"),
-    )
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
     const send = vi.fn()
@@ -338,12 +356,7 @@ describe("owned Eve channel", () => {
 
   it("requires the execution attestation after a session reaches V3", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind(
-      "session-1",
-      "user-1",
-      "agent-a",
-      executionBindingFor("agent-a"),
-    )
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
     const send = vi.fn()
@@ -475,9 +488,9 @@ describe("owned Eve channel", () => {
     expect(continued.status).toBe(200)
   })
 
-  it("rejects cross-thread replay while upgrading a legacy session", async () => {
+  it("rejects cross-thread replay against an immutable V3 session", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("legacy-session", "user-1", "agent-a")
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeSignedOwnedChannel(ownerStore)
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
     const send = vi.fn()
@@ -485,18 +498,21 @@ describe("owned Eve channel", () => {
     const denied = await route.handler(
       signedRequest(
         "POST",
-        "/eve/v1/session/legacy-session",
-        signedSessionBinding({ applicationThreadId: "thread-other" }),
+        "/eve/v1/session/session-1",
+        signedSessionBinding({
+          applicationThreadId: "thread-other",
+          eveSessionId: "session-1",
+        }),
         { continuationToken: "eve:continuation-1", message: "Continue" },
       ),
-      routeArgs({ params: { sessionId: "legacy-session" }, send }),
+      routeArgs({ params: { sessionId: "session-1" }, send }),
     )
 
     expect(denied.status).toBe(403)
     expect(send).not.toHaveBeenCalled()
-    await expect(ownerStore.getBinding("legacy-session")).resolves.toEqual({
-      personaId: "agent-a",
+    await expect(ownerStore.getBinding("session-1")).resolves.toEqual({
       subject: "user-1",
+      ...executionBindingFor("agent-a"),
     })
   })
 })

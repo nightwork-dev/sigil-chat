@@ -25,6 +25,8 @@ import {
 import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
 import {
   bindScopeDelegationToActorSession,
+  canReadMemorySource,
+  createScopeGrantPolicy,
   requireAuthorizedResourceScope,
 } from "../lib/scope-authorization"
 import { createReadinessRoute } from "../lib/readiness"
@@ -35,9 +37,16 @@ const requiredSkillIds = readCsvEnv("SIGIL_CONTEXT_REQUIRED_SKILLS")
 const pinnedResourceKeys = readCsvEnv("SIGIL_CONTEXT_PINNED_RESOURCE_KEYS")
 const contextCompiler = createDefaultSigilContextCompiler({ requiredSkillIds })
 const eveSessionOwnerStore = new MirkEveSessionOwnerStore()
+const memorySourcePolicy = createScopeGrantPolicy()
 const compileMessage = createSigilEveOnMessage({
   compiler: contextCompiler,
   pinnedResourceKeys,
+  authorizeMemorySource: ({ principalId, source }) =>
+    canReadMemorySource({
+      principalId,
+      source,
+      policy: memorySourcePolicy,
+    }),
   // S3.2: the session's shared blackboard rides every turn.
   readBlackboard: async (sessionId) =>
     (await blackboardRepository.read(sessionId)).content,

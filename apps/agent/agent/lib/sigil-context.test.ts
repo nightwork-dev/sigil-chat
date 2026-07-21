@@ -17,14 +17,17 @@ import {
 } from "./sigil-context"
 
 const SESSION_AUTH = {
-  attributes: { sigilPersonaId: "agent-a" } as Record<string, string>,
+  attributes: sessionAttributes("personal-scope:user-1") as Record<
+    string,
+    string
+  >,
   authenticator: "test",
   principalId: "user-1",
   principalType: "user",
 }
 
 describe("Sigil Eve context integration", () => {
-  it("omits oversized legacy blackboards from turn context", () => {
+  it("omits oversized blackboards from turn context", () => {
     expect(
       blackboardContextBlock("x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1)),
     ).toBeUndefined()
@@ -175,20 +178,72 @@ describe("Sigil Eve context integration", () => {
     expect(JSON.stringify(payload)).toContain("marigold")
   })
 
+  it("keeps personal recall continuity while viewing another workspace", async () => {
+    const recalls: Array<{
+      activeResourceScope?: string
+      targetAudience: { kind: string; principalId?: string; scopeId?: string }
+    }> = []
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes(
+          "personal-scope:user-1",
+          "workspace:ws-2",
+        ),
+      },
+      compiler: compilerWith([]),
+      recallLatestTurn: (input) => {
+        recalls.push(input)
+        return "## Relevant memory\n- PERSONAL_CONTINUITY"
+      },
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "Continue our work" })
+
+    expect(recalls).toEqual([
+      expect.objectContaining({
+        activeResourceScope: "workspace:ws-2",
+        targetAudience: { kind: "personal", principalId: "user-1" },
+      }),
+    ])
+    expect(JSON.stringify(firstSendCall(send)[0])).toContain(
+      "PERSONAL_CONTINUITY",
+    )
+  })
+
+  it("skips recall entirely when the immutable session binding is absent", async () => {
+    const recallLatestTurn = vi.fn(() => "SHOULD_NOT_BE_READ")
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: { sigilPersonaId: "agent-a" },
+      },
+      compiler: compilerWith([]),
+      recallLatestTurn,
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    expect(recallLatestTurn).not.toHaveBeenCalled()
+    expect(JSON.stringify(firstSendCall(send)[0])).not.toContain(
+      "SHOULD_NOT_BE_READ",
+    )
+  })
+
   it("adds labelled recall when its audience and sources are still authorized", async () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: {
-          sigilPersonaId: "agent-a",
-          sigilResourceScope: "workspace:ws-1",
-        },
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
       },
+      authorizeMemorySource: () => true,
       compiler: compilerWith([]),
       recallLatestTurn: () =>
         scopedRecall({
-          audience: { kind: "scope", scopeId: "workspace:ws-1" },
-          sources: [{ scopeId: "workspace:ws-1", resourceKey: "doc:launch" }],
+          audience: { kind: "scope", scopeId: "ws-1" },
+          sources: [{ scopeId: "ws-1", resourceKey: "doc:launch" }],
           content: "## Relevant memory\n- LABELLED_ALLOWED_RECALL",
         }),
     })
@@ -204,17 +259,15 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: {
-          sigilPersonaId: "agent-a",
-          sigilResourceScope: "workspace:ws-1",
-          sigilContextDeny: "doc:launch",
-        },
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
       },
+      authorizeMemorySource: ({ source }) =>
+        source.resourceKey !== "doc:launch",
       compiler: compilerWith([]),
       recallLatestTurn: () =>
         scopedRecall({
-          audience: { kind: "scope", scopeId: "workspace:ws-1" },
-          sources: [{ scopeId: "workspace:ws-1", resourceKey: "doc:launch" }],
+          audience: { kind: "scope", scopeId: "ws-1" },
+          sources: [{ scopeId: "ws-1", resourceKey: "doc:launch" }],
           content: "## Relevant memory\n- REVOKED_SOURCE_RECALL",
         }),
     })
@@ -230,12 +283,10 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: {
-          sigilPersonaId: "agent-a",
-          sigilResourceScope: "workspace:ws-1",
-          sigilContextDeny: "doc:denied",
-        },
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
       },
+      authorizeMemorySource: ({ source }) =>
+        source.resourceKey !== "doc:denied",
       compiler: compilerWith([]),
       recallLatestTurn: () => ({
         content:
@@ -245,21 +296,15 @@ describe("Sigil Eve context integration", () => {
           {
             id: "memory-1",
             labels: {
-              legacy: false,
-              audience: { kind: "scope", scopeId: "workspace:ws-1" },
-              sources: [
-                { scopeId: "workspace:ws-1", resourceKey: "doc:allowed" },
-              ],
+              audience: { kind: "scope", scopeId: "ws-1" },
+              sources: [{ scopeId: "ws-1", resourceKey: "doc:allowed" }],
             },
           },
           {
             id: "memory-2",
             labels: {
-              legacy: false,
-              audience: { kind: "scope", scopeId: "workspace:ws-1" },
-              sources: [
-                { scopeId: "workspace:ws-1", resourceKey: "doc:denied" },
-              ],
+              audience: { kind: "scope", scopeId: "ws-1" },
+              sources: [{ scopeId: "ws-1", resourceKey: "doc:denied" }],
             },
           },
         ],
@@ -279,16 +324,14 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: {
-          sigilPersonaId: "agent-a",
-          sigilResourceScope: "workspace:ws-1",
-        },
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
       },
+      authorizeMemorySource: () => true,
       compiler: compilerWith([]),
       recallLatestTurn: () =>
         scopedRecall({
-          audience: { kind: "scope", scopeId: "workspace:ws-2" },
-          sources: [{ scopeId: "workspace:ws-2" }],
+          audience: { kind: "scope", scopeId: "ws-2" },
+          sources: [{ scopeId: "ws-2" }],
           content: "## Relevant memory\n- WRONG_AUDIENCE_RECALL",
         }),
     })
@@ -304,10 +347,7 @@ describe("Sigil Eve context integration", () => {
     const channel = testChannel({
       auth: {
         ...SESSION_AUTH,
-        attributes: {
-          sigilPersonaId: "agent-a",
-          sigilResourceScope: "workspace:ws-1",
-        },
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
       },
       compiler: compilerWith([]),
       recallLatestTurn: () =>
@@ -326,7 +366,7 @@ describe("Sigil Eve context integration", () => {
     )
   })
 
-  it("allows legacy string recall only in the principal-private target", async () => {
+  it("allows unlabelled adapter recall only in the principal-private target", async () => {
     const personalChannel = testChannel({
       compiler: compilerWith([]),
       recallLatestTurn: () => "## Relevant memory\n- LEGACY_PRIVATE_RECALL",
@@ -335,8 +375,7 @@ describe("Sigil Eve context integration", () => {
       auth: {
         ...SESSION_AUTH,
         attributes: {
-          sigilPersonaId: "agent-a",
-          sigilResourceScope: "workspace:ws-1",
+          ...sessionAttributes("ws-1", "workspace:ws-1"),
         },
       },
       compiler: compilerWith([]),
@@ -574,6 +613,7 @@ describe("Sigil Eve context integration", () => {
 
 function testChannel(options: {
   auth?: typeof SESSION_AUTH
+  authorizeMemorySource?: SigilContextOptions["authorizeMemorySource"]
   compiler: ContextCompiler
   identityFloor?: (input: {
     eveSessionId: string
@@ -588,6 +628,7 @@ function testChannel(options: {
   return eveChannel({
     auth: [() => options.auth ?? SESSION_AUTH],
     onMessage: createSigilEveOnMessage({
+      authorizeMemorySource: options.authorizeMemorySource,
       compiler: options.compiler,
       identityFloor: options.identityFloor,
       maxTokens: options.maxTokens,
@@ -596,6 +637,14 @@ function testChannel(options: {
       recallLatestTurn: options.recallLatestTurn,
     }),
   })
+}
+
+function sessionAttributes(homeScopeId: string, resourceScope?: string) {
+  return {
+    sigilPersonaId: "agent-a",
+    sigilExecutionBinding: JSON.stringify({ homeScopeId }),
+    ...(resourceScope ? { sigilResourceScope: resourceScope } : {}),
+  }
 }
 
 async function postSession(
@@ -775,7 +824,6 @@ function scopedRecall(input: {
       {
         id: "memory-1",
         labels: {
-          legacy: false,
           audience: input.audience,
           sources: input.sources ?? [],
         },

@@ -142,66 +142,64 @@ export function createOwnedEveChannel(
       const subject = principalSubject(caller)
       const sessionId = sessionIdFromRequest(request)
       const requestedExecutionBinding = executionBindingFromCaller(caller)
-      const attestedEveSessionId = eveSessionIdFromCaller(caller)
-      let personaId = requestedPersonaId(caller) ?? defaultPersonaId
+      const requested = requestedPersonaId(caller)
+      if (
+        new URL(request.url).pathname === EVE_CREATE_PATH &&
+        !requestedExecutionBinding
+      ) {
+        throw new ForbiddenError({
+          code: "eve_session_binding_required",
+          message: "Session creation requires an immutable execution binding.",
+        })
+      }
+      let personaId =
+        requestedExecutionBinding?.personaId ?? requested ?? defaultPersonaId
+      if (
+        requested !== undefined &&
+        requestedExecutionBinding !== undefined &&
+        requested !== requestedExecutionBinding.personaId
+      ) {
+        throw new ForbiddenError({
+          code: "eve_session_persona_mismatch",
+          message: "The requested persona does not match the session binding.",
+        })
+      }
       if (sessionId !== undefined) {
         const binding = await ownerStore.getBinding(sessionId)
-        if (binding?.subject !== subject) {
+        if (!binding || binding.subject !== subject) {
           throw new ForbiddenError({
             code: "eve_session_owner_mismatch",
             message: "The authenticated principal does not own this session.",
           })
         }
-        personaId = binding.personaId ?? defaultPersonaId
-        const requested = requestedPersonaId(caller)
+        if (!requestedExecutionBinding) {
+          throw new ForbiddenError({
+            code: "eve_session_binding_required",
+            message: "This session requires its immutable execution binding.",
+          })
+        }
+        personaId = binding.personaId
         if (requested !== undefined && requested !== personaId) {
           throw new ForbiddenError({
             code: "eve_session_persona_mismatch",
             message: "The requested persona does not own this session.",
           })
         }
-        if (requestedExecutionBinding) {
-          if (
-            binding.applicationThreadId === undefined &&
-            attestedEveSessionId !== sessionId
-          ) {
-            throw new ForbiddenError({
-              code: "eve_session_execution_mismatch",
-              message:
-                "A legacy session can only be upgraded by its attested application thread.",
-            })
-          }
-          if (requestedExecutionBinding.personaId !== personaId) {
-            throw new ForbiddenError({
-              code: "eve_session_execution_mismatch",
-              message:
-                "The requested execution binding does not own this session.",
-            })
-          }
-          try {
-            await ownerStore.bind(
-              sessionId,
-              subject,
-              personaId,
-              requestedExecutionBinding,
-            )
-          } catch {
-            throw new ForbiddenError({
-              code: "eve_session_execution_mismatch",
-              message:
-                "The requested execution binding does not own this session.",
-            })
-          }
-        } else if (binding.applicationThreadId !== undefined) {
+        if (requestedExecutionBinding.personaId !== personaId) {
           throw new ForbiddenError({
-            code: "eve_session_binding_required",
-            message: "This session requires its immutable execution binding.",
+            code: "eve_session_execution_mismatch",
+            message:
+              "The requested execution binding does not own this session.",
           })
-        } else if (binding.personaId === undefined) {
-          // Compatibility-only callers without a V3 attestation may still
-          // promote the old subject-only record after all request checks pass.
-          // The real Sigil route always supplies a signed execution binding.
-          await ownerStore.bind(sessionId, subject, defaultPersonaId)
+        }
+        try {
+          await ownerStore.bind(sessionId, subject, requestedExecutionBinding)
+        } catch {
+          throw new ForbiddenError({
+            code: "eve_session_execution_mismatch",
+            message:
+              "The requested execution binding does not own this session.",
+          })
         }
       }
       const boundCaller = withPersona(caller, personaId)
@@ -302,7 +300,6 @@ function wrapHttpRoute(
                   await ownerStore.bind(
                     session.id,
                     principalSubject(caller),
-                    requiredPersonaId(caller),
                     requiredExecutionBinding(caller),
                   )
                   return session
@@ -364,14 +361,6 @@ function requestedPersonaId(caller: SessionAuthContext): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined
 }
 
-function requiredPersonaId(caller: SessionAuthContext): string {
-  const value = caller.attributes.sigilPersonaId
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error("Eve session creation requires a bound persona.")
-  }
-  return value.trim()
-}
-
 function requiredExecutionBinding(
   caller: SessionAuthContext,
 ): AgentSessionExecutionBinding {
@@ -393,13 +382,6 @@ function executionBindingFromCaller(
   } catch {
     return undefined
   }
-}
-
-function eveSessionIdFromCaller(
-  caller: SessionAuthContext,
-): string | undefined {
-  const value = caller.attributes.sigilAttestedEveSessionId
-  return typeof value === "string" && value.trim() ? value.trim() : undefined
 }
 
 function isExecutionBinding(

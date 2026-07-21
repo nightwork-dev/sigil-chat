@@ -53,7 +53,6 @@ export type ScopedMemoryAudienceLabel =
 export interface ScopedMemoryLabels {
   readonly sources: readonly ScopedMemorySourceLabel[]
   readonly audience: ScopedMemoryAudienceLabel
-  readonly legacy: boolean
 }
 
 export interface ScopedMemoryRecordProjection {
@@ -226,6 +225,36 @@ export function memoryDraft(
   }
 }
 
+export function memoryLabelsForSession(
+  attributes: Readonly<Record<string, unknown>>,
+  principalId: string,
+): {
+  readonly sources: readonly ScopedMemorySourceLabel[]
+  readonly audience: ScopedMemoryAudienceLabel
+} {
+  const executionBinding = executionBindingFromAttributes(attributes)
+  if (!executionBinding) {
+    throw new Error("Memory actions require an immutable session binding.")
+  }
+  const homeScopeId = executionBinding.homeScopeId
+  if (homeScopeId.startsWith("personal-scope:")) {
+    if (homeScopeId !== `personal-scope:${principalId}`) {
+      throw new Error("Memory session home does not belong to this principal.")
+    }
+    const activeSource = containerScopeId(attributes.sigilResourceScope)
+    return {
+      audience: { kind: "personal", principalId },
+      sources: activeSource ? [{ scopeId: activeSource }] : [],
+    }
+  }
+
+  const activeSource = containerScopeId(attributes.sigilResourceScope)
+  return {
+    audience: { kind: "scope", scopeId: homeScopeId },
+    sources: [{ scopeId: activeSource ?? homeScopeId }],
+  }
+}
+
 export function automaticScopedMemoryRecallForTurn(input: {
   personaId: string
   turn: TrustedMemoryTurn
@@ -262,35 +291,25 @@ export function scopedMemoryLabelsFromRecord(
     return {
       sources,
       audience,
-      legacy: false,
     }
   }
-
-  const legacyAudience = legacyAudienceFromRecord(record)
-  if (!legacyAudience) return undefined
-
-  return {
-    sources: [],
-    audience: legacyAudience,
-    legacy: true,
-  }
+  return undefined
 }
 
 function sourceLabelsToEvidence(
   sources: readonly ScopedMemorySourceLabel[],
 ): MemoryRecordDraft["evidence"] {
-  return sources.flatMap((source) => {
-    const evidence: MemoryRecordDraft["evidence"] = [
-      { kind: "record", id: `${SOURCE_SCOPE_EVIDENCE_PREFIX}${source.scopeId}` },
-    ]
-    if (source.resourceKey) {
-      evidence.push({
-        kind: "record",
-        id: `${SOURCE_RESOURCE_EVIDENCE_PREFIX}${source.scopeId}|${source.resourceKey}`,
-      })
-    }
-    return evidence
-  })
+  return sources.map((source) =>
+    source.resourceKey
+      ? {
+          kind: "record" as const,
+          id: `${SOURCE_RESOURCE_EVIDENCE_PREFIX}${source.scopeId}|${source.resourceKey}`,
+        }
+      : {
+          kind: "record",
+          id: `${SOURCE_SCOPE_EVIDENCE_PREFIX}${source.scopeId}`,
+        },
+  )
 }
 
 function audienceLabelToEvidence(
@@ -311,12 +330,13 @@ function audienceLabelToEvidence(
 function sourceLabelsFromEvidence(
   evidence: readonly MemoryRecord["provenance"]["evidence"][number][],
 ): ScopedMemorySourceLabel[] {
-  const byScope = new Map<string, ScopedMemorySourceLabel>()
+  const scopeOnly = new Set<string>()
+  const resources = new Map<string, ScopedMemorySourceLabel>()
   for (const item of evidence) {
     if (item.kind !== "record") continue
     if (item.id.startsWith(SOURCE_SCOPE_EVIDENCE_PREFIX)) {
       const scopeId = item.id.slice(SOURCE_SCOPE_EVIDENCE_PREFIX.length)
-      if (scopeId) byScope.set(scopeId, { scopeId })
+      if (scopeId) scopeOnly.add(scopeId)
       continue
     }
     if (item.id.startsWith(SOURCE_RESOURCE_EVIDENCE_PREFIX)) {
@@ -326,11 +346,22 @@ function sourceLabelsFromEvidence(
       const scopeId = encoded.slice(0, separator)
       const resourceKey = encoded.slice(separator + 1)
       if (scopeId && resourceKey) {
-        byScope.set(scopeId, { scopeId, resourceKey })
+        resources.set(`${scopeId}\u0000${resourceKey}`, {
+          scopeId,
+          resourceKey,
+        })
       }
     }
   }
-  return [...byScope.values()]
+  const resourceScopes = new Set(
+    [...resources.values()].map((source) => source.scopeId),
+  )
+  return [
+    ...[...scopeOnly]
+      .filter((scopeId) => !resourceScopes.has(scopeId))
+      .map((scopeId) => ({ scopeId })),
+    ...resources.values(),
+  ]
 }
 
 function audienceLabelFromEvidence(
@@ -339,7 +370,9 @@ function audienceLabelFromEvidence(
   for (const item of evidence) {
     if (item.kind !== "record") continue
     if (item.id.startsWith(AUDIENCE_PERSONAL_EVIDENCE_PREFIX)) {
-      const principalId = item.id.slice(AUDIENCE_PERSONAL_EVIDENCE_PREFIX.length)
+      const principalId = item.id.slice(
+        AUDIENCE_PERSONAL_EVIDENCE_PREFIX.length,
+      )
       if (principalId) return { kind: "personal", principalId }
     }
     if (item.id.startsWith(AUDIENCE_SCOPE_EVIDENCE_PREFIX)) {
@@ -350,19 +383,25 @@ function audienceLabelFromEvidence(
   return undefined
 }
 
-function legacyAudienceFromRecord(
-  record: MemoryRecord,
-): ScopedMemoryAudienceLabel | undefined {
-  if (
-    record.audience.recall.kind === "relationship" &&
-    record.audience.recall.principalId
-  ) {
-    return {
-      kind: "personal",
-      principalId: record.audience.recall.principalId,
-    }
+function executionBindingFromAttributes(
+  attributes: Readonly<Record<string, unknown>>,
+): { homeScopeId: string } | undefined {
+  const raw = attributes.sigilExecutionBinding
+  if (typeof raw !== "string" || !raw.trim()) return undefined
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>
+    return typeof value.homeScopeId === "string" && value.homeScopeId.trim()
+      ? { homeScopeId: value.homeScopeId.trim() }
+      : undefined
+  } catch {
+    return undefined
   }
-  return undefined
+}
+
+function containerScopeId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  const match = /^(?:project|workspace):(.+)$/.exec(value.trim())
+  return match?.[1]?.trim() || undefined
 }
 
 export function sessionPersonaId(
