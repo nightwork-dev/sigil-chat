@@ -13,23 +13,25 @@ import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThread } from "@/lib/agent-threads"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { resolveViaLabel } from "@/features/homes/home-view-model"
-import {
-  fixtureArtifactRows,
-  fixtureAttention,
-  fixtureWorkSource,
-} from "@/features/homes/fixtures"
+import { routeSources } from "@/features/homes/live-sources"
 import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
 
 export const Route = createFileRoute("/_app/sessions/$threadId")({
-  validateSearch: (search: Record<string, unknown>): { via?: string } =>
-    typeof search.via === "string" ? { via: search.via } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { via?: string; fixtures?: boolean } => ({
+    ...(typeof search.via === "string" ? { via: search.via } : {}),
+    ...(search.fixtures === "1" || search.fixtures === true
+      ? { fixtures: true }
+      : {}),
+  }),
   component: SessionHomeRoute,
 })
 
 function SessionHomeRoute() {
   const { threadId } = Route.useParams()
-  const { via } = Route.useSearch()
+  const { via, fixtures } = Route.useSearch()
   const thread = useAgentThread(threadId)
   const nav = useProjectWorkspaceNav()
   const compact = useMediaQuery("(max-width: 640px)")
@@ -49,6 +51,7 @@ function SessionHomeRoute() {
     const ownership = thread.data.workspaceId
       ? resolveViaLabel(nav.data, thread.data.workspaceId, via)
       : undefined
+    const sources = routeSources(Boolean(fixtures), [])
     const view: SessionHomeView = {
       header: {
         scopeId: thread.data.id,
@@ -58,12 +61,12 @@ function SessionHomeRoute() {
       },
       workspaceName: workspace?.name,
       ownership,
-      artifacts: fixtureArtifactRows,
-      commitments: fixtureWorkSource.commitmentsForSession(thread.data.id),
-      attention: fixtureAttention,
+      artifacts: sources.artifacts,
+      commitments: sources.work.commitmentsForSession(thread.data.id),
+      attention: sources.attention,
     }
     return { kind: "ready", view }
-  }, [thread.data, thread.isError, nav.data, nav.isLoading, via])
+  }, [thread.data, thread.isError, nav.data, nav.isLoading, via, fixtures])
 
   return <SessionHome state={state} compact={compact} />
 }
