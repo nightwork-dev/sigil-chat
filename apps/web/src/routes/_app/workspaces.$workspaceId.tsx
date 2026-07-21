@@ -12,6 +12,7 @@ import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
 import { useArtifacts } from "@/lib/artifacts"
+import { useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import {
   buildWorkspaceHome,
@@ -60,6 +61,11 @@ function WorkspaceHomeRoute() {
       ? artifactScopeForHome("workspace", workspaceId)
       : null
   const artifacts = useArtifacts(artifactScope)
+  const signals = useHomeSignals(
+    "workspace",
+    workspaceId,
+    !fixtures && access.data === "readable",
+  )
 
   const state: HomeState<WorkspaceHomeView> = useMemo(() => {
     const homeNav = fixtures ? fixtureNav : nav.data
@@ -67,10 +73,7 @@ function WorkspaceHomeRoute() {
     if (!fixtures && access.data === "denied") {
       return { kind: "denied", discoverable: true }
     }
-    if (
-      !fixtures &&
-      (access.data === "not-found" || access.isError)
-    ) {
+    if (!fixtures && (access.data === "not-found" || access.isError)) {
       return { kind: "not-found" }
     }
     if (
@@ -81,7 +84,8 @@ function WorkspaceHomeRoute() {
       (!fixtures &&
         Boolean(artifactScope) &&
         !artifacts.data &&
-        !artifacts.isError)
+        !artifacts.isError) ||
+      (!fixtures && !signals.data && !signals.isError)
     ) {
       return { kind: "loading" }
     }
@@ -101,6 +105,8 @@ function WorkspaceHomeRoute() {
       }),
       {
         resources: artifactRowsFromRecords(artifacts.data ?? []),
+        signals: signals.data,
+        viaProjectId: via,
       },
     )
     const input: HomesAdapterInput = {
@@ -109,6 +115,7 @@ function WorkspaceHomeRoute() {
       work: sources.work,
       agents: sources.agents,
       resources: sources.resources,
+      activity: sources.activity,
       attention: sources.attention,
     }
     const view = buildWorkspaceHome(input, workspaceId, via)
@@ -121,6 +128,8 @@ function WorkspaceHomeRoute() {
     scopedWork.isError,
     artifacts.data,
     artifacts.isError,
+    signals.data,
+    signals.isError,
     artifactScope,
     access.data,
     access.isError,

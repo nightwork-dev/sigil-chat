@@ -16,7 +16,8 @@ export interface SessionHomeProps {
 
 export function SessionHome({ state, compact }: SessionHomeProps) {
   if (state.kind === "loading") return <HomeSkeleton />
-  if (state.kind === "denied") return <HomeDenied discoverable={state.discoverable} />
+  if (state.kind === "denied")
+    return <HomeDenied discoverable={state.discoverable} />
   if (state.kind === "not-found") return <HomeDenied discoverable={false} />
 
   const { view } = state
@@ -33,11 +34,16 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
     >
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          {view.header.icon ? <span aria-hidden>{view.header.icon}</span> : null}
+          {view.header.icon ? (
+            <span aria-hidden>{view.header.icon}</span>
+          ) : null}
           {view.header.name}
         </h1>
         {view.workspaceName ? (
-          <p className="text-[11px] text-muted-foreground" data-testid="session-home-workspace">
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="session-home-workspace"
+          >
             Session in {view.workspaceName}
           </p>
         ) : null}
@@ -93,6 +99,26 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
           />
         ))}
       </HomeSection>
+
+      {view.activity.length > 0 ? (
+        <HomeSection
+          title="Recent activity"
+          count={view.activity.length}
+          empty=""
+          compact={compact}
+        >
+          {view.activity.map((item, index) => (
+            <HomeRow
+              key={item.id}
+              first={index === 0}
+              compact={compact}
+              title={item.summary}
+              description={item.agentName}
+              href={item.href}
+            />
+          ))}
+        </HomeSection>
+      ) : null}
 
       {view.attention.length > 0 ? (
         <HomeSection

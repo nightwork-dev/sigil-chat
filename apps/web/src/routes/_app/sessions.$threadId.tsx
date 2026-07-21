@@ -11,6 +11,7 @@ import { useMemo } from "react"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThread } from "@/lib/agent-threads"
 import { useArtifacts } from "@/lib/artifacts"
+import { useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { resolveViaLabel } from "@/features/homes/home-view-model"
 import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
@@ -48,6 +49,11 @@ function SessionHomeRoute() {
   const artifactScope =
     !fixtures && thread.data ? artifactScopeForHome("session", threadId) : null
   const artifacts = useArtifacts(artifactScope)
+  const signals = useHomeSignals(
+    "session",
+    threadId,
+    !fixtures && Boolean(thread.data),
+  )
 
   const state: HomeState<SessionHomeView> = useMemo(() => {
     const homeThread = fixtures
@@ -69,7 +75,8 @@ function SessionHomeRoute() {
       (!fixtures &&
         Boolean(artifactScope) &&
         !artifacts.data &&
-        !artifacts.isError)
+        !artifacts.isError) ||
+      (!fixtures && !signals.data && !signals.isError)
     ) {
       return { kind: "loading" }
     }
@@ -92,6 +99,8 @@ function SessionHomeRoute() {
       }),
       {
         artifacts: artifactRowsFromRecords(artifacts.data ?? []),
+        signals: signals.data,
+        viaProjectId: via,
       },
     )
     const view: SessionHomeView = {
@@ -105,6 +114,7 @@ function SessionHomeRoute() {
       ownership,
       artifacts: sources.artifacts,
       commitments: sources.work.commitmentsForSession(homeThread.id),
+      activity: sources.activity,
       attention: sources.attention,
     }
     return { kind: "ready", view }
@@ -118,6 +128,8 @@ function SessionHomeRoute() {
     commitments.isError,
     artifacts.data,
     artifacts.isError,
+    signals.data,
+    signals.isError,
     artifactScope,
     via,
     fixtures,

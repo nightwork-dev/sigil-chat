@@ -124,6 +124,59 @@ describe("home route sources", () => {
     ]);
   });
 
+  it("projects durable activity and attention without inventing a source scope", () => {
+    const live = liveWorkSource({ nav });
+    const sources = routeSources(
+      false,
+      [{ personaId: "eve", name: "Eve", hasPortrait: false }],
+      live,
+      {
+        signals: {
+          activity: [
+            {
+              id: "activity-1",
+              agentPersonaId: "eve",
+              occurredAt: "2026-07-21T01:00:00.000Z",
+              summary: "Used publish",
+              threadId: "thread-1",
+            },
+          ],
+          attention: [
+            {
+              id: "attention-1",
+              agentPersonaId: "eve",
+              anchorId: "claim-1",
+              body: "Check this claim",
+              label: "Claim",
+              occurredAt: "2026-07-21T01:00:00.000Z",
+              threadId: "thread-1",
+            },
+          ],
+        },
+        viaProjectId: "project-1",
+      },
+    );
+
+    expect(sources.activity).toEqual([
+      {
+        id: "activity-1",
+        agentName: "Eve",
+        summary: "Used publish",
+        occurredAt: "2026-07-21T01:00:00.000Z",
+        href: "/sessions/thread-1?via=project-1",
+      },
+    ]);
+    expect(sources.attention).toEqual([
+      {
+        id: "attention-1",
+        agentName: "Eve",
+        subject: "Check this claim",
+        notedFromName: undefined,
+        href: "/sessions/thread-1?via=project-1",
+      },
+    ]);
+  });
+
   it("formats artifact scopes without double-prefixing qualified ids", () => {
     expect(artifactScopeForHome("project", "project-1")).toBe(
       "project:project-1",

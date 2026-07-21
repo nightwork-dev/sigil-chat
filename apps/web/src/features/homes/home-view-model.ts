@@ -23,6 +23,7 @@ import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 import type { AgentThreadSummary } from "@/lib/agent-threads"
 
 import type {
+  ActivityItem,
   AgentRow,
   AttentionItem,
   HomeHeader,
@@ -40,6 +41,7 @@ export interface HomesAdapterInput {
   readonly threads: readonly AgentThreadSummary[]
   readonly work: ScopedWorkSource
   readonly agents?: readonly AgentRow[]
+  readonly activity?: readonly ActivityItem[]
   readonly attention?: readonly AttentionItem[]
   readonly resources?: readonly ResourceRow[]
 }
@@ -67,10 +69,7 @@ export function scopeLinksFromNav(
   return sortScopeLinks(links)
 }
 
-function workspaceHref(
-  workspaceId: string,
-  viaProjectId?: string,
-): string {
+function workspaceHref(workspaceId: string, viaProjectId?: string): string {
   return viaProjectId
     ? `/workspaces/${workspaceId}?via=${encodeURIComponent(viaProjectId)}`
     : `/workspaces/${workspaceId}`
@@ -113,8 +112,7 @@ export function projectWorkspaceRows(
 
   const ownerName = (workspace: (typeof nav.workspaces)[number]) =>
     workspace.projectId
-      ? nav.projects.find((project) => project.id === workspace.projectId)
-          ?.name
+      ? nav.projects.find((project) => project.id === workspace.projectId)?.name
       : undefined
 
   const rows: WorkspaceListRow[] = owned.map((workspace) => ({
@@ -154,7 +152,10 @@ function sessionRows(
       id: thread.id,
       title: thread.title,
       personaId: thread.personaId,
-      status: thread.status === "archived" ? ("archived" as const) : ("active" as const),
+      status:
+        thread.status === "archived"
+          ? ("archived" as const)
+          : ("active" as const),
       updatedAt: thread.updatedAt,
       workspaceId: thread.workspaceId,
       workspaceName: thread.workspaceId
@@ -208,7 +209,8 @@ export function buildProjectHome(
       input.threads,
       input.nav,
       (thread) => {
-        if (!thread.workspaceId) return projectId === input.nav.personalProjectId
+        if (!thread.workspaceId)
+          return projectId === input.nav.personalProjectId
         const workspace = input.nav.workspaces.find(
           (w) => w.id === thread.workspaceId,
         )
@@ -224,6 +226,7 @@ export function buildProjectHome(
     agents: input.agents ?? [],
     resources: input.resources ?? [],
     work: input.work.summariesForScope(projectId),
+    activity: input.activity ?? [],
     attention: input.attention ?? [],
   }
 }
@@ -287,6 +290,7 @@ export function buildWorkspaceHome(
     agents: input.agents ?? [],
     resources: input.resources ?? [],
     work: input.work.summariesForScope(workspaceId),
+    activity: input.activity ?? [],
     attention: input.attention ?? [],
   }
 }

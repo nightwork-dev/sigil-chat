@@ -192,6 +192,26 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         ))}
       </HomeSection>
 
+      {view.activity.length > 0 ? (
+        <HomeSection
+          title="Recent activity"
+          count={view.activity.length}
+          empty=""
+          compact={compact}
+        >
+          {view.activity.map((item, index) => (
+            <HomeRow
+              key={item.id}
+              first={index === 0}
+              compact={compact}
+              title={item.summary}
+              description={item.agentName}
+              href={item.href}
+            />
+          ))}
+        </HomeSection>
+      ) : null}
+
       {view.attention.length > 0 ? (
         <HomeSection
           title="Attention"
