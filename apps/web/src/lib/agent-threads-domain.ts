@@ -27,10 +27,28 @@ export interface ScopePerspective {
   viaScopeIds: string[];
 }
 
+export interface AgentThreadExecutionBinding {
+  /** Server-derived authenticated principal; never accepted from browser input. */
+  principalId: string;
+  /** Server-validated persona id for this execution thread. */
+  personaId: string;
+  /**
+   * Immutable scope record id. Ordinary sessions are workspace-homed; private
+   * cross-project personal-agent sessions are homed in the principal's personal
+   * scope.
+   */
+  homeScopeId: string;
+  /** The validated display perspective at session creation/fork time. */
+  initialPerspective: ScopePerspective;
+  /** Ordered, deduped, server-authorized context scope ids. */
+  additionalContextScopeIds: string[];
+}
+
 export interface AgentThread {
   members: string[];
   id: string;
   personaId: string;
+  executionBinding?: AgentThreadExecutionBinding;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -79,6 +97,7 @@ export interface AgentThreadPreference {
 export interface AgentThreadSummary {
   id: string;
   personaId: string;
+  executionBinding?: AgentThreadExecutionBinding;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -112,6 +131,13 @@ export interface ForkAgentThreadInput {
   sourceThreadId: string;
   title?: string;
   expectedRevision?: number;
+}
+
+export interface CreateAgentThreadInput {
+  personaId?: string;
+  title?: string;
+  workspaceId?: string;
+  executionBinding?: AgentThreadExecutionBinding;
 }
 
 const THREAD_KEY_PREFIX = "thread:";
@@ -186,14 +212,24 @@ export class AgentThreadRepository {
 
   create(
     userId: string,
-    input: { personaId?: string; title?: string; workspaceId?: string } = {},
+    input: CreateAgentThreadInput = {},
   ): AgentThread {
     const timestamp = this.now().toISOString();
     const workspaceId = normalizeWorkspaceId(input.workspaceId);
+    const personaId = normalizePersonaId(input.personaId ?? this.defaultPersonaId);
+    const executionBinding = input.executionBinding
+      ? normalizeExecutionBinding(input.executionBinding, {
+          principalId: userId,
+          personaId,
+        })
+      : workspaceId
+        ? legacyExecutionBinding(userId, personaId, workspaceId)
+        : undefined;
     const thread: AgentThread = {
       members: [userId],
       id: this.createId(),
-      personaId: normalizePersonaId(input.personaId ?? this.defaultPersonaId),
+      personaId,
+      ...(executionBinding ? { executionBinding } : {}),
       title: normalizeTitle(input.title),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -222,6 +258,11 @@ export class AgentThreadRepository {
     expectedRevision?: number,
   ): AgentThread {
     return this.update(userId, id, expectedRevision, (thread, timestamp) => {
+      if (thread.executionBinding) {
+        throw new Error(
+          "Bound agent thread home scope cannot be changed by workspace rebinding.",
+        );
+      }
       const normalized = normalizeWorkspaceId(workspaceId);
       const rebound = cloneThread(thread);
       if (normalized) rebound.workspaceId = normalized;
@@ -300,10 +341,19 @@ export class AgentThreadRepository {
     const source = this.require(userId, input.sourceThreadId);
     assertRevision(source, input.expectedRevision);
     const timestamp = this.now().toISOString();
+    const executionBinding = source.executionBinding
+      ? normalizeExecutionBinding(source.executionBinding, {
+          principalId: userId,
+          personaId: source.personaId,
+        })
+      : source.workspaceId
+        ? legacyExecutionBinding(userId, source.personaId, source.workspaceId)
+        : undefined;
     const fork: AgentThread = {
       members: [...source.members],
       id: this.createId(),
       personaId: source.personaId,
+      ...(executionBinding ? { executionBinding } : {}),
       title: normalizeTitle(input.title ?? `${source.title} — fork`),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -503,6 +553,9 @@ export function projectAgentThreadSummary(
   return {
     id: thread.id,
     personaId: thread.personaId,
+    ...(thread.executionBinding
+      ? { executionBinding: cloneExecutionBinding(thread.executionBinding) }
+      : {}),
     title: thread.title,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
@@ -587,6 +640,77 @@ function normalizePersonaId(personaId: string): string {
 function normalizeWorkspaceId(workspaceId: string | undefined): string | undefined {
   const normalized = workspaceId?.trim();
   return normalized ? normalized : undefined;
+}
+
+function normalizeExecutionBinding(
+  binding: AgentThreadExecutionBinding,
+  expected: { principalId: string; personaId: string },
+): AgentThreadExecutionBinding {
+  const principalId = normalizePrincipalId(binding.principalId);
+  const personaId = normalizePersonaId(binding.personaId);
+  if (principalId !== expected.principalId) {
+    throw new Error("Agent thread principal binding does not match owner.");
+  }
+  if (personaId !== expected.personaId) {
+    throw new Error("Agent thread persona binding does not match persona.");
+  }
+  const homeScopeId = normalizeScopeId(binding.homeScopeId, "home scope id");
+  return {
+    principalId,
+    personaId,
+    homeScopeId,
+    initialPerspective:
+      normalizeScopePerspective(binding.initialPerspective) ??
+      failInvalidPerspective(),
+    additionalContextScopeIds: dedupeScopeIds(binding.additionalContextScopeIds),
+  };
+}
+
+function legacyExecutionBinding(
+  principalId: string,
+  personaId: string,
+  workspaceId: string | undefined,
+): AgentThreadExecutionBinding {
+  if (!workspaceId) {
+    throw new Error("Agent thread home workspace could not be derived.");
+  }
+  return {
+    principalId,
+    personaId,
+    homeScopeId: workspaceId,
+    initialPerspective: { focusScopeId: workspaceId, viaScopeIds: [] },
+    additionalContextScopeIds: [],
+  };
+}
+
+function normalizePrincipalId(principalId: string): string {
+  const normalized = principalId.trim();
+  if (!normalized) {
+    throw new Error("Agent thread principal id must be non-empty.");
+  }
+  return normalized;
+}
+
+function normalizeScopeId(scopeId: string, label: string): string {
+  const normalized = scopeId.trim();
+  if (!normalized) throw new Error(`Agent thread ${label} must be non-empty.`);
+  return normalized;
+}
+
+function dedupeScopeIds(scopeIds: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const scopeId of scopeIds) {
+    const normalized = normalizeScopeId(scopeId, "context scope id");
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    deduped.push(normalized);
+  }
+  return deduped;
+}
+
+function failInvalidPerspective(): never {
+  throw new Error("Agent thread initial perspective is invalid.");
 }
 
 export function isScopePerspective(value: unknown): value is ScopePerspective {
@@ -696,6 +820,12 @@ function cloneSession(session: SessionState): SessionState {
 
 function cloneThread(thread: AgentThread): AgentThread {
   return structuredClone(thread);
+}
+
+function cloneExecutionBinding(
+  binding: AgentThreadExecutionBinding,
+): AgentThreadExecutionBinding {
+  return structuredClone(binding);
 }
 
 function assertRevision(thread: AgentThread, expectedRevision?: number): void {

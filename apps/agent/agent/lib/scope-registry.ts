@@ -1,4 +1,5 @@
 import type { Project, ProjectRegistry } from "./project-registry"
+import type { PersonalScope, PersonalScopeRegistry } from "./personal-scope"
 import type { Workspace, WorkspaceRegistry } from "./workspace-registry"
 import type { ScopeKind } from "./scope-graph"
 
@@ -19,13 +20,16 @@ export class ProjectWorkspaceScopeRegistry {
   constructor(
     private readonly projects: Pick<ProjectRegistry, "get">,
     private readonly workspaces: Pick<WorkspaceRegistry, "get">,
+    private readonly personalScopes?: Pick<PersonalScopeRegistry, "get">,
   ) {}
 
   get(id: string): ScopeRecord | undefined {
     const project = this.projects.get(id)
     if (project) return projectScope(project)
     const workspace = this.workspaces.get(id)
-    return workspace ? workspaceScope(workspace) : undefined
+    if (workspace) return workspaceScope(workspace)
+    const personalScope = this.personalScopes?.get(id)
+    return personalScope ? personalScopeRecord(personalScope) : undefined
   }
 }
 
@@ -47,5 +51,16 @@ function workspaceScope(workspace: Workspace): ScopeRecord {
     description: workspace.description,
     homeScopeId: workspace.homeScopeId,
     status: workspace.status,
+  }
+}
+
+function personalScopeRecord(scope: PersonalScope): ScopeRecord {
+  return {
+    id: scope.id,
+    kind: "personal",
+    name: scope.name,
+    description: scope.description,
+    homeScopeId: scope.homeScopeId,
+    status: scope.status,
   }
 }

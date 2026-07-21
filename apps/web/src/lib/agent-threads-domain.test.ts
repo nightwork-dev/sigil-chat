@@ -233,6 +233,38 @@ describe("AgentThreadRepository", () => {
     );
   });
 
+  it("creates immutable execution bindings with deduped additional context", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A, {
+      personaId: "agent-a",
+      title: "Personal reach",
+      executionBinding: {
+        principalId: USER_A,
+        personaId: "agent-a",
+        homeScopeId: "personal-scope:user-a",
+        initialPerspective: {
+          focusScopeId: "personal-scope:user-a",
+          viaScopeIds: [],
+        },
+        additionalContextScopeIds: ["workspace-1", "workspace-1", "project-1"],
+      },
+    });
+
+    expect(thread.executionBinding).toEqual({
+      principalId: USER_A,
+      personaId: "agent-a",
+      homeScopeId: "personal-scope:user-a",
+      initialPerspective: {
+        focusScopeId: "personal-scope:user-a",
+        viaScopeIds: [],
+      },
+      additionalContextScopeIds: ["workspace-1", "project-1"],
+    });
+    expect(projectAgentThreadSummary(thread).executionBinding).toEqual(
+      thread.executionBinding,
+    );
+  });
+
   it("persists a bounded retained event read model with its receipt", () => {
     const repo = repository();
     const thread = repo.create(USER_A);
@@ -335,9 +367,23 @@ describe("AgentThreadRepository", () => {
     );
   });
 
-  it("rebinds a thread's workspace and can unbind it back to the personal project", () => {
+  it("rejects workspace rebinding for immutable execution-bound threads", () => {
     const repo = repository();
     const thread = repo.create(USER_A, { workspaceId: "workspace-1" });
+
+    expect(() =>
+      repo.rebindWorkspace(
+        USER_A,
+        thread.id,
+        "workspace-2",
+        thread.revision,
+      ),
+    ).toThrow("Bound agent thread home scope cannot be changed");
+  });
+
+  it("keeps legacy unbound workspace rebinding available before binding migration", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
 
     const rebound = repo.rebindWorkspace(
       USER_A,
@@ -346,18 +392,7 @@ describe("AgentThreadRepository", () => {
       thread.revision,
     );
     expect(rebound.workspaceId).toBe("workspace-2");
-    expect(rebound.revision).toBe(thread.revision + 1);
-
-    const unbound = repo.rebindWorkspace(
-      USER_A,
-      thread.id,
-      undefined,
-      rebound.revision,
-    );
-    expect(unbound.workspaceId).toBeUndefined();
-    expect(projectAgentThreadSummary(unbound)).not.toHaveProperty(
-      "workspaceId",
-    );
+    expect(rebound.executionBinding).toBeUndefined();
   });
 
   it("rejects stale optimistic writes", () => {
@@ -435,6 +470,7 @@ describe("AgentThreadRepository", () => {
 
     expect(fork.forkedFrom).toBe(source.id);
     expect(fork.personaId).toBe(source.personaId);
+    expect(fork.executionBinding).toEqual(source.executionBinding);
     expect(fork.eve).toEqual({
       session: { streamIndex: 0 },
       events: [],
@@ -457,6 +493,29 @@ describe("AgentThreadRepository", () => {
         },
       ],
     });
+  });
+
+  it("forks from the source thread's immutable execution binding", () => {
+    const repo = repository();
+    const source = repo.create(USER_A, {
+      personaId: "agent-a",
+      executionBinding: {
+        principalId: USER_A,
+        personaId: "agent-a",
+        homeScopeId: "personal-scope:user-a",
+        initialPerspective: {
+          focusScopeId: "workspace-1",
+          viaScopeIds: ["project-1"],
+        },
+        additionalContextScopeIds: ["project-1"],
+      },
+    });
+
+    const fork = repo.fork(USER_A, { sourceThreadId: source.id });
+
+    expect(fork.executionBinding).toEqual(source.executionBinding);
+    expect(fork.executionBinding?.principalId).toBe(USER_A);
+    expect(fork.executionBinding?.personaId).toBe(source.personaId);
   });
 
   it("does not re-ingest a persisted fork packet when forking a fork", () => {

@@ -9,6 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { projectAgentThreadSummary } from "@/lib/agent-threads-domain";
 import type {
   AgentThread,
+  AgentThreadExecutionBinding,
   AgentThreadPreference,
   AgentThreadSnapshot,
   AgentThreadSummary,
@@ -26,6 +27,7 @@ export type {
   AgentThreadSnapshot,
   AgentThreadStatus,
   AgentThreadSummary,
+  CreateAgentThreadInput,
   ForkAgentThreadInput,
 } from "@/lib/agent-threads-domain";
 
@@ -54,8 +56,14 @@ const getAgentThreadFn = createServerFn({ method: "GET" })
 
 const createAgentThreadFn = createServerFn({ method: "POST" })
   .validator(
-    (input: { personaId: string; title?: string; workspaceId?: string }) =>
-      input,
+    (input: {
+      personaId: string;
+      title?: string;
+      workspaceId?: string;
+      sessionKind?: "workspace" | "personal";
+      initialPerspective?: ScopePerspective;
+      additionalContextScopeIds?: string[];
+    }) => input,
   )
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
@@ -65,10 +73,13 @@ const createAgentThreadFn = createServerFn({ method: "POST" })
     if (!personaRegistry.exists(data.personaId)) {
       throw new Error(`Persona ${data.personaId} was not found.`);
     }
-    if (data.workspaceId) {
-      await requireWorkspaceMembership(session.user.id, data.workspaceId);
-    }
-    return agentThreadRepository.create(session.user.id, data);
+    const binding = await resolveThreadCreationBinding(session.user.id, data);
+    return agentThreadRepository.create(session.user.id, {
+      personaId: data.personaId,
+      title: data.title,
+      ...(binding.workspaceId ? { workspaceId: binding.workspaceId } : {}),
+      executionBinding: binding.executionBinding,
+    });
   });
 
 const rebindAgentThreadWorkspaceFn = createServerFn({ method: "POST" })
@@ -106,6 +117,177 @@ async function requireWorkspaceMembership(
     throw new Error(`Workspace ${workspaceId} was not found.`);
   }
   assertRegisteredScopeMembership(`workspace:${workspaceId}`, userId, registries);
+}
+
+async function resolveThreadCreationBinding(
+  principalId: string,
+  input: {
+    personaId: string;
+    workspaceId?: string;
+    sessionKind?: "workspace" | "personal";
+    initialPerspective?: ScopePerspective;
+    additionalContextScopeIds?: string[];
+  },
+): Promise<{
+  workspaceId?: string;
+  executionBinding: AgentThreadExecutionBinding;
+}> {
+  const { agentThreadRepository } = await import("@/lib/agent-threads.server");
+  const {
+    loadProjectWorkspaceNav,
+    resolveScopePerspective,
+  } = await import("@/lib/agent-thread-containers.server");
+  const { getProjectWorkspaceRegistries } = await import(
+    "../../../agent/agent/lib/project-workspace-registries"
+  );
+  const registries = getProjectWorkspaceRegistries();
+  const nav = loadProjectWorkspaceNav(principalId);
+  const preference = agentThreadRepository.getActivePreference(principalId);
+  const requestedPerspective =
+    input.initialPerspective ?? preference.activePerspective;
+
+  if (input.sessionKind === "personal") {
+    const personalScope =
+      registries.personalScopes.ensureForPrincipal(principalId);
+    const initialPerspective = requestedPerspective
+      ? resolvePersonalAwarePerspective(
+          requestedPerspective,
+          personalScope.id,
+          nav,
+          resolveScopePerspective,
+        )
+      : { focusScopeId: personalScope.id, viaScopeIds: [] };
+    return {
+      executionBinding: {
+        principalId,
+        personaId: input.personaId,
+        homeScopeId: personalScope.id,
+        initialPerspective,
+        additionalContextScopeIds: authorizedContextScopes(
+          input.additionalContextScopeIds ?? [],
+          personalScope.id,
+          nav,
+        ),
+      },
+    };
+  }
+
+  const workspaceId = input.workspaceId ?? preference.activeWorkspaceId;
+  if (!workspaceId) {
+    throw new Error("Workspace-homed agent thread requires a workspace.");
+  }
+  await requireWorkspaceMembership(principalId, workspaceId);
+  const initialPerspective = requestedPerspective
+    ? resolveScopePerspective(requestedPerspective, nav)?.perspective
+    : resolveScopePerspective(
+        { focusScopeId: workspaceId, viaScopeIds: [] },
+        nav,
+      )?.perspective;
+  if (!initialPerspective || initialPerspective.focusScopeId !== workspaceId) {
+    throw new Error("Agent thread initial perspective is not valid.");
+  }
+  return {
+    workspaceId,
+    executionBinding: {
+      principalId,
+      personaId: input.personaId,
+      homeScopeId: workspaceId,
+      initialPerspective,
+      additionalContextScopeIds: authorizedContextScopes(
+        input.additionalContextScopeIds ?? [],
+        undefined,
+        nav,
+      ),
+    },
+  };
+}
+
+async function assertExecutionBindingVisible(
+  principalId: string,
+  binding: AgentThreadExecutionBinding,
+): Promise<void> {
+  const { loadProjectWorkspaceNav } = await import(
+    "@/lib/agent-thread-containers.server"
+  );
+  const { getProjectWorkspaceRegistries } = await import(
+    "../../../agent/agent/lib/project-workspace-registries"
+  );
+  const registries = getProjectWorkspaceRegistries();
+  const personalScope = registries.personalScopes.getForPrincipal(principalId);
+  const nav = loadProjectWorkspaceNav(principalId);
+  if (
+    binding.homeScopeId !== personalScope?.id &&
+    !scopeVisibleInNav(binding.homeScopeId, nav)
+  ) {
+    throw new Error("Agent thread home scope is not visible to this principal.");
+  }
+  authorizedContextScopes(
+    binding.additionalContextScopeIds,
+    personalScope?.id,
+    nav,
+  );
+}
+
+function resolvePersonalAwarePerspective(
+  requested: ScopePerspective,
+  personalScopeId: string,
+  nav: {
+    personalProjectId: string;
+    projects: readonly { id: string }[];
+    workspaces: readonly { id: string }[];
+  },
+  resolveScopePerspective: (
+    requested: ScopePerspective,
+    nav: any,
+  ) => { perspective: ScopePerspective } | undefined,
+): ScopePerspective {
+  if (
+    requested.focusScopeId === personalScopeId &&
+    requested.viaScopeIds.length === 0
+  ) {
+    return { focusScopeId: personalScopeId, viaScopeIds: [] };
+  }
+  const resolved = resolveScopePerspective(requested, nav)?.perspective;
+  if (!resolved) {
+    throw new Error("Agent thread initial perspective is not visible.");
+  }
+  return resolved;
+}
+
+function authorizedContextScopes(
+  scopeIds: readonly string[],
+  personalScopeId: string | undefined,
+  nav: {
+    projects: readonly { id: string }[];
+    workspaces: readonly { id: string }[];
+  },
+): string[] {
+  const seen = new Set<string>();
+  const authorized: string[] = [];
+  for (const scopeId of scopeIds) {
+    const normalized = scopeId.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    if (normalized === personalScopeId || scopeVisibleInNav(normalized, nav)) {
+      seen.add(normalized);
+      authorized.push(normalized);
+      continue;
+    }
+    throw new Error(`Context scope ${normalized} is not visible to this principal.`);
+  }
+  return authorized;
+}
+
+function scopeVisibleInNav(
+  scopeId: string,
+  nav: {
+    projects: readonly { id: string }[];
+    workspaces: readonly { id: string }[];
+  },
+): boolean {
+  return (
+    nav.projects.some((project) => project.id === scopeId) ||
+    nav.workspaces.some((workspace) => workspace.id === scopeId)
+  );
 }
 
 const renameAgentThreadFn = createServerFn({ method: "POST" })
@@ -176,6 +358,14 @@ const forkAgentThreadFn = createServerFn({ method: "POST" })
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
+    const source = agentThreadRepository.get(session.user.id, data.sourceThreadId);
+    if (!source) {
+      throw new Error(`Agent thread ${data.sourceThreadId} was not found.`);
+    }
+    if (!source.executionBinding) {
+      throw new Error("Source agent thread is missing an execution binding.");
+    }
+    await assertExecutionBindingVisible(session.user.id, source.executionBinding);
     return agentThreadRepository.fork(session.user.id, data);
   });
 
@@ -348,11 +538,16 @@ export function useCreateAgentThread() {
   const queryClient = useQueryClient();
   const principalId = useAgentPrincipalId();
   return useMutation({
-    mutationFn: (input: {
-      personaId: string;
-      title?: string;
-      workspaceId?: string;
-    }) => createAgentThreadFn({ data: input }),
+    mutationFn: (
+      input: {
+        personaId: string;
+        title?: string;
+        workspaceId?: string;
+        sessionKind?: "workspace" | "personal";
+        initialPerspective?: ScopePerspective;
+        additionalContextScopeIds?: string[];
+      },
+    ) => createAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
       cacheThread(queryClient, principalId, thread);
       cacheActivePreference(queryClient, principalId, {
