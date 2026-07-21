@@ -24,6 +24,10 @@ import { FilesystemManagedSkillRegistry } from "@gonk/skills"
 import type { UserContent } from "ai"
 import type { EveMessageContext, EveMessageResult } from "eve/channels/eve"
 import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
+import type {
+  ScopedMemoryAudienceLabel,
+  ScopedMemoryRecallDelivery,
+} from "./memory"
 
 type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
@@ -61,7 +65,13 @@ export interface SigilContextOptions {
     personaId: string
     principalId: string
     query: string
-  }) => string | undefined
+    activeResourceScope?: string
+    targetAudience: ScopedMemoryAudienceLabel
+  }) =>
+    | string
+    | ScopedMemoryRecallDelivery
+    | undefined
+    | Promise<string | ScopedMemoryRecallDelivery | undefined>
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -99,6 +109,11 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       const principalId = requireNonBlankCallerPrincipal(caller.principalId)
       const personaId = requireCallerPersona(caller)
       const eveSessionId = nonBlank(ctx.eve.sessionId) ?? `new:${principalId}`
+      const activeResourceScope = readScopeAttribute(ctx.eve.caller)
+      const targetAudience = recallTargetAudience({
+        principalId,
+        activeResourceScope,
+      })
       if (options.identityFloor) {
         const identity = options
           .identityFloor({
@@ -110,28 +125,37 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
         if (identity.length > 0) blocks.push(identity)
       }
       if (options.recallLatestTurn) {
-        const recalled = options
-          .recallLatestTurn({
+        const recalled = (
+          await options.recallLatestTurn({
             eveSessionId,
             personaId,
             principalId,
             query: messageToQuery(message),
+            activeResourceScope,
+            targetAudience,
           })
-          ?.trim()
+        )
+        const authorizedRecall = await authorizeRecallForTarget({
+          auth,
+          principalId,
+          recalled,
+          targetAudience,
+        })
         if (recalled) {
           const candidate = [
             ...blocks,
-            recalled,
+            authorizedRecall,
             ...(compiledContent ? [compiledContent] : []),
           ].join("\n\n")
           if (
+            authorizedRecall &&
             await contextFitsBudget(
               candidate,
               options.maxTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
               options.model,
             )
           ) {
-            blocks.push(recalled)
+            blocks.push(authorizedRecall)
           }
         }
       }
@@ -238,6 +262,112 @@ function readScopeAttribute(
 ): string | undefined {
   const value = caller?.attributes.sigilResourceScope
   return typeof value === "string" ? value : undefined
+}
+
+function recallTargetAudience(input: {
+  principalId: string
+  activeResourceScope: string | undefined
+}): ScopedMemoryAudienceLabel {
+  const activeResourceScope = nonBlank(input.activeResourceScope)
+  if (activeResourceScope === undefined) {
+    return { kind: "personal", principalId: input.principalId }
+  }
+  if (activeResourceScope.startsWith("personal-scope:")) {
+    const personalPrincipalId = activeResourceScope
+      .slice("personal-scope:".length)
+      .trim()
+    return {
+      kind: "personal",
+      principalId: personalPrincipalId || input.principalId,
+    }
+  }
+  return { kind: "scope", scopeId: activeResourceScope }
+}
+
+async function authorizeRecallForTarget(input: {
+  auth: AuthContext
+  principalId: string
+  recalled: string | ScopedMemoryRecallDelivery | undefined
+  targetAudience: ScopedMemoryAudienceLabel
+}): Promise<string | undefined> {
+  if (input.recalled === undefined) return undefined
+  if (typeof input.recalled === "string") {
+    const content = input.recalled.trim()
+    if (!content) return undefined
+    return audienceAllowsRecall({
+      recordAudience: { kind: "personal", principalId: input.principalId },
+      targetAudience: input.targetAudience,
+    })
+      ? content
+      : undefined
+  }
+
+  const content = input.recalled.content.trim()
+  if (!content || input.recalled.records.length === 0) return undefined
+
+  for (const record of input.recalled.records) {
+    if (record.labels === undefined) return undefined
+    if (
+      !audienceAllowsRecall({
+        recordAudience: record.labels.audience,
+        targetAudience: input.targetAudience,
+      })
+    ) {
+      return undefined
+    }
+    for (const source of record.labels.sources) {
+      const decision = await input.auth.authorize({
+        action: "context.use",
+        resource: {
+          kind: "application:memory-source",
+          target: source.resourceKey ?? source.scopeId,
+          scope: scopeKindFromScopeId(source.scopeId),
+          metadata: {
+            sourceScopeId: source.scopeId,
+            ...(source.resourceKey ? { resourceKey: source.resourceKey } : {}),
+          },
+        },
+      })
+      if (decision.outcome !== "allow") return undefined
+    }
+  }
+
+  return content
+}
+
+function audienceAllowsRecall(input: {
+  recordAudience: ScopedMemoryAudienceLabel
+  targetAudience: ScopedMemoryAudienceLabel
+}) {
+  if (
+    input.recordAudience.kind === "personal" ||
+    input.targetAudience.kind === "personal"
+  ) {
+    return (
+      input.recordAudience.kind === "personal" &&
+      input.targetAudience.kind === "personal" &&
+      input.recordAudience.principalId === input.targetAudience.principalId
+    )
+  }
+  return input.recordAudience.scopeId === input.targetAudience.scopeId
+}
+
+function scopeKindFromScopeId(scopeId: string) {
+  const separator = scopeId.indexOf(":")
+  const kind = separator < 0 ? scopeId : scopeId.slice(0, separator)
+  if (
+    kind === "global" ||
+    kind === "persona" ||
+    kind === "project" ||
+    kind === "directory" ||
+    kind === "session" ||
+    kind === "tenant" ||
+    kind === "workspace" ||
+    kind === "resource"
+  ) {
+    return kind
+  }
+  return "resource"
 }
 
 export async function compileSigilContextForMessage(input: {

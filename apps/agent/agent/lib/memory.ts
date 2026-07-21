@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import {
   StoreBackedMemoryRecordStore,
+  type MemoryRecord,
   type MemoryRecordDraft,
 } from "@gonk/memory"
 import {
@@ -27,6 +28,46 @@ const personaRegistry = new PersonaRegistry(
   { ...scopeEnv, cwd: personaDir },
   "eve",
 )
+const memoryRecordStore = new StoreBackedMemoryRecordStore({ scopeEnv })
+
+const SOURCE_SCOPE_EVIDENCE_PREFIX = "sigil-chat:source-scope:"
+const SOURCE_RESOURCE_EVIDENCE_PREFIX = "sigil-chat:source-resource:"
+const AUDIENCE_PERSONAL_EVIDENCE_PREFIX = "sigil-chat:audience-personal:"
+const AUDIENCE_SCOPE_EVIDENCE_PREFIX = "sigil-chat:audience-scope:"
+
+export interface ScopedMemorySourceLabel {
+  readonly scopeId: string
+  readonly resourceKey?: string
+}
+
+export type ScopedMemoryAudienceLabel =
+  | {
+      readonly kind: "personal"
+      readonly principalId: string
+    }
+  | {
+      readonly kind: "scope"
+      readonly scopeId: string
+    }
+
+export interface ScopedMemoryLabels {
+  readonly sources: readonly ScopedMemorySourceLabel[]
+  readonly audience: ScopedMemoryAudienceLabel
+  readonly legacy: boolean
+}
+
+export interface ScopedMemoryRecordProjection {
+  readonly id: string
+  readonly labels: ScopedMemoryLabels | undefined
+}
+
+export interface ScopedMemoryRecallDelivery {
+  /** Append-only context for the latest turn after Sigil's scope filter runs. */
+  readonly content: string
+  readonly selectedRecordIds: readonly string[]
+  readonly records: readonly ScopedMemoryRecordProjection[]
+  readonly receipt: unknown
+}
 
 // First-boot seed ONLY. The persona RECORD is the source of truth for the
 // agent's identity from then on: an operator edits the record (or Agent
@@ -70,7 +111,7 @@ export function personaHost(
   const record = personaRegistry.get(personaId)
   if (!record) throw new Error(`No such persona: ${personaId}`)
   const host = new EveMemoryHost({
-    store: new StoreBackedMemoryRecordStore({ scopeEnv }),
+    store: memoryRecordStore,
     persona: {
       record,
       authoredBaseId: `${record.id}-v1`,
@@ -154,7 +195,15 @@ export function memoryDraft(
   personaId: string,
   principalId: string,
   content: string,
+  labels?: {
+    readonly sources?: readonly ScopedMemorySourceLabel[]
+    readonly audience?: ScopedMemoryAudienceLabel
+  },
 ): MemoryRecordDraft {
+  const audience = labels?.audience ?? {
+    kind: "personal",
+    principalId,
+  }
   return {
     kind: "preference",
     subject: { kind: "principal", id: principalId },
@@ -168,9 +217,152 @@ export function memoryDraft(
       disclosure: { kind: "same-as-recall" },
     },
     content,
-    evidence: [{ kind: "tool", id: "sigil-memory" }],
+    evidence: [
+      { kind: "tool", id: "sigil-memory" },
+      ...sourceLabelsToEvidence(labels?.sources ?? []),
+      audienceLabelToEvidence(audience),
+    ],
     author: { kind: "principal", id: principalId },
   }
+}
+
+export function automaticScopedMemoryRecallForTurn(input: {
+  personaId: string
+  turn: TrustedMemoryTurn
+  query: string
+}): ScopedMemoryRecallDelivery | undefined {
+  const delivery = personaHost(input.personaId).automaticRecallForTurn(
+    input.turn,
+    input.query,
+  )
+  const content = delivery.message?.content.trim()
+  if (!content) return undefined
+
+  return {
+    content,
+    selectedRecordIds: delivery.selectedRecordIds,
+    records: delivery.selectedRecordIds.map((id) => {
+      const record = memoryRecordStore.get(id)
+      return {
+        id,
+        labels: record ? scopedMemoryLabelsFromRecord(record) : undefined,
+      }
+    }),
+    receipt: delivery.receipt,
+  }
+}
+
+export function scopedMemoryLabelsFromRecord(
+  record: MemoryRecord,
+): ScopedMemoryLabels | undefined {
+  const sources = sourceLabelsFromEvidence(record.provenance.evidence)
+  const audience = audienceLabelFromEvidence(record.provenance.evidence)
+
+  if (audience) {
+    return {
+      sources,
+      audience,
+      legacy: false,
+    }
+  }
+
+  const legacyAudience = legacyAudienceFromRecord(record)
+  if (!legacyAudience) return undefined
+
+  return {
+    sources: [],
+    audience: legacyAudience,
+    legacy: true,
+  }
+}
+
+function sourceLabelsToEvidence(
+  sources: readonly ScopedMemorySourceLabel[],
+): MemoryRecordDraft["evidence"] {
+  return sources.flatMap((source) => {
+    const evidence: MemoryRecordDraft["evidence"] = [
+      { kind: "record", id: `${SOURCE_SCOPE_EVIDENCE_PREFIX}${source.scopeId}` },
+    ]
+    if (source.resourceKey) {
+      evidence.push({
+        kind: "record",
+        id: `${SOURCE_RESOURCE_EVIDENCE_PREFIX}${source.scopeId}|${source.resourceKey}`,
+      })
+    }
+    return evidence
+  })
+}
+
+function audienceLabelToEvidence(
+  audience: ScopedMemoryAudienceLabel,
+): MemoryRecordDraft["evidence"][number] {
+  if (audience.kind === "personal") {
+    return {
+      kind: "record",
+      id: `${AUDIENCE_PERSONAL_EVIDENCE_PREFIX}${audience.principalId}`,
+    }
+  }
+  return {
+    kind: "record",
+    id: `${AUDIENCE_SCOPE_EVIDENCE_PREFIX}${audience.scopeId}`,
+  }
+}
+
+function sourceLabelsFromEvidence(
+  evidence: readonly MemoryRecord["provenance"]["evidence"][number][],
+): ScopedMemorySourceLabel[] {
+  const byScope = new Map<string, ScopedMemorySourceLabel>()
+  for (const item of evidence) {
+    if (item.kind !== "record") continue
+    if (item.id.startsWith(SOURCE_SCOPE_EVIDENCE_PREFIX)) {
+      const scopeId = item.id.slice(SOURCE_SCOPE_EVIDENCE_PREFIX.length)
+      if (scopeId) byScope.set(scopeId, { scopeId })
+      continue
+    }
+    if (item.id.startsWith(SOURCE_RESOURCE_EVIDENCE_PREFIX)) {
+      const encoded = item.id.slice(SOURCE_RESOURCE_EVIDENCE_PREFIX.length)
+      const separator = encoded.indexOf("|")
+      if (separator < 1) continue
+      const scopeId = encoded.slice(0, separator)
+      const resourceKey = encoded.slice(separator + 1)
+      if (scopeId && resourceKey) {
+        byScope.set(scopeId, { scopeId, resourceKey })
+      }
+    }
+  }
+  return [...byScope.values()]
+}
+
+function audienceLabelFromEvidence(
+  evidence: readonly MemoryRecord["provenance"]["evidence"][number][],
+): ScopedMemoryAudienceLabel | undefined {
+  for (const item of evidence) {
+    if (item.kind !== "record") continue
+    if (item.id.startsWith(AUDIENCE_PERSONAL_EVIDENCE_PREFIX)) {
+      const principalId = item.id.slice(AUDIENCE_PERSONAL_EVIDENCE_PREFIX.length)
+      if (principalId) return { kind: "personal", principalId }
+    }
+    if (item.id.startsWith(AUDIENCE_SCOPE_EVIDENCE_PREFIX)) {
+      const scopeId = item.id.slice(AUDIENCE_SCOPE_EVIDENCE_PREFIX.length)
+      if (scopeId) return { kind: "scope", scopeId }
+    }
+  }
+  return undefined
+}
+
+function legacyAudienceFromRecord(
+  record: MemoryRecord,
+): ScopedMemoryAudienceLabel | undefined {
+  if (
+    record.audience.recall.kind === "relationship" &&
+    record.audience.recall.principalId
+  ) {
+    return {
+      kind: "personal",
+      principalId: record.audience.recall.principalId,
+    }
+  }
+  return undefined
 }
 
 export function sessionPersonaId(

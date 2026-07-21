@@ -16,6 +16,7 @@ import {
   requireVerifiedEveSessionBinding,
 } from "../lib/eve-session-binding"
 import {
+  automaticScopedMemoryRecallForTurn,
   DEFAULT_PERSONA_ID,
   hasPersona,
   memoryTurn,
@@ -45,10 +46,11 @@ const compileMessage = createSigilEveOnMessage({
       memoryTurn(eveSessionId, principalId),
     ).markdown,
   recallLatestTurn: ({ eveSessionId, personaId, principalId, query }) =>
-    personaHost(personaId).automaticRecallForTurn(
-      memoryTurn(eveSessionId, principalId),
+    automaticScopedMemoryRecallForTurn({
+      personaId,
+      turn: memoryTurn(eveSessionId, principalId),
       query,
-    ).message?.content,
+    }),
 })
 const onMessage: typeof compileMessage = async (context, message) => {
   const result = await compileMessage(context, message)
