@@ -34,6 +34,14 @@ export interface AgentThreadExecutionBindingRecord extends AgentThreadExecutionB
   threadId: string;
 }
 
+export function ownedAgentThreadHomeScope(
+  principalId: string,
+  threadId: string,
+): string | undefined {
+  return agentThreadRepository.get(principalId, threadId)?.executionBinding
+    ?.homeScopeId;
+}
+
 export function resolveAgentThreadExecutionBinding(
   principalId: string,
   threadId: string,

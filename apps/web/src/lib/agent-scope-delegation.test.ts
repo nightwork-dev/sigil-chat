@@ -22,6 +22,8 @@ describe("agent scope authorization", () => {
   it("requires a session scope to belong to the authenticated user", () => {
     const ownsThread = (userId: string, threadId: string) =>
       userId === "user-1" && threadId === "thread-1"
+        ? "personal-scope:user-1"
+        : undefined
 
     expect(() =>
       assertAuthorizedScope(
@@ -41,12 +43,69 @@ describe("agent scope authorization", () => {
     ).toThrow("not found")
   })
 
+  it("revokes a workspace-homed session when access to its live home is removed", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const workspaces = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    const project = {
+      id: "project-home",
+      name: "Project home",
+      description: "Session authorization root.",
+      members: [{ principalId: "user-1", role: "member" as const }],
+      settings: {},
+      createdAt: "2026-07-21T00:00:00.000Z",
+      createdBy: "user-1",
+    }
+    projects.upsert(project)
+    workspaces.upsert({
+      id: "workspace-home",
+      projectId: project.id,
+      name: "Workspace home",
+      description: "Session home.",
+      status: "active",
+      createdAt: project.createdAt,
+      createdBy: project.createdBy,
+    })
+    const registries = { projects, workspaces }
+    const homeScope = () => "workspace-home"
+
+    expect(() =>
+      assertAuthorizedScope(
+        "session:thread-1",
+        "user-1",
+        homeScope,
+        registries,
+      ),
+    ).not.toThrow()
+
+    projects.upsert({ ...project, members: [] })
+    expect(() =>
+      assertAuthorizedScope(
+        "session:thread-1",
+        "user-1",
+        homeScope,
+        registries,
+      ),
+    ).toThrow("NOT_AUTHORIZED")
+
+    expect(() =>
+      assertAuthorizedScope(
+        "session:personal-thread",
+        "user-1",
+        () => "personal-scope:user-1",
+        registries,
+      ),
+    ).not.toThrow()
+  })
+
   it("rejects malformed scope strings", () => {
     expect(() =>
       assertAuthorizedScope(
         "session:",
         "user-1",
-        () => true,
+        () => "personal-scope:user-1",
         emptyRegistries(),
       ),
     ).toThrow("invalid")
@@ -54,7 +113,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "global:anything",
         "user-1",
-        () => true,
+        () => "personal-scope:user-1",
         emptyRegistries(),
       ),
     ).toThrow("invalid")
@@ -90,7 +149,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "project:project-1",
         "user-member",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).not.toThrow()
@@ -98,7 +157,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "workspace:workspace-1",
         "user-member",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).not.toThrow()
@@ -106,7 +165,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "project:project-1",
         "user-outsider",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).toThrow("NOT_AUTHORIZED")
@@ -152,7 +211,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "workspace:workspace-shared",
         "user-grantee",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).not.toThrow()
@@ -160,7 +219,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "project:project-home",
         "user-grantee",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).toThrow("NOT_AUTHORIZED")
@@ -170,7 +229,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "workspace:workspace-shared",
         "user-grantee",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).toThrow("NOT_AUTHORIZED")
@@ -221,7 +280,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "workspace:workspace-shared",
         principalId,
-        () => false,
+        () => undefined,
         registries,
         undefined,
         action,
@@ -238,7 +297,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "project:evidence-room",
         "user-1",
-        () => false,
+        () => undefined,
         emptyRegistries(),
       ),
     ).not.toThrow()
@@ -246,7 +305,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "project:other",
         "user-1",
-        () => false,
+        () => undefined,
         emptyRegistries(),
       ),
     ).toThrow("not available")
@@ -254,7 +313,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "persona:any",
         "user-1",
-        () => false,
+        () => undefined,
         emptyRegistries(),
       ),
     ).toThrow("not available")

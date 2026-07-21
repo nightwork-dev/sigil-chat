@@ -68,7 +68,8 @@ const readScopedBlackboardFn = createServerFn({ method: "GET" })
     return access.readScopedBlackboard(
       session,
       data,
-      (userId, threadId) => Boolean(agentThreadRepository.get(userId, threadId)),
+      (userId, threadId) =>
+        agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
       blackboardRepository,
     )
   })
@@ -96,7 +97,8 @@ const writeScopedBlackboardFn = createServerFn({ method: "POST" })
     return access.writeScopedBlackboard(
       session,
       data,
-      (userId, threadId) => Boolean(agentThreadRepository.get(userId, threadId)),
+      (userId, threadId) =>
+        agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
       blackboardRepository,
     )
   })

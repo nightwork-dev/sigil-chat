@@ -342,6 +342,146 @@ describe("Sigil Chat Gonk registry", () => {
     });
   });
 
+  it("discovers a personal agent's live readable resource universe and re-authorizes retrieval", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-personal-reach-"));
+    temporaryDirectories.push(directory);
+    const readable = new Set(["project:project-a", "workspace:workspace-b"]);
+    const artifacts = new SessionArtifactStore(
+      new FileObjectStore({ root: directory }),
+      {
+        canAccessScope: (principal, scope) =>
+          principal?.id === "user-1" &&
+          readable.has(`${scope.tier}:${scope.id}`),
+      },
+    );
+    const { registry, projectRegistry, workspaceRegistry } =
+      await makeRegistry(artifacts);
+    projectRegistry.upsert({
+      id: "project-a",
+      name: "Project A",
+      description: "First product.",
+      members: [{ principalId: "user-1", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T00:00:00.000Z",
+      createdBy: "user-1",
+    });
+    projectRegistry.upsert({
+      id: "project-b",
+      name: "Project B",
+      description: "Second product.",
+      members: [{ principalId: "user-1", role: "member" }],
+      settings: {},
+      createdAt: "2026-07-21T00:00:00.000Z",
+      createdBy: "user-1",
+    });
+    workspaceRegistry.upsert({
+      id: "workspace-b",
+      projectId: "project-b",
+      name: "Cross-project initiative",
+      description: "Shared work.",
+      status: "active",
+      createdAt: "2026-07-21T00:00:00.000Z",
+      createdBy: "user-1",
+    });
+    const bytes = new TextEncoder().encode("shared brief");
+    const projectFile = await artifacts.putFile(
+      {
+        bytes,
+        filename: "brief.md",
+        mediaType: "text/markdown",
+        scope: { tier: "project", id: "project-a" },
+      },
+      humanPrincipal("user-1"),
+    );
+    await artifacts.putFile(
+      {
+        bytes,
+        filename: "brief.md",
+        mediaType: "text/markdown",
+        scope: { tier: "workspace", id: "workspace-b" },
+      },
+      humanPrincipal("user-1"),
+    );
+    const context = makeBaseContext({
+      auth: {
+        principal: humanPrincipal("user-1"),
+        authorize: () => ({ outcome: "allow", reason: "test" }),
+      },
+      host: {
+        agentReach: "principal",
+        resourceScope: "project:project-a",
+      },
+    });
+
+    const discovered = await collectToolOutcome(
+      registry.invoke("sigil-resource-discover", {}, context),
+    );
+    expect(discovered).toMatchObject({
+      ok: true,
+      data: {
+        scopes: expect.arrayContaining([
+          { label: "Project A", scope: { tier: "project", id: "project-a" } },
+          {
+            label: "Cross-project initiative",
+            scope: { tier: "workspace", id: "workspace-b" },
+          },
+        ]),
+        resources: [
+          {
+            id: projectFile.id,
+            availableIn: expect.arrayContaining([
+              { tier: "project", id: "project-a" },
+              { tier: "workspace", id: "workspace-b" },
+            ]),
+          },
+        ],
+      },
+    });
+
+    const crossProjectRead = await collectToolOutcome(
+      registry.invoke(
+        "sigil-read-file",
+        {
+          id: projectFile.id,
+          scope: { tier: "workspace", id: "workspace-b" },
+        },
+        context,
+      ),
+    );
+    expect(crossProjectRead).toMatchObject({
+      ok: true,
+      data: { content: "shared brief" },
+    });
+
+    readable.delete("workspace:workspace-b");
+    const afterRevocation = await collectToolOutcome(
+      registry.invoke("sigil-resource-discover", {}, context),
+    );
+    expect(afterRevocation).toMatchObject({
+      ok: true,
+      data: {
+        resources: [
+          {
+            id: projectFile.id,
+            availableIn: [{ tier: "project", id: "project-a" }],
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(afterRevocation)).not.toContain("workspace-b");
+    const revokedRead = await collectToolOutcome(
+      registry.invoke(
+        "sigil-read-file",
+        {
+          id: projectFile.id,
+          scope: { tier: "workspace", id: "workspace-b" },
+        },
+        context,
+      ),
+    );
+    expect(revokedRead).toMatchObject({ ok: false });
+  });
+
   it("edits a scoped source image into a new artifact with provenance", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-image-edit-"));
     temporaryDirectories.push(directory);
@@ -1390,6 +1530,20 @@ describe("Sigil Chat Gonk registry", () => {
     expect(JSON.stringify(outcome)).not.toContain("selector");
   });
 });
+
+function humanPrincipal(id: string): NonNullable<AuthContext["principal"]> {
+  return {
+    id,
+    kind: "human",
+    identity: {
+      issuer: "sigil:test",
+      subject: id,
+      method: "custom:test",
+    },
+    roles: ["member"],
+    scopes: [],
+  };
+}
 
 function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
   return {
