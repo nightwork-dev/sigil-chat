@@ -158,6 +158,7 @@ export const emptyProjectHome: ProjectHomeView = {
   workspaces: [],
   sessions: [],
   agents: [],
+  resources: [],
   work: [],
   attention: [],
 }

@@ -49,6 +49,7 @@ function ProjectHomeRoute() {
         threads: threads.data,
         work: sources.work,
         agents: sources.agents,
+        resources: sources.resources,
         attention: sources.attention,
       },
       projectId,

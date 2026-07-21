@@ -129,6 +129,32 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
       </HomeSection>
 
       <HomeSection
+        title="Resources"
+        count={view.resources.length}
+        empty="No artifacts, evidence, or pages here yet."
+        compact={compact}
+      >
+        {view.resources.map((resource, index) => (
+          <HomeRow
+            key={resource.id}
+            first={index === 0}
+            compact={compact}
+            title={resource.name}
+            description={
+              resource.mountedFromName
+                ? `Shared from ${resource.mountedFromName}`
+                : undefined
+            }
+            trailing={
+              <span className="rounded-full border border-border px-1.5 py-px text-[10px] text-muted-foreground">
+                {resource.kind}
+              </span>
+            }
+          />
+        ))}
+      </HomeSection>
+
+      <HomeSection
         title="Work"
         count={view.work.length}
         empty="No work is tracked here yet."
