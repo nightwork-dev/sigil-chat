@@ -546,12 +546,15 @@ type FeatureRequestProposalResult =
 9. emit the existing domain outcome only when a record actually changes so
    React Query can reconcile the UI.
 
-The duplicate policy is store-owned and deterministic. At minimum, an exact
-normalized title within the intended home scope and an existing explicit
-duplicate relation block creation. Fuzzy candidates below the blocking
-threshold may be returned as warnings. Creating despite a blocked match is a
-separate authenticated human action that records its rationale; an agent
-cannot bypass the result by repeating or reshaping the same proposal call.
+The duplicate policy is store-owned, deterministic, and versioned. At minimum,
+an exact normalized title within the intended home scope, an existing explicit
+duplicate relation, or a store-computed similarity at or above the blocking
+threshold blocks creation. Fuzzy candidates below that threshold may be
+returned as warnings. Creating despite a blocked match is a separate
+authenticated human action that records its rationale; the proposal tool has
+no override. Repeating or reshaping a proposal always re-runs the policy, and
+every match at or above the blocking threshold returns `outcome: "duplicate"`
+without creating a record.
 
 If trusted end-user identity has not reached the Gonk invocation boundary, the
 tool may record agent provenance but must leave sponsorship unconfirmed. It
