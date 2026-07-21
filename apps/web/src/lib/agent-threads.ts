@@ -462,9 +462,16 @@ function cacheActivePreference(
   principalId: string,
   preference: AgentThreadPreference,
 ) {
+  // Merge, never replace: callers that only know the active thread (create/
+  // fork) would otherwise drop the active container fields (§3.1) from the
+  // cache until the next refetch — the chrome would visibly revert to the
+  // personal project on every thread creation.
   queryClient.setQueryData(
     agentThreadKeys.preference(principalId),
-    preference,
+    (current: AgentThreadPreference | undefined) => ({
+      ...current,
+      ...preference,
+    }),
   );
 }
 

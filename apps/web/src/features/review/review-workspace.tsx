@@ -194,11 +194,16 @@ function enrichPassageAttention(
 
 export function ReviewWorkspace() {
   // §4.1 — this route owns a sidecar presentation in its right rail, so the
-  // shell's floating dock suppresses itself here. The rail is hidden below
-  // the lg breakpoint, so the claim is too — on small screens the dock stays
-  // (the region does not own a presentation it can't show).
-  const sidecarVisible = useMediaQuery("(min-width: 1024px)")
-  useRegisterAgentPresentation("sidecar", { enabled: sidecarVisible })
+  // shell's floating dock suppresses itself here. The claim holds only while
+  // the sidecar is actually visible: the rail is hidden below the lg
+  // breakpoint, and inside the rail the Passage tab swaps the sidecar out —
+  // in both states the dock must come back (a region can't own a
+  // presentation it isn't showing).
+  const railVisible = useMediaQuery("(min-width: 1024px)")
+  const [railTab, setRailTab] = useState<"agent" | "passage">("agent")
+  useRegisterAgentPresentation("sidecar", {
+    enabled: railVisible && railTab === "agent",
+  })
   const reviewDocument = useReviewDocument()
   const updateReviewPassages = useUpdateReviewPassages()
   const addReviewAnnotation = useAddReviewAnnotations()
@@ -695,7 +700,10 @@ export function ReviewWorkspace() {
           >
             <Tabs
               className="flex h-full min-h-0 flex-col"
-              defaultValue="agent"
+              onValueChange={(value) =>
+                setRailTab(value === "passage" ? "passage" : "agent")
+              }
+              value={railTab}
             >
               <TabsList className="mx-2 mt-2 shrink-0">
                 {/* The agent tab defaults: the sidecar IS this route's agent
