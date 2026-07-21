@@ -6,6 +6,7 @@
 > agent-authored requests, and the product information architecture that exposes
 > them
 > Companion to: [`PRODUCT-CHROME-REWORK-SPEC.md`](PRODUCT-CHROME-REWORK-SPEC.md),
+> [`PRODUCT-HOMES-IA-PROPOSAL.md`](PRODUCT-HOMES-IA-PROPOSAL.md),
 > [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md),
 > [`PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md`](PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md),
 > and [`AGENT-SURFACE-COORDINATION-SPEC.md`](AGENT-SURFACE-COORDINATION-SPEC.md)
@@ -280,8 +281,21 @@ interface ScopePerspective {
 
 `viaScopeIds` is an ordered display path ending immediately before the focus.
 The server or trusted host validates every step against canonical containment
-or a permitted `mounted-in` link. A stale path falls back to the focus's
-canonical home path and emits a diagnostic.
+or a permitted `mounted-in` link **and** filters the path through the current
+principal's visibility. Structural validity is insufficient: every returned
+crumb must be discoverable to that principal, and the focus must be authorized
+for the requested surface before the perspective becomes active.
+
+A stale or hidden path is treated as absent. The host falls back to the
+visibility-filtered portion of the focus's canonical home path and returns a
+non-identifying diagnostic code; it never reveals the id or name of a hidden
+scope in a breadcrumb, redirect, receipt, or error. If the focus itself is not
+accessible, the denied surface follows the product-home rule: `403` only when
+its existence is discoverable to the principal, otherwise `404`.
+
+Workspace and session URLs carry the entry perspective as `?via=<scopeId>`.
+The URL is a shareable display hint, not a trusted serialized authorization
+path; the server reconstructs and validates the full `viaScopeIds` chain.
 
 Perspective controls:
 
@@ -343,7 +357,17 @@ For an ordinary replace setting, the default candidate order is installation
 default, organization, validated perspective path, focused scope, session, and
 personal override where permitted. A definition may narrow that list but may
 not rely on incidental query order. The resolver returns both the value and a
-receipt listing the contributing scopes.
+receipt listing the contributing scopes **that the current principal may
+discover**. A mandatory hidden policy may still contribute to the value, but
+its receipt entry is reduced to a non-identifying policy class such as
+`installation-policy`; source ids, names, and inaccessible values are never
+projected. Receipt filtering changes disclosure, not policy application.
+
+For V1, personal overrides are permitted only for appearance settings and
+explicitly non-security agent preferences. Appearance replaces per key; each
+agent preference declares its own merge mode. Account identity, membership,
+authorization, retention, tool security, and organization/project policy do
+not accept a personal override.
 
 ### 8.3 Tools: catalog, enablement, configuration, authorization
 
@@ -418,7 +442,6 @@ interface WorkProvenance {
   actorPrincipalId: string
   agentSessionId?: string
   proposedSponsorPrincipalId?: string
-  sponsorStatus?: "unconfirmed" | "confirmed" | "declined"
   sourceRefs?: string[]
   createdAt: string
 }
@@ -437,7 +460,9 @@ marks a parent shipped.
 interface BoardView {
   id: string
   ownerScopeId: string
+  ownerPrincipalId?: string
   name: string
+  visibility: "private" | "published"
   roots: string[]
   traversal: "self" | "self-and-rollups"
   filters: {
@@ -458,6 +483,19 @@ product never creates them merely because scopes are linked.
 `self-and-rollups` follows only canonical descendants and explicit
 `rolls-up-to` links. `mounted-in` alone does not put work on a project's board.
 All query results are filtered by the current principal's access.
+
+A board renders **one record in one cell**, even when several roots or rollup
+paths match it. Query evaluation unions and de-duplicates by work-item id before
+grouping. For `groupBy: "scope"`, placement uses the item's home scope when it
+is present in the result graph; otherwise it uses the first matching root in
+the board's declared root order. Secondary matches appear as scope chips or in
+details, never as duplicate cards. Moving or updating any presentation updates
+the same record.
+
+Any principal may save a private multi-root board over scopes they can already
+access. A published multi-root board is an installation-level product surface
+and requires installation-owner authorization. Publishing does not broaden
+the audience: every viewer still receives a permission-filtered result.
 
 Useful default views are:
 
@@ -486,6 +524,10 @@ interface FeatureRequestProposalInput {
   proposedSponsorPrincipalId?: string
   sourceRefs?: string[]
 }
+
+type FeatureRequestProposalResult =
+  | { outcome: "created"; workItem: ScopedWorkItem }
+  | { outcome: "duplicate"; candidates: ScopedWorkItem[] }
 ```
 
 `sigil-feature-request-propose` must:
@@ -493,13 +535,23 @@ interface FeatureRequestProposalInput {
 1. derive the actor, agent session, and active perspective from trusted host
    context;
 2. authorize the intended home scope independently;
-3. search for likely duplicates before creating a record;
-4. create only a `feature-request` in `idea` status;
-5. record an agent origin when invoked by an agent;
-6. treat `proposedSponsorPrincipalId` as unconfirmed until that authenticated
+3. run the store's duplicate policy before any write;
+4. return `outcome: "duplicate"` and create **no record** when that policy
+   matches an existing request; the same call has no override flag;
+5. create only a `feature-request` in `idea` status when no duplicate matches;
+6. record an agent origin when invoked by an agent;
+7. treat `proposedSponsorPrincipalId` as unconfirmed until that authenticated
    principal confirms or declines it;
-7. return the created record, its home scope, and any duplicate candidates;
-8. emit the existing domain outcome so React Query can reconcile the UI.
+8. return the created record and its home scope, or the duplicate candidates;
+9. emit the existing domain outcome only when a record actually changes so
+   React Query can reconcile the UI.
+
+The duplicate policy is store-owned and deterministic. At minimum, an exact
+normalized title within the intended home scope and an existing explicit
+duplicate relation block creation. Fuzzy candidates below the blocking
+threshold may be returned as warnings. Creating despite a blocked match is a
+separate authenticated human action that records its rationale; an agent
+cannot bypass the result by repeating or reshaping the same proposal call.
 
 If trusted end-user identity has not reached the Gonk invocation boundary, the
 tool may record agent provenance but must leave sponsorship unconfirmed. It
@@ -509,7 +561,32 @@ An agent cannot approve, prioritize, assign, promote, or mark shipped a request
 it created unless a distinct policy explicitly authorizes that later action.
 Tool approval and scope membership do not collapse those workflow gates.
 
-### 10.1 Agent instruction contract
+### 10.1 Sponsor confirmation record
+
+Sponsor confirmation has a named durable home alongside work items in
+`@workspace/work-items-store` and its external Git-versioned Mirk repository:
+
+```ts
+interface WorkSponsorshipDecision {
+  id: string
+  workItemId: string
+  sponsorPrincipalId: string
+  decision: "confirmed" | "declined"
+  decidedByPrincipalId: string
+  decidedAt: string
+  revision: number
+}
+```
+
+The work item's `proposedSponsorPrincipalId` is the proposal; the latest valid
+`WorkSponsorshipDecision` is the authority for confirmed/declined state. The UI
+may project `sponsorStatus`, but that projection is not an agent-authored
+field. A host-owned sponsorship mutation requires the authenticated principal
+to equal `sponsorPrincipalId` unless a separately specified delegation policy
+exists. The confirmation does not live in chat text, user settings, an agent
+memory, or a mutable comment.
+
+### 10.2 Agent instruction contract
 
 Agent instructions should say, in plain language:
 
@@ -652,7 +729,8 @@ invent multi-parent records ahead of them.
 1. A workspace has one canonical home and may be mounted in a second project
    without duplication or shared delete authority.
 2. A valid perspective preserves the project through which a shared workspace
-   was entered; an invalid or stale path falls back safely.
+   was entered; every via crumb is visibility-filtered, and an invalid, hidden,
+   or stale path falls back without disclosing inaccessible scopes.
 3. Link traversal is ordered, de-duplicated, relation-specific, and rejects
    cycles.
 4. A mount, board result, setting contribution, or agent annotation never
@@ -660,21 +738,27 @@ invent multi-parent records ahead of them.
 5. Revoking a principal's resource grant prevents subsequent reads and tool
    calls even when stale client context remains.
 6. Conflicting eligible defaults resolve deterministically and produce a
-   contribution receipt.
+   permission-filtered contribution receipt; hidden mandatory policy may apply
+   without exposing its source identity.
 7. Resource lists union records by stable identity; removing a mount does not
    delete its subject.
 8. Tool visibility, enablement, client approval, and invocation authorization
    remain separate observable states.
 9. A normal board has one scope root; multi-project aggregation requires an
-   explicit saved view.
-10. A shared work item appears in eligible views as one record with one status
-    and one history.
+   explicit saved view. Any principal may save a private authorized view, while
+   publishing one requires installation-owner authorization.
+10. A shared work item appears in a multi-root board as one record in one cell,
+    with one status and one history; secondary scope matches are metadata, not
+    duplicate cards.
 11. Child completion updates derived progress only and never silently ships a
     parent.
 12. Agent-proposed feature requests begin as ideas with host-derived actor and
-    session provenance.
+    session provenance; a blocking duplicate result performs no create and has
+    no agent-callable override.
 13. “On behalf of” sponsorship remains unconfirmed until the authenticated
-    principal acts; the agent cannot confirm it.
+    principal acts; the durable decision lives in a revisioned
+    `WorkSponsorshipDecision` record in the product work store, and the agent
+    cannot confirm it.
 14. The project roadmap remains in the external Git-versioned product store
     and is not mirrored into portable Gonk work items.
 15. Project and workspace homes expose sessions, agents, artifacts/resources,
@@ -682,15 +766,18 @@ invent multi-parent records ahead of them.
 16. The first design review includes the principal access matrix, shared
     workspace perspective, empty/loading/denied states, and mobile navigation.
 
-## 15. Open questions
+## 15. Resolved first-slice decisions
 
-1. Should the initial single organization be visible in navigation or remain a
-   persisted but implicit child of the installation root until a second
-   organization exists?
-2. Which settings besides appearance and agent preferences permit a personal
-   override, and which merge modes does each use?
-3. Should a saved multi-root board require installation-owner creation, or may
-   any principal save a private view over scopes they can already access?
+1. **Organization visibility:** persist the initial organization beneath the
+   installation root but keep it implicit in navigation until a second
+   organization exists or organization administration is needed.
+2. **Personal overrides:** V1 permits appearance and explicitly non-security
+   agent preferences only. Each definition owns its merge mode; security and
+   identity families never accept personal override.
+3. **Multi-root board creation:** any principal may save a private view over
+   scopes they can access. Publishing a multi-root board requires
+   installation-owner authorization and never widens viewer access.
 
-These questions do not reopen the central decision: ownership is singular,
-composition is typed and ordered, and authorization is evaluated separately.
+These decisions close the original open questions without changing the central
+contract: ownership is singular, composition is typed and ordered, and
+authorization is evaluated separately.
