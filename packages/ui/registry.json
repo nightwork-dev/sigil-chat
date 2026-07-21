@@ -83,6 +83,23 @@
       ]
     },
     {
+      "name": "ambient-panel",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/ambient-panel.tsx",
+          "type": "registry:ui",
+          "target": "@ui/ambient-panel.tsx"
+        }
+      ]
+    },
+    {
       "name": "animated-beam",
       "type": "registry:ui",
       "dependencies": [
