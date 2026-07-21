@@ -2,7 +2,11 @@ import { createScope } from "@gonk/scope"
 import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
 import type { KvStore } from "@gonk/store/types"
 
-import { type ProjectRegistry } from "./project-registry"
+import {
+  RegistryRevisionConflictError,
+  type ProjectRegistry,
+  type RegistryUpsertOptions,
+} from "./project-registry"
 
 const WORKSPACE_NAMESPACE = "sigil-chat.workspaces.v1"
 
@@ -25,6 +29,7 @@ export interface Workspace {
   readonly status: WorkspaceStatus
   readonly createdAt: string
   readonly createdBy: string
+  readonly revision?: number
 }
 
 export interface WorkspaceRegistryOptions {
@@ -67,7 +72,7 @@ export class WorkspaceRegistry {
     assertIdentifier("workspace id", id)
     const value = this.workspaces.get(id)
     if (value === undefined) return undefined
-    if (!isWorkspace(value) || value.id !== id) {
+    if (!isStoredWorkspace(value) || value.id !== id) {
       throw new Error(`Workspace registry is corrupt for ${id}.`)
     }
     return this.normalize(value)
@@ -78,7 +83,7 @@ export class WorkspaceRegistry {
     return this.workspaces
       .entries()
       .map(({ key, value }) => {
-        if (!isWorkspace(value) || value.id !== key) {
+        if (!isStoredWorkspace(value) || value.id !== key) {
           throw new Error(`Workspace registry is corrupt for ${key}.`)
         }
         return this.normalize(value)
@@ -90,13 +95,22 @@ export class WorkspaceRegistry {
       .sort((left, right) => left.id.localeCompare(right.id))
   }
 
-  upsert(workspace: Workspace): Workspace {
+  upsert(workspace: Workspace, options: RegistryUpsertOptions = {}): Workspace {
     const normalized = normalizeWorkspace(workspace)
     assertWorkspace(normalized)
     if (!this.projects.get(normalized.homeScopeId)) {
       throw new Error(`Unknown project id: ${normalized.homeScopeId}.`)
     }
-    this.workspaces.set(normalized.id, clone(normalized))
+    const current = this.get(normalized.id)
+    assertExpectedRevision(normalized.id, current, options.expectedRevision)
+    const next = {
+      ...normalized,
+      revision:
+        options.expectedRevision !== undefined
+          ? (current?.revision ?? 0) + 1
+          : (normalized.revision ?? current?.revision ?? 1),
+    }
+    this.workspaces.set(normalized.id, clone(next))
     const persisted = this.get(normalized.id)
     if (!persisted) {
       throw new Error(`Workspace record did not persist for ${normalized.id}.`)
@@ -104,16 +118,29 @@ export class WorkspaceRegistry {
     return persisted
   }
 
-  private normalize(workspace: Workspace): NormalizedWorkspace {
+  private normalize(workspace: StoredWorkspace): NormalizedWorkspace {
     const normalized = normalizeWorkspace(workspace)
-    if (workspace.homeScopeId === undefined) {
-      this.workspaces.set(normalized.id, clone(normalized))
+    const versioned = { ...normalized, revision: workspace.revision ?? 1 }
+    if (
+      workspace.homeScopeId === undefined ||
+      workspace.revision === undefined
+    ) {
+      this.workspaces.set(versioned.id, clone(versioned))
     }
-    return normalized
+    return clone(versioned)
   }
 }
 
 export function isWorkspace(value: unknown): value is Workspace {
+  return isStoredWorkspace(value)
+}
+
+type StoredWorkspace = Omit<Workspace, "homeScopeId" | "revision"> & {
+  readonly homeScopeId?: string
+  readonly revision?: number
+}
+
+function isStoredWorkspace(value: unknown): value is StoredWorkspace {
   if (!isRecord(value) || !hasOnlyKeys(value, workspaceKeys)) return false
   return (
     isIdentifier(value.id) &&
@@ -124,7 +151,8 @@ export function isWorkspace(value: unknown): value is Workspace {
     (value.icon === undefined || typeof value.icon === "string") &&
     (value.status === "active" || value.status === "archived") &&
     isIdentifier(value.createdAt) &&
-    isIdentifier(value.createdBy)
+    isIdentifier(value.createdBy) &&
+    isOptionalRevision(value.revision)
   )
 }
 
@@ -138,13 +166,14 @@ const workspaceKeys = [
   "status",
   "createdAt",
   "createdBy",
+  "revision",
 ] as const
 
 function assertWorkspace(value: Workspace): asserts value is Workspace {
   if (!isWorkspace(value)) throw new Error("Workspace record is invalid.")
 }
 
-function normalizeWorkspace(workspace: Workspace): NormalizedWorkspace {
+function normalizeWorkspace(workspace: StoredWorkspace): NormalizedWorkspace {
   const homeScopeId = workspace.homeScopeId ?? workspace.projectId
   if (workspace.projectId !== homeScopeId) {
     throw new Error(
@@ -152,6 +181,21 @@ function normalizeWorkspace(workspace: Workspace): NormalizedWorkspace {
     )
   }
   return { ...workspace, homeScopeId }
+}
+
+function assertExpectedRevision(
+  id: string,
+  current: Workspace | undefined,
+  expectedRevision: number | undefined,
+): void {
+  if (expectedRevision === undefined) return
+  if (current?.revision !== expectedRevision) {
+    throw new RegistryRevisionConflictError(
+      id,
+      expectedRevision,
+      current?.revision,
+    )
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -168,6 +212,13 @@ function hasOnlyKeys(
 
 function isIdentifier(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0
+}
+
+function isOptionalRevision(value: unknown): value is number | undefined {
+  return (
+    value === undefined ||
+    (typeof value === "number" && Number.isSafeInteger(value) && value > 0)
+  )
 }
 
 function assertIdentifier(label: string, value: string): void {

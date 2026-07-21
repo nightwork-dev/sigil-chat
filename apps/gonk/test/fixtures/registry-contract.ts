@@ -642,7 +642,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-project-list",
     description:
-      "List the durable projects and their membership records. Inspect a project before replacing it.",
+      "List durable project summaries for projects where the authenticated principal is a current member.",
     visibility: "always",
     approval: "read",
     schema: {
@@ -680,13 +680,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-project-upsert",
     description:
-      "Create or replace a durable project record, including its authoritative members and settings. Inspect first when updating.",
+      "Create a durable project for the authenticated principal, or update an existing project as one of its current owners. Updates require expectedRevision.",
     visibility: "always",
     approval: "write",
     schema: {
       type: "object",
       required: ["project"],
-      properties: ["project"],
+      properties: ["project", "expectedRevision"],
       additionalProperties: false,
     },
     mcpAnnotations: {
@@ -736,13 +736,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-workspace-upsert",
     description:
-      "Create or replace a workspace inside an existing project. Inspect first when updating.",
+      "Create or update a workspace inside a project where the authenticated principal is a current member. Updates require expectedRevision and cannot move the canonical project.",
     visibility: "always",
     approval: "write",
     schema: {
       type: "object",
       required: ["workspace"],
-      properties: ["workspace"],
+      properties: ["workspace", "expectedRevision"],
       additionalProperties: false,
     },
     mcpAnnotations: {

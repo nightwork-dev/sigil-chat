@@ -21,6 +21,8 @@ const project: Project = {
   createdBy: "user-owner",
 }
 
+const versionedProject = { ...project, revision: 1 }
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -39,13 +41,13 @@ describe("ProjectRegistry", () => {
     })
 
     expect(first.list()).toEqual([])
-    expect(first.upsert(project)).toEqual(project)
+    expect(first.upsert(project)).toEqual(versionedProject)
 
     const reopened = new ProjectRegistry({
       cwd: directory,
       projectRoot: directory,
     })
-    expect(reopened.get("project-1")).toEqual(project)
+    expect(reopened.get("project-1")).toEqual(versionedProject)
     expect(reopened.hasMember("project-1", "user-member")).toBe(true)
     expect(reopened.hasMember("project-1", "user-outsider")).toBe(false)
   })
@@ -70,6 +72,32 @@ describe("ProjectRegistry", () => {
         ],
       }),
     ).toThrow("record is invalid")
+  })
+
+  it("defaults legacy records to revision 1 and writes the safe migration back", () => {
+    const values = new Map<string, unknown>([["project-1", project]])
+    const store = new ProjectRegistry({ store: memoryKv(values) })
+
+    expect(store.get("project-1")).toEqual(versionedProject)
+    expect(values.get("project-1")).toEqual(versionedProject)
+  })
+
+  it("increments revisions only when the expected revision matches", () => {
+    const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const created = store.upsert(project)
+
+    expect(
+      store.upsert(
+        { ...created, description: "Updated project." },
+        { expectedRevision: created.revision! },
+      ),
+    ).toMatchObject({ description: "Updated project.", revision: 2 })
+    expect(() =>
+      store.upsert(
+        { ...created, description: "Stale project." },
+        { expectedRevision: created.revision! },
+      ),
+    ).toThrow("revision conflict")
   })
 })
 

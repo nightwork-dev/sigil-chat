@@ -76,6 +76,23 @@ async function makeRegistry(
   };
 }
 
+function humanAuth(principalId: string, scope: string): AuthContext {
+  return {
+    principal: {
+      id: principalId,
+      kind: "human",
+      identity: {
+        issuer: "sigil:test",
+        subject: principalId,
+        method: "custom:scope-delegation",
+      },
+      roles: ["member"],
+      scopes: [scope],
+    },
+    authorize: () => ({ outcome: "allow", reason: "test policy" }),
+  };
+}
+
 describe("Sigil Chat Gonk registry", () => {
   it("omits local Codex image generation when production disables it", async () => {
     vi.stubEnv("SIGIL_LOCAL_CODEX_IMAGE_GENERATION", "disabled");
@@ -522,9 +539,7 @@ describe("Sigil Chat Gonk registry", () => {
       ok: true,
       data: {
         artifactId: expect.stringMatching(/^uploads\//),
-        url: expect.stringMatching(
-          /^\/api\/media\/artifact\?key=uploads%2F/,
-        ),
+        url: expect.stringMatching(/^\/api\/media\/artifact\?key=uploads%2F/),
         backend: "comfyui:phantom",
         sourceArtifactId: source.id,
         instruction: "Make the coat crimson",
@@ -824,14 +839,23 @@ describe("Sigil Chat Gonk registry", () => {
 
   it("reads and mutates project/workspace registries through domain outcomes", async () => {
     const { registry } = await makeRegistry();
+    const context = makeBaseContext({
+      auth: humanAuth("user-1", "project:project-1"),
+    });
     const project = {
       id: "project-1",
       name: "Project One",
       description: "A durable project.",
-      members: [{ principalId: "user-1", role: "owner" }],
+      members: [{ principalId: "user-evil", role: "owner" }],
       settings: { visibility: "shared" },
       createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-evil",
+    };
+    const createdProjectRecord = {
+      ...project,
+      members: [{ principalId: "user-1", role: "owner" }],
       createdBy: "user-1",
+      revision: 1,
     };
     const workspace = {
       id: "workspace-1",
@@ -840,21 +864,27 @@ describe("Sigil Chat Gonk registry", () => {
       description: "A focused effort.",
       status: "active",
       createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-evil",
+    };
+    const createdWorkspaceRecord = {
+      ...workspace,
+      homeScopeId: project.id,
       createdBy: "user-1",
+      revision: 1,
     };
 
     const listed = await collectToolOutcome(
-      registry.invoke("sigil-project-list", {}, makeBaseContext()),
+      registry.invoke("sigil-project-list", {}, context),
     );
     expect(listed).toMatchObject({ ok: true, data: { projects: [] } });
 
     const createdProject = await collectToolOutcome(
-      registry.invoke("sigil-project-upsert", { project }, makeBaseContext()),
+      registry.invoke("sigil-project-upsert", { project }, context),
     );
     expect(createdProject).toMatchObject({
       ok: true,
       data: {
-        project,
+        project: createdProjectRecord,
         clientCommand: {
           type: "agent.domain.outcome",
           payload: {
@@ -868,28 +898,102 @@ describe("Sigil Chat Gonk registry", () => {
     });
 
     const inspectedProject = await collectToolOutcome(
-      registry.invoke(
-        "sigil-project-inspect",
-        { id: project.id },
-        makeBaseContext(),
-      ),
+      registry.invoke("sigil-project-inspect", { id: project.id }, context),
     );
     expect(inspectedProject).toMatchObject({
       ok: true,
-      data: { project },
+      data: { project: createdProjectRecord },
+    });
+
+    const updatedProject = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        {
+          project: {
+            ...createdProjectRecord,
+            members: [
+              { principalId: "user-1", role: "owner" },
+              { principalId: "user-2", role: "member" },
+            ],
+          },
+          expectedRevision: 1,
+        },
+        context,
+      ),
+    );
+    expect(updatedProject).toMatchObject({
+      ok: true,
+      data: { project: { revision: 2 } },
+    });
+    const listedAfterUpdate = await collectToolOutcome(
+      registry.invoke("sigil-project-list", {}, context),
+    );
+    expect(listedAfterUpdate).toMatchObject({
+      ok: true,
+      data: {
+        projects: [
+          expect.objectContaining({
+            id: project.id,
+            role: "owner",
+            revision: 2,
+          }),
+        ],
+      },
+    });
+    expect(JSON.stringify(listedAfterUpdate)).not.toContain("members");
+    expect(JSON.stringify(listedAfterUpdate)).not.toContain("visibility");
+
+    const memberContext = makeBaseContext({
+      auth: humanAuth("user-2", "project:project-1"),
+    });
+    const memberProjectUpdate = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        {
+          project: {
+            ...createdProjectRecord,
+            members: [
+              { principalId: "user-1", role: "owner" },
+              { principalId: "user-2", role: "member" },
+            ],
+          },
+          expectedRevision: 2,
+        },
+        memberContext,
+      ),
+    );
+    expect(memberProjectUpdate).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: "Project is not available.",
+    });
+
+    const lastOwnerRemoval = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        {
+          project: {
+            ...createdProjectRecord,
+            members: [{ principalId: "user-2", role: "member" }],
+          },
+          expectedRevision: 2,
+        },
+        context,
+      ),
+    );
+    expect(lastOwnerRemoval).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: "Project must keep at least one owner.",
     });
 
     const createdWorkspace = await collectToolOutcome(
-      registry.invoke(
-        "sigil-workspace-upsert",
-        { workspace },
-        makeBaseContext(),
-      ),
+      registry.invoke("sigil-workspace-upsert", { workspace }, context),
     );
     expect(createdWorkspace).toMatchObject({
       ok: true,
       data: {
-        workspace,
+        workspace: createdWorkspaceRecord,
         clientCommand: {
           payload: {
             kind: "containers.changed",
@@ -905,19 +1009,64 @@ describe("Sigil Chat Gonk registry", () => {
       registry.invoke(
         "sigil-workspace-list",
         { projectId: project.id },
-        makeBaseContext(),
+        context,
       ),
     );
     expect(listedWorkspaces).toMatchObject({
       ok: true,
-      data: { workspaces: [workspace] },
+      data: { workspaces: [createdWorkspaceRecord] },
+    });
+
+    const outsiderContext = makeBaseContext({
+      auth: humanAuth("user-outsider", "project:project-1"),
+    });
+    const outsiderList = await collectToolOutcome(
+      registry.invoke("sigil-project-list", {}, outsiderContext),
+    );
+    expect(outsiderList).toMatchObject({ ok: true, data: { projects: [] } });
+    const outsiderInspect = await collectToolOutcome(
+      registry.invoke(
+        "sigil-workspace-inspect",
+        { id: workspace.id },
+        outsiderContext,
+      ),
+    );
+    expect(outsiderInspect).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: "Workspace is not available.",
+    });
+
+    const serviceList = await collectToolOutcome(
+      registry.invoke("sigil-project-list", {}, makeBaseContext()),
+    );
+    expect(serviceList).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: "Container registry is not available.",
+    });
+
+    const staleProject = await collectToolOutcome(
+      registry.invoke(
+        "sigil-project-upsert",
+        {
+          project: createdProjectRecord,
+          expectedRevision: 1,
+        },
+        context,
+      ),
+    );
+    expect(staleProject).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: expect.stringContaining("revision conflict"),
     });
 
     const malformed = await collectToolOutcome(
       registry.invoke(
         "sigil-project-upsert",
         { project: { ...project, members: [{ principalId: "user-1" }] } },
-        makeBaseContext(),
+        context,
       ),
     );
     expect(malformed).toMatchObject({ ok: false, code: "INVALID_INPUT" });

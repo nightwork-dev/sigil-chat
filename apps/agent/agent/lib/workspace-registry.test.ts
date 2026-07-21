@@ -30,6 +30,8 @@ const workspace: Workspace = {
   createdBy: "user-owner",
 }
 
+const versionedWorkspace = { ...workspace, revision: 1 }
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -53,15 +55,15 @@ describe("WorkspaceRegistry", () => {
       projects,
     })
 
-    expect(first.upsert(workspace)).toEqual(workspace)
+    expect(first.upsert(workspace)).toEqual(versionedWorkspace)
 
     const reopened = new WorkspaceRegistry({
       cwd: directory,
       projectRoot: directory,
       projects: new ProjectRegistry({ cwd: directory, projectRoot: directory }),
     })
-    expect(reopened.get("workspace-1")).toEqual(workspace)
-    expect(reopened.list(project.id)).toEqual([workspace])
+    expect(reopened.get("workspace-1")).toEqual(versionedWorkspace)
+    expect(reopened.list(project.id)).toEqual([versionedWorkspace])
   })
 
   it("refuses a workspace whose parent project does not exist", () => {
@@ -102,8 +104,31 @@ describe("WorkspaceRegistry", () => {
       store: memoryKv(values),
     })
 
-    expect(store.get(workspace.id)).toEqual(workspace)
-    expect(values.get(workspace.id)).toEqual(workspace)
+    expect(store.get(workspace.id)).toEqual(versionedWorkspace)
+    expect(values.get(workspace.id)).toEqual(versionedWorkspace)
+  })
+
+  it("increments revisions only when the expected revision matches", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    projects.upsert(project)
+    const store = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    const created = store.upsert(workspace)
+
+    expect(
+      store.upsert(
+        { ...created, description: "Updated workspace." },
+        { expectedRevision: created.revision! },
+      ),
+    ).toMatchObject({ description: "Updated workspace.", revision: 2 })
+    expect(() =>
+      store.upsert(
+        { ...created, description: "Stale workspace." },
+        { expectedRevision: created.revision! },
+      ),
+    ).toThrow("revision conflict")
   })
 })
 

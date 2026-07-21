@@ -25,12 +25,31 @@ export interface Project {
   readonly settings: Record<string, unknown>
   readonly createdAt: string
   readonly createdBy: string
+  readonly revision?: number
 }
 
 export interface ProjectRegistryOptions {
   cwd?: string
   projectRoot?: string
   store?: KvStore<unknown>
+}
+
+export interface RegistryUpsertOptions {
+  readonly expectedRevision?: number
+}
+
+export class RegistryRevisionConflictError extends Error {
+  constructor(
+    readonly id: string,
+    readonly expectedRevision: number,
+    readonly actualRevision: number | undefined,
+  ) {
+    super(
+      `Project ${id} revision conflict: expected ${expectedRevision}, found ${
+        actualRevision ?? "none"
+      }.`,
+    )
+  }
 }
 
 /**
@@ -61,27 +80,36 @@ export class ProjectRegistry {
     assertIdentifier("project id", id)
     const value = this.projects.get(id)
     if (value === undefined) return undefined
-    if (!isProject(value) || value.id !== id) {
+    if (!isStoredProject(value) || value.id !== id) {
       throw new Error(`Project registry is corrupt for ${id}.`)
     }
-    return clone(value)
+    return this.normalize(value)
   }
 
   list(): Project[] {
     return this.projects
       .entries()
       .map(({ key, value }) => {
-        if (!isProject(value) || value.id !== key) {
+        if (!isStoredProject(value) || value.id !== key) {
           throw new Error(`Project registry is corrupt for ${key}.`)
         }
-        return clone(value)
+        return this.normalize(value)
       })
       .sort((left, right) => left.id.localeCompare(right.id))
   }
 
-  upsert(project: Project): Project {
+  upsert(project: Project, options: RegistryUpsertOptions = {}): Project {
     assertProject(project)
-    this.projects.set(project.id, clone(project))
+    const current = this.get(project.id)
+    assertExpectedRevision(project.id, current, options.expectedRevision)
+    const next = {
+      ...project,
+      revision:
+        options.expectedRevision !== undefined
+          ? (current?.revision ?? 0) + 1
+          : (project.revision ?? current?.revision ?? 1),
+    }
+    this.projects.set(project.id, clone(next))
     const persisted = this.get(project.id)
     if (!persisted) {
       throw new Error(`Project record did not persist for ${project.id}.`)
@@ -98,9 +126,34 @@ export class ProjectRegistry {
       ) ?? false
     )
   }
+
+  hasOwner(projectId: string, principalId: string): boolean {
+    assertIdentifier("project id", projectId)
+    assertIdentifier("principal id", principalId)
+    return (
+      this.get(projectId)?.members.some(
+        (member) =>
+          member.principalId === principalId && member.role === "owner",
+      ) ?? false
+    )
+  }
+
+  private normalize(project: StoredProject): Project {
+    const normalized = { ...project, revision: project.revision ?? 1 }
+    if (project.revision === undefined) {
+      this.projects.set(normalized.id, clone(normalized))
+    }
+    return clone(normalized)
+  }
 }
 
 export function isProject(value: unknown): value is Project {
+  return isStoredProject(value)
+}
+
+type StoredProject = Omit<Project, "revision"> & { readonly revision?: number }
+
+function isStoredProject(value: unknown): value is StoredProject {
   if (!isRecord(value) || !hasOnlyKeys(value, projectKeys)) return false
   return (
     isIdentifier(value.id) &&
@@ -113,7 +166,8 @@ export function isProject(value: unknown): value is Project {
     isRecord(value.settings) &&
     isJsonValue(value.settings) &&
     isIdentifier(value.createdAt) &&
-    isIdentifier(value.createdBy)
+    isIdentifier(value.createdBy) &&
+    isOptionalRevision(value.revision)
   )
 }
 
@@ -126,6 +180,7 @@ const projectKeys = [
   "settings",
   "createdAt",
   "createdBy",
+  "revision",
 ] as const
 
 function assertProject(value: Project): asserts value is Project {
@@ -145,6 +200,21 @@ function hasUniquePrincipalIds(members: readonly ProjectMember[]): boolean {
   return (
     new Set(members.map((member) => member.principalId)).size === members.length
   )
+}
+
+function assertExpectedRevision(
+  id: string,
+  current: Project | undefined,
+  expectedRevision: number | undefined,
+): void {
+  if (expectedRevision === undefined) return
+  if (current?.revision !== expectedRevision) {
+    throw new RegistryRevisionConflictError(
+      id,
+      expectedRevision,
+      current?.revision,
+    )
+  }
 }
 
 function isJsonValue(value: unknown): boolean {
@@ -174,6 +244,13 @@ function hasOnlyKeys(
 
 function isIdentifier(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0
+}
+
+function isOptionalRevision(value: unknown): value is number | undefined {
+  return (
+    value === undefined ||
+    (typeof value === "number" && Number.isSafeInteger(value) && value > 0)
+  )
 }
 
 function assertIdentifier(label: string, value: string): void {
