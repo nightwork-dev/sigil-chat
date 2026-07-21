@@ -22,6 +22,7 @@ const project: Project = {
 const workspace: Workspace = {
   id: "workspace-1",
   projectId: project.id,
+  homeScopeId: project.id,
   name: "Workspace One",
   description: "A focused effort.",
   status: "active",
@@ -81,6 +82,28 @@ describe("WorkspaceRegistry", () => {
     })
 
     expect(() => store.get("workspace-1")).toThrow("registry is corrupt")
+  })
+
+  it("writes a canonical home back onto a legacy projectId-only workspace", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    projects.upsert(project)
+    const values = new Map<string, unknown>([
+      [
+        workspace.id,
+        (() => {
+          const legacy = { ...workspace }
+          delete legacy.homeScopeId
+          return legacy
+        })(),
+      ],
+    ])
+    const store = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(values),
+    })
+
+    expect(store.get(workspace.id)).toEqual(workspace)
+    expect(values.get(workspace.id)).toEqual(workspace)
   })
 })
 

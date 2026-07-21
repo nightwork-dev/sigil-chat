@@ -10,7 +10,14 @@ export type WorkspaceStatus = "active" | "archived"
 
 export interface Workspace {
   readonly id: string
+  /**
+   * Compatibility mirror for callers that still speak strict project-tree
+   * containment. New code should resolve canonical ownership through
+   * homeScopeId; composition belongs in ScopeLink records.
+   */
   readonly projectId: string
+  /** The workspace's singular canonical home. */
+  readonly homeScopeId?: string
   readonly name: string
   readonly description: string
   /** Visual identity in the chrome (see Project.icon). */
@@ -27,10 +34,13 @@ export interface WorkspaceRegistryOptions {
   store?: KvStore<unknown>
 }
 
+type NormalizedWorkspace = Workspace & { readonly homeScopeId: string }
+
 /**
- * Mirk-backed, authoritative workspace records. A workspace cannot outlive
- * its containing project: upserts reject a project id the project registry
- * does not recognize.
+ * Mirk-backed, authoritative workspace records. Older projectId-only records
+ * are read, upgraded in place with the same id, and written back with their
+ * canonical home. projectId remains an additive compatibility mirror while
+ * adjacent consumers migrate away from strict containment.
  */
 export class WorkspaceRegistry {
   private readonly projects: Pick<ProjectRegistry, "get">
@@ -60,7 +70,7 @@ export class WorkspaceRegistry {
     if (!isWorkspace(value) || value.id !== id) {
       throw new Error(`Workspace registry is corrupt for ${id}.`)
     }
-    return clone(value)
+    return this.normalize(value)
   }
 
   list(projectId?: string): Workspace[] {
@@ -71,26 +81,35 @@ export class WorkspaceRegistry {
         if (!isWorkspace(value) || value.id !== key) {
           throw new Error(`Workspace registry is corrupt for ${key}.`)
         }
-        return clone(value)
+        return this.normalize(value)
       })
       .filter(
         (workspace) =>
-          projectId === undefined || workspace.projectId === projectId,
+          projectId === undefined || workspace.homeScopeId === projectId,
       )
       .sort((left, right) => left.id.localeCompare(right.id))
   }
 
   upsert(workspace: Workspace): Workspace {
-    assertWorkspace(workspace)
-    if (!this.projects.get(workspace.projectId)) {
-      throw new Error(`Unknown project id: ${workspace.projectId}.`)
+    const normalized = normalizeWorkspace(workspace)
+    assertWorkspace(normalized)
+    if (!this.projects.get(normalized.homeScopeId)) {
+      throw new Error(`Unknown project id: ${normalized.homeScopeId}.`)
     }
-    this.workspaces.set(workspace.id, clone(workspace))
-    const persisted = this.get(workspace.id)
+    this.workspaces.set(normalized.id, clone(normalized))
+    const persisted = this.get(normalized.id)
     if (!persisted) {
-      throw new Error(`Workspace record did not persist for ${workspace.id}.`)
+      throw new Error(`Workspace record did not persist for ${normalized.id}.`)
     }
     return persisted
+  }
+
+  private normalize(workspace: Workspace): NormalizedWorkspace {
+    const normalized = normalizeWorkspace(workspace)
+    if (workspace.homeScopeId === undefined) {
+      this.workspaces.set(normalized.id, clone(normalized))
+    }
+    return normalized
   }
 }
 
@@ -99,6 +118,7 @@ export function isWorkspace(value: unknown): value is Workspace {
   return (
     isIdentifier(value.id) &&
     isIdentifier(value.projectId) &&
+    (value.homeScopeId === undefined || isIdentifier(value.homeScopeId)) &&
     isIdentifier(value.name) &&
     typeof value.description === "string" &&
     (value.icon === undefined || typeof value.icon === "string") &&
@@ -111,6 +131,7 @@ export function isWorkspace(value: unknown): value is Workspace {
 const workspaceKeys = [
   "id",
   "projectId",
+  "homeScopeId",
   "name",
   "description",
   "icon",
@@ -121,6 +142,16 @@ const workspaceKeys = [
 
 function assertWorkspace(value: Workspace): asserts value is Workspace {
   if (!isWorkspace(value)) throw new Error("Workspace record is invalid.")
+}
+
+function normalizeWorkspace(workspace: Workspace): NormalizedWorkspace {
+  const homeScopeId = workspace.homeScopeId ?? workspace.projectId
+  if (workspace.projectId !== homeScopeId) {
+    throw new Error(
+      "Workspace project id must remain its canonical home during compatibility migration.",
+    )
+  }
+  return { ...workspace, homeScopeId }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

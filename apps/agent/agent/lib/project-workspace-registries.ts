@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url"
 
 import { ProjectRegistry } from "./project-registry"
+import { ScopeLinkRegistry } from "./scope-link-registry"
+import { ProjectWorkspaceScopeRegistry } from "./scope-registry"
 import { WorkspaceRegistry } from "./workspace-registry"
 
 const agentDirectory = fileURLToPath(new URL("..", import.meta.url))
@@ -9,6 +11,8 @@ const localStorageRoot = fileURLToPath(new URL("../../.data", import.meta.url))
 export interface ProjectWorkspaceRegistries {
   projects: ProjectRegistry
   workspaces: WorkspaceRegistry
+  scopes: ProjectWorkspaceScopeRegistry
+  links: ScopeLinkRegistry
 }
 
 let registries: ProjectWorkspaceRegistries | undefined
@@ -27,12 +31,20 @@ export function getProjectWorkspaceRegistries(): ProjectWorkspaceRegistries {
     cwd: agentDirectory,
     projectRoot: storageRoot,
   })
-  registries = {
-    projects,
-    workspaces: new WorkspaceRegistry({
+  const workspaces = new WorkspaceRegistry({
       cwd: agentDirectory,
       projectRoot: storageRoot,
       projects,
+  })
+  const scopes = new ProjectWorkspaceScopeRegistry(projects, workspaces)
+  registries = {
+    projects,
+    workspaces,
+    scopes,
+    links: new ScopeLinkRegistry({
+      cwd: agentDirectory,
+      projectRoot: storageRoot,
+      scopes,
     }),
   }
   return registries
