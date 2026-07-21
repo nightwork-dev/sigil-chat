@@ -101,6 +101,25 @@ export const fetchAgentProfile = createServerFn({ method: "GET" })
     return loadAgentProfile(session.user.id, personaId)
   })
 
+// §4.3 — the reduced projection for non-owners: identity + description +
+// portrait presence, NEVER memory/sessions. The roster links every persona
+// here, so the destination must adapt to the viewer's role instead of
+// dead-ending on requireOwner. (Q1's sponsorship + relationship-memory model
+// is a follow-up spec; this is the no-dead-end floor.)
+export const fetchAgentPublicProfile = createServerFn({ method: "GET" })
+  .validator((personaId: string) => personaId)
+  .handler(async ({ data: personaId }): Promise<AgentPersonaSummary | null> => {
+    const { getSession, requireSession } = await import("./auth/session")
+    const { listAgentPersonas } = await import("./agent-profile.server")
+
+    const session = await getSession()
+    const assertSession: (
+      candidate: SigilAuthSession | null,
+    ) => asserts candidate is SigilAuthSession = requireSession
+    assertSession(session)
+    return listAgentPersonas().find((p) => p.id === personaId) ?? null
+  })
+
 export const listPersonas = createServerFn({ method: "GET" }).handler(
   async (): Promise<AgentPersonaSummary[]> => {
     const { getSession, requireSession } = await import("./auth/session")
@@ -238,6 +257,21 @@ export function agentProfileQueryOptions(
     queryKey: agentProfileKeys.detail(principalId, personaId),
     queryFn: () => fetchAgentProfile({ data: personaId }),
   })
+}
+
+export function agentPublicProfileQueryOptions(
+  principalId: string,
+  personaId: string,
+) {
+  return queryOptions({
+    queryKey: [...agentProfileKeys.detail(principalId, personaId), "public"],
+    queryFn: () => fetchAgentPublicProfile({ data: personaId }),
+  })
+}
+
+export function useAgentPublicProfile(personaId: string) {
+  const principalId = useAgentPrincipalId()
+  return useQuery(agentPublicProfileQueryOptions(principalId, personaId))
 }
 
 export function agentRosterQueryOptions(principalId: string) {

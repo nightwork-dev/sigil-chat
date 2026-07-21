@@ -53,6 +53,7 @@ import {
   agentPortraitUrl,
   useAgentMemoryActions,
   useAgentProfile,
+  useAgentPublicProfile,
   useUpdateAgentPersona,
   useUploadAgentPortrait,
   type AgentProfile as AgentProfileData,
@@ -824,7 +825,21 @@ function shapeOfRecord(record: MemoryRecord): string | null {
 
 // ─── Top-level view (data fetching + loading/error states) ─────────────────
 
-export function AgentProfileView({ personaId }: { personaId: string }) {
+export function AgentProfileView({
+  owner,
+  personaId,
+}: {
+  /** Whether the viewer owns this agent — selects the full vs reduced
+   *  projection (§4.3). The roster links every persona here, so the
+   *  destination adapts to role instead of dead-ending. */
+  owner: boolean
+  personaId: string
+}) {
+  if (!owner) return <PublicAgentProfileView personaId={personaId} />
+  return <OwnerAgentProfileView personaId={personaId} />
+}
+
+function OwnerAgentProfileView({ personaId }: { personaId: string }) {
   const { data, isPending, isError, error } = useAgentProfile(personaId)
 
   if (isPending) {
@@ -862,6 +877,66 @@ export function AgentProfileView({ personaId }: { personaId: string }) {
       <AgentProfile.Memory />
       <AgentProfile.Sessions />
     </AgentProfile.Root>
+  )
+}
+
+// §4.3 — the reduced projection a non-owner sees: identity + description +
+// portrait. Memory, sessions, and configuration stay owner-only (the Q1
+// relationship-memory model is a follow-up spec; this is the no-dead-end
+// floor — a member reaching /agents/$personaId from the roster always lands
+// on a real page, never a raw "Owner access required").
+function PublicAgentProfileView({ personaId }: { personaId: string }) {
+  const { data, isPending, isError, error } = useAgentPublicProfile(personaId)
+
+  if (isPending) {
+    return (
+      <div className="grid min-h-[50vh] place-items-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner /> Loading agent profile…
+        </div>
+      </div>
+    )
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="mx-auto max-w-xl p-6">
+        <Alert variant="destructive">
+          <AlertTitle>Agent not found</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error
+              ? error.message
+              : "This agent isn't visible to you."}
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  const portraitUrl = agentPortraitUrl(data.id, data.hasPortrait)
+  const initial = data.name.slice(0, 1).toUpperCase()
+
+  return (
+    <div className="mx-auto max-w-xl p-6">
+      <div className="flex items-start gap-4">
+        <Avatar className="size-16">
+          {portraitUrl ? <AvatarImage src={portraitUrl} alt="" /> : null}
+          <AvatarFallback className="text-xl font-medium text-primary">
+            {initial}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-medium">{data.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data.description || "No description."}
+          </p>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Memory, sessions, and configuration are visible to this agent's
+            owner.
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -10,17 +10,31 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { AgentProfileView } from "@/components/agents/agent-profile"
-import { agentProfileQueryOptions } from "@/lib/agent-profile"
+import {
+  agentProfileQueryOptions,
+  agentPublicProfileQueryOptions,
+} from "@/lib/agent-profile"
 
 export const Route = createFileRoute("/_app/agents/$personaId")({
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(
-      agentProfileQueryOptions(context.user.id, params.personaId),
-    ),
+  loader: ({ context, params }) => {
+    // §4.3 — the loader branches on role: the full profile fn is owner-only,
+    // so a non-owner's loader must never call it (that was the dead-end).
+    // Non-owners preload the reduced projection instead.
+    const owner = context.user.role === "owner"
+    if (owner) {
+      return context.queryClient.ensureQueryData(
+        agentProfileQueryOptions(context.user.id, params.personaId),
+      )
+    }
+    return context.queryClient.ensureQueryData(
+      agentPublicProfileQueryOptions(context.user.id, params.personaId),
+    )
+  },
   component: AgentProfileRoute,
 })
 
 function AgentProfileRoute() {
   const { personaId } = Route.useParams()
-  return <AgentProfileView personaId={personaId} />
+  const { user } = Route.useRouteContext()
+  return <AgentProfileView owner={user.role === "owner"} personaId={personaId} />
 }
