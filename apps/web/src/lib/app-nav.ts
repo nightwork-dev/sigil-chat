@@ -10,10 +10,8 @@
 // omits itself on principal-level routes) — not through a NavModel change.
 
 import {
-  ArchiveIcon,
-  FileCheck2Icon,
   FlaskConicalIcon,
-  LibraryBigIcon,
+  MapIcon,
   MessageSquareIcon,
   SettingsIcon,
   ActivityIcon,
@@ -28,15 +26,20 @@ export function buildAppNav(options: {
   return {
     brand: { label: "Sigil Chat", to: "/chat" },
     items: [
-      // Container-scoped — modes of working WITHIN the active project/workspace.
+      // The product center: conversation and the management session. Review,
+      // Evidence, and Artifacts are demo workspaces — reachable from the labs
+      // island, their tool definitions earmarked for generalization — not
+      // front-and-center nav.
       { to: "/chat", label: "Chat", icon: MessageSquareIcon },
-      { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
-      { to: "/artifacts", label: "Artifacts", icon: ArchiveIcon },
-      { to: "/review", label: "Review", icon: FileCheck2Icon },
       // Agent management — ONE entry into the management session (Agents |
       // Skills | Capabilities share a tab header in the top rail; principal-
       // level, so the breadcrumb omits the container segment here).
       { to: "/agents", label: "Agents", icon: UserRoundIcon },
+      // Kanban is not a demo — the work board is a centered product surface
+      // (internal profile until the scoped-rollup spec lands).
+      ...(options.internalWorkspaces
+        ? [{ to: "/roadmap", label: "Roadmap", icon: MapIcon }]
+        : []),
     ],
     footer: [
       // Demos and experiments stay reachable, out of the front-and-center

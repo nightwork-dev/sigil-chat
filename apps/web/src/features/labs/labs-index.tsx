@@ -2,14 +2,19 @@ import { Link } from "@tanstack/react-router"
 import {
   ArrowRightIcon,
   EyeIcon,
+  FileCheck2Icon,
   HandIcon,
-  MapIcon,
+  LibraryBigIcon,
+  ArchiveIcon,
   NetworkIcon,
 } from "lucide-react"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-const labs = [
+// Cards that can touch remote resources (the agent, Gonk tools) — hidden
+// entirely from anonymous visitors, not just disabled (nothing
+// remote-resource-using is visible without auth).
+const gatedLabs = [
   {
     to: "/studio" as const,
     title: "Studio",
@@ -18,12 +23,30 @@ const labs = [
     icon: NetworkIcon,
   },
   {
-    to: "/roadmap" as const,
-    title: "Roadmap",
+    to: "/review" as const,
+    title: "Review",
     description:
-      "Story status board with editor panel and the installation owner's review queue (internal workspace).",
-    icon: MapIcon,
+      "Document review workspace — passage annotations, decisions, and the agent sidecar. Demo-stage; its pieces are earmarked for generalization.",
+    icon: FileCheck2Icon,
   },
+  {
+    to: "/evidence" as const,
+    title: "Evidence",
+    description:
+      "The Evidence Room — a pinned resource corpus the agent's tools can search and cite. Demo-stage.",
+    icon: LibraryBigIcon,
+  },
+  {
+    to: "/artifacts" as const,
+    title: "Artifacts",
+    description:
+      "Generated artifact browser — images and files produced through the agent's tool calls. Demo-stage.",
+    icon: ArchiveIcon,
+  },
+]
+
+// Local-only studies — safe (and nice) to show without auth.
+const publicLabs = [
   {
     to: "/labs/gaze" as const,
     title: "Gaze",
@@ -40,7 +63,9 @@ const labs = [
   },
 ]
 
-export function LabsIndex() {
+export function LabsIndex({ authenticated }: { authenticated: boolean }) {
+  const labs = authenticated ? [...gatedLabs, ...publicLabs] : publicLabs
+
   return (
     <main className="min-h-svh bg-background px-5 py-10 text-foreground sm:px-8">
       <div className="mx-auto max-w-4xl">
@@ -58,6 +83,9 @@ export function LabsIndex() {
             Demos and experiments — reachable, but out of the product's front
             door. Camera-based studies process locally in this browser
             session and ask before starting the camera.
+            {authenticated
+              ? ""
+              : " Sign in to see the workspaces that use the agent."}
           </p>
         </header>
 

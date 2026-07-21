@@ -10,5 +10,12 @@ import { createFileRoute } from "@tanstack/react-router"
 import { LabsIndex } from "@/features/labs/labs-index"
 
 export const Route = createFileRoute("/labs/")({
-  component: LabsIndex,
+  component: LabsIndexRoute,
 })
+
+function LabsIndexRoute() {
+  // Resolved (never redirected) by the /labs layout: gated cards render only
+  // for authenticated visitors; the local-only studies show either way.
+  const { user } = Route.useRouteContext()
+  return <LabsIndex authenticated={user !== null} />
+}

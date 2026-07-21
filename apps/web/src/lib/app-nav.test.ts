@@ -3,41 +3,36 @@ import { describe, expect, it } from "vitest"
 import { buildAppNav } from "./app-nav"
 
 describe("app navigation profiles", () => {
-  it("keeps demos and coordination surfaces out of the product nav", () => {
+  it("keeps demo workspaces out of the product nav", () => {
     const { items, footer } = buildAppNav({ internalWorkspaces: false })
     const itemsTo = items.map((item) => item.to)
     const footerTo = (footer ?? []).map((item) => item.to)
 
-    // Product surfaces stay front and center.
-    expect(itemsTo).toContain("/chat")
-    expect(itemsTo).toContain("/evidence")
-    expect(itemsTo).toContain("/artifacts")
-    expect(itemsTo).toContain("/review")
+    // The product center: conversation + one management entry.
+    expect(itemsTo).toEqual(["/chat", "/agents"])
 
-    // One management entry; the management session's sections live in the
-    // rail, not the nav.
-    expect(itemsTo).toContain("/agents")
-    expect(itemsTo).not.toContain("/capabilities")
-    expect(itemsTo).not.toContain("/skills")
-
-    // Demos/labs never in the main nav — and absent entirely outside the
-    // internal profile.
+    // Demo workspaces are labs-island cards, not nav.
+    expect(itemsTo).not.toContain("/review")
+    expect(itemsTo).not.toContain("/evidence")
+    expect(itemsTo).not.toContain("/artifacts")
     expect(itemsTo).not.toContain("/studio")
-    expect(itemsTo).not.toContain("/labs")
-    expect(itemsTo).not.toContain("/roadmap")
     expect(footerTo).not.toContain("/labs")
+
+    // Kanban is centered, not a demo — internal profile only, until the
+    // scoped-rollup spec lands.
+    expect(itemsTo).not.toContain("/roadmap")
   })
 
-  it("exposes labs via the footer only for the internal profile", () => {
+  it("shows the roadmap to the internal profile and labs via the footer", () => {
     const internal = buildAppNav({ internalWorkspaces: true })
+    expect(internal.items.map((item) => item.to)).toContain("/roadmap")
     expect((internal.footer ?? []).map((item) => item.to)).toContain("/labs")
-    expect(internal.items.map((item) => item.to)).not.toContain("/labs")
-    expect(internal.items.map((item) => item.to)).not.toContain("/roadmap")
 
     const external = buildAppNav({ internalWorkspaces: false })
     expect((external.footer ?? []).map((item) => item.to)).not.toContain(
       "/labs",
     )
+    expect(external.items.map((item) => item.to)).not.toContain("/roadmap")
   })
 
   it("orders container-scoped surfaces before principal-level ones (§3.2)", () => {
@@ -45,7 +40,7 @@ describe("app navigation profiles", () => {
       (item) => item.to,
     )
 
-    const containerScoped = ["/chat", "/evidence", "/artifacts", "/review"]
+    const containerScoped = ["/chat"]
     const principalLevel = ["/agents"]
     const lastScoped = Math.max(...containerScoped.map((to) => order.indexOf(to)))
     const firstPrincipal = Math.min(
