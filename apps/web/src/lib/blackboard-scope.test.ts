@@ -20,6 +20,18 @@ describe("blackboardStoreKey", () => {
       "project:proj-1",
     );
   });
+
+  it("rejects a session id shaped like a workspace/project key instead of silently colliding", () => {
+    // Without this guard, {tier:"session", id:"workspace:foo"} and
+    // {tier:"workspace", id:"foo"} would both resolve to store key
+    // "workspace:foo" — a cross-container blackboard read.
+    expect(() =>
+      blackboardStoreKey({ tier: "session", id: "workspace:foo" }),
+    ).toThrow('must not contain ":"');
+    expect(() =>
+      blackboardStoreKey({ tier: "session", id: "project:foo" }),
+    ).toThrow('must not contain ":"');
+  });
 });
 
 describe("resolveEffectiveBlackboardTier", () => {

@@ -13,9 +13,25 @@ export interface BlackboardScope {
  * per the brief's "same store keyed by scope id" (no forked store). The
  * session tier keeps its historical bare-id key so every blackboard on disk
  * today stays readable; only the new tiers get a `<tier>:` prefix.
+ *
+ * That asymmetry is only collision-free because session ids are always
+ * `crypto.randomUUID()` (agent-threads-domain.ts) and never contain `:`. A
+ * session id shaped like `workspace:foo` would resolve to the exact same
+ * store key as workspace `foo` — a cross-container read. Rather than trust
+ * that invariant silently, reject it here so the boundary holds even if a
+ * future session concept (an imported thread, a slug id, a migration) ever
+ * produces a non-UUID id.
  */
 export function blackboardStoreKey(scope: BlackboardScope): string {
-  return scope.tier === "session" ? scope.id : `${scope.tier}:${scope.id}`;
+  if (scope.tier === "session") {
+    if (scope.id.includes(":")) {
+      throw new Error(
+        'Session blackboard scope id must not contain ":" — it would collide with a workspace/project store key.',
+      );
+    }
+    return scope.id;
+  }
+  return `${scope.tier}:${scope.id}`;
 }
 
 /**

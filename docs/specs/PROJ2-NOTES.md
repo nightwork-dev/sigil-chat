@@ -79,6 +79,35 @@ See `PROJ2-BUILD-BRIEF.md` for the acceptance criteria this satisfies.
    `assertRegisteredScopeMembership`/`assertAuthorizedScope` Eve's tool scope
    already relies on.
 
+## Post-review fixes (different-lineage review, pre-merge)
+
+Two should-fixes from the independent review, applied after the initial
+report:
+
+1. **Blackboard key collision (ISSUE 1/3).** `blackboardStoreKey`
+   (`apps/web/src/lib/blackboard-scope.ts`) mapped `{tier:"session",
+   id:"workspace:foo"}` and `{tier:"workspace", id:"foo"}` to the same flat
+   store key. Not exploitable today (session ids are always
+   `crypto.randomUUID()`), but the safety rested on that invariant being
+   unstated and untested. Fixed by rejecting any session-tier id containing
+   `:` at the key-derivation boundary, with a regression test in
+   `blackboard.server.test.ts` that constructs the collision directly (a
+   caller who owns a thread literally named `workspace:foo`, simulating the
+   invariant slipping) and asserts the read is refused — this test fails
+   against the pre-fix code and passes against the fix, which is the
+   falsifiable guard the review asked for.
+2. **Optimistic-cache summary drift (ISSUE 2/4).** The client's
+   `projectCachedThreadSummary` (`agent-threads.ts`) omitted `workspaceId`,
+   which the server's `projectAgentThreadSummary`
+   (`agent-threads-domain.ts`) already included — a freshly created/rebound
+   thread would render under Personal until the next refetch. Fixed by
+   deleting the client-side duplicate and having `cacheThread` call
+   `projectAgentThreadSummary` directly (also collapsed a redundant dynamic
+   import of the same function inside `listAgentThreadsFn`). Added
+   coverage in `agent-threads-domain.test.ts` asserting the summary carries
+   `workspaceId` when bound and omits it when unbound/rebound-away, so the
+   two projectors can't drift again — there's only one now.
+
 ## Verification
 
 - `pnpm --filter web typecheck`, `pnpm --filter sigil-chat-agent typecheck`,

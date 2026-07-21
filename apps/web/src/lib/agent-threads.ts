@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
+import { projectAgentThreadSummary } from "@/lib/agent-threads-domain";
 import type {
   AgentThread,
   AgentThreadPreference,
@@ -36,8 +37,6 @@ const listAgentThreadsFn = createServerFn({ method: "GET" })
     const threads = data.includeArchived
       ? agentThreadRepository.list(session.user.id, true)
       : agentThreadRepository.ensureActive(session.user.id);
-    const { projectAgentThreadSummary } =
-      await import("@/lib/agent-threads-domain");
     return threads.map(projectAgentThreadSummary);
   });
 
@@ -394,7 +393,7 @@ function cacheThread(
     agentThreadKeys.detail(principalId, thread.id),
     thread,
   );
-  const summary = projectCachedThreadSummary(thread);
+  const summary = projectAgentThreadSummary(thread);
   queryClient.setQueryData<AgentThreadSummary[]>(
     agentThreadKeys.list(principalId, true),
     (current) => upsertThread(current, summary),
@@ -432,19 +431,6 @@ function upsertThread(
       right.updatedAt.localeCompare(left.updatedAt) ||
       left.id.localeCompare(right.id),
   );
-}
-
-function projectCachedThreadSummary(thread: AgentThread): AgentThreadSummary {
-  return {
-    id: thread.id,
-    personaId: thread.personaId,
-    title: thread.title,
-    createdAt: thread.createdAt,
-    updatedAt: thread.updatedAt,
-    status: thread.status,
-    revision: thread.revision,
-    ...(thread.forkedFrom ? { forkedFrom: thread.forkedFrom } : {}),
-  };
 }
 
 async function requireThreadSession(): Promise<SigilAuthSession> {

@@ -114,6 +114,66 @@ describe("blackboard server boundary", () => {
       readOwnedBlackboard(session("user-1"), "workspace-1", { get: () => true }, blackboards),
     ).resolves.toMatchObject({ content: "" })
   })
+
+  it("refuses a session id shaped like a workspace key, even if a caller somehow owns a thread by that literal id", async () => {
+    // Session ids are always crypto.randomUUID() in practice, so this
+    // simulates that invariant slipping: a caller who genuinely owns a
+    // thread literally named "workspace:foo" (thus passing the ownership
+    // check) must still be refused, because reading it would otherwise
+    // return workspace "foo"'s notes — the exact collision blackboardStoreKey
+    // now rejects by construction.
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const workspaces = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    projects.upsert({
+      id: "project-1",
+      name: "Project One",
+      description: "",
+      members: [{ principalId: "user-1", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-1",
+    })
+    workspaces.upsert({
+      id: "foo",
+      projectId: "project-1",
+      name: "Workspace Foo",
+      description: "",
+      status: "active",
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-1",
+    })
+    const registries = { projects, workspaces }
+    const blackboards = new MemoryBlackboardRepository(
+      () => "2026-07-20T10:00:00.000Z",
+    )
+    await writeScopedBlackboard(
+      session("user-1"),
+      {
+        scope: { tier: "workspace", id: "foo" },
+        content: "Workspace foo secret",
+        expectedRevision: "",
+      },
+      () => false,
+      blackboards,
+      registries,
+    )
+
+    const ownsColonShapedThread = (userId: string, threadId: string) =>
+      userId === "user-1" && threadId === "workspace:foo"
+
+    await expect(
+      readScopedBlackboard(
+        session("user-1"),
+        { tier: "session", id: "workspace:foo" },
+        ownsColonShapedThread,
+        blackboards,
+        registries,
+      ),
+    ).rejects.toThrow('must not contain ":"')
+  })
 })
 
 function memoryKv(values: Map<string, unknown>): KvStore<unknown> {

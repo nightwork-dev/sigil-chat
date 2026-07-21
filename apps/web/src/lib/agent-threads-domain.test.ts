@@ -205,6 +205,51 @@ describe("AgentThreadRepository", () => {
     expect(JSON.stringify(summary)).not.toContain("Private transcript");
   });
 
+  it("carries a bound thread's workspaceId into its summary, and omits it when unbound", () => {
+    const repo = repository();
+    const bound = repo.create(USER_A, {
+      title: "Bound thread",
+      workspaceId: "workspace-1",
+    });
+    const unbound = repo.create(USER_A, { title: "Unbound thread" });
+
+    // This is the exact projector the client's optimistic cache write
+    // (agent-threads.ts: cacheThread) reuses — one source of truth, so a
+    // freshly created/rebound thread's summary can't drift from the
+    // server's the way two separate projectors once did.
+    expect(projectAgentThreadSummary(bound)).toMatchObject({
+      workspaceId: "workspace-1",
+    });
+    expect(projectAgentThreadSummary(unbound)).not.toHaveProperty(
+      "workspaceId",
+    );
+  });
+
+  it("rebinds a thread's workspace and can unbind it back to the personal project", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A, { workspaceId: "workspace-1" });
+
+    const rebound = repo.rebindWorkspace(
+      USER_A,
+      thread.id,
+      "workspace-2",
+      thread.revision,
+    );
+    expect(rebound.workspaceId).toBe("workspace-2");
+    expect(rebound.revision).toBe(thread.revision + 1);
+
+    const unbound = repo.rebindWorkspace(
+      USER_A,
+      thread.id,
+      undefined,
+      rebound.revision,
+    );
+    expect(unbound.workspaceId).toBeUndefined();
+    expect(projectAgentThreadSummary(unbound)).not.toHaveProperty(
+      "workspaceId",
+    );
+  });
+
   it("rejects stale optimistic writes", () => {
     const repo = repository();
     const thread = repo.create(USER_A);
