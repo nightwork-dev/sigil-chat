@@ -46,6 +46,9 @@ describes infrastructure, not what a person believes they are making.
 
 - Give every project, workspace, session, resource, artifact, agent binding,
   tool configuration, setting, and work item a durable scope identity.
+- Let higher-scope and personal agents work across the resources within their
+  declared reach while re-authorizing every read and action for the current
+  principal.
 - Support shared initiatives without duplicate workspaces or ambiguous delete
   authority.
 - Make resolution deterministic when multiple scope paths contribute context
@@ -71,6 +74,8 @@ describes infrastructure, not what a person believes they are making.
   workspace-level product slice.
 - Letting an agent commit a sponsor, priority, assignee, or release status on a
   person's behalf.
+- Treating temporary travel by a workspace-native agent as ordinary
+  inheritance or silently changing that agent's canonical home.
 
 ## 2. Concrete model
 
@@ -113,6 +118,7 @@ the canonical home. Neither is an authorization claim.
 | Membership or grant | May this principal read or perform this action? | Yes, when evaluated server-side. |
 | Setting contribution | Which values are candidates for this setting? | No. Security settings cannot be widened through inheritance. |
 | Board view | Which work records should this saved lens display? | No. The query is still filtered by authorization. |
+| Agent operating reach | Which scopes may this agent ask the host to resolve? | No. Every resource read and action is still authorized for the current principal. |
 | Agent attention | What part of the authorized surface is relevant now? | No. It is projection, not authority. |
 
 Any API or UI that uses one of these concepts as a synonym for another is a
@@ -152,7 +158,9 @@ Default home relationships are:
 - an organization is homed in the installation;
 - a project is homed in an organization;
 - a workspace is homed in one project;
-- a session is homed in one workspace;
+- an ordinary work session is homed in one workspace;
+- a cross-project personal-agent session may instead be homed in the same
+  principal's personal scope and is private by default;
 - a personal scope is homed directly in the installation and belongs to one
   principal.
 
@@ -162,9 +170,11 @@ installation-wide defaults, organization policy, and project defaults as the
 same thing.
 
 The personal scope is optional as a materialized record. It exists to home
-private defaults and resources when a real resource needs that lifecycle. A
-principal is still not a scope: identity, membership, roles, and grants remain
-in the authorization model.
+private defaults and resources, including a personal agent identity and its
+principal-private continuity, when a real resource needs that lifecycle. A
+personal cross-project session is such a resource and materializes the scope if
+needed. A principal is still not a scope: identity, membership, roles, and
+grants remain in the authorization model.
 
 ### 4.1 Ownership invariants
 
@@ -263,6 +273,15 @@ The first implementation must prove these cases:
    even if an old perspective, link, or agent annotation remains.
 7. A session cannot use its scope string, browser context, or mount path to
    widen the principal's authority.
+8. An installation-, organization-, or project-homed agent can resolve
+   resources within its declared scope reach only where the principal also has
+   current access.
+9. A principal's personal agent can discover and read anything that principal
+   can currently discover and read, across projects and workspaces, without
+   turning the personal scope into an authorization grant.
+10. Revocation removes a resource from future personal-agent discovery,
+    retrieval, and tool use even when earlier sessions or memories still refer
+    to it.
 
 This matrix is part of the first design slice, not deferred multi-user polish.
 Users are the hardest consumer of the model and expose false assumptions early.
@@ -383,16 +402,89 @@ authorize its side effects.
 ### 8.4 Agents and sessions
 
 Agent/persona records may have one canonical home and be made discoverable in
-other scopes. An execution session binds immutably to:
+other scopes. Canonical home controls lifecycle; **operating reach** controls
+where an agent may ask the host to discover or read. They are separate fields.
+
+The first reach policies are:
+
+- **scope reach** — installation-, organization-, project-, or workspace-homed
+  agents may resolve their home scope and the permitted canonical descendant
+  closure. A definition may opt into specific composition-link kinds; arbitrary
+  graph links never widen reach implicitly.
+- **principal reach** — an agent homed in a principal's personal scope may
+  resolve the full set of resources that principal can currently discover and
+  read, across project and workspace boundaries.
+
+Reach supplies candidates, not credentials. For every discovery, retrieval,
+read, or tool call, the host intersects the agent's declared reach with the
+authenticated principal's current grants, the resource family's policy, and
+any narrower session/tool constraint. Write operations and side effects are
+authorized independently against their real resource identities. A global
+agent therefore has installation-wide *eligible reach*, not installation-owner
+authority; it still sees only what its current principal may see.
+
+A personal agent keeps the same agent identity and principal-private continuity
+as the principal moves between projects and workspaces. A cross-project session
+for that agent is homed in the matching personal scope, not whichever workspace
+happened to be open when it began. Its active perspective may move among
+authorized scopes, but its transcript, derived context, and new private memory
+remain personal-scope content by default. Ordinary workspace work continues to
+use workspace-homed sessions.
+
+This does not mean all reachable material is loaded into every prompt. The
+active working set remains explicit, ordered, relevance-selected, and
+receipted. Recall re-authorizes its source before use; revoked or newly hidden
+sources cannot be retrieved merely because an earlier session or memory record
+refers to them.
+
+Authorization cannot honestly make an agent “unlearn” text already present in
+a durable transcript or derived memory. Derived records therefore retain source
+provenance and audience labels. Loss of source access quarantines them from
+automatic recall and use; the existing personal transcript remains governed by
+its retention/deletion policy rather than masquerading as erased. Moving or
+projecting personal-session content, including derived material, into a
+workspace or shared session is an explicit principal action. The host
+re-authorizes its labelled sources and target audience at that point and never
+ambiently injects personal cross-project continuity into a shared context.
+
+An execution session binds immutably to:
 
 - one authenticated principal;
 - one persona/agent identity;
-- one home workspace;
+- one home scope: normally a workspace, or that principal's personal scope for
+  a private cross-project personal-agent session;
 - one initial validated perspective.
 
 Additional context scopes are an ordered, authorized list. They do not become
 co-owners of the session. Changing persona still creates or selects a distinct
-execution session.
+execution session. Identity and authorized memory may persist across sessions;
+the contract does not require one thread to become the conversation history of
+every workspace.
+
+### 8.5 Future: portable agent leases
+
+A workspace-native agent may eventually travel with a principal temporarily,
+but this is not modeled as a move, mount, or personal agent. It requires an
+explicit, revocable **portable agent lease** that preserves the agent's native
+home and records at least:
+
+- the carrying principal, native scope, target perspective, start, expiry, and
+  revocation state;
+- the allowed read reach and tool-capability subset;
+- whose approval is required when the principal does not control the native
+  agent or source material;
+- memory ingress, recall, retention, and return/discard policy;
+- the session boundary and separate native, carried, and visited-context memory
+  partitions;
+- source and audience labels that prevent native-workspace secrets from
+  leaking into the visited context, or visited-context data from silently
+  contaminating native memory;
+- provenance for every action performed while carried.
+
+Lease expiry or revocation ends future reads and actions immediately. It does
+not rehome the agent, transfer ownership, imply write authority, or erase the
+audit trail. The exact lease and memory policy is a later roadmap slice; V1
+must not approximate it by adding foreign scopes to a native session.
 
 ## 9. Durable work: records first, boards second
 
@@ -666,6 +758,8 @@ assumptions must change deliberately:
   provenance;
 - broad story tools accept authorship-shaped input that should be trusted host
   context;
+- agent records do not yet distinguish canonical home, operating reach, active
+  working context, and current principal authorization;
 - chrome exposes container selection but not yet project/workspace home views.
 
 These are migration facts, not reasons to preserve the strict hierarchy.
@@ -676,6 +770,8 @@ These are migration facts, not reasons to preserve the strict hierarchy.
 
 - Ratify scope kinds, canonical home, link directions, perspective, and the
   authorization test matrix.
+- Ratify scope reach versus principal reach for agents; prove that neither is
+  an authorization grant.
 - Decide whether the personal scope is materialized immediately or represented
   by an app-owned virtual id until its first durable resource.
 
@@ -700,6 +796,8 @@ These are migration facts, not reasons to preserve the strict hierarchy.
 - Add resource mounts and tool enablement/configuration bindings.
 - Carry ordered additional context scopes into sessions without changing
   session ownership.
+- Add explicit agent reach policies and personal-agent continuity with
+  per-resource re-authorization and context receipts.
 
 ### Slice 5 — durable scoped work
 
@@ -768,6 +866,19 @@ invent multi-parent records ahead of them.
     work, and attention without reverting to a flat subsystem cabinet.
 16. The first design review includes the principal access matrix, shared
     workspace perspective, empty/loading/denied states, and mobile navigation.
+17. A higher-scope agent can discover and read only the intersection of its
+    declared scope reach and the current principal's authorization.
+18. A personal agent retains identity and principal-private continuity across
+    projects and workspaces and may read anything its principal can currently
+    read. Its cross-project session is homed in the matching personal scope;
+    source revocation disables future retrieval and automatic derived-memory
+    use even when retained transcripts or old references remain.
+19. Neither cross-scope continuity nor an additional context scope silently
+    rehomes an agent, grants write authority, or makes one thread the history
+    of every workspace.
+20. Personal-session and derived content remains private by default and enters
+    a workspace/shared scope only through an explicit, source- and
+    audience-authorized principal action.
 
 ## 15. Resolved first-slice decisions
 
@@ -780,6 +891,11 @@ invent multi-parent records ahead of them.
 3. **Multi-root board creation:** any principal may save a private view over
    scopes they can access. Publishing a multi-root board requires
    installation-owner authorization and never widens viewer access.
+4. **Agent reach:** canonical home and operating reach are independent. A
+   higher-scope agent has an explicit, typed scope reach; a personal agent has
+   principal reach. Both are dynamically intersected with current principal
+   authorization, while temporarily carrying a workspace-native agent is
+   deferred to an explicit portable-agent-lease contract.
 
 These decisions close the original open questions without changing the central
 contract: ownership is singular, composition is typed and ordered, and
