@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { PersonalScopeRegistry, personalScopeId } from "./personal-scope"
+import {
+  INSTALLATION_SCOPE_ID,
+  PersonalScopeRegistry,
+  personalScopeId,
+} from "./personal-scope"
 import { ProjectWorkspaceScopeRegistry } from "./scope-registry"
 
 class MemoryKv<T> {
@@ -66,19 +70,32 @@ describe("PersonalScopeRegistry", () => {
     })
     expect(personalScopeId("user-1")).toBe(scope.id)
     expect(registry.ensureForPrincipal("user-1")).toEqual(scope)
+    expect(registry.getInstallation()).toMatchObject({
+      id: INSTALLATION_SCOPE_ID,
+      kind: "installation",
+      status: "active",
+    })
   })
 
   it("projects personal scopes through the canonical scope registry without project membership", () => {
     const personalScopes = new PersonalScopeRegistry({
       store: new MemoryKv<unknown>(),
     })
-    const personal = personalScopes.ensureForPrincipal("user-1")
     const scopes = new ProjectWorkspaceScopeRegistry(
       { get: () => undefined },
       { get: () => undefined },
       personalScopes,
     )
 
+    expect(scopes.get(INSTALLATION_SCOPE_ID)).toEqual({
+      id: INSTALLATION_SCOPE_ID,
+      kind: "installation",
+      name: "Sigil Chat",
+      description: "Installation root for principal-owned personal scopes.",
+      status: "active",
+    })
+
+    const personal = personalScopes.ensureForPrincipal("user-1")
     expect(scopes.get(personal.id)).toEqual({
       id: personal.id,
       kind: "personal",

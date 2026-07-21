@@ -395,6 +395,43 @@ describe("AgentThreadRepository", () => {
     expect(rebound.executionBinding).toBeUndefined();
   });
 
+  it("owner-only migrates a legacy thread to one immutable execution binding", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
+    const binding = {
+      principalId: USER_A,
+      personaId: thread.personaId,
+      homeScopeId: "personal-scope:user-a",
+      initialPerspective: {
+        focusScopeId: "personal-scope:user-a",
+        viaScopeIds: [],
+      },
+      additionalContextScopeIds: [],
+    };
+
+    expect(() =>
+      repo.bindExecution(USER_B, thread.id, {
+        ...binding,
+        principalId: USER_B,
+      }),
+    ).toThrow(AgentThreadNotFoundError);
+
+    const migrated = repo.bindExecution(
+      USER_A,
+      thread.id,
+      binding,
+      thread.revision,
+    );
+    expect(migrated.executionBinding).toEqual(binding);
+    expect(migrated.revision).toBe(thread.revision + 1);
+    expect(() =>
+      repo.bindExecution(USER_A, thread.id, {
+        ...binding,
+        homeScopeId: "workspace-2",
+      }),
+    ).toThrow("execution binding is immutable");
+  });
+
   it("rejects stale optimistic writes", () => {
     const repo = repository();
     const thread = repo.create(USER_A);

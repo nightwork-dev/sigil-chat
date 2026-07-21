@@ -6,6 +6,17 @@ const PERSONAL_SCOPE_NAMESPACE = "sigil-chat.personal-scopes.v1"
 const PERSONAL_SCOPE_PREFIX = "personal-scope:"
 export const INSTALLATION_SCOPE_ID = "installation:default"
 
+export interface InstallationScope {
+  readonly id: typeof INSTALLATION_SCOPE_ID
+  readonly kind: "installation"
+  readonly name: string
+  readonly description: string
+  readonly status: "active"
+  readonly createdAt: string
+  readonly createdBy: "sigil-chat"
+  readonly revision: 1
+}
+
 export interface PersonalScope {
   readonly id: string
   readonly principalId: string
@@ -62,10 +73,41 @@ export class PersonalScopeRegistry {
     return this.get(personalScopeId(principalId))
   }
 
+  getInstallation(): InstallationScope | undefined {
+    const value = this.scopes.get(INSTALLATION_SCOPE_ID)
+    if (value === undefined) return undefined
+    if (!isInstallationScope(value)) {
+      throw new Error("Personal scope registry has a corrupt installation root.")
+    }
+    return clone(value)
+  }
+
+  ensureInstallation(
+    options: { now?: () => Date } = {},
+  ): InstallationScope {
+    const existing = this.getInstallation()
+    if (existing) return existing
+    const installation: InstallationScope = {
+      id: INSTALLATION_SCOPE_ID,
+      kind: "installation",
+      name: "Sigil Chat",
+      description: "Installation root for principal-owned personal scopes.",
+      status: "active",
+      createdAt: (options.now?.() ?? new Date()).toISOString(),
+      createdBy: "sigil-chat",
+      revision: 1,
+    }
+    this.scopes.set(INSTALLATION_SCOPE_ID, installation)
+    const persisted = this.getInstallation()
+    if (!persisted) throw new Error("Installation scope did not persist.")
+    return persisted
+  }
+
   ensureForPrincipal(
     principalId: string,
     options: { now?: () => Date } = {},
   ): PersonalScope {
+    this.ensureInstallation(options)
     const id = personalScopeId(principalId)
     const existing = this.get(id)
     if (existing) {
@@ -93,6 +135,21 @@ export class PersonalScopeRegistry {
     }
     return persisted
   }
+}
+
+export function isInstallationScope(value: unknown): value is InstallationScope {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, installationScopeKeys) &&
+    value.id === INSTALLATION_SCOPE_ID &&
+    value.kind === "installation" &&
+    isIdentifier(value.name) &&
+    typeof value.description === "string" &&
+    value.status === "active" &&
+    isIdentifier(value.createdAt) &&
+    value.createdBy === "sigil-chat" &&
+    value.revision === 1
+  )
 }
 
 export function personalScopeId(principalId: string): string {
@@ -124,6 +181,17 @@ const personalScopeKeys = [
   "name",
   "description",
   "homeScopeId",
+  "status",
+  "createdAt",
+  "createdBy",
+  "revision",
+] as const
+
+const installationScopeKeys = [
+  "id",
+  "kind",
+  "name",
+  "description",
   "status",
   "createdAt",
   "createdBy",

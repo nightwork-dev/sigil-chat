@@ -202,6 +202,10 @@ export class AgentThreadRepository {
     return active.length > 0 ? active : [this.create(userId)];
   }
 
+  getDefaultPersonaId(): string {
+    return this.defaultPersonaId;
+  }
+
   get(userId: string, id: string): AgentThread | undefined {
     const stored = this.threads.get(threadKey(id));
     const thread = stored ? this.normalizeThread(stored) : undefined;
@@ -269,6 +273,30 @@ export class AgentThreadRepository {
       else delete rebound.workspaceId;
       return {
         ...rebound,
+        updatedAt: timestamp,
+        revision: thread.revision + 1,
+      };
+    });
+  }
+
+  bindExecution(
+    userId: string,
+    id: string,
+    executionBinding: AgentThreadExecutionBinding,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => {
+      const normalized = normalizeExecutionBinding(executionBinding, {
+        principalId: userId,
+        personaId: thread.personaId,
+      });
+      if (thread.executionBinding) {
+        if (bindingsEqual(thread.executionBinding, normalized)) return thread;
+        throw new Error("Agent thread execution binding is immutable.");
+      }
+      return {
+        ...thread,
+        executionBinding: normalized,
         updatedAt: timestamp,
         revision: thread.revision + 1,
       };
@@ -681,6 +709,13 @@ function legacyExecutionBinding(
     initialPerspective: { focusScopeId: workspaceId, viaScopeIds: [] },
     additionalContextScopeIds: [],
   };
+}
+
+function bindingsEqual(
+  left: AgentThreadExecutionBinding,
+  right: AgentThreadExecutionBinding,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function normalizePrincipalId(principalId: string): string {
