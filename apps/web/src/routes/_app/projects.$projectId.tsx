@@ -85,6 +85,7 @@ function ProjectHomeRoute() {
         personaId: persona.id,
         name: persona.name,
         headline: persona.description,
+        hasPortrait: persona.hasPortrait,
       })),
       liveWorkSource({
         scopeId: projectId,

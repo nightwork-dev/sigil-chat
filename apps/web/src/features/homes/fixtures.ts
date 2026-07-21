@@ -164,8 +164,18 @@ export const fixtureWorkSource: ScopedWorkSource = {
 }
 
 export const fixtureAgents: readonly AgentRow[] = [
-  { personaId: "neve", name: "Neve Laine", headline: "Design and chrome" },
-  { personaId: "vesper", name: "Vesper Sund", headline: "Scope contracts" },
+  {
+    personaId: "neve",
+    name: "Neve Laine",
+    headline: "Design and chrome",
+    hasPortrait: false,
+  },
+  {
+    personaId: "vesper",
+    name: "Vesper Sund",
+    headline: "Scope contracts",
+    hasPortrait: false,
+  },
 ]
 
 export const fixtureAttention: readonly AttentionItem[] = [

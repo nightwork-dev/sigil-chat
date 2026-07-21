@@ -84,6 +84,7 @@ export interface AgentRow {
   readonly personaId: string
   readonly name: string
   readonly headline?: string
+  readonly hasPortrait: boolean
 }
 
 export interface ResourceRow {

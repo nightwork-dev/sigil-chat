@@ -4,6 +4,7 @@
 // work, and agent attention. No flat subsystem cabinet.
 
 import { HomeSection } from "./home-section"
+import { AgentHomeRow } from "./agent-home-row"
 import {
   ArchivedBanner,
   EmptySection,
@@ -126,13 +127,11 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         compact={compact}
       >
         {view.agents.map((agent, index) => (
-          <HomeRow
+          <AgentHomeRow
             key={agent.personaId}
+            agent={agent}
             first={index === 0}
             compact={compact}
-            title={agent.name}
-            description={agent.headline}
-            href={`/agents/${agent.personaId}`}
           />
         ))}
       </HomeSection>
