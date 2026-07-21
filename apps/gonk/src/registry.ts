@@ -16,6 +16,7 @@ import {
   workItemsRepository,
   type WorkItemsRepository,
 } from "@workspace/work-items-store";
+import { specsRepository } from "@workspace/work-items-store/specs";
 
 import { sigilApprovalProvider } from "./registry/approval.js";
 import { registerBlackboardTools } from "./registry/blackboard.js";
@@ -30,6 +31,7 @@ import {
   registerReviewTools,
 } from "./registry/review.js";
 import { registerStoryTools } from "./registry/story.js";
+import { registerSpecTools } from "./registry/spec.js";
 import {
   registerContainerTools,
   type ContainerRegistries,
@@ -60,6 +62,7 @@ export function createSigilRegistry(
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
   registerStoryTools(registry, workItems);
+  registerSpecTools(registry, specsRepository);
   registerContainerTools(registry, containers);
   registerAnnotationTools(registry);
   registerSkillTools(registry, skills);

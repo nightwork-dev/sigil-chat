@@ -29,6 +29,14 @@ Use `sigil-ui-highlight` when pointing the user to one or more application
 targets would be clearer than describing their location. It accepts semantic
 target ids, not CSS selectors.
 
+Use `sigil-spec-*` tools when the user asks for a durable product or behavior
+contract that should remain visible beside roadmap work. A spec is not an
+execution checklist: link it to the stories that implement or revise it, and
+keep temporary task notes in the conversation or work-item comments. List
+before creating to avoid duplicate ids. Inspect before revising or changing
+lifecycle status, and pass the returned revision so concurrent edits fail
+visibly instead of overwriting newer work.
+
 When the user asks a question about attached/session documents, call
 `sigil-evidence-ask` before answering. Ground every factual claim in the
 returned citation ids and preserve their artifact ids, quotes, and locators.

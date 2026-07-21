@@ -21,6 +21,7 @@
   "exports": {
     ".": "./src/repository.ts",
     "./types": "./src/types.ts",
+    "./specs": "./src/specs.ts",
     "./repository": "./src/repository.ts",
     "./markdown-repository": "./src/markdown-repository.ts",
     "./mirk-repository": "./src/mirk-repository.ts"
