@@ -97,7 +97,7 @@ export function HomeRow({
   )
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md border border-transparent text-left transition-colors",
-    compact ? "px-2 py-1.5" : "px-3 py-2",
+    compact ? "min-h-11 px-2 py-1.5" : "px-3 py-2",
     href
       ? "hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       : "cursor-default",
@@ -120,10 +120,8 @@ export function HomeRow({
   }
   return (
     <div
-      data-home-row
       data-testid={testId}
       role="listitem"
-      tabIndex={first ? 0 : -1}
       className={className}
     >
       {body}
@@ -140,13 +138,13 @@ export function RestrictedHomeRow({ label }: { label: string }) {
     <div
       data-testid="restricted-row"
       role="listitem"
-      className="flex w-full cursor-default items-center gap-2.5 rounded-md px-3 py-2 text-muted-foreground"
+      className="flex min-h-11 w-full cursor-default items-center gap-2.5 rounded-md px-3 py-2 text-muted-foreground"
     >
       <LockIcon className="size-3.5" aria-hidden />
       <span className="flex-1 text-sm italic">{label}</span>
       <Link
         to="/chat"
-        className="rounded-md border border-border px-2 py-0.5 text-[10px] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-11 items-center rounded-md border border-border px-2 py-0.5 text-[10px] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
       >
         Ask about access
       </Link>

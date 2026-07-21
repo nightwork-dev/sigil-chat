@@ -287,7 +287,7 @@ export function ContainerMenu({
         <Link
           to={href}
           data-testid="crumb-home-link"
-          className="flex items-center gap-1 rounded-sm px-1 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-11 items-center gap-1 rounded-sm px-1 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring md:min-h-0"
         >
           {icon ? <span aria-hidden>{icon}</span> : null}
           <span className="max-w-36 truncate">{label}</span>
@@ -301,7 +301,7 @@ export function ContainerMenu({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Switch ${label}`}
-          className="flex items-center rounded-sm px-0.5 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex size-11 items-center justify-center rounded-sm text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring md:size-auto md:px-0.5"
         >
           <ChevronDownIcon className="size-3 opacity-60" />
         </DropdownMenuTrigger>

@@ -33,7 +33,7 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
       data-testid="project-home"
       className={
         compact
-          ? "flex flex-col gap-4 p-3"
+          ? "flex flex-col gap-4 p-3 pb-20"
           : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
       }
     >

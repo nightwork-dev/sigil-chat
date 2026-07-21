@@ -223,9 +223,9 @@ export function SidebarShell({
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="min-h-0">
-        <header className="flex min-h-9 items-center gap-2 border-b border-border px-3 pt-[env(safe-area-inset-top)]">
-          <SidebarTrigger className="md:hidden" />
+      <SidebarInset className="min-h-0 overflow-hidden">
+        <header className="flex min-h-11 items-center gap-2 border-b border-border px-3 pt-[env(safe-area-inset-top)] md:min-h-9">
+          <SidebarTrigger className="-ml-3 size-11 md:hidden" />
           <Separator orientation="vertical" className="h-4 md:hidden" />
           <Breadcrumb>
             <BreadcrumbList>
@@ -248,10 +248,12 @@ export function SidebarShell({
           <HeaderActions actions={actions} />
         </header>
 
-        <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+          {children}
+        </div>
 
         {statusRailStart || statusRailEnd ? (
-          <footer className="flex h-7 shrink-0 items-center gap-2 border-t border-border px-2 text-[11px] text-muted-foreground">
+          <footer className="flex h-11 shrink-0 items-center gap-2 border-t border-border px-2 text-[11px] text-muted-foreground md:h-7">
             <div className="flex min-w-0 items-center gap-2 overflow-hidden">
               {statusRailStart}
             </div>

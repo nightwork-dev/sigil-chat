@@ -53,7 +53,7 @@ export function HomeDenied({ discoverable }: { discoverable: boolean }) {
           </p>
           <Link
             to="/chat"
-            className="mt-1 rounded-md border border-border px-3 py-1.5 text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-1 inline-flex min-h-11 items-center rounded-md border border-border px-3 py-1.5 text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
           >
             Ask about access
           </Link>
@@ -100,7 +100,7 @@ export function EmptySection({
       {action ? (
         <Link
           to={action.href}
-          className="mt-2 rounded-md border border-border px-3 py-1 text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mt-2 inline-flex min-h-11 items-center rounded-md border border-border px-3 py-1 text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
         >
           {action.label}
         </Link>
