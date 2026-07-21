@@ -1,4 +1,5 @@
 import { AgentChat } from "@/components/agent/agent-chat"
+import { useRegisterAgentPresentation } from "@/lib/agent-surface-registry"
 import {
   setToolApprovalMode,
   useToolApprovalMode,
@@ -6,6 +7,10 @@ import {
 
 export function AppChat() {
   const approvalMode = useToolApprovalMode()
+  // §4.1 — this ROUTE is the full conversation; registering at the route
+  // (not inside AgentChat, which the dock also renders) suppresses the shell
+  // dock structurally for exactly as long as this route is mounted.
+  useRegisterAgentPresentation("full")
 
   return (
     <AgentChat

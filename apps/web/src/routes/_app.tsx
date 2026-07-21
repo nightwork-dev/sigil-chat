@@ -24,6 +24,7 @@ import { ContainerBreadcrumb } from "@/components/agent/container-breadcrumb"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
 import { ActiveContainerProvider } from "@/lib/active-container"
+import { AgentSurfaceProvider } from "@/lib/agent-surface-registry"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -64,9 +65,11 @@ function AppLayout() {
         >
           <WorkspaceAttentionProvider>
             <AppAgentSessions principalId={user.id}>
-              <Outlet />
-              <ShellAgentHud />
-              <ShellOmnibar />
+              <AgentSurfaceProvider>
+                <Outlet />
+                <ShellAgentHud />
+                <ShellOmnibar />
+              </AgentSurfaceProvider>
             </AppAgentSessions>
           </WorkspaceAttentionProvider>
         </SidebarShell>

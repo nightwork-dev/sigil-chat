@@ -45,6 +45,7 @@ import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
+import { StudioAmbientPanel } from "@/components/agent/studio-ambient-panel"
 import {
   DemoAnnotationsProvider,
   mergeDemoAnnotations,
@@ -544,6 +545,11 @@ function ReducerCanvas({
           </AlertAction>
         </Alert>
       ) : null}
+
+      {/* Ambient working commentary (criterion 16) — the agent's latest
+          reasoning/text projected onto the canvas edge; quiet until hovered
+          or streaming. */}
+      <StudioAmbientPanel />
     </div>
   )
 }

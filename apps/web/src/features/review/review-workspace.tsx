@@ -28,6 +28,17 @@ import {
   type AttentionSelection,
 } from "@zigil/agent-react/attention"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
+import {
+  useMediaQuery,
+  useRegisterAgentPresentation,
+} from "@/lib/agent-surface-registry"
+import { AgentSidecar } from "@/components/agent/agent-sidecar"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 import { AcceptanceChecklist } from "@workspace/review/components/acceptance-checklist"
 import { AnnotationOverlay } from "@workspace/ui/components/annotation-overlay"
 import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
@@ -182,6 +193,12 @@ function enrichPassageAttention(
 }
 
 export function ReviewWorkspace() {
+  // §4.1 — this route owns a sidecar presentation in its right rail, so the
+  // shell's floating dock suppresses itself here. The rail is hidden below
+  // the lg breakpoint, so the claim is too — on small screens the dock stays
+  // (the region does not own a presentation it can't show).
+  const sidecarVisible = useMediaQuery("(min-width: 1024px)")
+  useRegisterAgentPresentation("sidecar", { enabled: sidecarVisible })
   const reviewDocument = useReviewDocument()
   const updateReviewPassages = useUpdateReviewPassages()
   const addReviewAnnotation = useAddReviewAnnotations()
@@ -673,33 +690,67 @@ export function ReviewWorkspace() {
 
           <aside
             className={cn(
-              "hidden min-h-0 border-l border-border bg-card/20 lg:grid lg:grid-rows-[auto_minmax(0,1fr)]",
+              "hidden min-h-0 border-l border-border bg-card/20 lg:block",
             )}
           >
-            <div className="border-b border-border px-4 py-3">
-              <SectionHeader
-                action={
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    {activeAnnotations.length} notes
-                  </span>
-                }
+            <Tabs
+              className="flex h-full min-h-0 flex-col"
+              defaultValue="agent"
+            >
+              <TabsList className="mx-2 mt-2 shrink-0">
+                {/* The agent tab defaults: the sidecar IS this route's agent
+                    presentation (§4.1); the passage tab is the reviewer's own
+                    annotation flow. */}
+                <TabsTrigger value="agent">Agent</TabsTrigger>
+                <TabsTrigger value="passage">Passage</TabsTrigger>
+              </TabsList>
+              <TabsContent
+                className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+                value="agent"
               >
-                Selected passage
-              </SectionHeader>
-              <p className="mt-2 text-sm font-medium">
-                {selectedPassage.section}
-              </p>
-              <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                {selectedPassage.body}
-              </p>
-            </div>
-            <div className="min-h-0 overflow-y-auto p-4">
-              <PassageFeedback
-                annotations={activeAnnotations}
-                onSubmit={addAnnotation}
-                passage={selectedPassage}
-              />
-            </div>
+                {/* Bound to the selected passage through the AttentionProvider
+                    above — the passage-aware placeholder flows from attention,
+                    not a second mount (§4.1). */}
+                <AgentSidecar
+                  className="min-h-0 flex-1 border-l-0 bg-transparent"
+                  subject={selectedPassage.section}
+                  subjectDetail={
+                    <span className="line-clamp-1">{selectedPassage.body}</span>
+                  }
+                />
+              </TabsContent>
+              <TabsContent
+                className="min-h-0 flex-1 data-[state=inactive]:hidden"
+                value="passage"
+              >
+                <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+                  <div className="border-b border-border px-4 py-3">
+                    <SectionHeader
+                      action={
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {activeAnnotations.length} notes
+                        </span>
+                      }
+                    >
+                      Selected passage
+                    </SectionHeader>
+                    <p className="mt-2 text-sm font-medium">
+                      {selectedPassage.section}
+                    </p>
+                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                      {selectedPassage.body}
+                    </p>
+                  </div>
+                  <div className="min-h-0 overflow-y-auto p-4">
+                    <PassageFeedback
+                      annotations={activeAnnotations}
+                      onSubmit={addAnnotation}
+                      passage={selectedPassage}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </aside>
         </div>
 

@@ -10,11 +10,12 @@
 // The compact HUD is a clean conversation surface: the heavy context inspector
 // and per-turn status live on the roomy /chat view, not this small panel.
 
-import { Link, useRouterState } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 
 import { AgentHud } from "@/components/agent/agent-hud"
 import { setAgentHudDock, useAgentHudDock } from "@/lib/agent-hud-dock"
 import { useAgentHudOpen } from "@/lib/agent-hud-open"
+import { useAgentSurfaceRegistry } from "@/lib/agent-surface-registry"
 import {
   setToolApprovalMode,
   useToolApprovalMode,
@@ -24,11 +25,13 @@ export function ShellAgentHud() {
   const [open, setOpen] = useAgentHudOpen()
   const approvalMode = useToolApprovalMode()
   const dock = useAgentHudDock()
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const registry = useAgentSurfaceRegistry()
 
-  // Redundant on /chat — that route IS the full agent conversation, so the
-  // floating "Ask your agent" affordance has nothing to add there.
-  if (pathname === "/chat") return null
+  // §4.1 — structural suppression, not a path check: the dock yields to any
+  // route that has registered a fuller presentation (the /chat route IS the
+  // conversation; /review owns a sidecar). A route that unmounts its
+  // presentation automatically returns the dock.
+  if (registry.dockSuppressed) return null
 
   return (
     <AgentHud.Root
