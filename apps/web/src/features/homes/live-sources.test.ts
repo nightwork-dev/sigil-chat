@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest";
 
-import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
-import type { Story } from "@workspace/work-items-store/types"
+import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav";
+import type { Story } from "@workspace/work-items-store/types";
 
-import { fixtureWorkSource } from "./fixtures"
-import { liveWorkSource, routeSources } from "./live-sources"
+import { fixtureWorkSource } from "./fixtures";
+import { liveWorkSource, routeSources } from "./live-sources";
 
 const nav: ProjectWorkspaceNavSummary = {
   personalProjectId: "project-personal",
@@ -25,13 +25,18 @@ const nav: ProjectWorkspaceNavSummary = {
       mountedProjectIds: [],
     },
   ],
-}
+};
 
 const story: Story = {
   id: "SC.7",
   kind: "story",
   homeScopeId: "workspace-1",
   scopeBindings: [],
+  provenance: {
+    origin: "principal",
+    actorPrincipalId: "user-1",
+    createdAt: "2026-07-21T00:00:00.000Z",
+  },
   revision: 2,
   epicId: "SC",
   epicTitle: "Scope composition",
@@ -45,7 +50,7 @@ const story: Story = {
   authoredBy: "Owner",
   createdAt: "2026-07-21T00:00:00.000Z",
   updatedAt: "2026-07-21T01:00:00.000Z",
-}
+};
 
 describe("home route sources", () => {
   it("uses permission-filtered live work when fixtures are disabled", () => {
@@ -53,23 +58,23 @@ describe("home route sources", () => {
       scopeId: "project-1",
       scopeStories: [story],
       nav,
-    })
-    const sources = routeSources(false, [], live)
+    });
+    const sources = routeSources(false, [], live);
 
     expect(sources.work.summariesForScope("project-1")).toEqual([
       expect.objectContaining({
         id: "SC.7",
         homeScopeName: "Checkout Reliability",
       }),
-    ])
-    expect(sources.resources).toEqual([])
-    expect(sources.attention).toEqual([])
-  })
+    ]);
+    expect(sources.resources).toEqual([]);
+    expect(sources.attention).toEqual([]);
+  });
 
   it("enables fixture work only behind the explicit review flag", () => {
-    const live = liveWorkSource({ nav })
+    const live = liveWorkSource({ nav });
 
-    expect(routeSources(false, [], live).work).toBe(live)
-    expect(routeSources(true, [], live).work).toBe(fixtureWorkSource)
-  })
-})
+    expect(routeSources(false, [], live).work).toBe(live);
+    expect(routeSources(true, [], live).work).toBe(fixtureWorkSource);
+  });
+});

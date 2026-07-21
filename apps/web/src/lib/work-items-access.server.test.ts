@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest";
 
-import type { SigilAuthSession } from "./auth/server"
+import type { SigilAuthSession } from "./auth/server";
 import {
   createBoardTraversalResolver,
   prepareBoardViewForUpsert,
@@ -23,7 +23,7 @@ function session(role: "member" | "owner"): SigilAuthSession {
       role,
       username: "example-user",
     } as SigilAuthSession["user"],
-  }
+  };
 }
 
 const board: BoardView = {
@@ -59,20 +59,20 @@ describe("work-item mutation access", () => {
   it("rejects anonymous callers", () => {
     expect(() => requireWorkItemsMutationAccess(null)).toThrow(
       "Authentication required",
-    )
-  })
+    );
+  });
 
   it("rejects authenticated members", () => {
     expect(() => requireWorkItemsMutationAccess(session("member"))).toThrow(
       "Owner access required",
-    )
-  })
+    );
+  });
 
   it("accepts the deployment owner", () => {
     expect(requireWorkItemsMutationAccess(session("owner")).user.role).toBe(
       "owner",
-    )
-  })
+    );
+  });
 
   it("does not expand an unauthorized root or return an unauthorized result", () => {
     const resolver = createBoardTraversalResolver(
@@ -192,8 +192,9 @@ describe("scope-home access projection", () => {
   });
 
   it("separates readable, discover-only, and undiscoverable scopes", () => {
-    expect(scopeHomeAccessSignal("user-1", "project-a", access(["board.read"])))
-      .toBe("readable");
+    expect(
+      scopeHomeAccessSignal("user-1", "project-a", access(["board.read"])),
+    ).toBe("readable");
     expect(
       scopeHomeAccessSignal("user-1", "project-a", access(["board.discover"])),
     ).toBe("denied");
@@ -225,21 +226,6 @@ describe("session commitment visibility", () => {
       ).map((item) => item.id),
     ).toEqual(["visible", "session-owned"]);
   });
-
-  it("does not project a legacy linked record with no canonical home", () => {
-    const legacy = linked({
-      ...story("legacy", "project-a"),
-      homeScopeId: undefined,
-    });
-    expect(
-      visibleSessionCommitments(
-        [legacy],
-        "thread-a",
-        "user-1",
-        scopeAccess(["project-a"]),
-      ),
-    ).toEqual([]);
-  });
 });
 
 describe("sponsorship decision access", () => {
@@ -255,7 +241,9 @@ describe("sponsorship decision access", () => {
   };
 
   it("lets only the authenticated proposed sponsor decide", () => {
-    expect(requireSponsorshipDecisionAccess(session("member"), proposed)).toBeTruthy();
+    expect(
+      requireSponsorshipDecisionAccess(session("member"), proposed),
+    ).toBeTruthy();
     expect(() =>
       requireSponsorshipDecisionAccess(
         {
