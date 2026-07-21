@@ -13,6 +13,8 @@ export interface Workspace {
   readonly projectId: string
   readonly name: string
   readonly description: string
+  /** Visual identity in the chrome (see Project.icon). */
+  readonly icon?: string
   readonly status: WorkspaceStatus
   readonly createdAt: string
   readonly createdBy: string
@@ -99,6 +101,7 @@ export function isWorkspace(value: unknown): value is Workspace {
     isIdentifier(value.projectId) &&
     isIdentifier(value.name) &&
     typeof value.description === "string" &&
+    (value.icon === undefined || typeof value.icon === "string") &&
     (value.status === "active" || value.status === "archived") &&
     isIdentifier(value.createdAt) &&
     isIdentifier(value.createdBy)
@@ -110,6 +113,7 @@ const workspaceKeys = [
   "projectId",
   "name",
   "description",
+  "icon",
   "status",
   "createdAt",
   "createdBy",

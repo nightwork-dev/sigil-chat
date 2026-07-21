@@ -42,6 +42,7 @@ export function ensurePersonalProject(
     id,
     name: "Personal",
     description: "Your personal project, created automatically.",
+    icon: "🏠",
     members: [{ principalId, role: "owner" }],
     settings: {},
     createdAt: timestamp,

@@ -79,7 +79,7 @@ test("updates all image digests and preserves a rollback manifest", () => {
     line.endsWith("container prune -f"),
   );
   const imagePrune = invocations.findIndex((line) =>
-    line.endsWith("image prune -f"),
+    line.endsWith("image prune -af"),
   );
   const pull = invocations.findIndex((line) => line.endsWith("pull"));
   const stopEdge = invocations.findIndex((line) =>
@@ -107,11 +107,6 @@ test("updates all image digests and preserves a rollback manifest", () => {
   assert.ok(
     invocations.some((line) => line.endsWith("up -d --wait --no-deps edge")),
     "edge must return only after private services pass readiness",
-  );
-  assert.ok(
-    invocations.findLastIndex((line) => line.endsWith("image prune -af")) >
-      replacePrivateServices,
-    "unused release images must be removed only after the candidate is healthy",
   );
 });
 

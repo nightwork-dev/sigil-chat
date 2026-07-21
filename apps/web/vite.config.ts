@@ -15,7 +15,9 @@ import { readRuntimeTopology } from "@workspace/runtime-env/topology"
 const rootEnv = resolve(import.meta.dirname, "../../.env")
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv)
 
-const { eveOrigin } = readRuntimeTopology(process.env)
+// Validate the topology at startup (fail fast on a malformed EVE_ORIGIN);
+// the /eve/** proxy route reads it per-request from process.env.
+readRuntimeTopology(process.env)
 const config = defineConfig({
   server: {
     // Allow Tailscale-served preview (tailscale serve → this dev server).
@@ -32,11 +34,12 @@ const config = defineConfig({
     tanstackStart(),
     nitro({
       serverDir: resolve(import.meta.dirname, "server"),
-      routeRules: {
-        "/eve/**": {
-          proxy: `${eveOrigin}/eve/**`,
-        },
-      },
+      // NOTE: /eve/** is proxied by an app-owned nitro route
+      // (server/routes/eve/[...].ts), not a routeRules proxy — h3's routeRule
+      // proxy 502s on POST /eve/v1/session in this stack (see the route's
+      // header comment). eveOrigin is still read here so the client bundle
+      // and server fn topology stay consistent.
+      routeRules: {},
     }),
     viteTsConfigPaths({
       // Load the ui package's tsconfig too: the portable Layouts/Views/Blocks

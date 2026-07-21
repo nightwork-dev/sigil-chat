@@ -53,7 +53,7 @@ variable "instance_type" {
 variable "root_volume_gib" {
   description = "Encrypted gp3 root volume size."
   type        = number
-  default     = 40
+  default     = 80
 
   validation {
     condition     = var.root_volume_gib >= 30 && var.root_volume_gib <= 100

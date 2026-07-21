@@ -15,6 +15,12 @@ export interface Project {
   readonly id: string
   readonly name: string
   readonly description: string
+  /**
+   * Visual identity for the container in the chrome (breadcrumb switcher,
+   * omnibar). An emoji or short glyph; an avatar-blob path (the persona
+   * portrait pattern) is a documented follow-up when one is needed.
+   */
+  readonly icon?: string
   readonly members: readonly ProjectMember[]
   readonly settings: Record<string, unknown>
   readonly createdAt: string
@@ -100,6 +106,7 @@ export function isProject(value: unknown): value is Project {
     isIdentifier(value.id) &&
     isIdentifier(value.name) &&
     typeof value.description === "string" &&
+    (value.icon === undefined || typeof value.icon === "string") &&
     Array.isArray(value.members) &&
     value.members.every(isProjectMember) &&
     hasUniquePrincipalIds(value.members) &&
@@ -114,6 +121,7 @@ const projectKeys = [
   "id",
   "name",
   "description",
+  "icon",
   "members",
   "settings",
   "createdAt",

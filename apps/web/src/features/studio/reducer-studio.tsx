@@ -44,6 +44,13 @@ import {
 import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
+import { StudioAmbientPanel } from "@/components/agent/studio-ambient-panel"
+import {
+  DemoAnnotationsProvider,
+  mergeDemoAnnotations,
+  useDemoAnnotations,
+} from "@/lib/demo-annotations"
 import {
   type AttentionContext,
   type AttentionSelection,
@@ -72,6 +79,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
+import { AnnotationOverlay } from "@workspace/ui/components/annotation-overlay"
 import { DataLabel } from "@workspace/ui/components/data-label"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
@@ -133,6 +141,14 @@ const REDUCER_GROUPS = [...registry.categories()].map(([label, reducers]) => ({
 const REDUCER_OPTIONS = REDUCER_GROUPS.flatMap((group) => group.items)
 
 export function ReducerStudio() {
+  return (
+    <DemoAnnotationsProvider>
+      <ReducerStudioInner />
+    </DemoAnnotationsProvider>
+  )
+}
+
+function ReducerStudioInner() {
   const documentQuery = useReducerGraph()
   const commandMutation = useReducerGraphCommand()
   const undoMutation = useReducerGraphUndo()
@@ -149,7 +165,7 @@ export function ReducerStudio() {
   const attention: AttentionContext | null = documentQuery.data
     ? {
         application: "sigil-chat",
-        route: "/studio",
+        route: "/demos/studio",
         workspace: {
           kind: "reducer-graph",
           id: documentQuery.data.id,
@@ -232,120 +248,121 @@ export function ReducerStudio() {
 
   return (
     <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
-        <div className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-2 py-1.5 sm:px-3">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Combobox
-              items={REDUCER_GROUPS}
-              onValueChange={(option: ReducerOption | null) => {
-                if (option) setReducerId(option.value)
-              }}
-              value={selectedReducerOption}
-            >
-              <ComboboxInput
-                aria-label="Reducer type"
-                className="min-w-36 flex-1 sm:w-52"
-                placeholder="Search reducers…"
-              />
-              <ComboboxContent className="w-80">
-                <ComboboxEmpty>No reducers match.</ComboboxEmpty>
-                <ComboboxList>
-                  <ComboboxCollection>
-                    {(group: { label: string; items: ReducerOption[] }) => (
-                      <ComboboxGroup key={group.label} items={group.items}>
-                        <ComboboxLabel>{group.label}</ComboboxLabel>
-                        {group.items.map((option) => (
-                          <ComboboxItem key={option.value} value={option}>
-                            <span className="min-w-0">
-                              <span className="block truncate text-xs font-medium">
-                                {option.label}
-                              </span>
-                              <span className="block truncate text-[10px] text-muted-foreground">
-                                {option.description}
-                              </span>
-                            </span>
-                          </ComboboxItem>
-                        ))}
-                      </ComboboxGroup>
-                    )}
-                  </ComboboxCollection>
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-            <Button onClick={addNode} size="sm" variant="secondary">
-              <PlusIcon /> <span className="hidden sm:inline">Add node</span>
-            </Button>
-            <span className="hidden font-mono text-[10px] text-muted-foreground xl:inline">
-              {document.nodes.length} nodes · {document.edges.length} edges ·
-              rev {document.revision}
-            </span>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <Button
-              disabled={undoMutation.isPending}
-              onClick={() => undoMutation.mutate()}
-              size="sm"
-              variant="ghost"
-            >
-              <Redo2Icon className="-scale-x-100" />{" "}
-              <span className="hidden sm:inline">Undo</span>
-            </Button>
-            <Button
-              disabled={runQuery.isFetching}
-              onClick={() => {
-                telemetry.recordActivity(
-                  "execute",
-                  {
-                    kind: "reducer-graph",
-                    id: document.id,
-                    label: document.title,
-                  },
-                  { summary: "Ran the reducer graph" },
-                )
-                void runQuery.refetch()
-              }}
-              size="sm"
-            >
-              <PlayIcon /> {runQuery.isFetching ? "Running…" : "Run"}
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_260px]">
-          <ReducerCanvas
-            document={document}
-            onCommand={sendCommand}
-            onSelectionChange={updateSelection}
-            run={runQuery.data}
-            selection={selection}
-          />
-          <aside
-            className={cn(
-              "absolute inset-x-2 bottom-2 z-20 max-h-[55dvh] overflow-y-auto rounded-lg border border-border bg-card shadow-xl",
-              "sm:inset-x-auto sm:bottom-0 sm:right-0 sm:top-0 sm:max-h-none sm:w-[280px] sm:rounded-none sm:border-y-0 sm:border-r-0",
-              "xl:static xl:min-h-0 xl:w-auto xl:shadow-none",
-              !selection && "max-xl:hidden",
-            )}
+      <div className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-2 py-1.5 sm:px-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Combobox
+            items={REDUCER_GROUPS}
+            onValueChange={(option: ReducerOption | null) => {
+              if (option) setReducerId(option.value)
+            }}
+            value={selectedReducerOption}
           >
-            <Inspector
-              document={document}
-              onClose={() => setSelection(null)}
-              onCommand={sendCommand}
-              selectedEdgeId={selectedEdge?.id}
-              selectedNode={selectedNode}
+            <ComboboxInput
+              aria-label="Reducer type"
+              className="min-w-36 flex-1 sm:w-52"
+              placeholder="Search reducers…"
             />
-          </aside>
+            <ComboboxContent className="w-80">
+              <ComboboxEmpty>No reducers match.</ComboboxEmpty>
+              <ComboboxList>
+                <ComboboxCollection>
+                  {(group: { label: string; items: ReducerOption[] }) => (
+                    <ComboboxGroup key={group.label} items={group.items}>
+                      <ComboboxLabel>{group.label}</ComboboxLabel>
+                      {group.items.map((option) => (
+                        <ComboboxItem key={option.value} value={option}>
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-medium">
+                              {option.label}
+                            </span>
+                            <span className="block truncate text-[10px] text-muted-foreground">
+                              {option.description}
+                            </span>
+                          </span>
+                        </ComboboxItem>
+                      ))}
+                    </ComboboxGroup>
+                  )}
+                </ComboboxCollection>
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+          <Button onClick={addNode} size="sm" variant="secondary">
+            <PlusIcon /> <span className="hidden sm:inline">Add node</span>
+          </Button>
+          <DemoAnnotationButton />
+          <span className="hidden font-mono text-[10px] text-muted-foreground xl:inline">
+            {document.nodes.length} nodes · {document.edges.length} edges · rev{" "}
+            {document.revision}
+          </span>
         </div>
-
-        {commandMutation.isError ? (
-          <Alert
-            className="absolute bottom-4 left-1/2 z-40 w-auto max-w-[calc(100%-2rem)] -translate-x-1/2 shadow-lg"
-            variant="destructive"
+        <div className="flex items-center gap-0.5">
+          <Button
+            disabled={undoMutation.isPending}
+            onClick={() => undoMutation.mutate()}
+            size="sm"
+            variant="ghost"
           >
-            <CircleAlertIcon />
-            <AlertDescription>{commandMutation.error.message}</AlertDescription>
-          </Alert>
-        ) : null}
+            <Redo2Icon className="-scale-x-100" />{" "}
+            <span className="hidden sm:inline">Undo</span>
+          </Button>
+          <Button
+            disabled={runQuery.isFetching}
+            onClick={() => {
+              telemetry.recordActivity(
+                "execute",
+                {
+                  kind: "reducer-graph",
+                  id: document.id,
+                  label: document.title,
+                },
+                { summary: "Ran the reducer graph" },
+              )
+              void runQuery.refetch()
+            }}
+            size="sm"
+          >
+            <PlayIcon /> {runQuery.isFetching ? "Running…" : "Run"}
+          </Button>
+        </div>
       </div>
+
+      <div className="grid min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_260px]">
+        <ReducerCanvas
+          document={document}
+          onCommand={sendCommand}
+          onSelectionChange={updateSelection}
+          run={runQuery.data}
+          selection={selection}
+        />
+        <aside
+          className={cn(
+            "absolute inset-x-2 bottom-2 z-20 max-h-[55dvh] overflow-y-auto rounded-lg border border-border bg-card shadow-xl",
+            "sm:inset-x-auto sm:bottom-0 sm:right-0 sm:top-0 sm:max-h-none sm:w-[280px] sm:rounded-none sm:border-y-0 sm:border-r-0",
+            "xl:static xl:min-h-0 xl:w-auto xl:shadow-none",
+            !selection && "max-xl:hidden",
+          )}
+        >
+          <Inspector
+            document={document}
+            onClose={() => setSelection(null)}
+            onCommand={sendCommand}
+            selectedEdgeId={selectedEdge?.id}
+            selectedNode={selectedNode}
+          />
+        </aside>
+      </div>
+
+      {commandMutation.isError ? (
+        <Alert
+          className="absolute bottom-4 left-1/2 z-40 w-auto max-w-[calc(100%-2rem)] -translate-x-1/2 shadow-lg"
+          variant="destructive"
+        >
+          <CircleAlertIcon />
+          <AlertDescription>{commandMutation.error.message}</AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
   )
 }
 
@@ -528,6 +545,11 @@ function ReducerCanvas({
           </AlertAction>
         </Alert>
       ) : null}
+
+      {/* Ambient working commentary (criterion 16) — the agent's latest
+          reasoning/text projected onto the canvas edge; quiet until hovered
+          or streaming. */}
+      <StudioAmbientPanel />
     </div>
   )
 }
@@ -611,7 +633,40 @@ function CanvasControlButton({
   )
 }
 
+// Demo scaffolding: drop a synthetic annotation on the first graph node so the
+// overlay projection is visible deterministically, without waiting for the
+// agent to call sigil-annotate. Clearly labeled (variant: outline) so it reads
+// as a dev affordance, not a product feature.
+function DemoAnnotationButton() {
+  const demo = useDemoAnnotations()
+  const documentQuery = useReducerGraph()
+  if (!demo) return null
+  const firstNode = documentQuery.data?.nodes[0]
+  if (!firstNode) return null
+  return (
+    <Button
+      onClick={() =>
+        demo.add(firstNode.id, {
+          body: "This node feeds the launch calculation — check its inputs are current before relying on the output.",
+          kind: "highlight",
+          label: "Agent note (demo)",
+        })
+      }
+      size="sm"
+      variant="outline"
+    >
+      <span className="hidden sm:inline">Demo annotation</span>
+    </Button>
+  )
+}
+
 function ReducerNode({ data, selected }: NodeProps<ReducerFlowNode>) {
+  const realAnnotations = useAgentAnnotationsByAnchor().get(data.node.id)
+  const demoAnnotations = useDemoAnnotations()?.byAnchor.get(data.node.id)
+  const agentAnnotations = mergeDemoAnnotations(
+    realAnnotations,
+    demoAnnotations,
+  )
   return (
     <Card
       size="sm"
@@ -685,6 +740,20 @@ function ReducerNode({ data, selected }: NodeProps<ReducerFlowNode>) {
         <p className="border-t border-destructive/20 px-3 py-2 text-[10px] text-destructive">
           {data.error}
         </p>
+      ) : null}
+      {agentAnnotations.length > 0 ? (
+        <div className="space-y-1 border-t border-border/60 px-2 py-1.5">
+          {agentAnnotations.map((a) => (
+            <AnnotationOverlay
+              key={a.toolCallId}
+              kind={a.kind === "highlight" ? "highlight" : "note"}
+              label={a.label}
+              title={`Node: ${data.node.label}`}
+              body={<p>{a.body}</p>}
+              meta={<span>sigil-{a.kind} · agent</span>}
+            />
+          ))}
+        </div>
       ) : null}
     </Card>
   )

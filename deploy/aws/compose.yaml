@@ -37,10 +37,12 @@ services:
         fi
         && chown -R 10000:10000
         /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
+        /var/lib/sigil-containers
         /var/lib/sigil-blackboard /var/lib/sigil-codex /var/lib/sigil-identity
         /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents
         && chmod 0700
         /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
+        /var/lib/sigil-containers
         /var/lib/sigil-blackboard /var/lib/sigil-codex /var/lib/sigil-identity
         /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents
     volumes:
@@ -51,6 +53,7 @@ services:
       - eve_scope:/app/eve-agents
       - gonk_data:/var/lib/sigil-gonk
       - gonk_scope:/app/gonk-agents
+      - container_registry_data:/var/lib/sigil-containers
       - blackboard_data:/var/lib/sigil-blackboard
       - codex_auth:/var/lib/sigil-codex
       - eve_identity:/var/lib/sigil-identity
@@ -100,6 +103,7 @@ services:
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
       SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_CONTAINER_REGISTRY_ROOT: /var/lib/sigil-containers
       SIGIL_INVITE_TOKEN_PEPPER_FILE: /run/secrets/invite_token_pepper
     secrets: [better_auth_secret, gonk_mcp_key, invite_token_pepper]
     volumes:
@@ -108,6 +112,7 @@ services:
       - web_appdata:/app/.data
       - eve_identity:/var/lib/sigil-identity:ro
       - blackboard_data:/var/lib/sigil-blackboard
+      - container_registry_data:/var/lib/sigil-containers
     expose: ["3000"]
     healthcheck:
       test:
@@ -205,12 +210,14 @@ services:
       SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
       SIGIL_ARTIFACT_DIR: /var/lib/sigil-gonk/artifacts
       SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_CONTAINER_REGISTRY_ROOT: /var/lib/sigil-containers
       SIGIL_LOCAL_CODEX_IMAGE_GENERATION: disabled
     secrets: [gonk_mcp_key]
     volumes:
       - gonk_data:/var/lib/sigil-gonk
       - gonk_scope:/app/.agents
       - blackboard_data:/var/lib/sigil-blackboard
+      - container_registry_data:/var/lib/sigil-containers
     expose: ["8808"]
     healthcheck:
       test:
@@ -267,6 +274,7 @@ volumes:
   eve_identity: {}
   gonk_data: {}
   blackboard_data: {}
+  container_registry_data: {}
   codex_auth: {}
 
 secrets:

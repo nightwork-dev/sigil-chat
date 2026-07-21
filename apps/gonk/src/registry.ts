@@ -34,6 +34,7 @@ import {
   registerContainerTools,
   type ContainerRegistries,
 } from "./registry/containers.js";
+import { registerAnnotationTools } from "./registry/annotations.js";
 import { createSkillRegistry, registerSkillTools } from "./registry/skills.js";
 import {
   registerRuntimeTools,
@@ -60,6 +61,7 @@ export function createSigilRegistry(
   registerReviewTools(registry, reviews);
   registerStoryTools(registry, workItems);
   registerContainerTools(registry, containers);
+  registerAnnotationTools(registry);
   registerSkillTools(registry, skills);
   registerUiCommandTools(registry);
   registerImageTools(

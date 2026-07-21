@@ -6,12 +6,18 @@ import type { SigilAuthSession } from "@/lib/auth/server";
 
 export interface ProjectWorkspaceNavSummary {
   personalProjectId: string;
-  projects: Array<{ id: string; name: string; description: string }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon?: string;
+  }>;
   workspaces: Array<{
     id: string;
     projectId: string;
     name: string;
     description: string;
+    icon?: string;
     status: "active" | "archived";
   }>;
 }
@@ -29,12 +35,14 @@ const loadProjectWorkspaceNavFn = createServerFn({ method: "GET" }).handler(
         id: project.id,
         name: project.name,
         description: project.description,
+        icon: project.icon,
       })),
       workspaces: nav.workspaces.map((workspace) => ({
         id: workspace.id,
         projectId: workspace.projectId,
         name: workspace.name,
         description: workspace.description,
+        icon: workspace.icon,
         status: workspace.status,
       })),
     };

@@ -6,8 +6,16 @@
 // Content: AppChat — full-page consumer of the shared embeddable agent session
 
 import { createFileRoute } from "@tanstack/react-router"
-import { AppChat } from "@/components/app-chat"
+import { AppChat, ChatRailTop } from "@/components/app-chat"
 
 export const Route = createFileRoute("/_app/chat")({
+  // The route declares its rail content; the _app layout renders it into the
+  // shell's top rail (useMatches — SSR-native, no runtime injection).
+  staticData: {
+    rail: {
+      top: ChatRailTop,
+      chords: [{ keys: "Enter", label: "Send" }],
+    },
+  },
   component: AppChat,
 })

@@ -31,6 +31,7 @@
       "registryDependencies": [
         "@sigil/button",
         "@sigil/floating-dock",
+        "@sigil/part-projection",
         "@sigil/select",
         "@sigil/textarea"
       ],
@@ -82,6 +83,23 @@
       ]
     },
     {
+      "name": "ambient-panel",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent-react"
+      ],
+      "registryDependencies": [
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/ambient-panel.tsx",
+          "type": "registry:ui",
+          "target": "@ui/ambient-panel.tsx"
+        }
+      ]
+    },
+    {
       "name": "animated-beam",
       "type": "registry:ui",
       "dependencies": [
@@ -113,6 +131,22 @@
           "path": ".registry-staging/src/components/effects/animated-patterns.tsx",
           "type": "registry:ui",
           "target": "@ui/effects/animated-patterns.tsx"
+        }
+      ]
+    },
+    {
+      "name": "annotation-overlay",
+      "type": "registry:ui",
+      "dependencies": [],
+      "registryDependencies": [
+        "@sigil/hover-card",
+        "@sigil/marker"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/annotation-overlay.tsx",
+          "type": "registry:ui",
+          "target": "@ui/annotation-overlay.tsx"
         }
       ]
     },
@@ -2094,6 +2128,21 @@
           "path": ".registry-staging/src/components/param-row.tsx",
           "type": "registry:ui",
           "target": "@ui/param-row.tsx"
+        }
+      ]
+    },
+    {
+      "name": "part-projection",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent-surface"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/part-projection.tsx",
+          "type": "registry:ui",
+          "target": "@ui/part-projection.tsx"
         }
       ]
     },

@@ -320,6 +320,7 @@ function projectSchema(): Record<string, unknown> {
       id: { type: "string", minLength: 1 },
       name: { type: "string", minLength: 1 },
       description: { type: "string" },
+      icon: { type: "string" },
       members: {
         type: "array",
         items: objectSchema(
@@ -353,6 +354,7 @@ function workspaceSchema(): Record<string, unknown> {
       projectId: { type: "string", minLength: 1 },
       name: { type: "string", minLength: 1 },
       description: { type: "string" },
+      icon: { type: "string" },
       status: { type: "string", enum: ["active", "archived"] },
       createdAt: { type: "string", minLength: 1 },
       createdBy: { type: "string", minLength: 1 },

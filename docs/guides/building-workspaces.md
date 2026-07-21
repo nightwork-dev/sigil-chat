@@ -12,23 +12,26 @@ and the attention/context tray that carries workspace state to the agent.
 Every product route under `apps/web/src/routes/_app/` is a thin wrapper; the
 actual UI lives in `apps/web/src/features/<name>/` or
 `apps/web/src/components/`. For example,
-[`apps/web/src/routes/_app/review.tsx`](../../apps/web/src/routes/_app/review.tsx)
+[`apps/web/src/routes/_app/demos.review.tsx`](../../apps/web/src/routes/_app/demos.review.tsx)
 just wires `Route` to a component:
 
 ```ts
-export const Route = createFileRoute("/_app/review")({
+export const Route = createFileRoute("/_app/demos/review")({
   component: ReviewWorkspace, // from "@/features/review/review-workspace"
-})
+});
 ```
 
-and [`_app/studio.tsx`](../../apps/web/src/routes/_app/studio.tsx) does the
+and [`_app/demos.studio.tsx`](../../apps/web/src/routes/_app/demos.studio.tsx) does the
 same for `ReducerStudio` from `@/features/studio/reducer-studio`. The route
 file's job is routing plus the mandatory ancestor-path/chrome-description
 header comment (see `.agents/index.md` and `trimming-the-template.md`); the
 feature component owns providers, layout, and the agent HUD. Follow this
 split for a new workspace: create `apps/web/src/features/<name>/<name>.tsx`
 (or reuse an existing feature if you're extending one), then point a new
-`_app/<name>.tsx` route file at it.
+`_app/<name>.tsx` route file at it. Demonstrations that require an account,
+agent session, Gonk tool, or durable remote resource belong under
+`_app/demos.<name>.tsx`, yielding `/demos/<name>`. Public `/labs/*` routes sit
+outside `_app` and must remain browser-local.
 
 ## The domain-outcome loop: a tool result becomes a cache update
 
@@ -73,11 +76,11 @@ does the real work:
 ```tsx
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "review.document.changed",
-  schema: { /* Standard Schema validating the outcome shape */ },
+  schema: {/* Standard Schema validating the outcome shape */},
   reconcile: async (outcome, context) => {
-    await context.invalidate([reviewDocumentKeys.detail(outcome.resource.id)])
+    await context.invalidate([reviewDocumentKeys.detail(outcome.resource.id)]);
   },
-}
+};
 
 export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
   return createReactQueryOutcomeDispatcher({
@@ -85,7 +88,7 @@ export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
     handlers: [reviewDocumentChangedHandler],
     duplicateKindPolicy: "reject",
     unhandledOutcomePolicy: "ignore",
-  })
+  });
 }
 ```
 
@@ -115,8 +118,8 @@ than adding a third legacy shape.)
 
 ## The attention/context tray: workspace state reaching the agent
 
-Separately from outcomes flowing *out* of a tool call, workspace state flows
-*into* the agent as `clientContext` on every send. The hook that does this is
+Separately from outcomes flowing _out_ of a tool call, workspace state flows
+_into_ the agent as `clientContext` on every send. The hook that does this is
 [`apps/web/src/hooks/use-app-agent-session.ts`](../../apps/web/src/hooks/use-app-agent-session.ts):
 
 ```ts

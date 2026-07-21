@@ -616,6 +616,63 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-annotate",
+    description:
+      "Leave a persistent note anchored to a specific attention item (a selected passage, focused element). The note renders as an overlay the user can expand, not just a transcript line. Use while reviewing or working on a specific subject.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["anchorId", "body"],
+      properties: ["anchorId", "body"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-pin",
+    description:
+      "Pin a remark to a specific attention item — a persistent marker the user will notice on return, lighter-weight than a full note. Renders as an overlay anchor.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["anchorId", "body"],
+      properties: ["anchorId", "body", "label"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-highlight",
+    description:
+      "Flag a specific attention item for the user's attention (e.g. a continuity issue, a turn to revisit). Renders as a primary-weighted overlay distinct from a quiet note.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["anchorId", "body"],
+      properties: ["anchorId", "body", "label"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-skill-list",
     description:
       "List the managed skills visible at a scope, including their stable revisions and lifecycle metadata.",

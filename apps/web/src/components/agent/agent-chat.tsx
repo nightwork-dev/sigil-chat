@@ -118,6 +118,10 @@ export interface AgentChatProps {
   showApprovalMode?: boolean
   showNewSession?: boolean
   showStatusIndicator?: boolean
+  /** Suppress the built-in header row — a route hoisting the header into the
+   *  shell's top rail (via AgentChatHeader in staticData.rail.top) sets this
+   *  so the content region doesn't stack a second header under the rail. */
+  hideHeader?: boolean
   className?: string
   approvalMode?: ToolApprovalMode
   onApprovalModeChange?: (mode: ToolApprovalMode) => void
@@ -130,6 +134,7 @@ export function AgentChat({
   session: providedSession,
   approvalMode,
   onApprovalModeChange,
+  hideHeader = false,
   showContextPrivacy = true,
   showApprovalMode = true,
   showNewSession = true,
@@ -137,39 +142,9 @@ export function AgentChat({
   statusLine = null,
 }: AgentChatProps) {
   const session = useAppAgentSession(providedSession)
-  const personaId = useAgentPersonaSession()
-  const roster = useAgentRoster()
-  const personaName = roster.data?.find(
-    (persona) => persona.id === personaId,
-  )?.name
-  const attention = useAttention()
   const threadControls = useAgentThreadControls()
   const [input, setInput] = useState("")
   const busy = isAgentSessionBusy(session)
-  const showStatus = showStatusIndicator || statusLine !== null
-  const showLeading = showStatus || threadControls !== null
-
-  // The blackboard's workspace/project tabs need the active thread's bound
-  // workspace and its derived (never stored) project — resolved through the
-  // registry-backed nav data, same as the conversation-sheet grouping.
-  const activeThreads = useAgentThreads()
-  const projectNav = useProjectWorkspaceNav()
-  const activeThreadSummary = activeThreads.data?.find(
-    (thread) => thread.id === threadControls?.activeThreadId,
-  )
-  const activeContainers = useMemo(() => {
-    if (!activeThreadSummary || !projectNav.data) return undefined
-    const nav = projectNav.data
-    const projectId = deriveThreadProjectId(
-      activeThreadSummary,
-      {
-        getWorkspaceProjectId: (id) =>
-          nav.workspaces.find((workspace) => workspace.id === id)?.projectId,
-      },
-      nav.personalProjectId,
-    )
-    return { workspaceId: activeThreadSummary.workspaceId, projectId }
-  }, [activeThreadSummary, projectNav.data])
 
   // Attachment queue lives in the reusable useAttachments core (INGRESS-CORES).
   // We inject the sigil-chat upload server fn; the hook owns the optimistic
@@ -254,102 +229,18 @@ export function AgentChat({
         className,
       )}
     >
-      <header
-        className={cn(
-          "flex shrink-0 items-center gap-3 border-b border-border px-3 py-2",
-          showLeading ? "justify-between" : "justify-end",
-        )}
-      >
-        {showLeading ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            {showStatus && showStatusIndicator ? (
-              <AgentStatusIndicator status={session.status} />
-            ) : null}
-            {showStatus && statusLine ? (
-              <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
-                {statusLine}
-              </span>
-            ) : null}
-            {threadControls ? (
-              <AgentSessionSwitcher
-                busy={busy}
-                controls={threadControls}
-                personaName={personaName ?? personaId ?? undefined}
-              />
-            ) : null}
-          </div>
-        ) : null}
-        {showContextPrivacy ||
-        showApprovalMode ||
-        showNewSession ? (
-          <div className="flex shrink-0 items-center gap-1">
-            {threadControls?.activeThreadId ? (
-              <SessionBlackboard
-                projectId={activeContainers?.projectId}
-                sessionId={threadControls.activeThreadId}
-                workspaceId={activeContainers?.workspaceId}
-              />
-            ) : null}
-            {showContextPrivacy ? (
-              <ContextTray.Root attention={attention}>
-                <ContextTray.Trigger className="max-sm:h-11" />
-                <ContextTray.Content />
-              </ContextTray.Root>
-            ) : null}
-            {showApprovalMode && approvalMode && onApprovalModeChange ? (
-              <Select
-                onValueChange={(value) => {
-                  if (value) onApprovalModeChange(value as ToolApprovalMode)
-                }}
-                value={approvalMode}
-              >
-                <SelectTrigger
-                  aria-label="Tool approval mode"
-                  className="max-sm:h-11"
-                  size="sm"
-                  title="Tool approval mode"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value="ask">Ask</SelectItem>
-                  <SelectItem value="always">Always allow</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : null}
-            {showNewSession ? (
-              threadControls ? (
-                <>
-                  <Button
-                    aria-label="Create semantic fork"
-                    className="max-sm:size-11"
-                    disabled={busy}
-                    onClick={() => void threadControls.forkActiveThread()}
-                    size="icon-xs"
-                    title="Semantic fork from visible transcript"
-                    variant="ghost"
-                  >
-                    <GitForkIcon />
-                  </Button>
-                  <NewSessionPersonaPicker busy={busy} />
-                </>
-              ) : (
-                <Button
-                  aria-label="Start a new session"
-                  className="max-sm:size-11"
-                  onClick={() => session.reset?.()}
-                  size="icon-xs"
-                  title="New session"
-                  variant="ghost"
-                >
-                  <RotateCcwIcon />
-                </Button>
-              )
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-
+      {!hideHeader ? (
+        <AgentChatHeader
+          approvalMode={approvalMode}
+          onApprovalModeChange={onApprovalModeChange}
+          session={providedSession}
+          showApprovalMode={showApprovalMode}
+          showContextPrivacy={showContextPrivacy}
+          showNewSession={showNewSession}
+          showStatusIndicator={showStatusIndicator}
+          statusLine={statusLine}
+        />
+      ) : null}
       {session.error ? (
         <Alert
           className="rounded-none border-x-0 border-t-0 px-4 py-3"
@@ -400,6 +291,171 @@ export function AgentChat({
         placeholder={placeholder}
         value={input}
       />
+    </div>
+  )
+}
+
+/**
+ * The chat header content, extracted so a route can hoist it into the shell's
+ * top rail (staticData.rail.top) instead of stacking it as a second header
+ * row under the shell's breadcrumb rail. AgentChat renders it inline by
+ * default; a route that hoists passes hideHeader to AgentChat and renders
+ * this in the rail with variant="rail" (no border/padding of its own).
+ *
+ * Every value comes from hooks/contexts, so the header works identically in
+ * both positions — the one-app-session + thread-controls providers in
+ * _app.tsx sit above both mount points.
+ */
+export function AgentChatHeader({
+  approvalMode,
+  onApprovalModeChange,
+  session: providedSession,
+  showApprovalMode = true,
+  showContextPrivacy = true,
+  showNewSession = true,
+  showStatusIndicator = true,
+  statusLine = null,
+  variant = "surface",
+}: {
+  session?: AgentRuntimeSession
+  statusLine?: ReactNode
+  showContextPrivacy?: boolean
+  showApprovalMode?: boolean
+  showNewSession?: boolean
+  showStatusIndicator?: boolean
+  approvalMode?: ToolApprovalMode
+  onApprovalModeChange?: (mode: ToolApprovalMode) => void
+  variant?: "surface" | "rail"
+}) {
+  const session = useAppAgentSession(providedSession)
+  const personaId = useAgentPersonaSession()
+  const roster = useAgentRoster()
+  const personaName = roster.data?.find(
+    (persona) => persona.id === personaId,
+  )?.name
+  const attention = useAttention()
+  const threadControls = useAgentThreadControls()
+  const busy = isAgentSessionBusy(session)
+  const showStatus = showStatusIndicator || statusLine !== null
+  const showLeading = showStatus || threadControls !== null
+
+  // The blackboard's workspace/project tabs need the active thread's bound
+  // workspace and its derived (never stored) project — resolved through the
+  // registry-backed nav data, same as the conversation-sheet grouping.
+  const activeThreads = useAgentThreads()
+  const projectNav = useProjectWorkspaceNav()
+  const activeThreadSummary = activeThreads.data?.find(
+    (thread) => thread.id === threadControls?.activeThreadId,
+  )
+  const activeContainers = useMemo(() => {
+    if (!activeThreadSummary || !projectNav.data) return undefined
+    const nav = projectNav.data
+    const projectId = deriveThreadProjectId(
+      activeThreadSummary,
+      {
+        getWorkspaceProjectId: (id) =>
+          nav.workspaces.find((workspace) => workspace.id === id)?.projectId,
+      },
+      nav.personalProjectId,
+    )
+    return { workspaceId: activeThreadSummary.workspaceId, projectId }
+  }, [activeThreadSummary, projectNav.data])
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-3",
+        variant === "surface" &&
+          "shrink-0 border-b border-border px-3 py-2",
+        showLeading ? "justify-between" : "justify-end",
+      )}
+    >
+      {showLeading ? (
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          {showStatus && showStatusIndicator ? (
+            <AgentStatusIndicator status={session.status} />
+          ) : null}
+          {showStatus && statusLine ? (
+            <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+              {statusLine}
+            </span>
+          ) : null}
+          {threadControls ? (
+            <AgentSessionSwitcher
+              busy={busy}
+              controls={threadControls}
+              personaName={personaName ?? personaId ?? undefined}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {showContextPrivacy || showApprovalMode || showNewSession ? (
+        <div className="flex shrink-0 items-center gap-1">
+          {threadControls?.activeThreadId ? (
+            <SessionBlackboard
+              projectId={activeContainers?.projectId}
+              sessionId={threadControls.activeThreadId}
+              workspaceId={activeContainers?.workspaceId}
+            />
+          ) : null}
+          {showContextPrivacy ? (
+            <ContextTray.Root attention={attention}>
+              <ContextTray.Trigger className="max-sm:h-11" />
+              <ContextTray.Content />
+            </ContextTray.Root>
+          ) : null}
+          {showApprovalMode && approvalMode && onApprovalModeChange ? (
+            <Select
+              onValueChange={(value) => {
+                if (value) onApprovalModeChange(value as ToolApprovalMode)
+              }}
+              value={approvalMode}
+            >
+              <SelectTrigger
+                aria-label="Tool approval mode"
+                className="max-sm:h-11"
+                size="sm"
+                title="Tool approval mode"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="ask">Ask</SelectItem>
+                <SelectItem value="always">Always allow</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
+          {showNewSession ? (
+            threadControls ? (
+              <>
+                <Button
+                  aria-label="Create semantic fork"
+                  className="max-sm:size-11"
+                  disabled={busy}
+                  onClick={() => void threadControls.forkActiveThread()}
+                  size="icon-xs"
+                  title="Semantic fork from visible transcript"
+                  variant="ghost"
+                >
+                  <GitForkIcon />
+                </Button>
+                <NewSessionPersonaPicker busy={busy} />
+              </>
+            ) : (
+              <Button
+                aria-label="Start a new session"
+                className="max-sm:size-11"
+                onClick={() => session.reset?.()}
+                size="icon-xs"
+                title="New session"
+                variant="ghost"
+              >
+                <RotateCcwIcon />
+              </Button>
+            )
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

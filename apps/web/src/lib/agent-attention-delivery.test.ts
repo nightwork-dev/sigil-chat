@@ -39,7 +39,7 @@ function attention(history: AttentionContext["history"]): AttentionContext {
   const selection = { kind: "passage", id: "passage-b", label: "Passage B" }
   return {
     application: "sigil-chat",
-    route: "/review",
+    route: "/demos/review",
     selection,
     selections: [selection],
     history,

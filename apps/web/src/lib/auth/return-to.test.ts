@@ -4,8 +4,8 @@ import { DEFAULT_RETURN_TO, sanitizeReturnTo } from "./return-to"
 
 describe("sanitizeReturnTo", () => {
   it("passes through a same-origin path with search and hash", () => {
-    expect(sanitizeReturnTo("/studio/foo?bar=1#baz")).toBe(
-      "/studio/foo?bar=1#baz",
+    expect(sanitizeReturnTo("/demos/studio/foo?bar=1#baz")).toBe(
+      "/demos/studio/foo?bar=1#baz",
     )
   })
 
@@ -23,11 +23,13 @@ describe("sanitizeReturnTo", () => {
 
   it("rejects an absolute cross-origin URL", () => {
     expect(sanitizeReturnTo("https://evil.com")).toBe(DEFAULT_RETURN_TO)
-    expect(sanitizeReturnTo("http://evil.com/studio")).toBe(DEFAULT_RETURN_TO)
+    expect(sanitizeReturnTo("http://evil.com/demos/studio")).toBe(
+      DEFAULT_RETURN_TO,
+    )
   })
 
   it("rejects a path that doesn't start with a single slash", () => {
-    expect(sanitizeReturnTo("studio")).toBe(DEFAULT_RETURN_TO)
+    expect(sanitizeReturnTo("demos/studio")).toBe(DEFAULT_RETURN_TO)
     expect(sanitizeReturnTo("javascript:alert(1)")).toBe(DEFAULT_RETURN_TO)
   })
 

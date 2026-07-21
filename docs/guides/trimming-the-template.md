@@ -10,11 +10,11 @@ delete what you don't need without guessing.
 
 ### Core agent surfaces — keep
 
-| Route | Why it's core |
-| --- | --- |
-| `_app/chat.tsx` | The chat workspace itself — `AppChat`, the full-page consumer of the shared agent session. |
+| Route             | Why it's core                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `_app/chat.tsx`   | The chat workspace itself — `AppChat`, the full-page consumer of the shared agent session.                                     |
 | `_app/skills.tsx` | Searchable Eve capability catalog with an honest Gonk Core lifecycle boundary — the operational view of what the agent can do. |
-| `_app/index.tsx` | Redirects to the canonical agentic workspace. |
+| `_app/index.tsx`  | Redirects to the canonical agentic workspace.                                                                                  |
 
 ### Demonstration workspaces — pattern reference, delete per-app
 
@@ -22,13 +22,12 @@ These show the domain-outcome and attention patterns in `building-workspaces.md`
 end to end, but are demo domains (a reducer graph, a draft article review
 document, a stat dashboard), not part of the chat product itself.
 
-| Route | Backing feature | Demonstrates |
-| --- | --- | --- |
-| `_app/studio.tsx` | `@/features/studio/reducer-studio` (`ReducerStudio`) | Typed reducer graph editing with an overlaid agent HUD — the richest `sigil-graph-*` tool consumer. |
-| `_app/review.tsx` | `@/features/review/review-workspace` (`ReviewWorkspace`) | The full domain-outcome loop (`sigil-review-*` tools → `clientCommand` → React Query invalidation) and `AttentionProvider` wiring. |
-| `_app/dashboard.tsx` | — | Stat cards / charts / data table demo. No agent-domain-outcome or attention wiring found. |
-| `_app/canvas.tsx` | — | Canvas/spatial workspace demo. |
-| `_app/data.tsx` | — | Data-browsing workspace demo. |
+| Route                      | Backing feature                                                 | Demonstrates                                                                                                                       |
+| -------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `_app/demos.studio.tsx`    | `@/features/studio/reducer-studio` (`ReducerStudio`)            | Typed reducer graph editing with an overlaid agent HUD — the richest `sigil-graph-*` tool consumer.                                |
+| `_app/demos.review.tsx`    | `@/features/review/review-workspace` (`ReviewWorkspace`)        | The full domain-outcome loop (`sigil-review-*` tools → `clientCommand` → React Query invalidation) and `AttentionProvider` wiring. |
+| `_app/demos.evidence.tsx`  | `@/features/evidence/evidence-room` (`EvidenceRoom`)            | Authenticated evidence resources, distillation, and citation-backed agent questions.                                               |
+| `_app/demos.artifacts.tsx` | `@/features/artifacts/artifact-workspace` (`ArtifactWorkspace`) | Artifacts produced through authenticated agent tool calls.                                                                         |
 
 Before deleting `studio` or `review`, note they're also the only two consumers
 of `@workspace/graph`/`@workspace/graph-store` and `@workspace/review`/
@@ -66,30 +65,30 @@ Verdicts below come from `rg` for each package's import specifier across
 `apps/` and `packages/` — "used by" lists every consumer found, "delete
 freely" means the grep returned nothing outside the package's own source.
 
-| Package | Used by | Verdict |
-| --- | --- | --- |
-| `@workspace/ui` | Every route and most components (shadcn base, tokens, hooks) | Load-bearing. Keep. |
-| `@workspace/agent-contracts` | `apps/gonk/src/registry.ts`, `apps/web/src/lib/agent-client-command.ts`, `apps/web/src/lib/agent-dom-effects.ts` | Load-bearing bridge between Gonk tool results and TanStack client projection. Delete only if you remove both Gonk client commands and web attention projection. |
-| `@workspace/chat` | `apps/web/src/components/agent/agent-chat.tsx`, `packages/ui/src/components/views/chat.tsx`, `examples/chat.tsx`, `examples-gallery.tsx`, `apps/web/vite.config.ts` | Load-bearing — the real chat message/input/streaming components used by `AppChat`. Keep. |
-| `@workspace/graph`, `@workspace/graph-store` | `apps/gonk/src/registry.ts`, `apps/gonk/test/registry.test.ts`, `apps/web/src/features/studio/reducer-studio.tsx`, `apps/web/src/features/studio/reducer-data.ts`, `apps/web/src/routes/examples/canvas.tsx`, `packages/canvas/src/*` | Powers the `sigil-graph-*` tools and the Studio workspace. Delete only if you delete Studio *and* the graph tools in `registry.ts`. |
-| `@workspace/review`, `@workspace/review-store` | `apps/gonk/src/registry.ts`, `apps/web/src/features/review/review-workspace.tsx`, `apps/web/src/lib/review-document.ts`, `apps/web/src/components/showcase/review.tsx`, `apps/web/src/components/showcase/landing.tsx` | Powers the `sigil-review-*` tools and the Review workspace. Delete only if you delete Review *and* the review tools in `registry.ts`. |
-| `@workspace/data` | `packages/data/src/components/entity-browser.tsx`, `packages/ui/src/components/views/entity-browser.tsx`, `apps/web/src/routes/examples/data.tsx`, `examples-gallery.tsx` | Only reached from the `_app/data.tsx` demo workspace and the `examples/` scaffold. Delete freely if you delete both. |
-| `@workspace/canvas` | `apps/web/src/routes/examples/canvas.tsx`, `examples-gallery.tsx` | Only reached from the `examples/` scaffold — **not** `_app/canvas.tsx`, which is a separate, unrelated demo route. Delete freely if you delete `examples/`. |
-| `@workspace/file-store-core` | `packages/review-store/src/repository.ts`, `packages/graph-store/src/repository.ts` | Internal dependency of the two `-store` packages above, not imported directly by any app. Delete only alongside both stores. |
+| Package                                        | Used by                                                                                                                                                                                                                               | Verdict                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@workspace/ui`                                | Every route and most components (shadcn base, tokens, hooks)                                                                                                                                                                          | Load-bearing. Keep.                                                                                                                                             |
+| `@workspace/agent-contracts`                   | `apps/gonk/src/registry.ts`, `apps/web/src/lib/agent-client-command.ts`, `apps/web/src/lib/agent-dom-effects.ts`                                                                                                                      | Load-bearing bridge between Gonk tool results and TanStack client projection. Delete only if you remove both Gonk client commands and web attention projection. |
+| `@workspace/chat`                              | `apps/web/src/components/agent/agent-chat.tsx`, `packages/ui/src/components/views/chat.tsx`, `examples/chat.tsx`, `examples-gallery.tsx`, `apps/web/vite.config.ts`                                                                   | Load-bearing — the real chat message/input/streaming components used by `AppChat`. Keep.                                                                        |
+| `@workspace/graph`, `@workspace/graph-store`   | `apps/gonk/src/registry.ts`, `apps/gonk/test/registry.test.ts`, `apps/web/src/features/studio/reducer-studio.tsx`, `apps/web/src/features/studio/reducer-data.ts`, `apps/web/src/routes/examples/canvas.tsx`, `packages/canvas/src/*` | Powers the `sigil-graph-*` tools and the Studio workspace. Delete only if you delete Studio _and_ the graph tools in `registry.ts`.                             |
+| `@workspace/review`, `@workspace/review-store` | `apps/gonk/src/registry.ts`, `apps/web/src/features/review/review-workspace.tsx`, `apps/web/src/lib/review-document.ts`, `apps/web/src/components/showcase/review.tsx`, `apps/web/src/components/showcase/landing.tsx`                | Powers the `sigil-review-*` tools and the Review workspace. Delete only if you delete Review _and_ the review tools in `registry.ts`.                           |
+| `@workspace/data`                              | `packages/data/src/components/entity-browser.tsx`, `packages/ui/src/components/views/entity-browser.tsx`, `apps/web/src/routes/examples/data.tsx`, `examples-gallery.tsx`                                                             | Only reached from the `_app/data.tsx` demo workspace and the `examples/` scaffold. Delete freely if you delete both.                                            |
+| `@workspace/canvas`                            | `apps/web/src/routes/examples/canvas.tsx`, `examples-gallery.tsx`                                                                                                                                                                     | Only reached from the `examples/` scaffold — **not** `_app/canvas.tsx`, which is a separate, unrelated demo route. Delete freely if you delete `examples/`.     |
+| `@workspace/file-store-core`                   | `packages/review-store/src/repository.ts`, `packages/graph-store/src/repository.ts`                                                                                                                                                   | Internal dependency of the two `-store` packages above, not imported directly by any app. Delete only alongside both stores.                                    |
 
 ## Deletion recipe
 
 For any route + package pair you've decided to remove (example: dropping the
 Studio workspace and the graph tools):
 
-1. `rm apps/web/src/routes/_app/studio.tsx` and its backing feature
+1. `rm apps/web/src/routes/_app/demos.studio.tsx` and its backing feature
    directory (`apps/web/src/features/studio/`).
 2. Remove the corresponding `registry.register({...})` calls and their
    supporting types/functions from `apps/gonk/src/registry.ts` (the
    `sigil-graph-*` tools and their input-guard/schema helpers at the bottom
    of the file).
 3. `rm -rf packages/graph packages/graph-store` (or `packages/review
-   packages/review-store`, `packages/data`, or `packages/canvas`
+packages/review-store`, `packages/data`, or `packages/canvas`
    — whichever you're dropping).
 4. Remove the corresponding `"@workspace/<name>": "workspace:*"` line from
    `apps/web/package.json` and/or `apps/gonk/package.json` dependencies, and

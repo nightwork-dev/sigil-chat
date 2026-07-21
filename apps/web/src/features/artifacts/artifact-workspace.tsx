@@ -69,7 +69,7 @@ export function ArtifactWorkspace() {
   const attention: AttentionContext = useMemo(
     () => ({
       application: "sigil-chat",
-      route: "/artifacts",
+      route: "/demos/artifacts",
       workspace: { kind: "artifacts", id: "artifacts", label: "Artifacts" },
       selection: selected ? artifactTarget(selected) : undefined,
       selections: selected ? [artifactTarget(selected)] : undefined,
@@ -218,7 +218,7 @@ function ArtifactList({
           <p>No artifacts match this view.</p>
           {scopeChoice === "evidence" ? (
             <Link
-              to="/evidence"
+              to="/demos/evidence"
               className="text-primary underline-offset-2 hover:underline"
             >
               Open Evidence Room to add documents

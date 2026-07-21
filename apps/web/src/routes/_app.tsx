@@ -19,8 +19,17 @@ import { fetchCurrentSession } from "@/lib/auth/route-guard"
 import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
+import { ContainerBreadcrumb } from "@/components/agent/container-breadcrumb"
+import { AgentRailStatus } from "@/components/agent/agent-rail-status"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
+import { ActiveContainerProvider } from "@/lib/active-container"
+import { AgentSurfaceProvider } from "@/lib/agent-surface-registry"
+import {
+  ViewRailChords,
+  ViewRailStatusStart,
+  ViewRailTop,
+} from "@/lib/view-rails"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
@@ -45,21 +54,43 @@ function AppLayout() {
     owner: user.role === "owner",
   })
 
+  // One rail, one header: the top rail is breadcrumb (always) + the matched
+  // route's viewContent (read from staticData via useMatches — SSR-native,
+  // no provider). The bottom status rail carries view controls (left), chord
+  // hints + agent attention (right). The theme picker lives in the sidebar
+  // footer with the account menu, not the rail.
   return (
-    <SidebarShell
-      nav={nav}
-      actions={<ThemePicker variant="compact" />}
-      accountMenu={<AccountMenu user={user} />}
-    >
-      <WorkspaceAttentionProvider>
-        <AgentPrincipalProvider principalId={user.id}>
+    <AgentPrincipalProvider principalId={user.id}>
+      <ActiveContainerProvider>
+        <WorkspaceAttentionProvider>
           <AppAgentSessions principalId={user.id}>
-            <Outlet />
-            <ShellAgentHud />
-            <ShellOmnibar />
+            <AgentSurfaceProvider>
+              <SidebarShell
+                nav={nav}
+                accountMenu={
+                  <>
+                    <ThemePicker variant="compact" />
+                    <AccountMenu user={user} />
+                  </>
+                }
+                breadcrumbContext={<ContainerBreadcrumb />}
+                viewContent={<ViewRailTop />}
+                statusRailStart={<ViewRailStatusStart />}
+                statusRailEnd={
+                  <>
+                    <ViewRailChords />
+                    <AgentRailStatus />
+                  </>
+                }
+              >
+                <Outlet />
+                <ShellAgentHud />
+                <ShellOmnibar />
+              </SidebarShell>
+            </AgentSurfaceProvider>
           </AppAgentSessions>
-        </AgentPrincipalProvider>
-      </WorkspaceAttentionProvider>
-    </SidebarShell>
+        </WorkspaceAttentionProvider>
+      </ActiveContainerProvider>
+    </AgentPrincipalProvider>
   )
 }

@@ -35,7 +35,8 @@ import {
 
 type MobileTab = "library" | "distills" | "ask"
 
-const ACCEPTED_TYPES = ".md,.txt,.markdown,.pdf,text/*,application/pdf,application/json"
+const ACCEPTED_TYPES =
+  ".md,.txt,.markdown,.pdf,text/*,application/pdf,application/json"
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
 
 /**
@@ -74,8 +75,12 @@ export function EvidenceRoom() {
   const attention: AttentionContext = useMemo(
     () => ({
       application: "sigil-chat",
-      route: "/evidence",
-      workspace: { kind: "evidence-room", id: "evidence", label: "Evidence Room" },
+      route: "/demos/evidence",
+      workspace: {
+        kind: "evidence-room",
+        id: "evidence",
+        label: "Evidence Room",
+      },
       selection: selectedDoc ? documentTarget(selectedDoc) : undefined,
       selections: selectedDoc ? [documentTarget(selectedDoc)] : undefined,
       history: telemetry.history,
@@ -103,7 +108,9 @@ export function EvidenceRoom() {
         if (doc.id === selectedDocId) setSelectedDocId(null)
         deleteDocument.mutate(doc.id)
       }}
-      deletingId={deleteDocument.isPending ? deleteDocument.variables : undefined}
+      deletingId={
+        deleteDocument.isPending ? deleteDocument.variables : undefined
+      }
     />
   )
   const gallery = (
@@ -202,7 +209,12 @@ function LibraryRegion({
     <div className="space-y-2 p-3">
       <div className="flex items-center justify-between gap-2">
         <RegionLabel>Documents</RegionLabel>
-        <Button size="sm" variant="ghost" onClick={upload.open} disabled={isUploading}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={upload.open}
+          disabled={isUploading}
+        >
           <UploadIcon className="size-3.5" />
           {isUploading ? "Uploading…" : "Upload"}
         </Button>
@@ -291,11 +303,13 @@ function GalleryRegion({
           Couldn’t load distilled cards.
         </p>
       ) : isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading distilled cards…</p>
+        <p className="text-xs text-muted-foreground">
+          Loading distilled cards…
+        </p>
       ) : distills.length === 0 ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <SparklesIcon className="size-3.5" /> Distilled cards land here. Select a
-          document and say “distill this”.
+          <SparklesIcon className="size-3.5" /> Distilled cards land here.
+          Select a document and say “distill this”.
         </p>
       ) : (
         <div className="space-y-2">

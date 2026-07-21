@@ -10,5 +10,9 @@ import { createFileRoute } from "@tanstack/react-router"
 import { LabsIndex } from "@/features/labs/labs-index"
 
 export const Route = createFileRoute("/labs/")({
-  component: LabsIndex,
+  component: LabsIndexRoute,
 })
+
+function LabsIndexRoute() {
+  return <LabsIndex />
+}

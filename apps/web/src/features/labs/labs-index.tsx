@@ -3,7 +3,8 @@ import { ArrowRightIcon, EyeIcon, HandIcon } from "lucide-react"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-const labs = [
+// Local-only studies — safe (and nice) to show without auth.
+const publicLabs = [
   {
     to: "/labs/gaze" as const,
     title: "Gaze",
@@ -25,15 +26,23 @@ export function LabsIndex() {
     <main className="min-h-svh bg-background px-5 py-10 text-foreground sm:px-8">
       <div className="mx-auto max-w-4xl">
         <header className="mb-8 max-w-2xl">
-          <h1 className="text-2xl font-semibold tracking-tight">Labs</h1>
+          <div className="flex items-baseline justify-between gap-4">
+            <h1 className="text-2xl font-semibold tracking-tight">Labs</h1>
+            <Link
+              to="/chat"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              ← Back to the app
+            </Link>
+          </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Experimental interaction studies. Camera processing stays in this
-            browser session; each lab asks before starting the camera.
+            Local interaction experiments. These studies run in this browser,
+            require no account, and ask before starting the camera.
           </p>
         </header>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {labs.map((lab) => {
+          {publicLabs.map((lab) => {
             const Icon = lab.icon
 
             return (

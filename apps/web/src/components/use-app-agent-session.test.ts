@@ -194,7 +194,7 @@ function attention(history: AttentionContext["history"]): AttentionContext {
   }
   return {
     application: "sigil-chat",
-    route: "/review",
+    route: "/demos/review",
     workspace: { kind: "review", id: "draft", label: "Draft" },
     selection,
     selections: [selection],

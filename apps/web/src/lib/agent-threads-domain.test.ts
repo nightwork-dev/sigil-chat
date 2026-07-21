@@ -13,6 +13,7 @@ import {
 } from "./agent-threads-domain";
 
 const USER_A = "user-a";
+const USER_B = "user-b";
 
 class MemoryKv<T> implements AgentThreadKvStore<T> {
   private readonly values = new Map<string, T>();
@@ -86,6 +87,49 @@ describe("AgentThreadRepository", () => {
     expect(repo.getActivePreference(USER_A).activeThreadId).toBe(second.id);
     expect(first.personaId).toBe("agent-a");
     expect(second.personaId).toBe("agent-b");
+  });
+
+  it("persists the active container selection per principal (§3.1)", () => {
+    const repo = repository();
+
+    // Default: no selection (resolves to the personal project upstream).
+    expect(repo.getActivePreference(USER_A).activeProjectId).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+
+    repo.setActiveContainer(USER_A, { projectId: "project-1" });
+    expect(repo.getActivePreference(USER_A).activeProjectId).toBe("project-1");
+    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+
+    repo.setActiveContainer(USER_A, {
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+    });
+    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBe(
+      "workspace-1",
+    );
+
+    // Per-principal isolation: another principal's selection is untouched.
+    expect(repo.getActivePreference(USER_B).activeProjectId).toBeUndefined();
+
+    // Clearing returns to the default.
+    repo.setActiveContainer(USER_A, {});
+    expect(repo.getActivePreference(USER_A).activeProjectId).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+  });
+
+  it("keeps the container selection when the active thread changes", () => {
+    const repo = repository();
+    repo.setActiveContainer(USER_A, {
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+    });
+    const thread = repo.create(USER_A, { title: "T" });
+
+    repo.setActive(USER_A, thread.id);
+
+    const preference = repo.getActivePreference(USER_A);
+    expect(preference.activeThreadId).toBe(thread.id);
+    expect(preference.activeWorkspaceId).toBe("workspace-1");
   });
 
   it("ensures one default active thread for first-load query paths", () => {
