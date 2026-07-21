@@ -17,23 +17,25 @@ import {
   buildWorkspaceHome,
   type HomesAdapterInput,
 } from "@/features/homes/home-view-model"
-import {
-  fixtureAttention,
-  fixtureResources,
-  fixtureWorkSource,
-} from "@/features/homes/fixtures"
+import { routeSources } from "@/features/homes/live-sources"
 import { WorkspaceHome } from "@/features/homes/workspace-home"
 import type { HomeState, WorkspaceHomeView } from "@/features/homes/types"
 
 export const Route = createFileRoute("/_app/workspaces/$workspaceId")({
-  validateSearch: (search: Record<string, unknown>): { via?: string } =>
-    typeof search.via === "string" ? { via: search.via } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { via?: string; fixtures?: boolean } => ({
+    ...(typeof search.via === "string" ? { via: search.via } : {}),
+    ...(search.fixtures === "1" || search.fixtures === true
+      ? { fixtures: true }
+      : {}),
+  }),
   component: WorkspaceHomeRoute,
 })
 
 function WorkspaceHomeRoute() {
   const { workspaceId } = Route.useParams()
-  const { via } = Route.useSearch()
+  const { via, fixtures } = Route.useSearch()
   const nav = useProjectWorkspaceNav()
   const threads = useAgentThreads()
   const roster = useAgentRoster()
@@ -41,21 +43,25 @@ function WorkspaceHomeRoute() {
 
   const state: HomeState<WorkspaceHomeView> = useMemo(() => {
     if (!nav.data || !threads.data) return { kind: "loading" }
-    const input: HomesAdapterInput = {
-      nav: nav.data,
-      threads: threads.data,
-      work: fixtureWorkSource,
-      agents: (roster.data ?? []).map((persona) => ({
+    const sources = routeSources(
+      Boolean(fixtures),
+      (roster.data ?? []).map((persona) => ({
         personaId: persona.id,
         name: persona.name,
         headline: persona.description,
       })),
-      resources: fixtureResources,
-      attention: fixtureAttention,
+    )
+    const input: HomesAdapterInput = {
+      nav: nav.data,
+      threads: threads.data,
+      work: sources.work,
+      agents: sources.agents,
+      resources: sources.resources,
+      attention: sources.attention,
     }
     const view = buildWorkspaceHome(input, workspaceId, via)
     return view ? { kind: "ready", view } : { kind: "not-found" }
-  }, [nav.data, threads.data, roster.data, workspaceId, via])
+  }, [nav.data, threads.data, roster.data, workspaceId, via, fixtures])
 
   return <WorkspaceHome state={state} compact={compact} />
 }
