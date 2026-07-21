@@ -45,7 +45,34 @@ const candidates = [
 ]
 
 describe("resolveAgentReach", () => {
-  it("uses only declared composition links and current authorization", () => {
+  it("includes a trusted canonical descendant without requiring a mount or link", () => {
+    const resolved = resolveAgentReach({
+      policy: {
+        kind: "scope",
+        homeScopeId: "project-1",
+        homeScopeKind: "project",
+        compositionLinkKinds: [],
+        descendantScopeKinds: ["workspace"],
+      },
+      candidates,
+      canonicalDescendants: [
+        { scopeId: "workspace-1", scopeKind: "workspace" },
+        { scopeId: "session-1", scopeKind: "session" },
+      ],
+      authorization: {
+        canDiscover: () => true,
+        canRead: () => true,
+      },
+    })
+
+    expect(resolved.candidateScopeIds).toEqual(["project-1", "workspace-1"])
+    expect(resolved.readable.map((candidate) => candidate.id)).toEqual([
+      "project-doc",
+      "workspace-doc",
+    ])
+  })
+
+  it("uses only declared composition links after the canonical closure", () => {
     const resolved = resolveAgentReach({
       policy: {
         kind: "scope",
@@ -56,6 +83,7 @@ describe("resolveAgentReach", () => {
       },
       candidates,
       links,
+      canonicalDescendants: [],
       authorization: {
         canDiscover: () => true,
         canRead: () => true,
@@ -76,9 +104,16 @@ describe("resolveAgentReach", () => {
   it("applies a revoked grant immediately on the next resolve", () => {
     const input = {
       policy: {
-        kind: "principal" as const,
+        kind: "scope" as const,
+        homeScopeId: "project-1",
+        homeScopeKind: "project" as const,
+        compositionLinkKinds: [] as const,
+        descendantScopeKinds: ["workspace"] as const,
       },
       candidates,
+      canonicalDescendants: [
+        { scopeId: "workspace-1", scopeKind: "workspace" as const },
+      ],
       authorization: {
         canDiscover: () => true,
         canRead: (candidate: (typeof candidates)[number]) =>
@@ -94,12 +129,10 @@ describe("resolveAgentReach", () => {
 
     expect(beforeRevocation.readable.map((candidate) => candidate.id)).toEqual([
       "project-doc",
-      "unrelated-doc",
       "workspace-doc",
     ])
     expect(afterRevocation.readable.map((candidate) => candidate.id)).toEqual([
       "project-doc",
-      "unrelated-doc",
     ])
   })
 })

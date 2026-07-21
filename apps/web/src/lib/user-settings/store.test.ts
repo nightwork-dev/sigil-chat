@@ -215,7 +215,7 @@ describe("resolveFromTiers", () => {
 
 describe("resolveSettingCandidates", () => {
   it("uses explicit semantic order and projects a permission-filtered receipt", () => {
-    const definition: SettingDefinition<Record<string, string>> = {
+    const definition: SettingDefinition<Record<string, unknown>> = {
       key: "agent.preference.example",
       allowedScopes: ["user"],
       allowedScopeKinds: ["installation", "organization", "personal"],
@@ -224,7 +224,7 @@ describe("resolveSettingCandidates", () => {
       allowsPersonalOverride: true,
       affectsSecurity: false,
       defaultValue: {},
-      isValid: (value): value is Record<string, string> =>
+      isValid: (value): value is Record<string, unknown> =>
         typeof value === "object" && value !== null && !Array.isArray(value),
     }
 
@@ -233,14 +233,22 @@ describe("resolveSettingCandidates", () => {
         scopeId: "person-1",
         scopeKind: "personal",
         order: 2,
-        value: { personal: "always" },
+        value: {
+          personal: "always",
+          nested: { personal: "always" },
+          arrayLeaf: ["personal"],
+        },
         visibility: { kind: "discoverable" },
       },
       {
         scopeId: "organization-hidden",
         scopeKind: "installation",
         order: 0,
-        value: { mandatory: "ask" },
+        value: {
+          mandatory: "ask",
+          nested: { installation: "ask", replaced: "installation" },
+          arrayLeaf: ["installation"],
+        },
         visibility: {
           kind: "hidden-mandatory-policy",
           policyClass: "installation-policy",
@@ -250,7 +258,11 @@ describe("resolveSettingCandidates", () => {
         scopeId: "org-1",
         scopeKind: "organization",
         order: 1,
-        value: { organization: "ask" },
+        value: {
+          organization: "ask",
+          nested: { organization: "ask", replaced: "organization" },
+          arrayLeaf: ["organization"],
+        },
         linkKind: "contributes-defaults",
         visibility: { kind: "discoverable" },
       },
@@ -260,6 +272,13 @@ describe("resolveSettingCandidates", () => {
       mandatory: "ask",
       organization: "ask",
       personal: "always",
+      nested: {
+        installation: "ask",
+        organization: "ask",
+        personal: "always",
+        replaced: "organization",
+      },
+      arrayLeaf: ["personal"],
     })
     expect(resolved.receipt).toEqual([
       { kind: "mandatory-policy", policyClass: "installation-policy" },

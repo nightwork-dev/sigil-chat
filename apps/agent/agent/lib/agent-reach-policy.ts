@@ -32,6 +32,12 @@ export interface AgentReachCandidate {
   readonly homeScopeKind: ScopeKind
 }
 
+/** A trusted projection of canonical ownership, not a composition relation. */
+export interface CanonicalDescendantScope {
+  readonly scopeId: string
+  readonly scopeKind: ScopeKind
+}
+
 export interface CurrentAgentReachAuthorization<T extends AgentReachCandidate> {
   canDiscover(candidate: T): boolean
   canRead(candidate: T): boolean
@@ -40,6 +46,11 @@ export interface CurrentAgentReachAuthorization<T extends AgentReachCandidate> {
 export interface ResolveAgentReachInput<T extends AgentReachCandidate> {
   readonly policy: AgentReachPolicy
   readonly candidates: readonly T[]
+  /**
+   * Supplied by the scope registry for the policy home. These are seeded into
+   * reach before optional composition links are traversed.
+   */
+  readonly canonicalDescendants?: readonly CanonicalDescendantScope[]
   readonly links?: readonly ScopeLink[]
   /** Re-injected for every resolve; this is intentionally not cached. */
   readonly authorization: CurrentAgentReachAuthorization<T>
@@ -61,6 +72,7 @@ export function resolveAgentReach<T extends AgentReachCandidate>(
 ): ResolvedAgentReach<T> {
   const candidateScopeIds = resolveCandidateScopeIds(
     input.policy,
+    input.canonicalDescendants ?? [],
     input.links ?? [],
   )
   const eligible = uniqueCandidates(input.candidates).filter((candidate) =>
@@ -76,25 +88,45 @@ export function resolveAgentReach<T extends AgentReachCandidate>(
 
 function resolveCandidateScopeIds(
   policy: AgentReachPolicy,
+  canonicalDescendants: readonly CanonicalDescendantScope[],
   links: readonly ScopeLink[],
 ): string[] {
   if (policy.kind === "principal") return []
 
-  const scopeIds: string[] = []
-  const seen = new Set<string>()
-  for (const linkKind of policy.compositionLinkKinds) {
-    for (const scopeId of traverseScopeLinks({
-      rootScopeId: policy.homeScopeId,
-      kind: linkKind,
-      direction: "subjects",
-      links,
-    })) {
-      if (seen.has(scopeId)) continue
-      seen.add(scopeId)
-      scopeIds.push(scopeId)
+  const scopeIds = [policy.homeScopeId]
+  const seen = new Set(scopeIds)
+  for (const descendant of [...canonicalDescendants].sort(
+    (left, right) => left.scopeId.localeCompare(right.scopeId),
+  )) {
+    if (
+      !policy.descendantScopeKinds.includes(descendant.scopeKind) ||
+      seen.has(descendant.scopeId)
+    ) {
+      continue
+    }
+    seen.add(descendant.scopeId)
+    scopeIds.push(descendant.scopeId)
+  }
+
+  // Composition is opt-in. Traverse only the declared relations, starting
+  // from the trusted canonical closure and continuing through those same
+  // relations deterministically.
+  for (let index = 0; index < scopeIds.length; index += 1) {
+    const rootScopeId = scopeIds[index]
+    if (!rootScopeId) continue
+    for (const linkKind of policy.compositionLinkKinds) {
+      for (const scopeId of traverseScopeLinks({
+        rootScopeId,
+        kind: linkKind,
+        direction: "subjects",
+        links,
+      })) {
+        if (seen.has(scopeId)) continue
+        seen.add(scopeId)
+        scopeIds.push(scopeId)
+      }
     }
   }
-  if (!seen.has(policy.homeScopeId)) scopeIds.unshift(policy.homeScopeId)
   return scopeIds
 }
 

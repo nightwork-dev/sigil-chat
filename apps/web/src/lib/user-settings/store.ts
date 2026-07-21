@@ -155,7 +155,7 @@ export function resolveSettingCandidates<T>(
             `Setting "${definition.key}" requires record contributions.`,
           )
         }
-        return { ...merged, ...contribution.value }
+        return mergePlainRecords(merged, contribution.value)
       },
       {},
     )
@@ -244,6 +244,21 @@ function toReceipt<T>(
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function mergePlainRecords(
+  base: Record<string, unknown>,
+  contribution: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...base }
+  for (const [key, value] of Object.entries(contribution)) {
+    const existing = merged[key]
+    merged[key] =
+      isPlainRecord(existing) && isPlainRecord(value)
+        ? mergePlainRecords(existing, value)
+        : value
+  }
+  return merged
 }
 
 // Walks an explicit, already most- to least-specific ordered tier list and
