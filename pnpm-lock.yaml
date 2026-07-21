@@ -256,8 +256,8 @@ importers:
         specifier: ^0.1.5
         version: 0.1.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(react@19.2.7)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
       '@zigil/agent-react':
-        specifier: ^0.1.3
-        version: 0.1.3(react@19.2.7)
+        specifier: ^0.1.4
+        version: 0.1.4(react@19.2.7)
       '@zigil/agent-react-query':
         specifier: ^0.1.1
         version: 0.1.1(@tanstack/react-query@5.101.3(react@19.2.7))
@@ -579,8 +579,8 @@ importers:
         specifier: ^3.28.0
         version: 3.28.0
       '@zigil/agent-react':
-        specifier: ^0.1.3
-        version: 0.1.3(react@19.2.7)
+        specifier: ^0.1.4
+        version: 0.1.4(react@19.2.7)
       '@zigil/agent-surface':
         specifier: ^0.1.1
         version: 0.1.1
@@ -3081,8 +3081,8 @@ packages:
     peerDependencies:
       '@tanstack/react-query': ^5.0.0
 
-  '@zigil/agent-react@0.1.3':
-    resolution: {integrity: sha512-Sliuaw0Pb/wcpvtwPb62eCcp30L0n2AXemsPSokf7eu9tS+SP/qrLFwf0Yth8MAVVUNIa7zIScD7Pe/DoseRbw==}
+  '@zigil/agent-react@0.1.4':
+    resolution: {integrity: sha512-epe/1iqPqxHFAuF0XBEIq348v2Yw50lqhoxyViV/QrH3cvSwSKqMUfPbDi90OUSHBqGc2rzJemA52EkyOfJqvA==}
     peerDependencies:
       react: ^19.0.0
 
@@ -9001,7 +9001,7 @@ snapshots:
       '@tanstack/react-query': 5.101.3(react@19.2.7)
       '@zigil/agent-surface': 0.1.1
 
-  '@zigil/agent-react@0.1.3(react@19.2.7)':
+  '@zigil/agent-react@0.1.4(react@19.2.7)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@zigil/agent-surface': 0.1.1

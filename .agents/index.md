@@ -84,24 +84,28 @@ which wraps:
 - `_app/index.tsx` — redirects to `/chat` (static landing target until S10.4's
   last-workspace setting exists)
 - `_app/chat.tsx` — the chat workspace
-- `_app/studio.tsx` — ReducerStudio, the typed reducer graph workspace with an overlaid agent HUD
-- `_app/review.tsx` — review/annotation workspace
-- `_app/skills.tsx` — searchable Eve capability catalog (Gonk Core lifecycle boundary)
-- `_app/evidence.tsx` — Evidence Room: document library → distilled-cards
+- `_app/demos.index.tsx` — authenticated directory for product demonstrations
+- `_app/demos.studio.tsx` — ReducerStudio, the typed reducer graph workspace with an overlaid agent HUD
+- `_app/demos.review.tsx` — review/annotation workspace
+- `_app/demos.evidence.tsx` — Evidence Room: document library → distilled-cards
   gallery → ask-with-citations (sigil-evidence-ask), with selection→agent
   attention
+- `_app/demos.artifacts.tsx` — artifacts produced through authenticated agent
+  tool calls
+- `_app/skills.tsx` — searchable Eve capability catalog (Gonk Core lifecycle boundary)
 - `_app/roadmap.tsx` — RoadmapWorkspace: story/work-items board over the
   external roadmap store, reconciled through the work-items domain-outcome loop
 - `_app/settings.tsx` — real user settings (account / appearance / security /
   agent preferences), nested inside the existing app chrome
 
-Outside `_app` (no product nav): `login.tsx`, `setup.tsx`, and
-`api/auth/$.ts` (the Better Auth surface), plus `labs.gaze.tsx` — the
-quarantined gaze lab route (out of scope for this doc's product-surface
-description; see the repo's `labs.gaze` skill/owner notes).
+Outside `_app` (no authenticated product shell): `login.tsx`, `setup.tsx`,
+and `api/auth/$.ts` (the Better Auth surface), plus the `/labs` island. Labs
+are public and browser-local: they do not resolve an auth session or mount
+agent/Gonk-backed demonstrations. Those live under authenticated `/demos/*`.
 
 `__root.tsx` (no visible chrome) provides ThemeProvider, QueryClientProvider,
-AgentSessionProvider, and loads global styles/fonts.
+and loads global styles/fonts. The agent session provider lives inside `_app`
+so public routes do not create an Eve client.
 
 The inherited demo route tree (`showcase/*`, `gallery/*`, `examples/*`,
 `sidebar.*`, `footer/*`, `menubar/*`, `split/*`, `settings/*`, `inspector/*`,
@@ -159,11 +163,11 @@ pnpm dev
 `pnpm dev` runs `turbo dev`, which starts three Portless services in
 parallel:
 
-| Service | Portless name | URL |
-| --- | --- | --- |
-| Chat (`apps/web`) | `sigil-chat` | `http://sigil-chat.localhost:1355` |
-| Eve (`apps/agent`) | `sigil-chat-agent` | `http://sigil-chat-agent.localhost:1355` |
-| Gonk MCP (`apps/gonk`) | `sigil-chat-gonk` | `http://sigil-chat-gonk.localhost:1355/mcp` |
+| Service                | Portless name      | URL                                         |
+| ---------------------- | ------------------ | ------------------------------------------- |
+| Chat (`apps/web`)      | `sigil-chat`       | `http://sigil-chat.localhost:1355`          |
+| Eve (`apps/agent`)     | `sigil-chat-agent` | `http://sigil-chat-agent.localhost:1355`    |
+| Gonk MCP (`apps/gonk`) | `sigil-chat-gonk`  | `http://sigil-chat-gonk.localhost:1355/mcp` |
 
 Prerequisites and required env:
 
@@ -183,7 +187,7 @@ Prerequisites and required env:
   with a bare OpenAI model slug.
 - `GONK_MCP_KEY` — **required**. `apps/gonk/src/server.ts` calls
   `process.exit(1)` at startup if it is unset (Portless exposes the endpoint
-  machine-wide; loopback binding alone is not isolation). Set the *same*
+  machine-wide; loopback binding alone is not isolation). Set the _same_
   bearer token on both the Eve (`apps/agent`) and Gonk (`apps/gonk`)
   processes — Eve's `connections/gonk.ts` reads it too. This has already
   tripped people up: a missing/mismatched key means Eve can't reach the
@@ -201,6 +205,7 @@ Prerequisites and required env:
   still wins (parent-process env takes precedence over the file), matching
   Eve's dev env-file behavior. Copy `.env.example` to `.env` and set the key on
   a fresh checkout.
+
 - `GONK_MCP_URL` — optional, overrides the MCP endpoint Eve connects to
   (defaults to the Portless Gonk URL above).
 - `SIGIL_ROADMAP_DIR` — optional, configures the external Markdown roadmap

@@ -26,7 +26,12 @@ import {
 import { useActiveContainer } from "@/lib/active-container"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 
-const PRINCIPAL_LEVEL_PREFIXES = ["/agents", "/capabilities", "/skills", "/studio"]
+const PRINCIPAL_LEVEL_PREFIXES = [
+  "/agents",
+  "/capabilities",
+  "/skills",
+  "/demos",
+]
 
 export function ContainerBreadcrumb() {
   const container = useActiveContainer()
@@ -44,7 +49,9 @@ export function ContainerBreadcrumb() {
     <>
       <BreadcrumbItem>
         <ContainerMenu
-          icon={nav.data.projects.find((p) => p.id === container.projectId)?.icon}
+          icon={
+            nav.data.projects.find((p) => p.id === container.projectId)?.icon
+          }
           label={container.projectName ?? "Personal"}
           items={nav.data.projects.map((project) => ({
             id: project.id,
@@ -62,7 +69,10 @@ export function ContainerBreadcrumb() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <ContainerMenu
-              icon={workspacesInProject.find((w) => w.id === container.workspaceId)?.icon}
+              icon={
+                workspacesInProject.find((w) => w.id === container.workspaceId)
+                  ?.icon
+              }
               label={container.workspaceName ?? "Workspace"}
               items={workspacesInProject.map((workspace) => ({
                 id: workspace.id,

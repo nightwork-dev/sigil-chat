@@ -485,7 +485,7 @@ export function ReviewWorkspace() {
   )
   const attention: AttentionContext = {
     application: "sigil-chat",
-    route: "/review",
+    route: "/demos/review",
     workspace: {
       kind: "document-review",
       id: DOCUMENT_ID,
@@ -664,16 +664,18 @@ export function ReviewWorkspace() {
                         </span>
                       </div>
 
-                      {(agentAnnotationsByAnchor.get(passage.id) ?? []).map((a) => (
-                        <AnnotationOverlay
-                          key={a.toolCallId}
-                          kind={a.kind === "highlight" ? "highlight" : "note"}
-                          label={a.label}
-                          title={`Passage: “${passage.section}”`}
-                          body={<p>{a.body}</p>}
-                          meta={<span>sigil-{a.kind} · agent</span>}
-                        />
-                      ))}
+                      {(agentAnnotationsByAnchor.get(passage.id) ?? []).map(
+                        (a) => (
+                          <AnnotationOverlay
+                            key={a.toolCallId}
+                            kind={a.kind === "highlight" ? "highlight" : "note"}
+                            label={a.label}
+                            title={`Passage: “${passage.section}”`}
+                            body={<p>{a.body}</p>}
+                            meta={<span>sigil-{a.kind} · agent</span>}
+                          />
+                        ),
+                      )}
 
                       {editing ? (
                         <div className="border-t border-border bg-background/60 p-4">
@@ -761,7 +763,6 @@ export function ReviewWorkspace() {
             </Tabs>
           </aside>
         </div>
-
       </div>
     </AttentionProvider>
   )

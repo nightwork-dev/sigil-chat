@@ -11,6 +11,7 @@
 
 import {
   FlaskConicalIcon,
+  GalleryVerticalEndIcon,
   MapIcon,
   MessageSquareIcon,
   SettingsIcon,
@@ -27,8 +28,8 @@ export function buildAppNav(options: {
     brand: { label: "Sigil Chat", to: "/chat" },
     items: [
       // The product center: conversation and the management session. Review,
-      // Evidence, and Artifacts are demo workspaces — reachable from the labs
-      // island, their tool definitions earmarked for generalization — not
+      // Evidence, and Artifacts are demo workspaces — reachable from /demos,
+      // their tool definitions earmarked for generalization — not
       // front-and-center nav.
       { to: "/chat", label: "Chat", icon: MessageSquareIcon },
       // Agent management — ONE entry into the management session (Agents |
@@ -42,11 +43,13 @@ export function buildAppNav(options: {
         : []),
     ],
     footer: [
-      // Demos and experiments stay reachable, out of the front-and-center
-      // nav: the labs island indexes Studio, the roadmap board, and the
-      // interaction studies.
+      // Demos require the authenticated app boundary. Labs are a separate
+      // public, local-only island and never mount agent/Gonk resources.
       ...(options.internalWorkspaces
-        ? [{ to: "/labs", label: "Labs", icon: FlaskConicalIcon }]
+        ? [
+            { to: "/demos", label: "Demos", icon: GalleryVerticalEndIcon },
+            { to: "/labs", label: "Labs", icon: FlaskConicalIcon },
+          ]
         : []),
       ...(options.owner
         ? [{ to: "/status", label: "Status", icon: ActivityIcon }]
@@ -58,5 +61,6 @@ export function buildAppNav(options: {
 
 export const appNav = buildAppNav({
   internalWorkspaces:
-    import.meta.env.DEV || import.meta.env.VITE_SIGIL_INTERNAL_WORKSPACES === "1",
+    import.meta.env.DEV ||
+    import.meta.env.VITE_SIGIL_INTERNAL_WORKSPACES === "1",
 })

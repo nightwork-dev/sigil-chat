@@ -6,7 +6,7 @@
 // returns a same-origin path (+ search + hash) or a fixed fallback — never the
 // input verbatim.
 
-export const DEFAULT_RETURN_TO = "/studio"
+export const DEFAULT_RETURN_TO = "/demos/studio"
 
 export function sanitizeReturnTo(
   value: unknown,
@@ -16,7 +16,11 @@ export function sanitizeReturnTo(
   // Reject anything that isn't a single leading slash: protocol-relative
   // (`//host`), absolute URLs, and backslash tricks some browsers normalize
   // to a scheme-relative URL are all rejected here before URL parsing.
-  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+  if (
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\")
+  ) {
     return fallback
   }
 
