@@ -29,6 +29,8 @@ import {
 } from "@zigil/agent-react/attention"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { AcceptanceChecklist } from "@workspace/review/components/acceptance-checklist"
+import { AnnotationOverlay } from "@workspace/ui/components/annotation-overlay"
+import { useAgentAnnotationsByAnchor } from "./agent-annotations"
 import { AnnotationComposer } from "@workspace/review/components/annotation-composer"
 import { AnnotationFeed } from "@workspace/review/components/annotation-feed"
 import { Decisions } from "@workspace/review/components/decisions-panel"
@@ -190,6 +192,7 @@ export function ReviewWorkspace() {
   const document = reviewDocument.data ?? DEFAULT_DOCUMENT
   const passages = passagesFromDocument(document)
   const annotations = annotationsFromDocument(document)
+  const agentAnnotationsByAnchor = useAgentAnnotationsByAnchor()
   const decisions = decisionsFromDocument(document)
   const checklist: AcceptanceCheck[] = document.acceptance.checklist
   const revisions = revisionsFromDocument(document)
@@ -638,6 +641,17 @@ export function ReviewWorkspace() {
                           {passageAnnotations === 1 ? "" : "s"}
                         </span>
                       </div>
+
+                      {(agentAnnotationsByAnchor.get(passage.id) ?? []).map((a) => (
+                        <AnnotationOverlay
+                          key={a.toolCallId}
+                          kind={a.kind === "highlight" ? "highlight" : "note"}
+                          label={a.label}
+                          title={`Passage: “${passage.section}”`}
+                          body={<p>{a.body}</p>}
+                          meta={<span>sigil-{a.kind} · agent</span>}
+                        />
+                      ))}
 
                       {editing ? (
                         <div className="border-t border-border bg-background/60 p-4">
