@@ -8,6 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { useAgentPrincipalId } from "@/lib/agent-principal";
 import type {
   BoardQueryResult,
+  BoardTraversal,
   BoardView,
   BoardViewFilter,
   ReviewDecision,
@@ -121,6 +122,70 @@ const queryBoardViewFn = createServerFn({ method: "GET" })
       document.stories,
       view,
       createBoardTraversalResolver(viewer.id),
+    );
+  });
+
+const queryScopeWorkFn = createServerFn({ method: "GET" })
+  .validator((input: { scopeId: string; traversal: BoardTraversal }) => input)
+  .handler(async ({ data }): Promise<BoardQueryResult> => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { createBoardTraversalResolver, currentWorkItemsScopeAccess } =
+      await import("@/lib/work-items-access.server");
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const access = currentWorkItemsScopeAccess();
+    if (
+      !access.canAccess({
+        principalId: viewer.id,
+        scopeId: data.scopeId,
+        action: "board.read",
+      })
+    ) {
+      throw new Error("Scoped work was not found.");
+    }
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const view: BoardView = {
+      id: `scope-home:${data.scopeId}`,
+      ownerScopeId: data.scopeId,
+      ownerPrincipalId: viewer.id,
+      name: "Scope home",
+      visibility: "private",
+      roots: [data.scopeId],
+      traversal: data.traversal,
+      filters: {},
+      groupBy: "status",
+      revision: 0,
+    };
+    return queryBoardView(
+      document.stories,
+      view,
+      createBoardTraversalResolver(viewer.id, access),
+    );
+  });
+
+const listSessionCommitmentsFn = createServerFn({ method: "GET" })
+  .validator((input: { threadId: string }) => input)
+  .handler(async ({ data }): Promise<Story[]> => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { agentThreadRepository } =
+      await import("@/lib/agent-threads.server");
+    if (!agentThreadRepository.get(viewer.id, data.threadId)) {
+      throw new Error("Agent session was not found.");
+    }
+    const { currentWorkItemsScopeAccess, visibleSessionCommitments } =
+      await import("@/lib/work-items-access.server");
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    return visibleSessionCommitments(
+      document.stories,
+      data.threadId,
+      viewer.id,
+      currentWorkItemsScopeAccess(),
     );
   });
 
@@ -389,6 +454,16 @@ export const workItemKeys = {
     [...workItemKeys.all(), "board-view", viewerId, id] as const,
   boardQuery: (viewerId: string, id: string) =>
     [...workItemKeys.all(), "board-query", viewerId, id] as const,
+  scopeQuery: (viewerId: string, scopeId: string, traversal: BoardTraversal) =>
+    [
+      ...workItemKeys.all(),
+      "scope-query",
+      viewerId,
+      scopeId,
+      traversal,
+    ] as const,
+  sessionCommitments: (viewerId: string, threadId: string) =>
+    [...workItemKeys.all(), "session-commitments", viewerId, threadId] as const,
 };
 
 export function useStories(
@@ -473,6 +548,36 @@ export function useBoardViewQuery(id: string | undefined) {
     queryKey: workItemKeys.boardQuery(principalId, id ?? "none"),
     queryFn: () => queryBoardViewFn({ data: { id: id ?? "" } }),
     enabled: Boolean(id),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useScopeWork(
+  scopeId: string,
+  traversal: BoardTraversal,
+  enabled = true,
+) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.scopeQuery(principalId, scopeId, traversal),
+    queryFn: () => queryScopeWorkFn({ data: { scopeId, traversal } }),
+    enabled: enabled && scopeId.length > 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useSessionCommitments(threadId: string, enabled = true) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.sessionCommitments(principalId, threadId),
+    queryFn: () => listSessionCommitmentsFn({ data: { threadId } }),
+    enabled: enabled && threadId.length > 0,
     refetchOnMount: "always",
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",

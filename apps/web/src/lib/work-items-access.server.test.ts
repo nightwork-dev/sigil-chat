@@ -7,6 +7,7 @@ import {
   requireBoardViewMutationAccess,
   requireSponsorshipDecisionAccess,
   requireWorkItemsMutationAccess,
+  visibleSessionCommitments,
   type WorkItemsScopeAccess,
 } from "./work-items-access.server";
 import type { BoardView } from "@workspace/work-items-store/types";
@@ -179,6 +180,45 @@ describe("work-item mutation access", () => {
         privateView,
       ),
     ).toThrow("Owner access required");
+  });
+});
+
+describe("session commitment visibility", () => {
+  const sessionScopeId = "session:thread-a";
+  const linked = (item: Story): Story => ({
+    ...item,
+    scopeBindings: [{ scopeId: sessionScopeId, relation: "mounted-in" }],
+  });
+
+  it("re-authorizes a linked record against its canonical home", () => {
+    const visible = linked(story("visible", "project-a"));
+    const hidden = linked(story("hidden", "project-hidden"));
+    const sessionOwned = story("session-owned", sessionScopeId);
+    const unrelated = story("unrelated", "project-a");
+
+    expect(
+      visibleSessionCommitments(
+        [visible, hidden, sessionOwned, unrelated],
+        "thread-a",
+        "user-1",
+        scopeAccess(["project-a"]),
+      ).map((item) => item.id),
+    ).toEqual(["visible", "session-owned"]);
+  });
+
+  it("does not project a legacy linked record with no canonical home", () => {
+    const legacy = linked({
+      ...story("legacy", "project-a"),
+      homeScopeId: undefined,
+    });
+    expect(
+      visibleSessionCommitments(
+        [legacy],
+        "thread-a",
+        "user-1",
+        scopeAccess(["project-a"]),
+      ),
+    ).toEqual([]);
   });
 });
 

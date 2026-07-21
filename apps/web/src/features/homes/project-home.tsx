@@ -21,7 +21,8 @@ export interface ProjectHomeProps {
 
 export function ProjectHome({ state, compact }: ProjectHomeProps) {
   if (state.kind === "loading") return <HomeSkeleton />
-  if (state.kind === "denied") return <HomeDenied discoverable={state.discoverable} />
+  if (state.kind === "denied")
+    return <HomeDenied discoverable={state.discoverable} />
   if (state.kind === "not-found") return <HomeDenied discoverable={false} />
 
   const { view } = state
@@ -38,7 +39,9 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
     >
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          {view.header.icon ? <span aria-hidden>{view.header.icon}</span> : null}
+          {view.header.icon ? (
+            <span aria-hidden>{view.header.icon}</span>
+          ) : null}
           {view.header.name}
         </h1>
         {view.header.description ? (
@@ -54,7 +57,9 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         title="Workspaces"
         count={view.workspaces.length}
         empty="No workspaces here yet."
-        emptyAction={archived ? undefined : "New workspace"}
+        emptyAction={
+          archived ? undefined : { label: "Ask for a workspace", href: "/chat" }
+        }
         compact={compact}
       >
         {view.workspaces.map((row, index) =>
@@ -90,7 +95,9 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         title="Sessions"
         count={view.sessions.length}
         empty="No sessions yet."
-        emptyAction={archived ? undefined : "Start a session"}
+        emptyAction={
+          archived ? undefined : { label: "Open chat", href: "/chat" }
+        }
         compact={compact}
       >
         {view.sessions.map((session, index) => (
@@ -103,7 +110,9 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
             href={session.href}
             trailing={
               session.status === "archived" ? (
-                <span className="text-[10px] text-muted-foreground">Archived</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Archived
+                </span>
               ) : undefined
             }
           />
@@ -132,7 +141,9 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         title="Work"
         count={view.work.length}
         empty="No work is tracked here yet."
-        emptyAction={archived ? undefined : "New request"}
+        emptyAction={
+          archived ? undefined : { label: "Request a feature", href: "/chat" }
+        }
         compact={compact}
       >
         {view.work.map((item, index) => (
@@ -142,9 +153,7 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
             compact={compact}
             title={item.title}
             description={
-              item.homeScopeName
-                ? `Home: ${item.homeScopeName}`
-                : undefined
+              item.homeScopeName ? `Home: ${item.homeScopeName}` : undefined
             }
             trailing={
               <span

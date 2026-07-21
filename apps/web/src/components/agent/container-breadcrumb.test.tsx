@@ -14,7 +14,13 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import { ContainerMenu } from "./container-breadcrumb"
+import { fixtureNav, NORTHSTAR } from "@/features/homes/fixtures"
+
+import {
+  ContainerMenu,
+  parseHomeRoute,
+  resolveHomeBreadcrumbSelection,
+} from "./container-breadcrumb"
 
 beforeAll(() => {
   ;(
@@ -56,7 +62,11 @@ const items = [
 describe("ContainerMenu split control", () => {
   it("label is a link to the home; chevron is a separate labelled trigger", async () => {
     const el = await render(
-      <ContainerMenu label="Commerce Platform" href="/projects/p1" items={items} />,
+      <ContainerMenu
+        label="Commerce Platform"
+        href="/projects/p1"
+        items={items}
+      />,
     )
     const link = el.querySelector("[data-testid='crumb-home-link']")
     expect(link?.getAttribute("href")).toBe("/projects/p1")
@@ -72,5 +82,58 @@ describe("ContainerMenu split control", () => {
     expect(el.querySelector("[data-testid='crumb-home-link']")).toBeNull()
     expect(el.querySelector("a")).toBeNull()
     expect(el.textContent).toContain("Workspace")
+  })
+})
+
+describe("home route breadcrumb selection", () => {
+  it("uses the project encoded by a project-home route", () => {
+    const route = parseHomeRoute(`/projects/${NORTHSTAR.commerce}`)
+    expect(route).toEqual({ kind: "project", projectId: NORTHSTAR.commerce })
+    expect(
+      resolveHomeBreadcrumbSelection({ route: route!, nav: fixtureNav }),
+    ).toEqual({ projectId: NORTHSTAR.commerce })
+  })
+
+  it("preserves a visible mounted-in perspective", () => {
+    const route = parseHomeRoute(`/workspaces/${NORTHSTAR.holidayLaunch}`)
+    expect(
+      resolveHomeBreadcrumbSelection({
+        route: route!,
+        nav: fixtureNav,
+        viaProjectId: NORTHSTAR.commerce,
+      }),
+    ).toEqual({
+      projectId: NORTHSTAR.commerce,
+      workspaceId: NORTHSTAR.holidayLaunch,
+    })
+  })
+
+  it("rejects a hidden or structurally invalid via project", () => {
+    const route = parseHomeRoute(`/workspaces/${NORTHSTAR.holidayLaunch}`)
+    expect(
+      resolveHomeBreadcrumbSelection({
+        route: route!,
+        nav: fixtureNav,
+        viaProjectId: "project:hidden",
+      }),
+    ).toEqual({
+      projectId: NORTHSTAR.brand,
+      workspaceId: NORTHSTAR.holidayLaunch,
+    })
+  })
+
+  it("derives a session breadcrumb from its owned workspace", () => {
+    const route = parseHomeRoute(`/sessions/${NORTHSTAR.draftOffers}`)
+    expect(
+      resolveHomeBreadcrumbSelection({
+        route: route!,
+        nav: fixtureNav,
+        viaProjectId: NORTHSTAR.commerce,
+        sessionWorkspaceId: NORTHSTAR.holidayLaunch,
+      }),
+    ).toEqual({
+      projectId: NORTHSTAR.commerce,
+      workspaceId: NORTHSTAR.holidayLaunch,
+    })
   })
 })

@@ -1,8 +1,9 @@
 // HomeRow — one record in a home section list, plus the quiet ownership
 // chip. Rows are links by default; RESTRICTED rows are inert: no href, no
 // id, no name, removed from the tab order — the discovery policy surfaced a
-// mount indicator, nothing more (spec §6). The only affordance is Request
-// access, and it goes nowhere silently: it's a button, not a link.
+// mount indicator, nothing more (spec §6). The access affordance opens chat,
+// where the principal can ask for help without the UI pretending a grant was
+// created.
 
 import { Link } from "@tanstack/react-router"
 import { LockIcon } from "lucide-react"
@@ -89,7 +90,9 @@ export function HomeRow({
           </span>
         ) : null}
       </span>
-      {trailing ? <span className="flex shrink-0 items-center">{trailing}</span> : null}
+      {trailing ? (
+        <span className="flex shrink-0 items-center">{trailing}</span>
+      ) : null}
     </>
   )
   const className = cn(
@@ -131,7 +134,7 @@ export function HomeRow({
 /** A mount the principal can see the existence of but cannot enter. The row
  *  itself is not a link and is skipped by the section's roving tabindex (no
  *  data-home-row) — a visible mount indicator is never a clickable dead-end.
- *  Request access remains an ordinary, focusable button. */
+ *  The access affordance is an ordinary, focusable link to chat. */
 export function RestrictedHomeRow({ label }: { label: string }) {
   return (
     <div
@@ -141,12 +144,12 @@ export function RestrictedHomeRow({ label }: { label: string }) {
     >
       <LockIcon className="size-3.5" aria-hidden />
       <span className="flex-1 text-sm italic">{label}</span>
-      <button
-        type="button"
+      <Link
+        to="/chat"
         className="rounded-md border border-border px-2 py-0.5 text-[10px] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        Request access
-      </button>
+        Ask about access
+      </Link>
     </div>
   )
 }

@@ -313,12 +313,12 @@ export function useAgentThreads(includeArchived = false) {
   });
 }
 
-export function useAgentThread(id: string | undefined) {
+export function useAgentThread(id: string | undefined, enabled = true) {
   const principalId = useAgentPrincipalId();
   return useQuery({
     queryKey: agentThreadKeys.detail(principalId, id ?? "none"),
     queryFn: () => getAgentThreadFn({ data: { id: id ?? "" } }),
-    enabled: Boolean(id),
+    enabled: enabled && Boolean(id),
   });
 }
 

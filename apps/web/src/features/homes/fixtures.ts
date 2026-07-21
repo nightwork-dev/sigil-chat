@@ -19,6 +19,8 @@ import type {
   WorkspaceHomeView,
   WorkSummaryItem,
 } from "./types"
+import type { AgentThreadSummary } from "@/lib/agent-threads"
+import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 
 export const NORTHSTAR = {
   installation: "installation:northstar",
@@ -29,6 +31,67 @@ export const NORTHSTAR = {
   holidayLaunch: "workspace:holiday-launch",
   draftOffers: "session:draft-holiday-offers",
 } as const
+
+export const fixtureNav: ProjectWorkspaceNavSummary = {
+  personalProjectId: "project:personal-reviewer",
+  projects: [
+    {
+      id: NORTHSTAR.commerce,
+      name: "Commerce Platform",
+      description: "Storefront and checkout.",
+      icon: "🛒",
+    },
+    {
+      id: NORTHSTAR.brand,
+      name: "Brand",
+      description: "Brand systems and campaigns.",
+      icon: "✦",
+    },
+  ],
+  workspaces: [
+    {
+      id: NORTHSTAR.checkoutReliability,
+      projectId: NORTHSTAR.commerce,
+      mountedProjectIds: [],
+      name: "Checkout Reliability",
+      description: "Error budget and payment reliability work.",
+      icon: "🧯",
+      status: "active",
+    },
+    {
+      id: NORTHSTAR.holidayLaunch,
+      projectId: NORTHSTAR.brand,
+      mountedProjectIds: [NORTHSTAR.commerce],
+      name: "Holiday Launch",
+      description: "Holiday campaign offers and storefront coordination.",
+      icon: "🎁",
+      status: "active",
+    },
+  ],
+}
+
+export const fixtureThreads: readonly AgentThreadSummary[] = [
+  {
+    id: "session:checkout-triage",
+    personaId: "vesper",
+    title: "Retry storm triage",
+    createdAt: "2026-07-20T10:00:00Z",
+    updatedAt: "2026-07-21T10:00:00Z",
+    status: "active",
+    revision: 2,
+    workspaceId: NORTHSTAR.checkoutReliability,
+  },
+  {
+    id: NORTHSTAR.draftOffers,
+    personaId: "neve",
+    title: "Draft Holiday Offers",
+    createdAt: "2026-07-20T09:00:00Z",
+    updatedAt: "2026-07-21T09:00:00Z",
+    status: "active",
+    revision: 3,
+    workspaceId: NORTHSTAR.holidayLaunch,
+  },
+]
 
 const commerceWork: readonly WorkSummaryItem[] = [
   {
@@ -90,7 +153,8 @@ export const fixtureWorkSource: ScopedWorkSource = {
   summariesForScope(scopeId) {
     if (scopeId === NORTHSTAR.commerce) return commerceRollupWork
     if (scopeId === NORTHSTAR.holidayLaunch) return holidayWork
-    if (scopeId === NORTHSTAR.checkoutReliability) return commerceWork.slice(0, 2)
+    if (scopeId === NORTHSTAR.checkoutReliability)
+      return commerceWork.slice(0, 2)
     return []
   },
   commitmentsForSession(sessionId) {

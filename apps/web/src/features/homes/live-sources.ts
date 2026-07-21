@@ -1,13 +1,13 @@
 // Route-side data sources for the homes.
 //
-// Honesty rule: a live page never shows fixture records as if they were
-// real — with one sanctioned exception. Scoped work is the brief-approved
-// interim: it flows through the ScopedWorkSource seam backed by the typed
-// Northstar fixture until SC.5's durable board query replaces it behind the
-// same interface. Resources, artifacts, and attention have NO sanctioned
-// interim — routes render them empty until the integration lane lands a
-// real query, EXCEPT under the explicit, self-documenting `?fixtures=1`
-// review flag used by the browser:owner gate to exercise the rich states.
+// Honesty rule: a live page never shows fixture records as if they were real.
+// Scoped work comes from SC.5's permission-filtered server queries. Resources,
+// artifacts, and attention render empty until their real query lanes land.
+// The explicit `?fixtures=1` review flag is the only path that enables the
+// Northstar data needed to exercise the rich state matrix.
+
+import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
+import type { Story } from "@workspace/work-items-store/types"
 
 import {
   fixtureAgents,
@@ -21,6 +21,7 @@ import type {
   AttentionItem,
   ResourceRow,
   ScopedWorkSource,
+  WorkSummaryItem,
 } from "./types"
 
 export interface HomeRouteSources {
@@ -31,13 +32,54 @@ export interface HomeRouteSources {
   readonly attention: readonly AttentionItem[]
 }
 
+export interface LiveWorkInput {
+  readonly scopeId?: string
+  readonly scopeStories?: readonly Story[]
+  readonly sessionId?: string
+  readonly sessionStories?: readonly Story[]
+  readonly nav: ProjectWorkspaceNavSummary
+}
+
+export function liveWorkSource({
+  scopeId,
+  scopeStories = [],
+  sessionId,
+  sessionStories = [],
+  nav,
+}: LiveWorkInput): ScopedWorkSource {
+  const scopeNames = new Map([
+    ...nav.projects.map((scope) => [scope.id, scope.name] as const),
+    ...nav.workspaces.map((scope) => [scope.id, scope.name] as const),
+  ])
+  const summarize = (story: Story): WorkSummaryItem => {
+    const homeScopeName = story.homeScopeId
+      ? scopeNames.get(story.homeScopeId)
+      : undefined
+    return {
+      id: story.id,
+      title: story.title,
+      status: story.status,
+      ...(story.kind ? { kind: story.kind } : {}),
+      ...(homeScopeName ? { homeScopeName } : {}),
+      updatedAt: story.updatedAt,
+    }
+  }
+  return {
+    summariesForScope: (requestedScopeId) =>
+      requestedScopeId === scopeId ? scopeStories.map(summarize) : [],
+    commitmentsForSession: (requestedSessionId) =>
+      requestedSessionId === sessionId ? sessionStories.map(summarize) : [],
+  }
+}
+
 export function routeSources(
   fixtures: boolean,
   agents: readonly AgentRow[],
+  work: ScopedWorkSource,
 ): HomeRouteSources {
   if (!fixtures) {
     return {
-      work: fixtureWorkSource, // sanctioned interim — see header
+      work,
       agents,
       resources: [],
       artifacts: [],

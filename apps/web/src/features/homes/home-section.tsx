@@ -23,7 +23,7 @@ export interface HomeSectionProps {
   readonly title: string
   readonly count?: number
   readonly empty: string
-  readonly emptyAction?: string
+  readonly emptyAction?: { readonly label: string; readonly href: string }
   readonly children: ReactNode
   /** Compact density (mobile) — tighter rows, no descriptions. */
   readonly compact?: boolean
@@ -66,7 +66,10 @@ export function HomeSection({
     if (event.key === "ArrowDown" || event.key === "ArrowRight") {
       next = current < 0 ? 0 : (current + 1) % rows.length
     } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
-      next = current < 0 ? rows.length - 1 : (current - 1 + rows.length) % rows.length
+      next =
+        current < 0
+          ? rows.length - 1
+          : (current - 1 + rows.length) % rows.length
     } else if (event.key === "Home") {
       next = 0
     } else if (event.key === "End") {

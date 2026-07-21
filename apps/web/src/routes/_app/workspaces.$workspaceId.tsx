@@ -1,10 +1,9 @@
-// Route: /workspaces/$workspaceId?via=<projectId> — Workspace Home (SC.7).
-//
-// The `via` search param is the entered-via perspective: a shareable display
-// hint, never a trusted authorization path (spec §7). The adapter honors it
-// only when the workspace, the via project, AND the mount are all visible in
-// the permission-filtered nav summary; anything else falls back to the
-// canonical path with no hint a hidden scope exists.
+// Route: /workspaces/$workspaceId?via=<projectId>
+// Tree:
+//   apps/web/src/routes/__root.tsx                       — HTML shell, theme/query providers, shared agent session (no visible chrome)
+//   apps/web/src/routes/_app.tsx                         — one-rail product shell, breadcrumb via-path, theme picker
+//   apps/web/src/routes/_app/workspaces.$workspaceId.tsx — THIS FILE
+// Content: WorkspaceHome — permission-filtered initiative composition with validated via display
 
 import { createFileRoute } from "@tanstack/react-router"
 import { useMemo } from "react"
@@ -17,16 +16,20 @@ import {
   buildWorkspaceHome,
   type HomesAdapterInput,
 } from "@/features/homes/home-view-model"
-import { routeSources } from "@/features/homes/live-sources"
+import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
+import { liveWorkSource, routeSources } from "@/features/homes/live-sources"
 import { WorkspaceHome } from "@/features/homes/workspace-home"
 import type { HomeState, WorkspaceHomeView } from "@/features/homes/types"
+import { useScopeWork } from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/workspaces/$workspaceId")({
   validateSearch: (
     search: Record<string, unknown>,
   ): { via?: string; fixtures?: boolean } => ({
     ...(typeof search.via === "string" ? { via: search.via } : {}),
-    ...(search.fixtures === "1" || search.fixtures === true
+    ...(search.fixtures === "1" ||
+    search.fixtures === "true" ||
+    search.fixtures === true
       ? { fixtures: true }
       : {}),
   }),
@@ -40,9 +43,19 @@ function WorkspaceHomeRoute() {
   const threads = useAgentThreads()
   const roster = useAgentRoster()
   const compact = useMediaQuery("(max-width: 640px)")
+  const scopedWork = useScopeWork(workspaceId, "self", !fixtures)
 
   const state: HomeState<WorkspaceHomeView> = useMemo(() => {
-    if (!nav.data || !threads.data) return { kind: "loading" }
+    const homeNav = fixtures ? fixtureNav : nav.data
+    const homeThreads = fixtures ? fixtureThreads : threads.data
+    if (
+      !homeNav ||
+      !homeThreads ||
+      (!fixtures && !scopedWork.data && !scopedWork.isError)
+    ) {
+      return { kind: "loading" }
+    }
+    if (!fixtures && scopedWork.isError) return { kind: "not-found" }
     const sources = routeSources(
       Boolean(fixtures),
       (roster.data ?? []).map((persona) => ({
@@ -50,10 +63,15 @@ function WorkspaceHomeRoute() {
         name: persona.name,
         headline: persona.description,
       })),
+      liveWorkSource({
+        scopeId: workspaceId,
+        scopeStories: scopedWork.data?.items.map(({ story }) => story),
+        nav: homeNav,
+      }),
     )
     const input: HomesAdapterInput = {
-      nav: nav.data,
-      threads: threads.data,
+      nav: homeNav,
+      threads: homeThreads,
       work: sources.work,
       agents: sources.agents,
       resources: sources.resources,
@@ -61,7 +79,16 @@ function WorkspaceHomeRoute() {
     }
     const view = buildWorkspaceHome(input, workspaceId, via)
     return view ? { kind: "ready", view } : { kind: "not-found" }
-  }, [nav.data, threads.data, roster.data, workspaceId, via, fixtures])
+  }, [
+    nav.data,
+    threads.data,
+    roster.data,
+    scopedWork.data,
+    scopedWork.isError,
+    workspaceId,
+    via,
+    fixtures,
+  ])
 
   return <WorkspaceHome state={state} compact={compact} />
 }

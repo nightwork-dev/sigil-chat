@@ -5,6 +5,7 @@
 // surface says "not found" and reveals nothing. Both are quiet — no ids, no
 // names, no hints of the hidden scope's owner.
 
+import { Link } from "@tanstack/react-router"
 import { ArchiveIcon, LockIcon } from "lucide-react"
 
 import { Skeleton } from "@workspace/ui/components/skeleton"
@@ -50,12 +51,12 @@ export function HomeDenied({ discoverable }: { discoverable: boolean }) {
           <p className="text-xs text-muted-foreground">
             Ask someone who manages it to grant you access.
           </p>
-          <button
-            type="button"
+          <Link
+            to="/chat"
             className="mt-1 rounded-md border border-border px-3 py-1.5 text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Request access
-          </button>
+            Ask about access
+          </Link>
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
@@ -88,7 +89,7 @@ export function EmptySection({
 }: {
   testId?: string
   message: string
-  action?: string
+  action?: { readonly label: string; readonly href: string }
 }) {
   return (
     <div
@@ -97,12 +98,12 @@ export function EmptySection({
     >
       <p className="text-xs text-muted-foreground">{message}</p>
       {action ? (
-        <button
-          type="button"
+        <Link
+          to={action.href}
           className="mt-2 rounded-md border border-border px-3 py-1 text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {action}
-        </button>
+          {action.label}
+        </Link>
       ) : null}
     </div>
   )

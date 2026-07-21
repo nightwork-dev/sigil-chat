@@ -28,7 +28,11 @@ import {
   NORTHSTAR,
   restrictedMountRow,
 } from "./fixtures"
-import type { ProjectHomeView, SessionHomeView, WorkspaceHomeView } from "./types"
+import type {
+  ProjectHomeView,
+  SessionHomeView,
+  WorkspaceHomeView,
+} from "./types"
 
 beforeAll(() => {
   ;(
@@ -144,7 +148,9 @@ const sharedWorkspaceView: WorkspaceHomeView = {
 
 function workspaceList(el: HTMLElement): HTMLElement[] {
   return Array.from(
-    el.querySelectorAll<HTMLElement>("section[aria-label='Workspaces'] [data-home-row]"),
+    el.querySelectorAll<HTMLElement>(
+      "section[aria-label='Workspaces'] [data-home-row]",
+    ),
   )
 }
 
@@ -169,13 +175,14 @@ describe("load lifecycle", () => {
     expect(el.textContent).not.toContain("Commerce Platform")
   })
 
-  it("denied + discoverable states access plainly and offers Request access", async () => {
+  it("denied + discoverable states access plainly and offers a real help path", async () => {
     const el = await render(
       <WorkspaceHome state={{ kind: "denied", discoverable: true }} />,
     )
     expect(el.querySelector("[data-testid='home-denied']")).toBeTruthy()
     expect(el.textContent).toContain("You don't have access")
-    expect(el.textContent).toContain("Request access")
+    expect(el.textContent).toContain("Ask about access")
+    expect(el.querySelector("a")?.getAttribute("href")).toBe("/chat")
   })
 
   it("denied + not discoverable reveals nothing", async () => {
@@ -183,14 +190,16 @@ describe("load lifecycle", () => {
       <WorkspaceHome state={{ kind: "denied", discoverable: false }} />,
     )
     expect(el.querySelector("[data-testid='home-not-found']")).toBeTruthy()
-    expect(el.textContent).not.toContain("Request access")
+    expect(el.textContent).not.toContain("Ask about access")
     expect(el.textContent).not.toContain("Holiday Launch")
   })
 })
 
 describe("project home", () => {
   it("composes workspaces, sessions, agents, work, and attention", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     expect(el.textContent).toContain("Commerce Platform")
     expect(el.textContent).toContain("Checkout Reliability")
     expect(el.textContent).toContain("Retry storm triage")
@@ -200,23 +209,29 @@ describe("project home", () => {
   })
 
   it("labels a mounted workspace with its canonical owner, quietly", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     const chip = el.querySelector("[data-testid='mount-chip']")
     expect(chip?.textContent).toBe("Shared from Brand")
   })
 
   it("renders a restricted mount inert: no name, no link, not in the roving list", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     const restricted = el.querySelector("[data-testid='restricted-row']")
     expect(restricted).toBeTruthy()
     expect(restricted?.textContent).toContain("Restricted workspace")
     expect(restricted?.getAttribute("data-home-row")).toBeNull()
     expect(restricted?.closest("a")).toBeNull()
-    expect(el.textContent).toContain("Request access")
+    expect(el.textContent).toContain("Ask about access")
   })
 
   it("rollup work names its canonical home instead of pretending locality", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     expect(el.textContent).toContain("Home: Holiday Launch")
   })
 
@@ -225,13 +240,15 @@ describe("project home", () => {
       <ProjectHome state={{ kind: "ready", view: emptyProjectHome }} />,
     )
     expect(el.textContent).toContain("No workspaces here yet.")
-    expect(el.textContent).toContain("New workspace")
-    expect(el.textContent).toContain("Start a session")
+    expect(el.textContent).toContain("Ask for a workspace")
+    expect(el.textContent).toContain("Open chat")
     expect(el.textContent).toContain("No work is tracked here yet.")
   })
 
   it("labels cross-view attention with its noted-from scope", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     expect(el.textContent).toContain("noted from Holiday Launch")
   })
 })
@@ -252,14 +269,16 @@ describe("workspace home", () => {
     )
     expect(el.querySelector("[data-testid='archived-banner']")).toBeTruthy()
     expect(el.textContent).toContain("read-only")
-    expect(el.textContent).not.toContain("Start a session")
-    expect(el.textContent).not.toContain("New request")
+    expect(el.textContent).not.toContain("Open chat")
+    expect(el.textContent).not.toContain("Request a feature")
   })
 })
 
 describe("session home", () => {
   it("names its home workspace without claiming ownership", async () => {
-    const el = await render(<SessionHome state={{ kind: "ready", view: sessionView }} />)
+    const el = await render(
+      <SessionHome state={{ kind: "ready", view: sessionView }} />,
+    )
     expect(
       el.querySelector("[data-testid='session-home-workspace']")?.textContent,
     ).toBe("Session in Holiday Launch")
@@ -269,17 +288,24 @@ describe("session home", () => {
   })
 
   it("empty commitments say 'explicitly linked', not 'nothing exists'", async () => {
-    const empty: SessionHomeView = { ...sessionView, commitments: [], artifacts: [] }
-    const el = await render(<SessionHome state={{ kind: "ready", view: empty }} />)
+    const empty: SessionHomeView = {
+      ...sessionView,
+      commitments: [],
+      artifacts: [],
+    }
+    const el = await render(
+      <SessionHome state={{ kind: "ready", view: empty }} />,
+    )
     expect(el.textContent).toContain("No work is explicitly linked")
     expect(el.textContent).toContain("hasn't produced anything yet")
   })
 })
 
 describe("keyboard — roving tabindex", () => {
-
   it("exactly one row is tabbable; arrows move focus within the list", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     const rows = workspaceList(el)
     expect(rows.length).toBe(2) // restricted row is not a roving row
     expect(rows.map((r) => r.tabIndex)).toEqual([0, -1])
@@ -311,9 +337,10 @@ describe("keyboard — roving tabindex", () => {
   it("a leading restricted row still leaves exactly one tabbable row", async () => {
     const restrictedFirst: ProjectHomeView = {
       ...projectView,
-      workspaces: [restrictedMountRow, ...projectView.workspaces.filter(
-        (row) => !("restricted" in row),
-      )],
+      workspaces: [
+        restrictedMountRow,
+        ...projectView.workspaces.filter((row) => !("restricted" in row)),
+      ],
     }
     const el = await render(
       <ProjectHome state={{ kind: "ready", view: restrictedFirst }} />,
@@ -326,7 +353,9 @@ describe("keyboard — roving tabindex", () => {
 
 describe("via propagation — the path you arrived by survives the click", () => {
   it("a mounted workspace row links out with ?via=<project>", async () => {
-    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
     const rows = workspaceList(el)
     expect(rows[0].getAttribute("href")).toBe(
       "/workspaces/workspace:checkout-reliability",

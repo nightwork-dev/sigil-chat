@@ -148,6 +148,35 @@ export function createBoardTraversalResolver(
   };
 }
 
+/**
+ * A session binding selects commitment candidates; it does not authorize the
+ * work item's canonical home. The caller separately proves ownership of the
+ * session, then this filter re-authorizes every non-session home.
+ */
+export function visibleSessionCommitments(
+  stories: readonly Story[],
+  threadId: string,
+  principalId: string,
+  access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
+): Story[] {
+  const sessionScopeIds = new Set([threadId, `session:${threadId}`]);
+  return stories.filter((story) => {
+    const linked =
+      (story.homeScopeId !== undefined &&
+        sessionScopeIds.has(story.homeScopeId)) ||
+      story.scopeBindings?.some((binding) =>
+        sessionScopeIds.has(binding.scopeId),
+      );
+    if (!linked || !story.homeScopeId) return false;
+    if (sessionScopeIds.has(story.homeScopeId)) return true;
+    return access.canAccess({
+      principalId,
+      scopeId: story.homeScopeId,
+      action: "board.read",
+    });
+  });
+}
+
 /** A board is never evaluated if any saved root is outside the viewer grant. */
 export function canDiscoverBoardView(
   view: BoardView,

@@ -133,6 +133,7 @@ export function SidebarShell({
   accountMenu,
   workspaceSwitcher,
   breadcrumbContext,
+  breadcrumbPage,
   viewContent,
   statusRailStart,
   statusRailEnd,
@@ -151,6 +152,12 @@ export function SidebarShell({
    * the separators.
    */
   breadcrumbContext?: ReactNode
+  /**
+   * App-owned current-page crumb. Omit to use the active navigation label.
+   * Container-home routes use this to avoid presenting the nav fallback as
+   * their current surface.
+   */
+  breadcrumbPage?: ReactNode
   /**
    * View-owned content filling the top rail between the breadcrumb and the
    * header actions (e.g. the chat surface's status + session switcher). One
@@ -224,7 +231,12 @@ export function SidebarShell({
             <BreadcrumbList>
               {breadcrumbContext}
               <BreadcrumbItem>
-                <BreadcrumbPage className="text-xs">{active?.label ?? nav.brand?.label ?? "Home"}</BreadcrumbPage>
+                <BreadcrumbPage className="text-xs">
+                  {breadcrumbPage ??
+                    active?.label ??
+                    nav.brand?.label ??
+                    "Home"}
+                </BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

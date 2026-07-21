@@ -9,7 +9,7 @@
 // Selection goes through useActiveContainer — shared with the omnibar, so
 // chrome and keyboard paths can never disagree.
 
-import { Link, useRouterState } from "@tanstack/react-router"
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router"
 import { CheckIcon, ChevronDownIcon, FolderIcon } from "lucide-react"
 
 import {
@@ -24,7 +24,12 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 
 import { useActiveContainer } from "@/lib/active-container"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
+import { useAgentThread } from "@/lib/agent-threads"
+import {
+  useProjectWorkspaceNav,
+  type ProjectWorkspaceNavSummary,
+} from "@/lib/project-workspace-nav"
 
 const PRINCIPAL_LEVEL_PREFIXES = [
   "/agents",
@@ -33,83 +38,204 @@ const PRINCIPAL_LEVEL_PREFIXES = [
   "/demos",
 ]
 
+type HomeRoute =
+  | { kind: "project"; projectId: string }
+  | { kind: "workspace"; workspaceId: string }
+  | { kind: "session"; threadId: string }
+
+function decodedSegment(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+export function parseHomeRoute(pathname: string): HomeRoute | undefined {
+  const match = pathname.match(/^\/(projects|workspaces|sessions)\/([^/]+)\/?$/)
+  if (!match) return undefined
+  const id = decodedSegment(match[2])
+  if (match[1] === "projects") return { kind: "project", projectId: id }
+  if (match[1] === "workspaces") return { kind: "workspace", workspaceId: id }
+  return { kind: "session", threadId: id }
+}
+
+export function resolveHomeBreadcrumbSelection({
+  route,
+  nav,
+  viaProjectId,
+  sessionWorkspaceId,
+}: {
+  route: HomeRoute
+  nav: ProjectWorkspaceNavSummary
+  viaProjectId?: string
+  sessionWorkspaceId?: string
+}): { projectId?: string; workspaceId?: string } | undefined {
+  if (route.kind === "project") {
+    return nav.projects.some((project) => project.id === route.projectId)
+      ? { projectId: route.projectId }
+      : undefined
+  }
+
+  const workspaceId =
+    route.kind === "workspace" ? route.workspaceId : sessionWorkspaceId
+  const workspace = nav.workspaces.find((entry) => entry.id === workspaceId)
+  if (!workspace) return undefined
+
+  const visibleVia =
+    viaProjectId &&
+    nav.projects.some((project) => project.id === viaProjectId) &&
+    (workspace.projectId === viaProjectId ||
+      workspace.mountedProjectIds.includes(viaProjectId))
+      ? viaProjectId
+      : undefined
+
+  return {
+    projectId: visibleVia ?? workspace.projectId,
+    workspaceId: workspace.id,
+  }
+}
+
 export function ContainerBreadcrumb() {
   const container = useActiveContainer()
-  const nav = useProjectWorkspaceNav()
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const liveNav = useProjectWorkspaceNav()
+  const navigate = useNavigate()
+  const location = useRouterState({ select: (s) => s.location })
+  const homeRoute = parseHomeRoute(location.pathname)
+  const searchParams = new URLSearchParams(location.href.split("?", 2)[1] ?? "")
+  const fixtureValue = searchParams.get("fixtures")
+  const fixtureMode = fixtureValue === "1" || fixtureValue === "true"
+  const liveSession = useAgentThread(
+    homeRoute?.kind === "session" ? homeRoute.threadId : undefined,
+    homeRoute?.kind === "session" && !fixtureMode,
+  )
+  const nav = fixtureMode ? fixtureNav : liveNav.data
+  const sessionWorkspaceId =
+    homeRoute?.kind === "session"
+      ? fixtureMode
+        ? fixtureThreads.find((thread) => thread.id === homeRoute.threadId)
+            ?.workspaceId
+        : liveSession.data?.workspaceId
+      : undefined
+  const viaProjectId = searchParams.get("via") ?? undefined
+  const homeSelection =
+    homeRoute && nav
+      ? resolveHomeBreadcrumbSelection({
+          route: homeRoute,
+          nav,
+          viaProjectId,
+          sessionWorkspaceId,
+        })
+      : undefined
+  const projectId = homeRoute ? homeSelection?.projectId : container.projectId
+  const workspaceId = homeRoute
+    ? homeSelection?.workspaceId
+    : container.workspaceId
 
-  if (!container.isReady || !nav.data) return null
-  if (PRINCIPAL_LEVEL_PREFIXES.some((p) => pathname.startsWith(p))) return null
+  if ((!homeRoute && !container.isReady) || !nav) return null
+  if (PRINCIPAL_LEVEL_PREFIXES.some((p) => location.pathname.startsWith(p)))
+    return null
+  // A home route must never fall back to a different persisted container while
+  // its own permission-filtered record is loading or unavailable.
+  if (homeRoute && !homeSelection) return null
 
-  const ownedWorkspaces = nav.data.workspaces.filter(
-    (w) => w.projectId === container.projectId,
+  const ownedWorkspaces = nav.workspaces.filter(
+    (w) => w.projectId === projectId,
   )
   // Workspaces mounted into the current project: switchable here, labelled
   // as shared — entering one keeps this project as the via perspective.
-  const mountedWorkspaces = nav.data.workspaces.filter(
+  const mountedWorkspaces = nav.workspaces.filter(
     (w) =>
-      w.projectId !== container.projectId &&
-      w.mountedProjectIds.includes(container.projectId ?? ""),
+      w.projectId !== projectId &&
+      w.mountedProjectIds.includes(projectId ?? ""),
   )
-  const activeWorkspace = nav.data.workspaces.find(
-    (w) => w.id === container.workspaceId,
-  )
+  const activeWorkspace = nav.workspaces.find((w) => w.id === workspaceId)
   // The workspace home link carries the entered-via perspective only when
   // the current project is not the workspace's canonical home (or that home
   // is hidden — projectId absent). Canonical entries carry no via.
   const workspaceHomeHref =
-    container.workspaceId && container.projectId
-      ? activeWorkspace?.projectId === container.projectId
-        ? `/workspaces/${container.workspaceId}`
-        : `/workspaces/${container.workspaceId}?via=${encodeURIComponent(container.projectId)}`
+    workspaceId && projectId
+      ? activeWorkspace?.projectId === projectId
+        ? `/workspaces/${workspaceId}${fixtureMode ? "?fixtures=1" : ""}`
+        : `/workspaces/${workspaceId}?via=${encodeURIComponent(projectId)}${fixtureMode ? "&fixtures=1" : ""}`
       : undefined
+  const projectHomeHref = projectId
+    ? `/projects/${projectId}${fixtureMode ? "?fixtures=1" : ""}`
+    : undefined
+
+  const selectProject = (nextProjectId: string) => {
+    container.selectProject(nextProjectId)
+    if (homeRoute) {
+      void navigate({
+        to: "/projects/$projectId",
+        params: { projectId: nextProjectId },
+        search: fixtureMode ? { fixtures: true } : {},
+      })
+    }
+  }
+
+  const selectWorkspace = (nextWorkspaceId: string) => {
+    container.selectWorkspace(nextWorkspaceId)
+    if (!homeRoute) return
+    const nextWorkspace = nav.workspaces.find(
+      (workspace) => workspace.id === nextWorkspaceId,
+    )
+    const nextVia =
+      projectId && nextWorkspace?.projectId !== projectId
+        ? projectId
+        : undefined
+    void navigate({
+      to: "/workspaces/$workspaceId",
+      params: { workspaceId: nextWorkspaceId },
+      search: {
+        ...(nextVia ? { via: nextVia } : {}),
+        ...(fixtureMode ? { fixtures: true } : {}),
+      },
+    })
+  }
 
   return (
     <>
       <BreadcrumbItem>
         <ContainerMenu
-          icon={
-            nav.data.projects.find((p) => p.id === container.projectId)?.icon
+          icon={nav.projects.find((p) => p.id === projectId)?.icon}
+          label={
+            nav.projects.find((project) => project.id === projectId)?.name ??
+            "Personal"
           }
-          label={container.projectName ?? "Personal"}
-          href={
-            container.projectId
-              ? `/projects/${container.projectId}`
-              : undefined
-          }
-          items={nav.data.projects.map((project) => ({
+          href={projectHomeHref}
+          items={nav.projects.map((project) => ({
             id: project.id,
             label: project.name,
             icon: project.icon,
-            active:
-              project.id === container.projectId && !container.workspaceId,
-            onSelect: () => container.selectProject(project.id),
+            active: project.id === projectId && !workspaceId,
+            onSelect: () => selectProject(project.id),
           }))}
         />
       </BreadcrumbItem>
 
-      {container.workspaceId ? (
+      {workspaceId ? (
         <>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <ContainerMenu
               icon={activeWorkspace?.icon}
-              label={container.workspaceName ?? "Workspace"}
+              label={activeWorkspace?.name ?? "Workspace"}
               href={workspaceHomeHref}
               items={[
                 ...ownedWorkspaces.map((workspace) => ({
                   id: workspace.id,
                   label: workspace.name,
                   icon: workspace.icon,
-                  active: workspace.id === container.workspaceId,
-                  onSelect: () => container.selectWorkspace(workspace.id),
+                  active: workspace.id === workspaceId,
+                  onSelect: () => selectWorkspace(workspace.id),
                 })),
                 ...mountedWorkspaces.map((workspace) => ({
                   id: workspace.id,
                   label: `${workspace.name} · Shared`,
                   icon: workspace.icon,
-                  active: workspace.id === container.workspaceId,
-                  onSelect: () => container.selectWorkspace(workspace.id),
+                  active: workspace.id === workspaceId,
+                  onSelect: () => selectWorkspace(workspace.id),
                 })),
               ]}
             />
@@ -120,6 +246,17 @@ export function ContainerBreadcrumb() {
       <BreadcrumbSeparator />
     </>
   )
+}
+
+export function useContainerBreadcrumbPage(): string | undefined {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const route = parseHomeRoute(pathname)
+  if (route?.kind === "project") return "Project Home"
+  if (route?.kind === "workspace") return "Workspace Home"
+  if (route?.kind === "session") return "Session"
+  return undefined
 }
 
 /** Split control: the crumb LABEL navigates to the container's home (SC.7 —
@@ -170,7 +307,7 @@ export function ContainerMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {items.map((item) => (
-            <DropdownMenuItem key={item.id} onSelect={item.onSelect}>
+            <DropdownMenuItem key={item.id} onClick={item.onSelect}>
               {item.icon ? (
                 <span className="mr-1.5">{item.icon}</span>
               ) : (
