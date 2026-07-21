@@ -124,6 +124,20 @@ export function createSigilMcpHandler({
                   subject: delegated.principalId,
                   method: "custom:scope-delegation",
                 },
+                ...(delegated.actorSessionId
+                  ? {
+                      delegation: {
+                        actorKind: "agent" as const,
+                        actor: {
+                          issuer: "sigil-chat",
+                          subject: "sigil-chat-agent",
+                          method: "service-token" as const,
+                        },
+                        actorId: "agent:sigil-chat-agent",
+                        actorSessionId: delegated.actorSessionId,
+                      },
+                    }
+                  : {}),
                 roles: ["member"],
                 scopes: [formatScopeHeader(delegated.scope)!],
               }

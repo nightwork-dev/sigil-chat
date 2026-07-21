@@ -1,9 +1,13 @@
-import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
+import {
+  issueScopeDelegation,
+  readScopeDelegation,
+} from "@workspace/agent-contracts/scope-delegation.server"
 import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
 import { ProjectRegistry } from "./project-registry"
 import {
+  bindScopeDelegationToActorSession,
   createScopeGrantPolicy,
   requireAuthorizedResourceScope,
 } from "./scope-authorization"
@@ -32,6 +36,43 @@ function registries(): {
 }
 
 describe("Eve resource-scope authorization", () => {
+  it("binds a verified browser proof to Eve's trusted continuation session", () => {
+    const expiresAt = Math.floor(Date.now() / 1_000) + 60
+    const proof = issueScopeDelegation(
+      {
+        expiresAt,
+        scope: "workspace:workspace-1",
+        subject: "user-1",
+      },
+      SECRET,
+    )
+
+    const delegated = bindScopeDelegationToActorSession({
+      actorSessionId: "eve-session-1",
+      principalId: "user-1",
+      proof,
+      resourceScope: "workspace:workspace-1",
+      secret: SECRET,
+    })
+
+    expect(delegated).toBeTruthy()
+    expect(readScopeDelegation(delegated!, expiresAt - 1, SECRET)).toMatchObject({
+      actorSessionId: "eve-session-1",
+      expiresAt,
+      scope: "workspace:workspace-1",
+      subject: "user-1",
+    })
+    expect(
+      bindScopeDelegationToActorSession({
+        actorSessionId: "eve-session-1",
+        principalId: "user-2",
+        proof,
+        resourceScope: "workspace:workspace-1",
+        secret: SECRET,
+      }),
+    ).toBeUndefined()
+  })
+
   it("accepts an exact signed principal and scope binding", () => {
     expect(
       requireAuthorizedResourceScope({

@@ -87,7 +87,7 @@ export function registerFeatureRequestTools(
         },
         {
           actorPrincipalId: principal.id,
-          agentSessionId: resolveAgentSessionId(principal, host),
+          agentSessionId: resolveAgentSessionId(principal),
           currentScopeId: target.id,
           now: new Date().toISOString(),
         },
@@ -168,10 +168,10 @@ function requireHumanAuth(
   if (
     !auth?.principal ||
     auth.principal.kind !== "human" ||
-    !auth.principal.delegation
+    !auth.principal.delegation?.actorSessionId
   ) {
     throw new Error(
-      "Feature request proposals require a delegated authenticated human principal.",
+      "Feature request proposals require a delegated authenticated human principal with a trusted actor session.",
     );
   }
   return auth as AuthContext & {
@@ -234,15 +234,14 @@ function resolveTargetScope(
 
 function resolveAgentSessionId(
   principal: AuthenticatedPrincipal,
-  host: { resourceScope?: unknown; sessionScope?: unknown } | undefined,
-): string | undefined {
-  if (principal.delegation?.actorSessionId) {
-    return principal.delegation.actorSessionId;
+): string {
+  const actorSessionId = principal.delegation?.actorSessionId;
+  if (!actorSessionId) {
+    throw new Error(
+      "Feature request proposals require a trusted delegated actor session.",
+    );
   }
-  const resourceScope = parseScope(host?.resourceScope);
-  if (resourceScope?.tier === "session") return resourceScope.id;
-  const sessionScope = parseSessionScope(host?.sessionScope);
-  return sessionScope?.id;
+  return actorSessionId;
 }
 
 function parseSessionScope(value: unknown): ScopeTarget | undefined {

@@ -18,7 +18,10 @@ import {
   personaHost,
 } from "../lib/memory"
 import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
-import { requireAuthorizedResourceScope } from "../lib/scope-authorization"
+import {
+  bindScopeDelegationToActorSession,
+  requireAuthorizedResourceScope,
+} from "../lib/scope-authorization"
 import { createReadinessRoute } from "../lib/readiness"
 
 const authEnvironment = readSigilEveAuthEnvironment()
@@ -27,7 +30,7 @@ const requiredSkillIds = readCsvEnv("SIGIL_CONTEXT_REQUIRED_SKILLS")
 const pinnedResourceKeys = readCsvEnv("SIGIL_CONTEXT_PINNED_RESOURCE_KEYS")
 const contextCompiler = createDefaultSigilContextCompiler({ requiredSkillIds })
 const eveSessionOwnerStore = new MirkEveSessionOwnerStore()
-const onMessage = createSigilEveOnMessage({
+const compileMessage = createSigilEveOnMessage({
   compiler: contextCompiler,
   pinnedResourceKeys,
   // S3.2: the session's shared blackboard rides every turn.
@@ -43,6 +46,31 @@ const onMessage = createSigilEveOnMessage({
       query,
     ).message?.content,
 })
+const onMessage: typeof compileMessage = async (context, message) => {
+  const result = await compileMessage(context, message)
+  if (!result?.auth || !context.eve.sessionId) return result
+  const resourceScope = result.auth.attributes.sigilResourceScope
+  const scopeProof = result.auth.attributes.sigilScopeProof
+  const delegatedProof = bindScopeDelegationToActorSession({
+    actorSessionId: context.eve.sessionId,
+    principalId: result.auth.principalId,
+    proof: typeof scopeProof === "string" ? scopeProof : undefined,
+    resourceScope:
+      typeof resourceScope === "string" ? resourceScope : undefined,
+    secret: process.env.GONK_MCP_KEY,
+  })
+  if (!delegatedProof) return result
+  return {
+    ...result,
+    auth: {
+      ...result.auth,
+      attributes: {
+        ...result.auth.attributes,
+        sigilScopeProof: delegatedProof,
+      },
+    },
+  }
+}
 
 const channel = createOwnedEveChannel({
   auth: async (request) => {

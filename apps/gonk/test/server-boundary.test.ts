@@ -2,6 +2,7 @@ import type { KvStore } from "@gonk/store/types"
 import { afterEach, describe, expect, it } from "vitest"
 import { passthrough, ToolRegistry } from "@gonk/tool-registry"
 import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
+import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository"
 
 import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js"
 import { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
@@ -15,6 +16,8 @@ import {
   authenticateScopeDelegation,
   createContainerScopeAuthorizationPolicy,
 } from "../src/auth.js"
+import { sigilApprovalProvider } from "../src/registry/approval.js"
+import { registerFeatureRequestTools } from "../src/registry/feature-request.js"
 
 const token = "sigil-server-boundary-token"
 const handlers: ReturnType<typeof createSigilMcpHandler>[] = []
@@ -200,7 +203,8 @@ describe("production MCP handler boundary", () => {
         }),
       }),
     )
-    expect(await response.json()).toMatchObject({
+    const responseBody = await response.json()
+    expect(responseBody).toMatchObject({
       result: {
         structuredContent: {
           principal: {
@@ -211,6 +215,9 @@ describe("production MCP handler boundary", () => {
         },
       },
     })
+    expect(
+      responseBody.result.structuredContent.principal,
+    ).not.toHaveProperty("delegation")
 
     const user2Proof = issueScopeDelegation(
       {
@@ -261,6 +268,144 @@ describe("production MCP handler boundary", () => {
       }),
     )
     expect(revoked.status).toBe(401)
+  })
+
+  it("discovers and invokes feature intake with signed principal, session, and scope provenance", async () => {
+    const records = containers()
+    records.projects.upsert({
+      id: "project-home",
+      name: "Canonical home",
+      description: "The workspace's owner project.",
+      members: [{ principalId: "user-1", role: "member" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-1",
+    })
+    records.workspaces.upsert({
+      id: "workspace-feature-intake",
+      projectId: "project-home",
+      homeScopeId: "project-home",
+      name: "Feature intake",
+      description: "Workspace-scoped feature requests.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-1",
+    })
+    const repository = new MemoryWorkItemsRepository()
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    })
+    registerFeatureRequestTools(registry, repository)
+    const proof = issueScopeDelegation(
+      {
+        actorSessionId: "eve-session-42",
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "workspace:workspace-feature-intake",
+        subject: "user-1",
+      },
+      token,
+    )
+    const scopeHeaders = {
+      "x-sigil-scope": "workspace:workspace-feature-intake",
+      "x-sigil-scope-proof": proof,
+    }
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      containers: records,
+      port: 8808,
+      source: registry,
+    })
+    handlers.push(handler)
+
+    const initialized = await handler.handle(
+      initializeRequest("127.0.0.1:8808", scopeHeaders),
+    )
+    expect(initialized.status).toBe(200)
+    const mcpSessionId = initialized.headers.get("mcp-session-id")
+    expect(mcpSessionId).toBeTruthy()
+
+    const listed = await handler.handle(
+      mcpRequest(mcpSessionId!, scopeHeaders, 2, "tools/list", {}),
+    )
+    expect(await listed.json()).toMatchObject({
+      result: {
+        tools: [
+          expect.objectContaining({ name: "sigil-feature-request-propose" }),
+        ],
+      },
+    })
+
+    const invoked = await handler.handle(
+      mcpRequest(mcpSessionId!, scopeHeaders, 3, "tools/call", {
+        name: "sigil-feature-request-propose",
+        arguments: {
+          title: "Preserve feature provenance",
+          problem: "Feature intake can lose its trusted actor session.",
+          desiredOutcome: "Every proposal records verified actor provenance.",
+        },
+      }),
+    )
+    expect(await invoked.json()).toMatchObject({
+      result: {
+        structuredContent: {
+          outcome: "created",
+          workItem: {
+            homeScopeId: "workspace-feature-intake",
+            provenance: {
+              actorPrincipalId: "user-1",
+              agentSessionId: "eve-session-42",
+            },
+          },
+        },
+      },
+    })
+    const persisted = await repository.get()
+    expect(persisted.stories.find((story) => story.id === "FR.1")).toMatchObject({
+      homeScopeId: "workspace-feature-intake",
+      provenance: {
+        actorPrincipalId: "user-1",
+        agentSessionId: "eve-session-42",
+      },
+    })
+
+    const legacyProof = issueScopeDelegation(
+      {
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "workspace:workspace-feature-intake",
+        subject: "user-1",
+      },
+      token,
+    )
+    const legacyHeaders = {
+      "x-sigil-scope": "workspace:workspace-feature-intake",
+      "x-sigil-scope-proof": legacyProof,
+    }
+    const legacyInitialized = await handler.handle(
+      initializeRequest("127.0.0.1:8808", legacyHeaders),
+    )
+    expect(legacyInitialized.status).toBe(200)
+    const legacySessionId = legacyInitialized.headers.get("mcp-session-id")
+    expect(legacySessionId).toBeTruthy()
+    const legacyInvocation = await handler.handle(
+      mcpRequest(legacySessionId!, legacyHeaders, 4, "tools/call", {
+        name: "sigil-feature-request-propose",
+        arguments: {
+          title: "Untrusted legacy proposal",
+          problem: "This proof has no trusted Eve actor session.",
+          desiredOutcome: "The proposal fails closed.",
+        },
+      }),
+    )
+    expect(await legacyInvocation.json()).toMatchObject({
+      result: {
+        structuredContent: {
+          error: {
+            message: expect.stringContaining("trusted actor session"),
+          },
+        },
+      },
+    })
+    await expect(repository.get()).resolves.toMatchObject({ revision: 1 })
   })
 
   it("re-authorizes a signed session proof against its live thread owner", async () => {
@@ -341,4 +486,25 @@ function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
     },
     set: (key, value) => void values.set(key, value),
   }
+}
+
+function mcpRequest(
+  sessionId: string,
+  scopeHeaders: Record<string, string>,
+  id: number,
+  method: string,
+  params: unknown,
+): Request {
+  return new Request("http://127.0.0.1:8808/mcp", {
+    method: "POST",
+    headers: {
+      accept: "application/json, text/event-stream",
+      "content-type": "application/json",
+      host: "127.0.0.1:8808",
+      "mcp-session-id": sessionId,
+      ...createAgentMcpBearerHeaders(token),
+      ...scopeHeaders,
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+  })
 }

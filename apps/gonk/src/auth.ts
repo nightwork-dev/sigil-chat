@@ -81,7 +81,14 @@ export async function authenticateScopeDelegation(input: {
   proof: string | undefined
   scope: ResourceScope | undefined
   secret: string
-}): Promise<{ principalId: string; scope: ResourceScope } | undefined> {
+}): Promise<
+  | {
+      actorSessionId?: string
+      principalId: string
+      scope: ResourceScope
+    }
+  | undefined
+> {
   if (!input.scope || !input.proof) return undefined
   const delegation = readScopeDelegation(
     input.proof,
@@ -99,7 +106,13 @@ export async function authenticateScopeDelegation(input: {
   ) {
     return undefined
   }
-  return { principalId: delegation.subject, scope: input.scope }
+  return {
+    ...(delegation.actorSessionId
+      ? { actorSessionId: delegation.actorSessionId }
+      : {}),
+    principalId: delegation.subject,
+    scope: input.scope,
+  }
 }
 
 function parseSessionScope(scope: string): { id: string } | undefined {

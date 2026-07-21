@@ -164,6 +164,14 @@ describe("feature request proposal tool", () => {
     await expectRejectedWithoutMutation(
       setup({
         auth: allowedAuth({
+          principal: humanPrincipal({ actorSession: false }),
+        }),
+      }),
+      "trusted actor session",
+    );
+    await expectRejectedWithoutMutation(
+      setup({
+        auth: allowedAuth({
           authorize: allowRegistryThen(undefined as never),
         }),
       }),
@@ -260,7 +268,10 @@ function allowedAuth(options?: {
 }
 
 function humanPrincipal(
-  options: { delegated?: boolean } = { delegated: true },
+  options: { actorSession?: boolean; delegated?: boolean } = {
+    actorSession: true,
+    delegated: true,
+  },
 ): AuthenticatedPrincipal {
   return {
     id: "user-1",
@@ -281,7 +292,9 @@ function humanPrincipal(
               method: "service-token" as const,
             },
             actorId: "agent:eve",
-            actorSessionId: "delegated-thread",
+            ...(options.actorSession === false
+              ? {}
+              : { actorSessionId: "delegated-thread" }),
           },
         }),
     roles: ["member"],

@@ -7,6 +7,7 @@ export function issueScopeDelegation(
   secret: string,
 ): string {
   const payload: ScopeDelegationPayload = {
+    ...(input.actorSessionId ? { actorSessionId: input.actorSessionId } : {}),
     audience: "sigil-agent-scope",
     expiresAt: input.expiresAt,
     scope: input.scope,
@@ -60,6 +61,9 @@ export function readScopeDelegation(
       payload.subject.length > 0 &&
       typeof payload.scope === "string" &&
       payload.scope.length > 0 &&
+      (payload.actorSessionId === undefined ||
+        (typeof payload.actorSessionId === "string" &&
+          payload.actorSessionId.trim().length > 0)) &&
       typeof payload.expiresAt === "number" &&
       Number.isSafeInteger(payload.expiresAt) &&
       payload.expiresAt > now

@@ -73,4 +73,30 @@ describe("agent scope delegation", () => {
     expect(readScopeDelegation(proof, 200, SECRET)).toBeUndefined();
     expect(readScopeDelegation(`${proof}x`, 199, SECRET)).toBeUndefined();
   });
+
+  it("cryptographically binds an optional Eve actor session", () => {
+    const proof = issueScopeDelegation(
+      {
+        actorSessionId: "eve-session-1",
+        expiresAt: 200,
+        scope: "workspace:launch",
+        subject: "user-1",
+      },
+      SECRET,
+    );
+
+    expect(readScopeDelegation(proof, 199, SECRET)).toMatchObject({
+      actorSessionId: "eve-session-1",
+      scope: "workspace:launch",
+      subject: "user-1",
+    });
+
+    const [encoded, signature] = proof.split(".");
+    const payload = JSON.parse(
+      Buffer.from(encoded!, "base64url").toString("utf8"),
+    );
+    payload.actorSessionId = "eve-session-2";
+    const tampered = `${Buffer.from(JSON.stringify(payload)).toString("base64url")}.${signature}`;
+    expect(readScopeDelegation(tampered, 199, SECRET)).toBeUndefined();
+  });
 });
