@@ -4,7 +4,6 @@
   "globalPassThroughEnv": [
     "CODEX_MODEL",
     "EVE_ORIGIN",
-    "GONK_MCP_ALLOW_UNAUTHENTICATED",
     "GONK_MCP_KEY",
     "GONK_MCP_URL",
     "PAGES_BASE",

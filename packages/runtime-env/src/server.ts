@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   readRuntimeTopology,
+  parseHttpUrl,
   RuntimeEnvironmentError,
   type RuntimeEnvironment,
   type SigilRuntimeTopology,
@@ -30,6 +31,45 @@ export interface StorageRuntimeEnvironment {
 export interface IdentityRuntimeEnvironment {
   personaDir: string;
   memoryDir: string;
+}
+
+export interface DisabledEmbeddingRuntimeEnvironment {
+  enabled: false;
+}
+
+export interface EnabledEmbeddingRuntimeEnvironment {
+  enabled: true;
+  baseURL: string;
+  model: string;
+  dim: number | undefined;
+  apiKey: string | undefined;
+}
+
+export type EmbeddingRuntimeEnvironment =
+  | DisabledEmbeddingRuntimeEnvironment
+  | EnabledEmbeddingRuntimeEnvironment;
+
+export function readEmbeddingEnvironment(
+  env: RuntimeEnvironment,
+): EmbeddingRuntimeEnvironment {
+  const baseURL = env.SIGIL_EMBEDDING_BASE_URL?.trim();
+  const model = env.SIGIL_EMBEDDING_MODEL?.trim();
+
+  // The provider is optional as a group. A partial configuration must not
+  // accidentally turn on a client with an unusable endpoint or model.
+  if (!baseURL || !model) return { enabled: false };
+
+  return {
+    enabled: true,
+    baseURL: parseHttpUrl(
+      baseURL,
+      baseURL,
+      "SIGIL_EMBEDDING_BASE_URL",
+    ),
+    model,
+    dim: parseOptionalEmbeddingDimension(env.SIGIL_EMBEDDING_DIM),
+    apiKey: env.SIGIL_EMBEDDING_API_KEY?.trim() || undefined,
+  };
 }
 
 export function readAgentEnvironment(
@@ -155,6 +195,29 @@ export function parsePort(
     throw invalidPort(name);
   }
   return port;
+}
+
+function parseOptionalEmbeddingDimension(
+  value: string | undefined,
+): number | undefined {
+  const candidate = value?.trim();
+  if (!candidate) return undefined;
+  if (!/^\d+$/.test(candidate)) {
+    throw new RuntimeEnvironmentError(
+      "INVALID_EMBEDDING_DIM",
+      "SIGIL_EMBEDDING_DIM",
+      "must be a positive integer",
+    );
+  }
+  const dim = Number(candidate);
+  if (!Number.isSafeInteger(dim) || dim < 1) {
+    throw new RuntimeEnvironmentError(
+      "INVALID_EMBEDDING_DIM",
+      "SIGIL_EMBEDDING_DIM",
+      "must be a positive integer",
+    );
+  }
+  return dim;
 }
 
 function parseOptionalStoragePath(

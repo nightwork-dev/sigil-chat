@@ -32,7 +32,6 @@
     "paths": {
       "@/*": ["./src/*"],
       "@workspace/agent-contracts/*": ["../../packages/agent-contracts/src/*"],
-      "@workspace/canvas/*": ["../../packages/canvas/src/*"],
       "@workspace/chat/*": ["../../packages/chat/src/*"],
       "@workspace/data/*": ["../../packages/data/src/*"],
       "@workspace/review/*": ["../../packages/review/src/*"],
