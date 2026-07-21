@@ -15,6 +15,10 @@ import {
 import type { ContainerRegistries } from "./registry/containers.js"
 import type { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
 
+export interface SessionScopeOwnerLookup {
+  owns(sessionId: string, principalId: string): boolean
+}
+
 export const authorizeSigilMcpRequest: AgentMcpAuthorizationPolicy = () => {
   // Sigil currently exposes one trusted service principal: possession of
   // the bearer permits application-tool authorization, while operation
@@ -35,9 +39,14 @@ export function createContainerScopeAuthorizationPolicy(
     ContainerRegistries,
     "projects" | "workspaces"
   > & { grants?: Pick<ScopeGrantRegistry, "listActive"> },
+  sessionOwners?: SessionScopeOwnerLookup,
 ): ScopeAuthorizationPolicy {
   return {
     authorize(input: ScopeAuthorizationRequest): boolean {
+      const session = parseSessionScope(input.resourceScope)
+      if (session) {
+        return sessionOwners?.owns(session.id, input.principalId) === true
+      }
       if (hasScopeGrant(containers.grants?.listActive() ?? [], input)) {
         return true
       }
@@ -91,6 +100,12 @@ export async function authenticateScopeDelegation(input: {
     return undefined
   }
   return { principalId: delegation.subject, scope: input.scope }
+}
+
+function parseSessionScope(scope: string): { id: string } | undefined {
+  const prefix = "session:"
+  if (!scope.startsWith(prefix) || scope.length === prefix.length) return undefined
+  return { id: scope.slice(prefix.length) }
 }
 
 function parseContainerScope(

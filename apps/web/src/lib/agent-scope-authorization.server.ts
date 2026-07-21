@@ -3,7 +3,10 @@ import {
   createScopeGrantPolicy,
   type ScopeAuthorizationRegistries,
 } from "../../../agent/agent/lib/scope-authorization"
-import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
+import type {
+  ScopeAuthorizationAction,
+  ScopeAuthorizationPolicy,
+} from "@workspace/agent-contracts/scope-authorization"
 
 export function assertAuthorizedScope(
   scope: string,
@@ -11,6 +14,7 @@ export function assertAuthorizedScope(
   ownsThread: (userId: string, threadId: string) => boolean,
   registries?: ScopeAuthorizationRegistries,
   policy?: ScopeAuthorizationPolicy,
+  action: ScopeAuthorizationAction = "read",
 ): void {
   const match = /^(session|workspace|project|persona):([^\s:][^\s]*)$/.exec(
     scope,
@@ -34,7 +38,7 @@ export function assertAuthorizedScope(
         policy ?? createScopeGrantPolicy({ registries: resolvedRegistries })
       if (
         !authorization.authorize({
-          action: "tool",
+          action,
           principalId: userId,
           resourceScope: scope,
         })

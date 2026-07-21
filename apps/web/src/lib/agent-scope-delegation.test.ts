@@ -176,6 +176,63 @@ describe("agent scope authorization", () => {
     ).toThrow("NOT_AUTHORIZED")
   })
 
+  it("keeps read and tool grants at their respective web boundaries", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const workspaces = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    projects.upsert({
+      id: "project-home",
+      name: "Home project",
+      description: "Canonical workspace home.",
+      members: [{ principalId: "user-owner", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      name: "Shared workspace",
+      description: "Directly granted resource.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    const grants = new ScopeGrantRegistry({
+      scopes: new ProjectWorkspaceScopeRegistry(projects, workspaces),
+      store: memoryKv(new Map()),
+    })
+    const registries = { grants, projects, workspaces }
+    grants.create({
+      actions: ["tool"],
+      createdBy: "user-owner",
+      principalId: "user-tool-only",
+      resourceScope: "workspace:workspace-shared",
+    })
+    grants.create({
+      actions: ["read"],
+      createdBy: "user-owner",
+      principalId: "user-read-only",
+      resourceScope: "workspace:workspace-shared",
+    })
+    const assert = (principalId: string, action: "read" | "tool") =>
+      assertAuthorizedScope(
+        "workspace:workspace-shared",
+        principalId,
+        () => false,
+        registries,
+        undefined,
+        action,
+      )
+
+    expect(() => assert("user-tool-only", "tool")).not.toThrow()
+    expect(() => assert("user-tool-only", "read")).toThrow("NOT_AUTHORIZED")
+    expect(() => assert("user-read-only", "read")).not.toThrow()
+    expect(() => assert("user-read-only", "tool")).toThrow("NOT_AUTHORIZED")
+  })
+
   it("preserves the unregistered evidence-room scope and rejects other legacy scopes", () => {
     expect(() =>
       assertAuthorizedScope(

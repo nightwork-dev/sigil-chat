@@ -9,6 +9,7 @@ import {
   authenticateScopeDelegation,
   authorizeSigilMcpRequest,
   createContainerScopeAuthorizationPolicy,
+  type SessionScopeOwnerLookup,
 } from "./auth.js"
 import {
   createScopeAccessCheck,
@@ -24,6 +25,7 @@ import {
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
 import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries.js"
+import { MirkAgentThreadScopeOwnerRegistry } from "../../agent/agent/lib/agent-thread-scope-owners.js"
 import type { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
 import { createSigilRegistry } from "./registry.js"
 import type { ContainerRegistries } from "./registry/containers.js"
@@ -34,6 +36,7 @@ export function createSigilMcpHandler({
   portlessUrl = process.env.PORTLESS_URL,
   configuredAllowedHosts = process.env.GONK_ALLOWED_HOSTS,
   containers,
+  sessionOwners,
   scopeAuthorization,
   source,
 }: {
@@ -44,15 +47,25 @@ export function createSigilMcpHandler({
   containers?: ContainerRegistries & {
     grants?: Pick<ScopeGrantRegistry, "listActive">
   }
+  sessionOwners?: SessionScopeOwnerLookup
   scopeAuthorization?: ScopeAuthorizationPolicy
   /** Test/composition seam; production uses the complete Sigil registry. */
   source?: ToolRegistry
 }) {
   const resolvedContainers = containers ?? createSigilRegistryContainers()
+  const resolvedSessionOwners = sessionOwners ?? createSessionOwnerLookup()
   const authorization =
-    scopeAuthorization ?? createContainerScopeAuthorizationPolicy(resolvedContainers)
+    scopeAuthorization ??
+    createContainerScopeAuthorizationPolicy(
+      resolvedContainers,
+      resolvedSessionOwners,
+    )
   const artifacts = new SessionArtifactStore(getArtifactStore(), {
-    canAccessScope: createScopeAccessCheck(authorization),
+    // Artifact operations reached from MCP are part of an already-authorized
+    // tool invocation, not a browser read. Keep this distinct from the web
+    // read boundary so a read-only grant cannot call tools and a tool grant
+    // cannot be mistaken for a direct read grant.
+    canAccessScope: createScopeAccessCheck(authorization, "tool"),
   })
   return createAgentWebMcpHandler({
     source:
@@ -158,6 +171,18 @@ export function createSigilMcpHandler({
     enableJsonResponse: true,
     writeToolPolicy: "permissive",
   })
+}
+
+function createSessionOwnerLookup(): SessionScopeOwnerLookup {
+  let store: MirkAgentThreadScopeOwnerRegistry | undefined
+  return {
+    owns(sessionId, principalId) {
+      // Tests and container-only callers do not pay to open the Mirk backend;
+      // a session proof is the only path that needs the durable owner record.
+      store ??= new MirkAgentThreadScopeOwnerRegistry()
+      return store.owns(sessionId, principalId)
+    },
+  }
 }
 
 function createSigilRegistryContainers(): ContainerRegistries & {

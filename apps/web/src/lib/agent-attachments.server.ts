@@ -29,7 +29,14 @@ export async function uploadAgentAttachment(
   if (typeof scope !== "string" || scope.trim().length === 0) {
     throw new Error("Attachment upload requires a resource scope.")
   }
-  assertAuthorizedScope(scope, session.user.id, dependencies.ownsThread)
+  assertAuthorizedScope(
+    scope,
+    session.user.id,
+    dependencies.ownsThread,
+    undefined,
+    undefined,
+    "tool",
+  )
 
   const file = data.get("file")
   if (!(file instanceof File)) {

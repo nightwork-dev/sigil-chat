@@ -10,6 +10,7 @@ import { WorkspaceRegistry } from "../../agent/agent/lib/workspace-registry.js"
 import { createAgentMcpBearerHeaders } from "@zigil/agent-gonk"
 
 import { createSigilMcpHandler } from "../src/mcp-handler.js"
+import { MirkAgentThreadScopeOwnerRegistry } from "../../agent/agent/lib/agent-thread-scope-owners.js"
 import {
   authenticateScopeDelegation,
   createContainerScopeAuthorizationPolicy,
@@ -227,11 +228,97 @@ describe("production MCP handler boundary", () => {
     )
     expect(user2.status).toBe(401)
 
+    records.grants.create({
+      actions: ["read"],
+      createdBy: "user-owner",
+      principalId: "user-read-only",
+      resourceScope: "workspace:workspace-shared",
+    })
+    const readOnlyProof = issueScopeDelegation(
+      {
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "workspace:workspace-shared",
+        subject: "user-read-only",
+      },
+      token,
+    )
+    const readOnly = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "workspace:workspace-shared",
+        "x-sigil-scope-proof": readOnlyProof,
+      }),
+    )
+    // A signed proof is not a tool permission: a read-only grant cannot
+    // initialize an MCP tool session.
+    expect(readOnly.status).toBe(401)
+
     records.grants.revoke(grant.id, "user-owner")
     const revoked = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
         "x-sigil-scope": "workspace:workspace-shared",
         // Reuse the same still-valid user-1 proof: only the durable grant changed.
+        "x-sigil-scope-proof": proof,
+      }),
+    )
+    expect(revoked.status).toBe(401)
+  })
+
+  it("re-authorizes a signed session proof against its live thread owner", async () => {
+    const sessionRecords = new Map<string, unknown>([
+      [
+        "thread:thread-owned",
+        { id: "thread-owned", members: ["user-1"] },
+      ],
+    ])
+    const sessionOwners = new MirkAgentThreadScopeOwnerRegistry({
+      store: memoryKv(sessionRecords),
+    })
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      containers: containers(),
+      port: 8808,
+      sessionOwners,
+    })
+    handlers.push(handler)
+    const proof = issueScopeDelegation(
+      {
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "session:thread-owned",
+        subject: "user-1",
+      },
+      token,
+    )
+
+    const owner = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "session:thread-owned",
+        "x-sigil-scope-proof": proof,
+      }),
+    )
+    expect(owner.status).toBe(200)
+
+    const outsiderProof = issueScopeDelegation(
+      {
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "session:thread-owned",
+        subject: "user-2",
+      },
+      token,
+    )
+    const outsider = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "session:thread-owned",
+        "x-sigil-scope-proof": outsiderProof,
+      }),
+    )
+    expect(outsider.status).toBe(401)
+
+    sessionRecords.delete("thread:thread-owned")
+    const revoked = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "session:thread-owned",
+        // Reuse the same unexpired proof. Deleting the web-owned thread
+        // revokes the scope because Gonk reads membership on every request.
         "x-sigil-scope-proof": proof,
       }),
     )
