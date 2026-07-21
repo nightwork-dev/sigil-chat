@@ -8,10 +8,12 @@ import {
   SettingRevisionConflictError,
   SettingScopeNotAllowedError,
   getUserSettingRecord,
+  resolveSettingCandidates,
   resolveFromTiers,
   resolveUserSetting,
   setUserSetting,
 } from "./store"
+import type { SettingDefinition } from "./registry"
 
 const MIGRATION_SQL = readFileSync(
   resolve(import.meta.dirname, "../../../migrations/0002_user_settings.sql"),
@@ -208,5 +210,132 @@ describe("resolveFromTiers", () => {
       { kind: "channel", id: "ch-missing" },
     ])
     expect(none).toBeNull()
+  })
+})
+
+describe("resolveSettingCandidates", () => {
+  it("uses explicit semantic order and projects a permission-filtered receipt", () => {
+    const definition: SettingDefinition<Record<string, unknown>> = {
+      key: "agent.preference.example",
+      allowedScopes: ["user"],
+      allowedScopeKinds: ["installation", "organization", "personal"],
+      allowedContributingLinkKinds: ["contributes-defaults"],
+      mergeMode: "deep-merge",
+      allowsPersonalOverride: true,
+      affectsSecurity: false,
+      defaultValue: {},
+      isValid: (value): value is Record<string, unknown> =>
+        typeof value === "object" && value !== null && !Array.isArray(value),
+    }
+
+    const resolved = resolveSettingCandidates(definition, [
+      {
+        scopeId: "person-1",
+        scopeKind: "personal",
+        order: 2,
+        value: {
+          personal: "always",
+          nested: { personal: "always" },
+          arrayLeaf: ["personal"],
+        },
+        visibility: { kind: "discoverable" },
+      },
+      {
+        scopeId: "organization-hidden",
+        scopeKind: "installation",
+        order: 0,
+        value: {
+          mandatory: "ask",
+          nested: { installation: "ask", replaced: "installation" },
+          arrayLeaf: ["installation"],
+        },
+        visibility: {
+          kind: "hidden-mandatory-policy",
+          policyClass: "installation-policy",
+        },
+      },
+      {
+        scopeId: "org-1",
+        scopeKind: "organization",
+        order: 1,
+        value: {
+          organization: "ask",
+          nested: { organization: "ask", replaced: "organization" },
+          arrayLeaf: ["organization"],
+        },
+        linkKind: "contributes-defaults",
+        visibility: { kind: "discoverable" },
+      },
+    ])
+
+    expect(resolved.value).toEqual({
+      mandatory: "ask",
+      organization: "ask",
+      personal: "always",
+      nested: {
+        installation: "ask",
+        organization: "ask",
+        personal: "always",
+        replaced: "organization",
+      },
+      arrayLeaf: ["personal"],
+    })
+    expect(resolved.receipt).toEqual([
+      { kind: "mandatory-policy", policyClass: "installation-policy" },
+      { kind: "scope", scopeId: "org-1", scopeKind: "organization" },
+      { kind: "scope", scopeId: "person-1", scopeKind: "personal" },
+    ])
+    expect(JSON.stringify(resolved.receipt)).not.toContain(
+      "organization-hidden",
+    )
+    expect(JSON.stringify(resolved.receipt)).not.toContain('"mandatory":"ask"')
+  })
+
+  it("does not allow personal or linked input to widen a security setting", () => {
+    // This intentionally bypasses defineSetting to prove the resolver keeps
+    // the invariant when an untyped boundary constructs an unsafe definition.
+    const unsafeDefinition = {
+      key: "security.example",
+      allowedScopes: ["user"],
+      allowedScopeKinds: ["installation", "personal"],
+      allowedContributingLinkKinds: ["contributes-defaults"],
+      mergeMode: "replace",
+      allowsPersonalOverride: true,
+      affectsSecurity: true,
+      defaultValue: "locked",
+      isValid: (value: unknown): value is string => typeof value === "string",
+    } as unknown as SettingDefinition<string>
+
+    const resolved = resolveSettingCandidates(unsafeDefinition, [
+      {
+        scopeId: "installation-1",
+        scopeKind: "installation",
+        order: 0,
+        value: "locked",
+        visibility: { kind: "discoverable" },
+      },
+      {
+        scopeId: "workspace-1",
+        scopeKind: "installation",
+        order: 1,
+        value: "widened-through-link",
+        linkKind: "contributes-defaults",
+        visibility: { kind: "discoverable" },
+      },
+      {
+        scopeId: "person-1",
+        scopeKind: "personal",
+        order: 2,
+        value: "widened-personally",
+        visibility: { kind: "discoverable" },
+      },
+    ])
+
+    expect(resolved).toEqual({
+      value: "locked",
+      receipt: [
+        { kind: "scope", scopeId: "installation-1", scopeKind: "installation" },
+      ],
+    })
   })
 })

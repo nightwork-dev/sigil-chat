@@ -502,6 +502,144 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-feature-request-propose",
+    description:
+      "Propose a durable product feature request from the current trusted principal and scope. Use only for durable product changes, defects, or capability requests; it creates idea-stage feature requests and blocks likely duplicates.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["title", "problem", "desiredOutcome"],
+      properties: [
+        "title",
+        "problem",
+        "desiredOutcome",
+        "evidence",
+        "sourceRefs",
+        "intendedScopeId",
+        "proposedSponsorPrincipalId",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-spec-list",
+    description:
+      "List durable product specifications in the roadmap, optionally filtered by lifecycle status or linked story id.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: ["filter", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-spec-inspect",
+    description:
+      "Inspect one durable product specification by stable id, including its Markdown body and linked roadmap stories.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-spec-create",
+    description:
+      "Create a new durable product specification in draft status. This never updates an existing id; inspect or list first to avoid duplicates.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "title", "summary", "body"],
+      properties: [
+        "id",
+        "title",
+        "summary",
+        "body",
+        "storyIds",
+        "supersedes",
+        "expectedRevision",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-spec-revise",
+    description:
+      "Revise an existing durable specification without changing its lifecycle status. Inspect first and pass the current revision to avoid overwriting newer work.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: [
+        "id",
+        "title",
+        "summary",
+        "body",
+        "storyIds",
+        "supersedes",
+        "expectedRevision",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-spec-transition",
+    description:
+      "Change a durable specification's lifecycle status. Inspect it first and pass the current revision when available.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "status"],
+      properties: ["id", "status", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-project-list",
     description:
       "List the durable projects and their membership records. Inspect a project before replacing it.",
@@ -579,8 +717,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   },
   {
     name: "sigil-workspace-inspect",
-    description:
-      "Inspect one workspace and its containing project id.",
+    description: "Inspect one workspace and its containing project id.",
     visibility: "always",
     approval: "read",
     schema: {

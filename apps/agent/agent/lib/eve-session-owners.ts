@@ -1,31 +1,29 @@
 import { createScope } from "@gonk/scope"
 import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
 import type { KvStore } from "@gonk/store/types"
+import type {
+  AgentSessionExecutionBinding,
+  AgentSessionScopePerspective,
+} from "@workspace/agent-contracts/session-binding"
 
-const OWNER_NAMESPACE = "sigil-chat.eve-session-owners.v1"
+const OWNER_NAMESPACE = "sigil-chat.eve-session-owners.v3"
 
-interface EveSessionOwnerRecordV1 {
+interface EveSessionOwnerRecordV3 extends AgentSessionExecutionBinding {
   sessionId: string
   subject: string
-  version: 1
+  version: 3
 }
 
-interface EveSessionOwnerRecordV2 {
-  personaId: string
-  sessionId: string
-  subject: string
-  version: 2
-}
-
-type EveSessionOwnerRecord = EveSessionOwnerRecordV1 | EveSessionOwnerRecordV2
-
-export interface EveSessionBinding {
-  personaId?: string
+export interface EveSessionBinding extends AgentSessionExecutionBinding {
   subject: string
 }
 
 export interface EveSessionOwnerStore {
-  bind(sessionId: string, subject: string, personaId: string): Promise<void>
+  bind(
+    sessionId: string,
+    subject: string,
+    executionBinding: AgentSessionExecutionBinding,
+  ): Promise<void>
   getBinding(sessionId: string): Promise<EveSessionBinding | undefined>
   getOwner(sessionId: string): Promise<string | undefined>
 }
@@ -38,15 +36,17 @@ export interface MirkEveSessionOwnerStoreOptions {
 
 export class EveSessionOwnerConflictError extends Error {
   constructor(readonly sessionId: string) {
-    super(`Eve session ${sessionId} is already bound to another principal.`)
+    super(
+      `Eve session ${sessionId} is already bound to another execution context.`,
+    )
     this.name = "EveSessionOwnerConflictError"
   }
 }
 
 /**
- * Immutable Eve-session ownership records on Gonk's Mirk-backed project KV.
- * Eve remains execution authority; this app-owned record is the fail-closed
- * authorization fact checked before Eve can resolve a resumed session.
+ * Clean-install V3 store. Every Eve session is born with its complete immutable
+ * application-thread binding; incomplete legacy records are intentionally not
+ * read or promoted.
  */
 export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
   private readonly owners: KvStore<unknown>
@@ -57,12 +57,8 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
       this.owners = options.store
       return
     }
-
     const cwd = options.cwd ?? process.cwd()
-    const scope = createScope({
-      cwd,
-      projectRoot: options.projectRoot,
-    })
+    const scope = createScope({ cwd, projectRoot: options.projectRoot })
     const provider = createStoreProvider(scope, {
       backendFactory: mirkBackendFactory(scope),
     })
@@ -72,44 +68,21 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
   async bind(
     sessionId: string,
     subject: string,
-    personaId: string,
+    executionBinding: AgentSessionExecutionBinding,
   ): Promise<void> {
     assertIdentifier("session id", sessionId)
     assertIdentifier("subject", subject)
-    assertIdentifier("persona id", personaId)
+    assertExecutionBinding(executionBinding)
 
     await this.runExclusive(() => {
+      const requested = v3Record(sessionId, subject, executionBinding)
       const existing = this.readRecord(sessionId)
-      if (
-        existing?.subject === subject &&
-        (existing.version === 1 || existing.personaId === personaId)
-      ) {
-        if (existing.version === 1) {
-          this.owners.set(sessionId, {
-            personaId,
-            sessionId,
-            subject,
-            version: 2,
-          })
-        }
-        return
-      }
-      if (existing !== undefined) {
-        throw new EveSessionOwnerConflictError(sessionId)
-      }
-      this.owners.set(sessionId, {
-        personaId,
-        sessionId,
-        subject,
-        version: 2,
-      })
+      if (existing && recordsEqual(existing, requested)) return
+      if (existing) throw new EveSessionOwnerConflictError(sessionId)
 
+      this.owners.set(sessionId, requested)
       const persisted = this.readRecord(sessionId)
-      if (
-        persisted?.subject !== subject ||
-        persisted.version !== 2 ||
-        persisted.personaId !== personaId
-      ) {
+      if (!persisted || !recordsEqual(persisted, requested)) {
         throw new Error(
           `Eve session-owner binding did not persist for ${sessionId}.`,
         )
@@ -124,14 +97,10 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
   async getBinding(sessionId: string): Promise<EveSessionBinding | undefined> {
     assertIdentifier("session id", sessionId)
     const record = this.readRecord(sessionId)
-    if (!record) return undefined
-    return {
-      subject: record.subject,
-      ...(record.version === 2 ? { personaId: record.personaId } : {}),
-    }
+    return record ? bindingFromRecord(record) : undefined
   }
 
-  private readRecord(sessionId: string): EveSessionOwnerRecord | undefined {
+  private readRecord(sessionId: string): EveSessionOwnerRecordV3 | undefined {
     const value = this.owners.get(sessionId)
     if (value === undefined) return undefined
     if (!isOwnerRecord(value) || value.sessionId !== sessionId) {
@@ -155,15 +124,16 @@ export class MemoryEveSessionOwnerStore implements EveSessionOwnerStore {
   async bind(
     sessionId: string,
     subject: string,
-    personaId: string,
+    executionBinding: AgentSessionExecutionBinding,
   ): Promise<void> {
+    assertIdentifier("session id", sessionId)
+    assertIdentifier("subject", subject)
+    assertExecutionBinding(executionBinding)
+    const requested = { subject, ...structuredClone(executionBinding) }
     const existing = this.owners.get(sessionId)
-    if (existing?.subject === subject && existing.personaId === personaId)
-      return
-    if (existing !== undefined) {
-      throw new EveSessionOwnerConflictError(sessionId)
-    }
-    this.owners.set(sessionId, { personaId, subject })
+    if (existing && bindingsEqual(existing, requested)) return
+    if (existing) throw new EveSessionOwnerConflictError(sessionId)
+    this.owners.set(sessionId, requested)
   }
 
   async getOwner(sessionId: string): Promise<string | undefined> {
@@ -171,26 +141,118 @@ export class MemoryEveSessionOwnerStore implements EveSessionOwnerStore {
   }
 
   async getBinding(sessionId: string): Promise<EveSessionBinding | undefined> {
-    return this.owners.get(sessionId)
+    const binding = this.owners.get(sessionId)
+    return binding ? structuredClone(binding) : undefined
   }
 }
 
-function isOwnerRecord(value: unknown): value is EveSessionOwnerRecord {
+function bindingFromRecord(record: EveSessionOwnerRecordV3): EveSessionBinding {
+  return {
+    subject: record.subject,
+    applicationThreadId: record.applicationThreadId,
+    personaId: record.personaId,
+    homeScopeId: record.homeScopeId,
+    initialPerspective: structuredClone(record.initialPerspective),
+    additionalContextScopeIds: [...record.additionalContextScopeIds],
+  }
+}
+
+function v3Record(
+  sessionId: string,
+  subject: string,
+  binding: AgentSessionExecutionBinding,
+): EveSessionOwnerRecordV3 {
+  return { ...structuredClone(binding), sessionId, subject, version: 3 }
+}
+
+function recordsEqual(
+  left: EveSessionOwnerRecordV3,
+  right: EveSessionOwnerRecordV3,
+): boolean {
+  return (
+    left.sessionId === right.sessionId &&
+    left.version === right.version &&
+    bindingsEqual(bindingFromRecord(left), bindingFromRecord(right))
+  )
+}
+
+function bindingsEqual(
+  left: EveSessionBinding,
+  right: EveSessionBinding,
+): boolean {
+  return (
+    left.subject === right.subject &&
+    left.applicationThreadId === right.applicationThreadId &&
+    left.personaId === right.personaId &&
+    left.homeScopeId === right.homeScopeId &&
+    left.initialPerspective.focusScopeId ===
+      right.initialPerspective.focusScopeId &&
+    arraysEqual(
+      left.initialPerspective.viaScopeIds,
+      right.initialPerspective.viaScopeIds,
+    ) &&
+    arraysEqual(left.additionalContextScopeIds, right.additionalContextScopeIds)
+  )
+}
+
+function arraysEqual(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  )
+}
+
+function isOwnerRecord(value: unknown): value is EveSessionOwnerRecordV3 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false
   }
   const record = value as Record<string, unknown>
   return (
-    (record.version === 1 || record.version === 2) &&
-    typeof record.sessionId === "string" &&
-    record.sessionId.length > 0 &&
-    typeof record.subject === "string" &&
-    record.subject.length > 0 &&
-    (record.version === 1 ||
-      (typeof record.personaId === "string" && record.personaId.length > 0))
+    record.version === 3 &&
+    isIdentifier(record.sessionId) &&
+    isIdentifier(record.subject) &&
+    isExecutionBinding(record)
   )
 }
 
+function isExecutionBinding(
+  value: Record<string, unknown>,
+): value is Record<string, unknown> & AgentSessionExecutionBinding {
+  return (
+    isIdentifier(value.applicationThreadId) &&
+    isIdentifier(value.personaId) &&
+    isIdentifier(value.homeScopeId) &&
+    isPerspective(value.initialPerspective) &&
+    Array.isArray(value.additionalContextScopeIds) &&
+    value.additionalContextScopeIds.every(isIdentifier)
+  )
+}
+
+function isPerspective(value: unknown): value is AgentSessionScopePerspective {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const perspective = value as Record<string, unknown>
+  return (
+    isIdentifier(perspective.focusScopeId) &&
+    Array.isArray(perspective.viaScopeIds) &&
+    perspective.viaScopeIds.every(isIdentifier)
+  )
+}
+
+function assertExecutionBinding(binding: AgentSessionExecutionBinding): void {
+  if (!isExecutionBinding(binding as unknown as Record<string, unknown>)) {
+    throw new Error("Eve execution binding is invalid.")
+  }
+}
+
 function assertIdentifier(label: string, value: string): void {
-  if (!value.trim()) throw new Error(`Eve ${label} must be non-empty.`)
+  if (!isIdentifier(value)) throw new Error(`Eve ${label} must be non-empty.`)
+}
+
+function isIdentifier(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
 }

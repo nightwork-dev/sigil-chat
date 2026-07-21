@@ -6,8 +6,10 @@ import {
   type JWTVerifyGetKey,
 } from "jose"
 import type { HttpRouteDefinition } from "eve/channels"
+import { ForbiddenError } from "eve/channels/auth"
 import type { EveChannel } from "eve/channels/eve"
 import { beforeAll, describe, expect, it, vi } from "vitest"
+import { issueAgentSessionBinding } from "@workspace/agent-contracts/session-binding.server"
 
 import {
   createOwnedEveChannel,
@@ -17,6 +19,10 @@ import {
   type CreateOwnedEveChannelOptions,
 } from "./eve-auth"
 import { MemoryEveSessionOwnerStore } from "./eve-session-owners"
+import {
+  EveSessionBindingVerificationError,
+  requireVerifiedEveSessionBinding,
+} from "./eve-session-binding"
 
 const environment: SigilEveAuthEnvironment = {
   allowLocalDev: false,
@@ -26,6 +32,8 @@ const environment: SigilEveAuthEnvironment = {
   issuer: "https://chat.example.test",
   jwksUrl: "https://chat.example.test/api/auth/jwks",
 }
+const SESSION_BINDING_SECRET = "test-session-binding-secret"
+const SESSION_BINDING_NOW = 1_750_000_000
 
 let privateKey: CryptoKey
 let jwks: JWTVerifyGetKey
@@ -156,6 +164,29 @@ describe("owned Eve channel", () => {
     await expect(ownerStore.getOwner("session-1")).resolves.toBe("user-1")
   })
 
+  it("rejects session creation without an immutable execution binding", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    const channel = makeOwnedChannel(ownerStore)
+    const send = vi.fn()
+    const route = findRoute(channel, "POST", "/eve/v1/session")
+
+    const response = await route.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session",
+        "user-1",
+        { message: "Hello" },
+        undefined,
+        { omitBinding: true },
+      ),
+      routeArgs({ send }),
+    )
+
+    expect(response.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+    await expect(ownerStore.getOwner("session-1")).resolves.toBeUndefined()
+  })
+
   it("binds the selected persona and rejects persona switching on continuation", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
     const observedPersonas: string[] = []
@@ -181,6 +212,13 @@ describe("owned Eve channel", () => {
 
     expect(created.status).toBe(202)
     await expect(ownerStore.getBinding("session-1")).resolves.toEqual({
+      additionalContextScopeIds: [],
+      applicationThreadId: "thread-1",
+      homeScopeId: "workspace-a",
+      initialPerspective: {
+        focusScopeId: "workspace-a",
+        viaScopeIds: ["project-a"],
+      },
       personaId: "agent-b",
       subject: "user-1",
     })
@@ -208,10 +246,16 @@ describe("owned Eve channel", () => {
 
     const allowedSend = vi.fn(async () => ({ id: "session-1" }))
     const allowed = await continueRoute.handler(
-      requestFor("POST", "/eve/v1/session/session-1", "user-1", {
-        continuationToken: "eve:continuation-1",
-        message: "Continue",
-      }),
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-1",
+        "user-1",
+        {
+          continuationToken: "eve:continuation-1",
+          message: "Continue",
+        },
+        "agent-b",
+      ),
       routeArgs({ params: { sessionId: "session-1" }, send: allowedSend }),
     )
 
@@ -221,7 +265,7 @@ describe("owned Eve channel", () => {
 
   it("allows the owner to continue and rejects a different caller before dispatch", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("session-1", "user-1", "agent-a")
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
     const allowedSend = vi.fn(async () => ({ id: "session-1" }))
@@ -256,7 +300,7 @@ describe("owned Eve channel", () => {
 
   it("rejects cross-owner event-stream reads before resolving the session", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
-    await ownerStore.bind("session-1", "user-1", "agent-a")
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
     const channel = makeOwnedChannel(ownerStore)
     const route = findRoute(channel, "GET", "/eve/v1/session/:sessionId/stream")
     const getSession = vi.fn()
@@ -276,11 +320,57 @@ describe("owned Eve channel", () => {
     const send = vi.fn()
 
     const response = await route.handler(
-      requestFor("POST", "/eve/v1/session/legacy-session", "user-1", {
+      requestFor("POST", "/eve/v1/session/unbound-session", "user-1", {
         continuationToken: "eve:continuation-1",
         message: "Continue",
       }),
-      routeArgs({ params: { sessionId: "legacy-session" }, send }),
+      routeArgs({ params: { sessionId: "unbound-session" }, send }),
+    )
+
+    expect(response.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it("rejects a different application thread or home on continuation", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
+    const channel = makeOwnedChannel(ownerStore)
+    const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
+    const send = vi.fn()
+
+    const response = await route.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-1",
+        "user-1",
+        { continuationToken: "eve:continuation-1", message: "Continue" },
+        "agent-a",
+        { threadId: "thread-other" },
+      ),
+      routeArgs({ params: { sessionId: "session-1" }, send }),
+    )
+
+    expect(response.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it("requires the execution attestation after a session reaches V3", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
+    const channel = makeOwnedChannel(ownerStore)
+    const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
+    const send = vi.fn()
+
+    const response = await route.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-1",
+        "user-1",
+        { continuationToken: "eve:continuation-1", message: "Continue" },
+        "agent-a",
+        { omitBinding: true },
+      ),
+      routeArgs({ params: { sessionId: "session-1" }, send }),
     )
 
     expect(response.status).toBe(403)
@@ -296,6 +386,10 @@ describe("owned Eve channel", () => {
         return {
           attributes: {
             sigilResourceScope: request.headers.get("x-sigil-scope") ?? "",
+            sigilScopeProof: "browser-proof",
+            sigilExecutionBinding: JSON.stringify(
+              executionBindingFor("agent-a"),
+            ),
           },
           authenticator: "test",
           issuer: "test",
@@ -311,7 +405,10 @@ describe("owned Eve channel", () => {
         return {
           // A context compiler may return a narrowed projection. The channel
           // must still carry the authoritative request scope into this turn.
-          auth: { ...caller, attributes: {} },
+          auth: {
+            ...caller,
+            attributes: { sigilScopeProof: "eve-session-bound-proof" },
+          },
         }
       },
       ownerStore,
@@ -342,10 +439,81 @@ describe("owned Eve channel", () => {
         auth: expect.objectContaining({
           attributes: expect.objectContaining({
             sigilResourceScope: "project:evidence-room",
+            sigilScopeProof: "eve-session-bound-proof",
           }),
         }),
       }),
     )
+  })
+
+  it("enforces signed bindings across create, continuation, and stream routes", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    const channel = makeSignedOwnedChannel(ownerStore)
+    const createRoute = findRoute(channel, "POST", "/eve/v1/session")
+    const continuationRoute = findRoute(
+      channel,
+      "POST",
+      "/eve/v1/session/:sessionId",
+    )
+    const streamRoute = findRoute(
+      channel,
+      "GET",
+      "/eve/v1/session/:sessionId/stream",
+    )
+    const createProof = signedSessionBinding()
+
+    const created = await createRoute.handler(
+      signedRequest("POST", "/eve/v1/session", createProof, {
+        message: "Hello",
+      }),
+      routeArgs(),
+    )
+    expect(created.status).toBe(202)
+
+    const streamed = await streamRoute.handler(
+      signedRequest("GET", "/eve/v1/session/session-1/stream", createProof),
+      routeArgs({ params: { sessionId: "session-1" } }),
+    )
+    expect(streamed.status).toBe(200)
+
+    const continued = await continuationRoute.handler(
+      signedRequest(
+        "POST",
+        "/eve/v1/session/session-1",
+        signedSessionBinding({ eveSessionId: "session-1" }),
+        { continuationToken: "eve:continuation-1", message: "Continue" },
+      ),
+      routeArgs({ params: { sessionId: "session-1" } }),
+    )
+    expect(continued.status).toBe(200)
+  })
+
+  it("rejects cross-thread replay against an immutable V3 session", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
+    const channel = makeSignedOwnedChannel(ownerStore)
+    const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
+    const send = vi.fn()
+
+    const denied = await route.handler(
+      signedRequest(
+        "POST",
+        "/eve/v1/session/session-1",
+        signedSessionBinding({
+          applicationThreadId: "thread-other",
+          eveSessionId: "session-1",
+        }),
+        { continuationToken: "eve:continuation-1", message: "Continue" },
+      ),
+      routeArgs({ params: { sessionId: "session-1" }, send }),
+    )
+
+    expect(denied.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+    await expect(ownerStore.getBinding("session-1")).resolves.toEqual({
+      subject: "user-1",
+      ...executionBindingFor("agent-a"),
+    })
   })
 })
 
@@ -374,6 +542,96 @@ async function signToken(
     .sign(privateKey)
 }
 
+function makeSignedOwnedChannel(ownerStore: MemoryEveSessionOwnerStore) {
+  return createOwnedEveChannel({
+    auth: (request) => {
+      const subject = request.headers.get("x-test-subject")
+      if (!subject) return null
+      try {
+        const binding = requireVerifiedEveSessionBinding(
+          request,
+          subject,
+          SESSION_BINDING_SECRET,
+          SESSION_BINDING_NOW,
+        )
+        return {
+          attributes: binding
+            ? {
+                sigilExecutionBinding: JSON.stringify({
+                  additionalContextScopeIds: binding.additionalContextScopeIds,
+                  applicationThreadId: binding.applicationThreadId,
+                  homeScopeId: binding.homeScopeId,
+                  initialPerspective: binding.initialPerspective,
+                  personaId: binding.personaId,
+                }),
+                sigilRequestedPersonaId: binding.personaId,
+                ...(binding.eveSessionId
+                  ? { sigilAttestedEveSessionId: binding.eveSessionId }
+                  : {}),
+              }
+            : {},
+          authenticator: "signed-test",
+          issuer: "test",
+          principalId: subject,
+          principalType: "user",
+          subject,
+        }
+      } catch (error) {
+        if (!(error instanceof EveSessionBindingVerificationError)) throw error
+        throw new ForbiddenError({
+          code: "eve_session_binding_invalid",
+          message: error.message,
+        })
+      }
+    },
+    defaultPersonaId: "agent-a",
+    ownerStore,
+  })
+}
+
+function signedSessionBinding(
+  overrides: {
+    applicationThreadId?: string
+    eveSessionId?: string
+  } = {},
+) {
+  return issueAgentSessionBinding(
+    {
+      additionalContextScopeIds: [],
+      applicationThreadId: overrides.applicationThreadId ?? "thread-1",
+      ...(overrides.eveSessionId
+        ? { eveSessionId: overrides.eveSessionId }
+        : {}),
+      expiresAt: SESSION_BINDING_NOW + 60,
+      homeScopeId: "workspace-a",
+      initialPerspective: {
+        focusScopeId: "workspace-a",
+        viaScopeIds: ["project-a"],
+      },
+      personaId: "agent-a",
+      subject: "user-1",
+    },
+    SESSION_BINDING_SECRET,
+  )
+}
+
+function signedRequest(
+  method: "GET" | "POST",
+  path: string,
+  proof: string,
+  body?: unknown,
+) {
+  return new Request(`http://localhost${path}`, {
+    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: {
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      "x-sigil-session-binding": proof,
+      "x-test-subject": "user-1",
+    },
+    method,
+  })
+}
+
 function makeOwnedChannel(
   ownerStore: MemoryEveSessionOwnerStore,
   onMessage?: CreateOwnedEveChannelOptions["onMessage"],
@@ -383,10 +641,30 @@ function makeOwnedChannel(
       const subject = request.headers.get("x-test-subject")
       if (!subject) return null
       const requestedPersonaId = request.headers.get("x-sigil-persona-id")
+      const executionBinding = request.headers.get("x-test-omit-binding")
+        ? undefined
+        : executionBindingFor(
+            requestedPersonaId ?? "agent-a",
+            request.headers.get("x-test-thread-id") ?? "thread-1",
+          )
+      const routeSessionId = /^\/eve\/v1\/session\/([^/]+)/.exec(
+        new URL(request.url).pathname,
+      )?.[1]
+      const attestedEveSessionId = request.headers.get("x-test-eve-session-id")
       return {
         attributes: {
           ...(requestedPersonaId
             ? { sigilRequestedPersonaId: requestedPersonaId }
+            : {}),
+          ...(executionBinding
+            ? { sigilExecutionBinding: JSON.stringify(executionBinding) }
+            : {}),
+          ...(!request.headers.get("x-test-omit-eve-session-id") &&
+          (attestedEveSessionId || routeSessionId)
+            ? {
+                sigilAttestedEveSessionId:
+                  attestedEveSessionId ?? routeSessionId,
+              }
             : {}),
         },
         authenticator: "test",
@@ -419,16 +697,46 @@ function requestFor(
   subject: string,
   body?: unknown,
   personaId?: string,
+  binding?: {
+    eveSessionId?: string
+    omitBinding?: boolean
+    omitEveSessionId?: boolean
+    threadId?: string
+  },
 ) {
   return new Request(`http://localhost${path}`, {
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: {
       ...(body === undefined ? {} : { "content-type": "application/json" }),
       ...(personaId ? { "x-sigil-persona-id": personaId } : {}),
+      ...(binding?.omitBinding ? { "x-test-omit-binding": "1" } : {}),
+      ...(binding?.omitEveSessionId
+        ? { "x-test-omit-eve-session-id": "1" }
+        : {}),
+      ...(binding?.eveSessionId
+        ? { "x-test-eve-session-id": binding.eveSessionId }
+        : {}),
+      ...(binding?.threadId ? { "x-test-thread-id": binding.threadId } : {}),
       "x-test-subject": subject,
     },
     method,
   })
+}
+
+function executionBindingFor(
+  personaId: string,
+  applicationThreadId = "thread-1",
+) {
+  return {
+    applicationThreadId,
+    personaId,
+    homeScopeId: "workspace-a",
+    initialPerspective: {
+      focusScopeId: "workspace-a",
+      viaScopeIds: ["project-a"],
+    },
+    additionalContextScopeIds: [],
+  }
 }
 
 function routeArgs(

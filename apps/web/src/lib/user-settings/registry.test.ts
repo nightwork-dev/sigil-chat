@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  SETTINGS_REGISTRY,
+  defineSetting,
   getSettingDefinition,
   isKnownSettingKey,
   isScopeAllowed,
@@ -54,5 +56,41 @@ describe("SETTINGS_REGISTRY", () => {
       const definition = getSettingDefinition(key)
       expect(definition.isValid(definition.defaultValue)).toBe(true)
     }
+  })
+
+  it("makes scope-composition algebra explicit for every setting", () => {
+    for (const definition of Object.values(SETTINGS_REGISTRY)) {
+      expect(definition.allowedScopeKinds.length).toBeGreaterThan(0)
+      expect(definition.mergeMode).toBeDefined()
+      expect(typeof definition.allowsPersonalOverride).toBe("boolean")
+      expect(typeof definition.affectsSecurity).toBe("boolean")
+    }
+
+    const appearance = getSettingDefinition("appearance.mode")
+    expect(appearance.allowedContributingLinkKinds).toEqual([
+      "contributes-defaults",
+    ])
+    expect(appearance.allowsPersonalOverride).toBe(true)
+    expect(appearance.affectsSecurity).toBe(false)
+
+    const panelState = getSettingDefinition("workspace.panelState")
+    expect(panelState.allowedScopeKinds).toEqual(["workspace"])
+    expect(panelState.allowsPersonalOverride).toBe(false)
+  })
+
+  it("rejects a security definition that could widen through personal or linked input", () => {
+    expect(() =>
+      defineSetting({
+        key: "security.example",
+        allowedScopes: ["user"] as const,
+        allowedScopeKinds: ["installation", "personal"] as const,
+        allowedContributingLinkKinds: ["contributes-defaults"] as const,
+        mergeMode: "replace" as const,
+        allowsPersonalOverride: true,
+        affectsSecurity: true,
+        defaultValue: "locked",
+        isValid: (value: unknown): value is string => typeof value === "string",
+      }),
+    ).toThrow(/cannot permit personal or linked contributions/)
   })
 })

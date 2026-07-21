@@ -26,6 +26,9 @@ const issueAgentScopeProof = createServerFn({ method: "POST" })
       await import("./agent-scope-authorization.server")
     assertAuthorizedScope(scope, session.user.id, (userId, threadId) =>
       Boolean(agentThreadRepository.get(userId, threadId)),
+      undefined,
+      undefined,
+      "tool",
     )
     const secret = process.env.GONK_MCP_KEY?.trim()
     if (!secret) throw new Error("Agent scope delegation is unavailable.")

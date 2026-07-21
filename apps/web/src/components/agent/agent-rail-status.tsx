@@ -47,7 +47,7 @@ export function AgentRailStatus() {
         <span className="text-muted-foreground/70">no context</span>
       )}
       <ContextTray.Root attention={attention ?? null}>
-        <ContextTray.Trigger className="h-5 px-1.5 text-[10px]" />
+        <ContextTray.Trigger className="h-11 px-1.5 text-[10px] md:h-5" />
         <ContextTray.Content />
       </ContextTray.Root>
     </span>

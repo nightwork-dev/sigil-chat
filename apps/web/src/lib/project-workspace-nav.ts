@@ -14,7 +14,9 @@ export interface ProjectWorkspaceNavSummary {
   }>;
   workspaces: Array<{
     id: string;
-    projectId: string;
+    /** Present only when the canonical project is visible to this principal. */
+    projectId?: string;
+    mountedProjectIds: string[];
     name: string;
     description: string;
     icon?: string;
@@ -39,7 +41,13 @@ const loadProjectWorkspaceNavFn = createServerFn({ method: "GET" }).handler(
       })),
       workspaces: nav.workspaces.map((workspace) => ({
         id: workspace.id,
-        projectId: workspace.projectId,
+        ...(nav.projects.some(
+          (project) =>
+            project.id === (workspace.homeScopeId ?? workspace.projectId),
+        )
+          ? { projectId: workspace.homeScopeId ?? workspace.projectId }
+          : {}),
+        mountedProjectIds: workspace.mountedProjectIds,
         name: workspace.name,
         description: workspace.description,
         icon: workspace.icon,

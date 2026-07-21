@@ -19,7 +19,10 @@ import { fetchCurrentSession } from "@/lib/auth/route-guard"
 import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
-import { ContainerBreadcrumb } from "@/components/agent/container-breadcrumb"
+import {
+  ContainerBreadcrumb,
+  useContainerBreadcrumbPage,
+} from "@/components/agent/container-breadcrumb"
 import { AgentRailStatus } from "@/components/agent/agent-rail-status"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
@@ -47,6 +50,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user } = Route.useRouteContext()
+  const breadcrumbPage = useContainerBreadcrumbPage()
   const nav = buildAppNav({
     internalWorkspaces:
       import.meta.env.DEV ||
@@ -74,6 +78,7 @@ function AppLayout() {
                   </>
                 }
                 breadcrumbContext={<ContainerBreadcrumb />}
+                breadcrumbPage={breadcrumbPage}
                 viewContent={<ViewRailTop />}
                 statusRailStart={<ViewRailStatusStart />}
                 statusRailEnd={

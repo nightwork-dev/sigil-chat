@@ -3,6 +3,7 @@ import { AuthenticationRequiredError } from "./auth/session"
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import { blackboardStoreKey, type BlackboardScope } from "./blackboard-scope"
 import type { ScopeAuthorizationRegistries } from "../../../agent/agent/lib/scope-authorization"
+import type { ScopeAuthorizationAction } from "@workspace/agent-contracts/scope-authorization"
 import type {
   BlackboardDoc,
   BlackboardRepository,
@@ -67,6 +68,7 @@ export function requireBlackboardScopeAccess(
   scope: BlackboardScope,
   ownsThread: (userId: string, threadId: string) => boolean,
   registries?: ScopeAuthorizationRegistries,
+  action: ScopeAuthorizationAction = "read",
 ): SigilAuthSession {
   if (!session) throw new AuthenticationRequiredError()
   assertAuthorizedScope(
@@ -74,6 +76,8 @@ export function requireBlackboardScopeAccess(
     session.user.id,
     ownsThread,
     registries,
+    undefined,
+    action,
   )
   return session
 }
@@ -85,7 +89,7 @@ export async function readScopedBlackboard(
   blackboards: BlackboardRepository,
   registries?: ScopeAuthorizationRegistries,
 ): Promise<BlackboardDoc> {
-  requireBlackboardScopeAccess(session, scope, ownsThread, registries)
+  requireBlackboardScopeAccess(session, scope, ownsThread, registries, "read")
   return blackboards.read(blackboardStoreKey(scope))
 }
 
@@ -96,7 +100,13 @@ export async function writeScopedBlackboard(
   blackboards: BlackboardRepository,
   registries?: ScopeAuthorizationRegistries,
 ): Promise<BlackboardDoc> {
-  requireBlackboardScopeAccess(session, input.scope, ownsThread, registries)
+  requireBlackboardScopeAccess(
+    session,
+    input.scope,
+    ownsThread,
+    registries,
+    "tool",
+  )
   return blackboards.write(
     blackboardStoreKey(input.scope),
     input.content,

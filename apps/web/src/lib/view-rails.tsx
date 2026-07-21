@@ -73,7 +73,10 @@ const GLOBAL_CHORDS: readonly ViewChord[] = [
 export function ViewRailChords() {
   const chords = [...GLOBAL_CHORDS, ...(useViewRailDeclaration().chords ?? [])]
   return (
-    <span className="flex items-center gap-2.5" aria-label="Keyboard shortcuts">
+    <span
+      className="hidden items-center gap-2.5 md:flex"
+      aria-label="Keyboard shortcuts"
+    >
       {chords.map((chord) => (
         <span key={chord.keys} className="flex items-center gap-1">
           <kbd className="rounded border border-border bg-muted/60 px-1 font-mono text-[9px] leading-3 text-foreground">

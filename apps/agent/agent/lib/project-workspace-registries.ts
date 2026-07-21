@@ -1,6 +1,10 @@
 import { fileURLToPath } from "node:url"
 
 import { ProjectRegistry } from "./project-registry"
+import { ScopeLinkRegistry } from "./scope-link-registry"
+import { ScopeGrantRegistry } from "./scope-grant-registry"
+import { ProjectWorkspaceScopeRegistry } from "./scope-registry"
+import { PersonalScopeRegistry } from "./personal-scope"
 import { WorkspaceRegistry } from "./workspace-registry"
 
 const agentDirectory = fileURLToPath(new URL("..", import.meta.url))
@@ -9,6 +13,10 @@ const localStorageRoot = fileURLToPath(new URL("../../.data", import.meta.url))
 export interface ProjectWorkspaceRegistries {
   projects: ProjectRegistry
   workspaces: WorkspaceRegistry
+  personalScopes: PersonalScopeRegistry
+  scopes: ProjectWorkspaceScopeRegistry
+  links: ScopeLinkRegistry
+  grants: ScopeGrantRegistry
 }
 
 let registries: ProjectWorkspaceRegistries | undefined
@@ -27,12 +35,34 @@ export function getProjectWorkspaceRegistries(): ProjectWorkspaceRegistries {
     cwd: agentDirectory,
     projectRoot: storageRoot,
   })
-  registries = {
-    projects,
-    workspaces: new WorkspaceRegistry({
+  const workspaces = new WorkspaceRegistry({
       cwd: agentDirectory,
       projectRoot: storageRoot,
       projects,
+  })
+  const personalScopes = new PersonalScopeRegistry({
+    cwd: agentDirectory,
+    projectRoot: storageRoot,
+  })
+  const scopes = new ProjectWorkspaceScopeRegistry(
+    projects,
+    workspaces,
+    personalScopes,
+  )
+  registries = {
+    projects,
+    workspaces,
+    personalScopes,
+    scopes,
+    links: new ScopeLinkRegistry({
+      cwd: agentDirectory,
+      projectRoot: storageRoot,
+      scopes,
+    }),
+    grants: new ScopeGrantRegistry({
+      cwd: agentDirectory,
+      projectRoot: storageRoot,
+      scopes,
     }),
   }
   return registries

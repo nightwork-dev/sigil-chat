@@ -2,28 +2,61 @@ import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
 import { ProjectRegistry } from "../../../agent/agent/lib/project-registry"
+import { ScopeGrantRegistry } from "../../../agent/agent/lib/scope-grant-registry"
+import { ProjectWorkspaceScopeRegistry } from "../../../agent/agent/lib/scope-registry"
 import { WorkspaceRegistry } from "../../../agent/agent/lib/workspace-registry"
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 
 describe("agent scope authorization", () => {
+  const emptyRegistries = () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    return {
+      projects,
+      workspaces: new WorkspaceRegistry({
+        projects,
+        store: memoryKv(new Map()),
+      }),
+    }
+  }
+
   it("requires a session scope to belong to the authenticated user", () => {
     const ownsThread = (userId: string, threadId: string) =>
       userId === "user-1" && threadId === "thread-1"
 
     expect(() =>
-      assertAuthorizedScope("session:thread-1", "user-1", ownsThread),
+      assertAuthorizedScope(
+        "session:thread-1",
+        "user-1",
+        ownsThread,
+        emptyRegistries(),
+      ),
     ).not.toThrow()
     expect(() =>
-      assertAuthorizedScope("session:thread-1", "user-2", ownsThread),
+      assertAuthorizedScope(
+        "session:thread-1",
+        "user-2",
+        ownsThread,
+        emptyRegistries(),
+      ),
     ).toThrow("not found")
   })
 
   it("rejects malformed scope strings", () => {
     expect(() =>
-      assertAuthorizedScope("session:", "user-1", () => true),
+      assertAuthorizedScope(
+        "session:",
+        "user-1",
+        () => true,
+        emptyRegistries(),
+      ),
     ).toThrow("invalid")
     expect(() =>
-      assertAuthorizedScope("global:anything", "user-1", () => true),
+      assertAuthorizedScope(
+        "global:anything",
+        "user-1",
+        () => true,
+        emptyRegistries(),
+      ),
     ).toThrow("invalid")
   })
 
@@ -79,15 +112,151 @@ describe("agent scope authorization", () => {
     ).toThrow("NOT_AUTHORIZED")
   })
 
-  it("preserves the unregistered evidence-room scope and rejects other legacy scopes", () => {
+  it("can issue a workspace proof from an explicit resource grant without granting its home project", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const workspaces = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    projects.upsert({
+      id: "project-home",
+      name: "Home project",
+      description: "Canonical workspace home.",
+      members: [{ principalId: "user-owner", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      name: "Shared workspace",
+      description: "Directly granted resource.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    const grants = new ScopeGrantRegistry({
+      scopes: new ProjectWorkspaceScopeRegistry(projects, workspaces),
+      store: memoryKv(new Map()),
+    })
+    const grant = grants.create({
+      actions: ["read", "tool"],
+      createdBy: "user-owner",
+      principalId: "user-grantee",
+      resourceScope: "workspace:workspace-shared",
+    })
+    const registries = { grants, projects, workspaces }
+
     expect(() =>
-      assertAuthorizedScope("project:evidence-room", "user-1", () => false),
+      assertAuthorizedScope(
+        "workspace:workspace-shared",
+        "user-grantee",
+        () => false,
+        registries,
+      ),
     ).not.toThrow()
     expect(() =>
-      assertAuthorizedScope("project:other", "user-1", () => false),
+      assertAuthorizedScope(
+        "project:project-home",
+        "user-grantee",
+        () => false,
+        registries,
+      ),
+    ).toThrow("NOT_AUTHORIZED")
+
+    grants.revoke(grant.id, "user-owner")
+    expect(() =>
+      assertAuthorizedScope(
+        "workspace:workspace-shared",
+        "user-grantee",
+        () => false,
+        registries,
+      ),
+    ).toThrow("NOT_AUTHORIZED")
+  })
+
+  it("keeps read and tool grants at their respective web boundaries", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const workspaces = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    projects.upsert({
+      id: "project-home",
+      name: "Home project",
+      description: "Canonical workspace home.",
+      members: [{ principalId: "user-owner", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      name: "Shared workspace",
+      description: "Directly granted resource.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    const grants = new ScopeGrantRegistry({
+      scopes: new ProjectWorkspaceScopeRegistry(projects, workspaces),
+      store: memoryKv(new Map()),
+    })
+    const registries = { grants, projects, workspaces }
+    grants.create({
+      actions: ["tool"],
+      createdBy: "user-owner",
+      principalId: "user-tool-only",
+      resourceScope: "workspace:workspace-shared",
+    })
+    grants.create({
+      actions: ["read"],
+      createdBy: "user-owner",
+      principalId: "user-read-only",
+      resourceScope: "workspace:workspace-shared",
+    })
+    const assert = (principalId: string, action: "read" | "tool") =>
+      assertAuthorizedScope(
+        "workspace:workspace-shared",
+        principalId,
+        () => false,
+        registries,
+        undefined,
+        action,
+      )
+
+    expect(() => assert("user-tool-only", "tool")).not.toThrow()
+    expect(() => assert("user-tool-only", "read")).toThrow("NOT_AUTHORIZED")
+    expect(() => assert("user-read-only", "read")).not.toThrow()
+    expect(() => assert("user-read-only", "tool")).toThrow("NOT_AUTHORIZED")
+  })
+
+  it("preserves the unregistered evidence-room scope and rejects other legacy scopes", () => {
+    expect(() =>
+      assertAuthorizedScope(
+        "project:evidence-room",
+        "user-1",
+        () => false,
+        emptyRegistries(),
+      ),
+    ).not.toThrow()
+    expect(() =>
+      assertAuthorizedScope(
+        "project:other",
+        "user-1",
+        () => false,
+        emptyRegistries(),
+      ),
     ).toThrow("not available")
     expect(() =>
-      assertAuthorizedScope("persona:any", "user-1", () => false),
+      assertAuthorizedScope(
+        "persona:any",
+        "user-1",
+        () => false,
+        emptyRegistries(),
+      ),
     ).toThrow("not available")
   })
 })

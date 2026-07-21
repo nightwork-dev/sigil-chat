@@ -18,6 +18,7 @@ import {
   type EveMessageContext,
   type EveMessageResult,
 } from "eve/channels/eve"
+import type { AgentSessionExecutionBinding } from "@workspace/agent-contracts/session-binding"
 
 import type { EveSessionOwnerStore } from "./eve-session-owners"
 
@@ -140,28 +141,64 @@ export function createOwnedEveChannel(
 
       const subject = principalSubject(caller)
       const sessionId = sessionIdFromRequest(request)
-      let personaId = requestedPersonaId(caller) ?? defaultPersonaId
+      const requestedExecutionBinding = executionBindingFromCaller(caller)
+      const requested = requestedPersonaId(caller)
+      if (
+        new URL(request.url).pathname === EVE_CREATE_PATH &&
+        !requestedExecutionBinding
+      ) {
+        throw new ForbiddenError({
+          code: "eve_session_binding_required",
+          message: "Session creation requires an immutable execution binding.",
+        })
+      }
+      let personaId =
+        requestedExecutionBinding?.personaId ?? requested ?? defaultPersonaId
+      if (
+        requested !== undefined &&
+        requestedExecutionBinding !== undefined &&
+        requested !== requestedExecutionBinding.personaId
+      ) {
+        throw new ForbiddenError({
+          code: "eve_session_persona_mismatch",
+          message: "The requested persona does not match the session binding.",
+        })
+      }
       if (sessionId !== undefined) {
         const binding = await ownerStore.getBinding(sessionId)
-        if (binding?.subject !== subject) {
+        if (!binding || binding.subject !== subject) {
           throw new ForbiddenError({
             code: "eve_session_owner_mismatch",
             message: "The authenticated principal does not own this session.",
           })
         }
-        if (binding.personaId === undefined) {
-          // Compatibility migration for sessions created before persona
-          // binding existed. The old runtime could only inhabit its configured
-          // default; lock that fact now so a later default change cannot
-          // silently reinterpret the session.
-          await ownerStore.bind(sessionId, subject, defaultPersonaId)
+        if (!requestedExecutionBinding) {
+          throw new ForbiddenError({
+            code: "eve_session_binding_required",
+            message: "This session requires its immutable execution binding.",
+          })
         }
-        personaId = binding.personaId ?? defaultPersonaId
-        const requested = requestedPersonaId(caller)
+        personaId = binding.personaId
         if (requested !== undefined && requested !== personaId) {
           throw new ForbiddenError({
             code: "eve_session_persona_mismatch",
             message: "The requested persona does not own this session.",
+          })
+        }
+        if (requestedExecutionBinding.personaId !== personaId) {
+          throw new ForbiddenError({
+            code: "eve_session_execution_mismatch",
+            message:
+              "The requested execution binding does not own this session.",
+          })
+        }
+        try {
+          await ownerStore.bind(sessionId, subject, requestedExecutionBinding)
+        } catch {
+          throw new ForbiddenError({
+            code: "eve_session_execution_mismatch",
+            message:
+              "The requested execution binding does not own this session.",
           })
         }
       }
@@ -207,7 +244,15 @@ function preserveTurnResourceScope(
 
   const resourceScope = caller.attributes.sigilResourceScope
   const sessionScope = caller.attributes.sigilSessionScope
-  if (typeof resourceScope !== "string" && typeof sessionScope !== "string") {
+  const resultScopeProof = result.auth.attributes.sigilScopeProof
+  const callerScopeProof = caller.attributes.sigilScopeProof
+  const scopeProof =
+    typeof resultScopeProof === "string" ? resultScopeProof : callerScopeProof
+  if (
+    typeof resourceScope !== "string" &&
+    typeof sessionScope !== "string" &&
+    typeof scopeProof !== "string"
+  ) {
     return result
   }
 
@@ -222,6 +267,9 @@ function preserveTurnResourceScope(
           : {}),
         ...(typeof sessionScope === "string"
           ? { sigilSessionScope: sessionScope }
+          : {}),
+        ...(typeof scopeProof === "string"
+          ? { sigilScopeProof: scopeProof }
           : {}),
       },
     },
@@ -252,7 +300,7 @@ function wrapHttpRoute(
                   await ownerStore.bind(
                     session.id,
                     principalSubject(caller),
-                    requiredPersonaId(caller),
+                    requiredExecutionBinding(caller),
                   )
                   return session
                 },
@@ -313,12 +361,56 @@ function requestedPersonaId(caller: SessionAuthContext): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined
 }
 
-function requiredPersonaId(caller: SessionAuthContext): string {
-  const value = caller.attributes.sigilPersonaId
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error("Eve session creation requires a bound persona.")
+function requiredExecutionBinding(
+  caller: SessionAuthContext,
+): AgentSessionExecutionBinding {
+  const binding = executionBindingFromCaller(caller)
+  if (!binding) {
+    throw new Error("Eve session creation requires an execution binding.")
   }
-  return value.trim()
+  return binding
+}
+
+function executionBindingFromCaller(
+  caller: SessionAuthContext,
+): AgentSessionExecutionBinding | undefined {
+  const raw = caller.attributes.sigilExecutionBinding
+  if (typeof raw !== "string" || !raw.trim()) return undefined
+  try {
+    const value = JSON.parse(raw) as unknown
+    return isExecutionBinding(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function isExecutionBinding(
+  value: unknown,
+): value is AgentSessionExecutionBinding {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const binding = value as Record<string, unknown>
+  const perspective = binding.initialPerspective
+  return (
+    isNonEmptyString(binding.applicationThreadId) &&
+    isNonEmptyString(binding.personaId) &&
+    isNonEmptyString(binding.homeScopeId) &&
+    typeof perspective === "object" &&
+    perspective !== null &&
+    !Array.isArray(perspective) &&
+    isNonEmptyString((perspective as Record<string, unknown>).focusScopeId) &&
+    isStringList((perspective as Record<string, unknown>).viaScopeIds) &&
+    isStringList(binding.additionalContextScopeIds)
+  )
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isNonEmptyString)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
 }
 
 function withPersona(
