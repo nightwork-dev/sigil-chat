@@ -7,6 +7,7 @@ import {
   requireBoardViewMutationAccess,
   requireSponsorshipDecisionAccess,
   requireWorkItemsMutationAccess,
+  scopeHomeAccessSignal,
   visibleSessionCommitments,
   type WorkItemsScopeAccess,
 } from "./work-items-access.server";
@@ -180,6 +181,25 @@ describe("work-item mutation access", () => {
         privateView,
       ),
     ).toThrow("Owner access required");
+  });
+});
+
+describe("scope-home access projection", () => {
+  const access = (actions: readonly string[]): WorkItemsScopeAccess => ({
+    canAccess: ({ action }) => actions.includes(action),
+    canonicalDescendants: () => [],
+    rollupSubjects: () => [],
+  });
+
+  it("separates readable, discover-only, and undiscoverable scopes", () => {
+    expect(scopeHomeAccessSignal("user-1", "project-a", access(["board.read"])))
+      .toBe("readable");
+    expect(
+      scopeHomeAccessSignal("user-1", "project-a", access(["board.discover"])),
+    ).toBe("denied");
+    expect(scopeHomeAccessSignal("user-1", "project-a", access([]))).toBe(
+      "not-found",
+    );
   });
 });
 

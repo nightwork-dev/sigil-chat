@@ -12,6 +12,7 @@
 import {
   FlaskConicalIcon,
   GalleryVerticalEndIcon,
+  HouseIcon,
   MapIcon,
   MessageSquareIcon,
   SettingsIcon,
@@ -31,6 +32,7 @@ export function buildAppNav(options: {
       // Evidence, and Artifacts are demo workspaces — reachable from /demos,
       // their tool definitions earmarked for generalization — not
       // front-and-center nav.
+      { to: "/home", label: "Home", icon: HouseIcon },
       { to: "/chat", label: "Chat", icon: MessageSquareIcon },
       // Agent management — ONE entry into the management session (Agents |
       // Skills | Capabilities share a tab header in the top rail; principal-

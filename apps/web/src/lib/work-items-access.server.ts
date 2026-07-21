@@ -31,6 +31,36 @@ export interface WorkItemsScopeAuthorizationRequest {
   action: WorkItemsScopeAction;
 }
 
+export type ScopeHomeAccessSignal = "readable" | "denied" | "not-found";
+
+/**
+ * Route projection signal: a discover-only grant may name a scope without
+ * granting its contents. Unknown and undiscoverable scopes deliberately
+ * collapse to the same result.
+ */
+export function scopeHomeAccessSignal(
+  principalId: string,
+  scopeId: string,
+  access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
+): ScopeHomeAccessSignal {
+  if (
+    access.canAccess({
+      principalId,
+      scopeId,
+      action: "board.read",
+    })
+  ) {
+    return "readable";
+  }
+  return access.canAccess({
+    principalId,
+    scopeId,
+    action: "board.discover",
+  })
+    ? "denied"
+    : "not-found";
+}
+
 export function requireWorkItemsMutationAccess(
   session: SigilAuthSession | null,
 ): SigilAuthSession {

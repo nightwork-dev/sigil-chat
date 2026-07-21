@@ -165,6 +165,22 @@ const queryScopeWorkFn = createServerFn({ method: "GET" })
     );
   });
 
+const queryScopeHomeAccessFn = createServerFn({ method: "GET" })
+  .validator((scopeId: string) => scopeId)
+  .handler(async ({ data: scopeId }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const { currentWorkItemsScopeAccess, scopeHomeAccessSignal } =
+      await import("@/lib/work-items-access.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    return scopeHomeAccessSignal(
+      viewer.id,
+      scopeId,
+      currentWorkItemsScopeAccess(),
+    );
+  });
+
 const listSessionCommitmentsFn = createServerFn({ method: "GET" })
   .validator((input: { threadId: string }) => input)
   .handler(async ({ data }): Promise<Story[]> => {
@@ -569,6 +585,18 @@ export function useScopeWork(
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
+  });
+}
+
+export function useScopeHomeAccess(scopeId: string, enabled = true) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: ["scope-home-access", principalId, scopeId] as const,
+    queryFn: () => queryScopeHomeAccessFn({ data: scopeId }),
+    enabled: enabled && scopeId.length > 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
   });
 }
 

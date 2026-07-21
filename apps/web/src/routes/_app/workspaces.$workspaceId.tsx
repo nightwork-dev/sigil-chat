@@ -20,7 +20,7 @@ import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
 import { liveWorkSource, routeSources } from "@/features/homes/live-sources"
 import { WorkspaceHome } from "@/features/homes/workspace-home"
 import type { HomeState, WorkspaceHomeView } from "@/features/homes/types"
-import { useScopeWork } from "@/lib/work-items"
+import { useScopeHomeAccess, useScopeWork } from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/workspaces/$workspaceId")({
   validateSearch: (
@@ -43,14 +43,29 @@ function WorkspaceHomeRoute() {
   const threads = useAgentThreads()
   const roster = useAgentRoster()
   const compact = useMediaQuery("(max-width: 640px)")
-  const scopedWork = useScopeWork(workspaceId, "self", !fixtures)
+  const access = useScopeHomeAccess(workspaceId, !fixtures)
+  const scopedWork = useScopeWork(
+    workspaceId,
+    "self",
+    !fixtures && access.data === "readable",
+  )
 
   const state: HomeState<WorkspaceHomeView> = useMemo(() => {
     const homeNav = fixtures ? fixtureNav : nav.data
     const homeThreads = fixtures ? fixtureThreads : threads.data
+    if (!fixtures && access.data === "denied") {
+      return { kind: "denied", discoverable: true }
+    }
+    if (
+      !fixtures &&
+      (access.data === "not-found" || access.isError)
+    ) {
+      return { kind: "not-found" }
+    }
     if (
       !homeNav ||
       !homeThreads ||
+      (!fixtures && !access.data) ||
       (!fixtures && !scopedWork.data && !scopedWork.isError)
     ) {
       return { kind: "loading" }
@@ -85,6 +100,8 @@ function WorkspaceHomeRoute() {
     roster.data,
     scopedWork.data,
     scopedWork.isError,
+    access.data,
+    access.isError,
     workspaceId,
     via,
     fixtures,

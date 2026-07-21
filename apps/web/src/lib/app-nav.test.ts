@@ -9,7 +9,7 @@ describe("app navigation profiles", () => {
     const footerTo = (footer ?? []).map((item) => item.to)
 
     // The product center: conversation + one management entry.
-    expect(itemsTo).toEqual(["/chat", "/agents"])
+    expect(itemsTo).toEqual(["/home", "/chat", "/agents"])
 
     // Demo workspaces are /demos cards, not primary nav.
     expect(itemsTo).not.toContain("/review")
@@ -45,7 +45,7 @@ describe("app navigation profiles", () => {
       (item) => item.to,
     )
 
-    const containerScoped = ["/chat"]
+    const containerScoped = ["/home", "/chat"]
     const principalLevel = ["/agents"]
     const lastScoped = Math.max(
       ...containerScoped.map((to) => order.indexOf(to)),
