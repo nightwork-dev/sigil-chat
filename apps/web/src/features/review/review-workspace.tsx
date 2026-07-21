@@ -1,5 +1,4 @@
 import { useReducer, useState } from "react"
-import { Link } from "@tanstack/react-router"
 import {
   AlertTriangleIcon,
   BotIcon,
@@ -28,12 +27,7 @@ import {
   type AttentionContext,
   type AttentionSelection,
 } from "@zigil/agent-react/attention"
-import { AgentHud } from "@/components/agent/agent-hud"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
-import {
-  setToolApprovalMode,
-  useToolApprovalMode,
-} from "@/lib/agent-tool-approval"
 import { AcceptanceChecklist } from "@workspace/review/components/acceptance-checklist"
 import { AnnotationComposer } from "@workspace/review/components/annotation-composer"
 import { AnnotationFeed } from "@workspace/review/components/annotation-feed"
@@ -186,7 +180,6 @@ function enrichPassageAttention(
 }
 
 export function ReviewWorkspace() {
-  const approvalMode = useToolApprovalMode()
   const reviewDocument = useReviewDocument()
   const updateReviewPassages = useUpdateReviewPassages()
   const addReviewAnnotation = useAddReviewAnnotations()
@@ -200,8 +193,6 @@ export function ReviewWorkspace() {
   const decisions = decisionsFromDocument(document)
   const checklist: AcceptanceCheck[] = document.acceptance.checklist
   const revisions = revisionsFromDocument(document)
-  const [agentDetached, setAgentDetached] = useState(false)
-  const [agentOpen, setAgentOpen] = useState(false)
   const [editingPassageId, setEditingPassageId] = useState<string | null>(null)
   const [multiSelect, setMultiSelect] = useState(false)
   const telemetry = useAttentionTelemetry({
@@ -632,7 +623,6 @@ export function ReviewWorkspace() {
                         <Button
                           onClick={() => {
                             telemetry.select(passageAttention(passage))
-                            setAgentOpen(true)
                             recordActivity("focus", passageAttention(passage), {
                               summary: `Asked the agent about ${passage.section}`,
                             })
@@ -670,7 +660,6 @@ export function ReviewWorkspace() {
           <aside
             className={cn(
               "hidden min-h-0 border-l border-border bg-card/20 lg:grid lg:grid-rows-[auto_minmax(0,1fr)]",
-              agentOpen && !agentDetached && "xl:hidden",
             )}
           >
             <div className="border-b border-border px-4 py-3">
@@ -700,22 +689,6 @@ export function ReviewWorkspace() {
           </aside>
         </div>
 
-        <AgentHud.Root
-          className="absolute bottom-4 right-4 z-30 lg:right-[336px] max-sm:inset-x-2 max-sm:bottom-2 max-sm:right-auto"
-          onDetachedChange={setAgentDetached}
-          onOpenChange={setAgentOpen}
-          open={agentOpen}
-        >
-          <AgentHud.Trigger />
-          <AgentHud.Panel
-            navigationTarget={<Link to="/chat" />}
-            chatProps={{
-              approvalMode,
-              onApprovalModeChange: setToolApprovalMode,
-              placeholder: "Ask about this passage or request a review…",
-            }}
-          />
-        </AgentHud.Root>
       </div>
     </AttentionProvider>
   )
