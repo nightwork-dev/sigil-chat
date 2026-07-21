@@ -17,6 +17,7 @@ import type {
   StoryFilter,
   StoryStatus,
   WorkItemsMutationResult,
+  WorkSponsorshipDecision,
 } from "@workspace/work-items-store/types";
 import { queryBoardView } from "@workspace/work-items-store/operations";
 
@@ -306,6 +307,70 @@ const addCommentFn = createServerFn({ method: "POST" })
     return result;
   });
 
+const listSponsorshipDecisionsFn = createServerFn({ method: "GET" })
+  .validator((input: { workItemId: string }) => input)
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } = await import(
+      "@/lib/work-items-viewer.server"
+    );
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const workItem = document.stories.find(
+      (candidate) => candidate.id === data.workItemId,
+    );
+    if (!workItem) throw new Error("Feature request was not found.");
+    const proposedSponsor = workItem.provenance?.proposedSponsorPrincipalId;
+    if (proposedSponsor !== viewer.id) return [];
+    return workItemsRepository.listSponsorshipDecisions({
+      workItemId: workItem.id,
+      sponsorPrincipalId: viewer.id,
+    });
+  });
+
+const decideSponsorshipFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      workItemId: string;
+      decision: WorkSponsorshipDecision["decision"];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { requireSponsorshipDecisionAccess } = await import(
+      "@/lib/work-items-access.server"
+    );
+    const session = await getSession();
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const workItem = document.stories.find(
+      (candidate) => candidate.id === data.workItemId,
+    );
+    if (!workItem) throw new Error("Feature request was not found.");
+    const sponsor = requireSponsorshipDecisionAccess(session, workItem).user.id;
+    const prior = document.sponsorshipDecisions.filter(
+      (candidate) =>
+        candidate.workItemId === workItem.id &&
+        candidate.sponsorPrincipalId === sponsor,
+    );
+    const decision: WorkSponsorshipDecision = {
+      id: crypto.randomUUID(),
+      workItemId: workItem.id,
+      sponsorPrincipalId: sponsor,
+      decision: data.decision,
+      decidedByPrincipalId: sponsor,
+      decidedAt: new Date().toISOString(),
+      revision:
+        prior.reduce((max, candidate) => Math.max(max, candidate.revision), 0) +
+        1,
+    };
+    return workItemsRepository.recordSponsorshipDecision(
+      decision,
+      document.revision,
+    );
+  });
+
 export const workItemKeys = {
   all: () => ["work-items"] as const,
   list: (filter?: StoryFilter) =>
@@ -314,6 +379,8 @@ export const workItemKeys = {
   reviews: () => [...workItemKeys.all(), "reviews"] as const,
   comments: (storyId: string) =>
     [...workItemKeys.all(), storyId, "comments"] as const,
+  sponsorship: (storyId: string, viewerId: string) =>
+    [...workItemKeys.all(), storyId, "sponsorship", viewerId] as const,
   addressed: (viewerId: string, filter?: StoryFilter) =>
     [...workItemKeys.all(), "addressed", viewerId, filter ?? {}] as const,
   boardViews: (viewerId: string, filter?: BoardViewFilter) =>
@@ -499,6 +566,38 @@ export function useAddComment() {
       void queryClient.invalidateQueries({
         queryKey: workItemKeys.comments(variables.storyId),
       });
+      return reconcileWorkItems(queryClient, result);
+    },
+  });
+}
+
+export function useSponsorshipDecisions(workItemId: string | undefined) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.sponsorship(workItemId ?? "none", principalId),
+    queryFn: () =>
+      listSponsorshipDecisionsFn({ data: { workItemId: workItemId ?? "" } }),
+    enabled: Boolean(workItemId),
+  });
+}
+
+export function useDecideSponsorship() {
+  const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
+  return useMutation({
+    mutationFn: (input: {
+      workItemId: string;
+      decision: WorkSponsorshipDecision["decision"];
+    }) => decideSponsorshipFn({ data: input }),
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(
+        workItemKeys.sponsorship(variables.workItemId, principalId),
+        result.document.sponsorshipDecisions.filter(
+          (candidate) =>
+            candidate.workItemId === variables.workItemId &&
+            candidate.sponsorPrincipalId === principalId,
+        ),
+      );
       return reconcileWorkItems(queryClient, result);
     },
   });

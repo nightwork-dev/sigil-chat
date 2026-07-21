@@ -5,6 +5,7 @@ import {
   createBoardTraversalResolver,
   prepareBoardViewForUpsert,
   requireBoardViewMutationAccess,
+  requireSponsorshipDecisionAccess,
   requireWorkItemsMutationAccess,
   type WorkItemsScopeAccess,
 } from "./work-items-access.server";
@@ -178,6 +179,35 @@ describe("work-item mutation access", () => {
         privateView,
       ),
     ).toThrow("Owner access required");
+  });
+});
+
+describe("sponsorship decision access", () => {
+  const proposed = {
+    ...story("FR.1", "workspace-a"),
+    kind: "feature-request" as const,
+    provenance: {
+      origin: "agent" as const,
+      actorPrincipalId: "user-agent-principal",
+      proposedSponsorPrincipalId: "user-1",
+      createdAt: "2026-07-21T00:00:00.000Z",
+    },
+  };
+
+  it("lets only the authenticated proposed sponsor decide", () => {
+    expect(requireSponsorshipDecisionAccess(session("member"), proposed)).toBeTruthy();
+    expect(() =>
+      requireSponsorshipDecisionAccess(
+        {
+          ...session("owner"),
+          user: { ...session("owner").user, id: "other-user" },
+        },
+        proposed,
+      ),
+    ).toThrow("Feature request was not found.");
+    expect(() => requireSponsorshipDecisionAccess(null, proposed)).toThrow(
+      "Authentication required",
+    );
   });
 });
 

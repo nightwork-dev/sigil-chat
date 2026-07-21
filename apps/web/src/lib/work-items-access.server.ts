@@ -6,6 +6,7 @@ import type {
   BoardScopeMatch,
   BoardTraversalResolver,
   BoardView,
+  Story,
 } from "@workspace/work-items-store/types";
 
 /**
@@ -35,6 +36,18 @@ export function requireWorkItemsMutationAccess(
 ): SigilAuthSession {
   requireOwner(session)
   return session
+}
+
+/** Sponsor decisions are personal attestations, not installation-owner edits. */
+export function requireSponsorshipDecisionAccess(
+  session: SigilAuthSession | null,
+  workItem: Story,
+): SigilAuthSession {
+  requireSession(session);
+  if (workItem.provenance?.proposedSponsorPrincipalId !== session.user.id) {
+    throw new Error("Feature request was not found.");
+  }
+  return session;
 }
 
 /**
