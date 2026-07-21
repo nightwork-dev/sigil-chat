@@ -29,8 +29,8 @@ export const agentThreadBindingService = createThreadBindingService({
   resolvePerspective: resolveScopePerspective,
 });
 
-export interface AgentThreadExecutionBindingRecord
-  extends AgentThreadExecutionBinding {
+export interface AgentThreadExecutionBindingRecord extends AgentThreadExecutionBinding {
+  eveSessionId?: string;
   threadId: string;
 }
 
@@ -38,9 +38,20 @@ export function resolveAgentThreadExecutionBinding(
   principalId: string,
   threadId: string,
 ): AgentThreadExecutionBindingRecord {
-  const thread = agentThreadBindingService.resolveExecution(principalId, threadId);
+  const thread = agentThreadBindingService.resolveExecution(
+    principalId,
+    threadId,
+  );
   if (!thread.executionBinding) {
-    throw new Error(`Agent thread ${threadId} is missing an execution binding.`);
+    throw new Error(
+      `Agent thread ${threadId} is missing an execution binding.`,
+    );
   }
-  return { threadId, ...thread.executionBinding };
+  return {
+    threadId,
+    ...thread.executionBinding,
+    ...(thread.eve.session.sessionId
+      ? { eveSessionId: thread.eve.session.sessionId }
+      : {}),
+  };
 }

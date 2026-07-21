@@ -12,6 +12,10 @@ import { ForbiddenError } from "eve/channels/auth"
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import { MirkEveSessionOwnerStore } from "../lib/eve-session-owners"
 import {
+  EveSessionBindingVerificationError,
+  requireVerifiedEveSessionBinding,
+} from "../lib/eve-session-binding"
+import {
   DEFAULT_PERSONA_ID,
   hasPersona,
   memoryTurn,
@@ -97,7 +101,33 @@ const channel = createOwnedEveChannel({
     }
     const requestedPersonaId =
       request.headers.get("x-sigil-persona-id")?.trim() || undefined
-    if (requestedPersonaId && !hasPersona(requestedPersonaId)) {
+    let sessionBinding
+    try {
+      sessionBinding = requireVerifiedEveSessionBinding(
+        request,
+        auth.principalId,
+        process.env.GONK_MCP_KEY,
+      )
+    } catch (error) {
+      if (!(error instanceof EveSessionBindingVerificationError)) throw error
+      throw new ForbiddenError({
+        code: "eve_session_binding_invalid",
+        message: error.message,
+      })
+    }
+    const boundPersonaId = sessionBinding?.personaId
+    if (
+      requestedPersonaId &&
+      boundPersonaId &&
+      requestedPersonaId !== boundPersonaId
+    ) {
+      throw new ForbiddenError({
+        code: "eve_session_persona_mismatch",
+        message: "The requested persona does not match the session binding.",
+      })
+    }
+    const personaId = requestedPersonaId ?? boundPersonaId
+    if (personaId && !hasPersona(personaId)) {
       throw new ForbiddenError({
         code: "eve_persona_not_found",
         message: "The requested persona is not available.",
@@ -108,8 +138,21 @@ const channel = createOwnedEveChannel({
       attributes: {
         ...auth.attributes,
         sigilToolApproval: JSON.stringify(toolApproval),
-        ...(requestedPersonaId
-          ? { sigilRequestedPersonaId: requestedPersonaId }
+        ...(personaId ? { sigilRequestedPersonaId: personaId } : {}),
+        ...(sessionBinding
+          ? {
+              sigilExecutionBinding: JSON.stringify({
+                applicationThreadId: sessionBinding.applicationThreadId,
+                personaId: sessionBinding.personaId,
+                homeScopeId: sessionBinding.homeScopeId,
+                initialPerspective: sessionBinding.initialPerspective,
+                additionalContextScopeIds:
+                  sessionBinding.additionalContextScopeIds,
+              }),
+              ...(sessionBinding.eveSessionId
+                ? { sigilAttestedEveSessionId: sessionBinding.eveSessionId }
+                : {}),
+            }
           : {}),
         ...(resourceScope
           ? {

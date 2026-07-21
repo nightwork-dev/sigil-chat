@@ -3,6 +3,7 @@ import {
   AGENT_SCOPE_HEADER,
 } from "@/lib/agent-session-scope"
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
+import { AGENT_SESSION_BINDING_HEADER } from "@workspace/agent-contracts/session-binding"
 import {
   useCallback,
   useLayoutEffect,
@@ -61,6 +62,7 @@ import {
 import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projector"
 import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
 import { getAgentScopeProof } from "@/lib/agent-scope-delegation"
+import { getAgentSessionBindingProof } from "@/lib/agent-session-binding"
 
 export function AppAgentSessions({
   children,
@@ -320,14 +322,18 @@ function ActiveAgentSession({
         turnActive.current = true
         try {
           const resourceScope = input.headers?.[AGENT_SCOPE_HEADER]
-          const scopeProof = resourceScope
-            ? await getAgentScopeProof(resourceScope, principalId)
-            : undefined
+          const [scopeProof, sessionBindingProof] = await Promise.all([
+            resourceScope
+              ? getAgentScopeProof(resourceScope, principalId)
+              : Promise.resolve(undefined),
+            getAgentSessionBindingProof(thread.id, principalId),
+          ])
           const result = await eveSession.send({
             ...input,
             headers: {
               ...input.headers,
               [AGENT_PERSONA_HEADER]: thread.personaId,
+              [AGENT_SESSION_BINDING_HEADER]: sessionBindingProof,
               ...(scopeProof ? { [AGENT_SCOPE_PROOF_HEADER]: scopeProof } : {}),
             },
             clientContext: composeClientContext(
@@ -347,6 +353,7 @@ function ActiveAgentSession({
       handleSendSuccess,
       principalId,
       thread.forkSeed,
+      thread.id,
       thread.personaId,
     ],
   )

@@ -160,6 +160,10 @@ vi.mock("@/lib/agent-threads", () => ({
   }),
 }));
 
+vi.mock("@/lib/agent-session-binding", () => ({
+  getAgentSessionBindingProof: vi.fn(async () => "signed-session-binding"),
+}));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -211,6 +215,7 @@ describe("AppAgentSessions persistence call site", () => {
     ]);
     expect(harness.lastEveSendInput?.headers).toMatchObject({
       "x-sigil-persona-id": "agent-a",
+      "x-sigil-session-binding": "signed-session-binding",
     });
     expect(repository.get(TEST_USER_ID, thread.id)).toMatchObject({
       forkSeed: thread.forkSeed,

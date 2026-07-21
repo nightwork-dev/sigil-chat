@@ -1,6 +1,10 @@
 import { createScope } from "@gonk/scope"
 import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
 import type { KvStore } from "@gonk/store/types"
+import type {
+  AgentSessionExecutionBinding,
+  AgentSessionScopePerspective,
+} from "@workspace/agent-contracts/session-binding"
 
 const OWNER_NAMESPACE = "sigil-chat.eve-session-owners.v1"
 
@@ -17,15 +21,31 @@ interface EveSessionOwnerRecordV2 {
   version: 2
 }
 
-type EveSessionOwnerRecord = EveSessionOwnerRecordV1 | EveSessionOwnerRecordV2
+interface EveSessionOwnerRecordV3 extends AgentSessionExecutionBinding {
+  sessionId: string
+  subject: string
+  version: 3
+}
+
+type EveSessionOwnerRecord =
+  EveSessionOwnerRecordV1 | EveSessionOwnerRecordV2 | EveSessionOwnerRecordV3
 
 export interface EveSessionBinding {
+  additionalContextScopeIds?: string[]
+  applicationThreadId?: string
+  homeScopeId?: string
+  initialPerspective?: AgentSessionScopePerspective
   personaId?: string
   subject: string
 }
 
 export interface EveSessionOwnerStore {
-  bind(sessionId: string, subject: string, personaId: string): Promise<void>
+  bind(
+    sessionId: string,
+    subject: string,
+    personaId: string,
+    executionBinding?: AgentSessionExecutionBinding,
+  ): Promise<void>
   getBinding(sessionId: string): Promise<EveSessionBinding | undefined>
   getOwner(sessionId: string): Promise<string | undefined>
 }
@@ -73,42 +93,51 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
     sessionId: string,
     subject: string,
     personaId: string,
+    executionBinding?: AgentSessionExecutionBinding,
   ): Promise<void> {
     assertIdentifier("session id", sessionId)
     assertIdentifier("subject", subject)
     assertIdentifier("persona id", personaId)
+    if (executionBinding) {
+      assertExecutionBinding(executionBinding)
+      if (executionBinding.personaId !== personaId) {
+        throw new Error("Eve execution binding persona does not match.")
+      }
+    }
 
     await this.runExclusive(() => {
       const existing = this.readRecord(sessionId)
-      if (
-        existing?.subject === subject &&
-        (existing.version === 1 || existing.personaId === personaId)
-      ) {
-        if (existing.version === 1) {
-          this.owners.set(sessionId, {
-            personaId,
-            sessionId,
-            subject,
-            version: 2,
-          })
+      if (existing?.subject === subject && existing.version === 3) {
+        if (
+          executionBinding &&
+          existing.personaId === personaId &&
+          executionBindingsEqual(existing, executionBinding)
+        ) {
+          return
         }
-        return
-      }
-      if (existing !== undefined) {
         throw new EveSessionOwnerConflictError(sessionId)
       }
-      this.owners.set(sessionId, {
-        personaId,
+      if (
+        existing !== undefined &&
+        (existing.subject !== subject ||
+          (existing.version === 2 && existing.personaId !== personaId))
+      ) {
+        throw new EveSessionOwnerConflictError(sessionId)
+      }
+      this.owners.set(
         sessionId,
-        subject,
-        version: 2,
-      })
+        executionBinding
+          ? v3Record(sessionId, subject, executionBinding)
+          : { personaId, sessionId, subject, version: 2 },
+      )
 
       const persisted = this.readRecord(sessionId)
       if (
         persisted?.subject !== subject ||
-        persisted.version !== 2 ||
-        persisted.personaId !== personaId
+        (executionBinding
+          ? persisted.version !== 3 ||
+            !executionBindingsEqual(persisted, executionBinding)
+          : persisted.version !== 2 || persisted.personaId !== personaId)
       ) {
         throw new Error(
           `Eve session-owner binding did not persist for ${sessionId}.`,
@@ -127,7 +156,17 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
     if (!record) return undefined
     return {
       subject: record.subject,
-      ...(record.version === 2 ? { personaId: record.personaId } : {}),
+      ...(record.version === 1
+        ? {}
+        : record.version === 2
+          ? { personaId: record.personaId }
+          : {
+              applicationThreadId: record.applicationThreadId,
+              personaId: record.personaId,
+              homeScopeId: record.homeScopeId,
+              initialPerspective: structuredClone(record.initialPerspective),
+              additionalContextScopeIds: [...record.additionalContextScopeIds],
+            }),
     }
   }
 
@@ -156,14 +195,34 @@ export class MemoryEveSessionOwnerStore implements EveSessionOwnerStore {
     sessionId: string,
     subject: string,
     personaId: string,
+    executionBinding?: AgentSessionExecutionBinding,
   ): Promise<void> {
+    if (executionBinding) {
+      assertExecutionBinding(executionBinding)
+      if (executionBinding.personaId !== personaId) {
+        throw new Error("Eve execution binding persona does not match.")
+      }
+    }
     const existing = this.owners.get(sessionId)
-    if (existing?.subject === subject && existing.personaId === personaId)
+    const requested: EveSessionBinding = {
+      subject,
+      personaId,
+      ...(executionBinding ? structuredClone(executionBinding) : {}),
+    }
+    if (existing && bindingsEqual(existing, requested)) return
+    if (
+      existing?.subject === subject &&
+      existing.personaId === personaId &&
+      existing.applicationThreadId === undefined &&
+      executionBinding
+    ) {
+      this.owners.set(sessionId, requested)
       return
+    }
     if (existing !== undefined) {
       throw new EveSessionOwnerConflictError(sessionId)
     }
-    this.owners.set(sessionId, { personaId, subject })
+    this.owners.set(sessionId, requested)
   }
 
   async getOwner(sessionId: string): Promise<string | undefined> {
@@ -171,7 +230,8 @@ export class MemoryEveSessionOwnerStore implements EveSessionOwnerStore {
   }
 
   async getBinding(sessionId: string): Promise<EveSessionBinding | undefined> {
-    return this.owners.get(sessionId)
+    const binding = this.owners.get(sessionId)
+    return binding ? structuredClone(binding) : undefined
   }
 }
 
@@ -181,16 +241,116 @@ function isOwnerRecord(value: unknown): value is EveSessionOwnerRecord {
   }
   const record = value as Record<string, unknown>
   return (
-    (record.version === 1 || record.version === 2) &&
+    (record.version === 1 || record.version === 2 || record.version === 3) &&
     typeof record.sessionId === "string" &&
     record.sessionId.length > 0 &&
     typeof record.subject === "string" &&
     record.subject.length > 0 &&
     (record.version === 1 ||
-      (typeof record.personaId === "string" && record.personaId.length > 0))
+      (typeof record.personaId === "string" &&
+        record.personaId.length > 0 &&
+        (record.version === 2 || isExecutionBinding(record))))
   )
+}
+
+function v3Record(
+  sessionId: string,
+  subject: string,
+  binding: AgentSessionExecutionBinding,
+): EveSessionOwnerRecordV3 {
+  return {
+    ...structuredClone(binding),
+    sessionId,
+    subject,
+    version: 3,
+  }
+}
+
+function executionBindingsEqual(
+  left: AgentSessionExecutionBinding,
+  right: AgentSessionExecutionBinding,
+): boolean {
+  return (
+    left.applicationThreadId === right.applicationThreadId &&
+    left.personaId === right.personaId &&
+    left.homeScopeId === right.homeScopeId &&
+    left.initialPerspective.focusScopeId ===
+      right.initialPerspective.focusScopeId &&
+    arraysEqual(
+      left.initialPerspective.viaScopeIds,
+      right.initialPerspective.viaScopeIds,
+    ) &&
+    arraysEqual(left.additionalContextScopeIds, right.additionalContextScopeIds)
+  )
+}
+
+function bindingsEqual(
+  left: EveSessionBinding,
+  right: EveSessionBinding,
+): boolean {
+  if (left.subject !== right.subject || left.personaId !== right.personaId) {
+    return false
+  }
+  if (
+    left.applicationThreadId === undefined ||
+    right.applicationThreadId === undefined
+  ) {
+    return (
+      left.applicationThreadId === right.applicationThreadId &&
+      left.homeScopeId === right.homeScopeId
+    )
+  }
+  return executionBindingsEqual(
+    left as AgentSessionExecutionBinding,
+    right as AgentSessionExecutionBinding,
+  )
+}
+
+function arraysEqual(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  )
+}
+
+function isExecutionBinding(
+  value: Record<string, unknown>,
+): value is Record<string, unknown> & AgentSessionExecutionBinding {
+  return (
+    isIdentifier(value.applicationThreadId) &&
+    isIdentifier(value.personaId) &&
+    isIdentifier(value.homeScopeId) &&
+    isPerspective(value.initialPerspective) &&
+    Array.isArray(value.additionalContextScopeIds) &&
+    value.additionalContextScopeIds.every(isIdentifier)
+  )
+}
+
+function isPerspective(value: unknown): value is AgentSessionScopePerspective {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const perspective = value as Record<string, unknown>
+  return (
+    isIdentifier(perspective.focusScopeId) &&
+    Array.isArray(perspective.viaScopeIds) &&
+    perspective.viaScopeIds.every(isIdentifier)
+  )
+}
+
+function assertExecutionBinding(binding: AgentSessionExecutionBinding): void {
+  if (!isExecutionBinding(binding as unknown as Record<string, unknown>)) {
+    throw new Error("Eve execution binding is invalid.")
+  }
 }
 
 function assertIdentifier(label: string, value: string): void {
   if (!value.trim()) throw new Error(`Eve ${label} must be non-empty.`)
+}
+
+function isIdentifier(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
 }

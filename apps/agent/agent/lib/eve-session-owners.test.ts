@@ -10,6 +10,16 @@ import {
 } from "./eve-session-owners"
 
 const temporaryDirectories: string[] = []
+const executionBinding = {
+  applicationThreadId: "thread-1",
+  personaId: "agent-a",
+  homeScopeId: "workspace-a",
+  initialPerspective: {
+    focusScopeId: "workspace-a",
+    viaScopeIds: ["project-a"],
+  },
+  additionalContextScopeIds: ["workspace-b"],
+}
 
 afterEach(async () => {
   await Promise.all(
@@ -58,10 +68,7 @@ describe("EveSessionOwnerStore", () => {
 
   it("upgrades a legacy subject-only binding when its persona is first known", async () => {
     const values = new Map<string, unknown>([
-      [
-        "session-1",
-        { sessionId: "session-1", subject: "user-1", version: 1 },
-      ],
+      ["session-1", { sessionId: "session-1", subject: "user-1", version: 1 }],
     ])
     const store = new MirkEveSessionOwnerStore({ store: memoryKv(values) })
 
@@ -86,6 +93,59 @@ describe("EveSessionOwnerStore", () => {
     await expect(store.bind("session-1", "user-2", "agent-a")).rejects.toThrow(
       "already bound to another principal",
     )
+  })
+
+  it("persists and enforces the complete V3 execution binding", async () => {
+    const values = new Map<string, unknown>()
+    const store = new MirkEveSessionOwnerStore({ store: memoryKv(values) })
+
+    await store.bind("session-1", "user-1", "agent-a", executionBinding)
+    await store.bind("session-1", "user-1", "agent-a", executionBinding)
+
+    await expect(store.getBinding("session-1")).resolves.toEqual({
+      subject: "user-1",
+      ...executionBinding,
+    })
+    expect(values.get("session-1")).toEqual({
+      sessionId: "session-1",
+      subject: "user-1",
+      version: 3,
+      ...executionBinding,
+    })
+
+    await expect(
+      store.bind("session-1", "user-1", "agent-a", {
+        ...executionBinding,
+        homeScopeId: "workspace-other",
+      }),
+    ).rejects.toThrow("already bound")
+  })
+
+  it("upgrades a V2 persona binding only from a matching V3 attestation", async () => {
+    const values = new Map<string, unknown>([
+      [
+        "session-1",
+        {
+          sessionId: "session-1",
+          subject: "user-1",
+          personaId: "agent-a",
+          version: 2,
+        },
+      ],
+    ])
+    const store = new MirkEveSessionOwnerStore({ store: memoryKv(values) })
+
+    await store.bind("session-1", "user-1", "agent-a", executionBinding)
+    await expect(store.getBinding("session-1")).resolves.toEqual({
+      subject: "user-1",
+      ...executionBinding,
+    })
+    await expect(
+      store.bind("session-1", "user-1", "agent-b", {
+        ...executionBinding,
+        personaId: "agent-b",
+      }),
+    ).rejects.toThrow("already bound")
   })
 })
 
