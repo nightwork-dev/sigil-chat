@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createWorkItemsDocument } from "./sample";
+import { queryBoardView } from "./operations";
 import {
   FileWorkItemsRepository,
   MemoryWorkItemsRepository,
@@ -117,6 +118,94 @@ describe("MemoryWorkItemsRepository", () => {
     expect(commented.document.comments).toHaveLength(1);
     expect(commented.document.revision).toBe(5);
     expect(commented.document.history).toHaveLength(5);
+  });
+
+  it("persists saved views and evaluates one scoped record in one board cell", async () => {
+    const repository = new MemoryWorkItemsRepository();
+    let document = await repository.get();
+    const parent = await seedStory("S0.3");
+    parent.kind = "story";
+    parent.homeScopeId = "workspace-a";
+    parent.provenance = {
+      origin: "principal",
+      actorPrincipalId: "principal-a",
+      createdAt: "2026-07-21T00:00:00.000Z",
+    };
+    parent.revision = 1;
+    document = (await repository.upsertStory(parent, document.revision)).document;
+
+    const child = await seedStory("S1.0");
+    child.kind = "task";
+    child.homeScopeId = "workspace-b";
+    child.parentWorkItemId = parent.id;
+    child.scopeBindings = [{ scopeId: "project-a", relation: "rolls-up-to" }];
+    child.provenance = {
+      origin: "agent",
+      actorPrincipalId: "principal-a",
+      agentSessionId: "session-a",
+      createdAt: "2026-07-21T00:00:00.000Z",
+    };
+    child.revision = 2;
+    document = (await repository.upsertStory(child, document.revision)).document;
+
+    const mountedOnly = await seedStory("S1.1");
+    mountedOnly.kind = "task";
+    mountedOnly.homeScopeId = "foreign-workspace";
+    mountedOnly.scopeBindings = [
+      { scopeId: "project-a", relation: "mounted-in" },
+    ];
+    mountedOnly.provenance = {
+      origin: "principal",
+      actorPrincipalId: "principal-a",
+      createdAt: "2026-07-21T00:00:00.000Z",
+    };
+    mountedOnly.revision = 1;
+    document = (
+      await repository.upsertStory(mountedOnly, document.revision)
+    ).document;
+    document = (
+      await repository.transitionStory("S0.3", "in-progress", document.revision)
+    ).document;
+
+    const view = {
+      id: "board-project-a",
+      ownerScopeId: "project-a",
+      name: "Project A roadmap",
+      visibility: "private" as const,
+      roots: ["project-a"],
+      traversal: "self-and-rollups" as const,
+      filters: {},
+      groupBy: "scope" as const,
+      revision: 1,
+    };
+    document = (await repository.upsertBoardView(view, document.revision)).document;
+    expect(await repository.listBoardViews({ ownerScopeId: "project-a" })).toEqual([
+      view,
+    ]);
+
+    const result = queryBoardView(document.stories, view, {
+      resolve: (roots, traversal) => {
+        expect(roots).toEqual(["project-a"]);
+        expect(traversal).toBe("self-and-rollups");
+        return [
+          { scopeId: "project-a", rootScopeId: "project-a" },
+          { scopeId: "workspace-a", rootScopeId: "project-a" },
+          { scopeId: "workspace-b", rootScopeId: "project-a" },
+        ];
+      },
+    });
+
+    expect(result.items.map(({ story }) => story.id)).toEqual(["S0.3", "S1.0"]);
+    expect(result.items.find(({ story }) => story.id === "S0.3")).toMatchObject({
+      group: "workspace-a",
+      childProgress: { total: 1, shipped: 1 },
+      // Child completion is derived progress only; it does not ship its parent.
+      story: { status: "in-progress", revision: 2 },
+    });
+    expect(result.items.find(({ story }) => story.id === "S1.0")).toMatchObject({
+      group: "workspace-b",
+      matchedScopeIds: ["workspace-b", "project-a"],
+    });
   });
 });
 

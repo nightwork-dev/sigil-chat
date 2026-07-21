@@ -1,6 +1,13 @@
 import { isRecord } from "@workspace/file-store-core";
 
 import type {
+  BoardQueryItem,
+  BoardQueryResult,
+  BoardScopeMatch,
+  BoardTraversalResolver,
+  BoardView,
+  BoardViewFilter,
+  ChildProgress,
   ReviewAssignment,
   ReviewDecision,
   ReviewGate,
@@ -33,8 +40,82 @@ export function upsertStory(
   const existingIndex = document.stories.findIndex(({ id }) => id === story.id);
   const stories = [...document.stories];
   if (existingIndex === -1) stories.push(structuredClone(story));
-  else stories[existingIndex] = structuredClone(story);
+  else {
+    const existing = stories[existingIndex];
+    stories[existingIndex] = {
+      ...structuredClone(story),
+      ...(existing.revision === undefined
+        ? {}
+        : { revision: existing.revision + 1 }),
+    };
+  }
   return commit(document, { stories }, [story.id]);
+}
+
+export function upsertBoardView(
+  document: WorkItemsDocument,
+  view: BoardView,
+  expectedRevision?: number,
+): WorkItemsMutationResult {
+  assertRevision(document, expectedRevision);
+  assertBoardView(view);
+  const existingIndex = document.boardViews.findIndex(({ id }) => id === view.id);
+  const boardViews = [...document.boardViews];
+  if (existingIndex === -1) boardViews.push(structuredClone(view));
+  else boardViews[existingIndex] = structuredClone(view);
+  return commit(document, { boardViews }, [view.id]);
+}
+
+export function filterBoardViews(
+  views: BoardView[],
+  filter?: BoardViewFilter,
+): BoardView[] {
+  if (!filter) return views;
+  return views.filter(
+    (view) =>
+      (filter.ownerScopeId === undefined ||
+        view.ownerScopeId === filter.ownerScopeId) &&
+      (filter.ownerPrincipalId === undefined ||
+        view.ownerPrincipalId === filter.ownerPrincipalId) &&
+      (filter.visibility === undefined || view.visibility === filter.visibility),
+  );
+}
+
+/**
+ * Evaluate a saved board after the host has supplied its authorized scope
+ * traversal. Rows are de-duplicated by work-item id before grouping, so a
+ * shared record has one card, status, and history regardless of path count.
+ */
+export function queryBoardView(
+  stories: readonly Story[],
+  view: BoardView,
+  traversal: BoardTraversalResolver,
+): BoardQueryResult {
+  assertBoardView(view);
+  const matches = orderedScopeMatches(view, traversal);
+  const resultScopeIds = new Set(matches.map(({ scopeId }) => scopeId));
+  const rootOrder = new Map(view.roots.map((root, index) => [root, index]));
+  const childrenByParent = new Map<string, Story[]>();
+  for (const story of stories) {
+    if (!story.parentWorkItemId) continue;
+    const children = childrenByParent.get(story.parentWorkItemId) ?? [];
+    children.push(story);
+    childrenByParent.set(story.parentWorkItemId, children);
+  }
+
+  const items: BoardQueryItem[] = [];
+  for (const story of stories) {
+    const matchedScopeIds = matchingScopeIds(story, resultScopeIds);
+    if (matchedScopeIds.length === 0 || !matchesBoardFilters(story, view)) continue;
+    const childProgress = progressFor(childrenByParent.get(story.id));
+    items.push({
+      story: structuredClone(story),
+      group: groupFor(story, view, matchedScopeIds, matches, rootOrder),
+      matchedScopeIds,
+      ...(childProgress ? { childProgress } : {}),
+    });
+  }
+  return { view: structuredClone(view), items };
 }
 
 export function transitionStory(
@@ -48,7 +129,14 @@ export function transitionStory(
   const story = findStory(document, id);
   if (story.status === status) return unchanged(document);
   const stories = document.stories.map((item) =>
-    item.id === id ? { ...item, status, updatedAt: now() } : item,
+    item.id === id
+      ? {
+          ...item,
+          status,
+          updatedAt: now(),
+          ...(item.revision === undefined ? {} : { revision: item.revision + 1 }),
+        }
+      : item,
   );
   return commit(document, { stories }, [id]);
 }
@@ -82,6 +170,7 @@ export function assignReview(
           assignee: assignment.assignee,
           reviewDecision: "proposed" as const,
           updatedAt: timestamp,
+          ...(item.revision === undefined ? {} : { revision: item.revision + 1 }),
         }
       : item,
   );
@@ -121,6 +210,7 @@ export function decideReview(
           decidedBy,
           decidedAt: timestamp,
           updatedAt: timestamp,
+          ...(item.revision === undefined ? {} : { revision: item.revision + 1 }),
         }
       : item,
   );
@@ -212,9 +302,25 @@ export function assertRevision(
 export function parseWorkItemsDocument(
   value: unknown,
 ): WorkItemsDocument | undefined {
-  return isWorkItemsDocument(value, 1)
-    ? (value as WorkItemsDocument)
-    : undefined;
+  if (!isWorkItemsDocument(value, 1)) return undefined;
+  return normalizeWorkItemsDocument(value);
+}
+
+/** Additive migration for JSON documents written before saved board views. */
+export function normalizeWorkItemsDocument(
+  value: WorkItemsDocument | Record<string, unknown>,
+): WorkItemsDocument {
+  const document = value as WorkItemsDocument;
+  const normalized = {
+    ...structuredClone(document),
+    boardViews: Array.isArray(document.boardViews)
+      ? structuredClone(document.boardViews)
+      : [],
+  };
+  normalized.history = normalized.history.map((entry) =>
+    normalizeWorkItemsDocument(entry),
+  );
+  return normalized;
 }
 
 export function isWorkItemsDocument(
@@ -228,6 +334,9 @@ export function isWorkItemsDocument(
     value.revision < 0 ||
     !Array.isArray(value.stories) ||
     !value.stories.every(isStory) ||
+    (value.boardViews !== undefined &&
+      (!Array.isArray(value.boardViews) ||
+        !value.boardViews.every(isBoardView))) ||
     !Array.isArray(value.comments) ||
     !value.comments.every(isStoryComment) ||
     !Array.isArray(value.reviews) ||
@@ -247,6 +356,12 @@ export function isStory(value: unknown): value is Story {
     isRecord(value) &&
     typeof value.id === "string" &&
     value.id.length > 0 &&
+    isOptionalWorkKind(value.kind) &&
+    isOptionalString(value.homeScopeId) &&
+    isOptionalScopeBindings(value.scopeBindings) &&
+    isOptionalString(value.parentWorkItemId) &&
+    isOptionalWorkProvenance(value.provenance) &&
+    isOptionalNonNegativeInteger(value.revision) &&
     isOptionalString(value.worktree) &&
     typeof value.epicId === "string" &&
     value.epicId.length > 0 &&
@@ -270,6 +385,7 @@ export function isStory(value: unknown): value is Story {
     Array.isArray(value.deps) &&
     value.deps.every((dependency) => typeof dependency === "string") &&
     isOptionalString(value.assignee) &&
+    isOptionalString(value.assigneePrincipalId) &&
     isOptionalReviewDecision(value.reviewDecision) &&
     typeof value.authoredBy === "string" &&
     value.authoredBy.length > 0 &&
@@ -327,8 +443,202 @@ export function assertStory(story: Story): void {
     throw new Error(`Invalid story: ${story.id}.`);
 }
 
+export function assertBoardView(view: BoardView): void {
+  if (!isBoardView(view as unknown))
+    throw new Error(`Invalid board view: ${view.id}.`);
+}
+
+export function isBoardView(value: unknown): value is BoardView {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    typeof value.ownerScopeId === "string" &&
+    value.ownerScopeId.length > 0 &&
+    isOptionalString(value.ownerPrincipalId) &&
+    typeof value.name === "string" &&
+    value.name.length > 0 &&
+    (value.visibility === "private" || value.visibility === "published") &&
+    Array.isArray(value.roots) &&
+    value.roots.length > 0 &&
+    value.roots.every((root) => typeof root === "string" && root.length > 0) &&
+    new Set(value.roots).size === value.roots.length &&
+    (value.traversal === "self" || value.traversal === "self-and-rollups") &&
+    isBoardViewFilters(value.filters) &&
+    (value.groupBy === "status" ||
+      value.groupBy === "scope" ||
+      value.groupBy === "assignee" ||
+      value.groupBy === "kind") &&
+    isNonNegativeInteger(value.revision)
+  );
+}
+
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isOptionalNonNegativeInteger(
+  value: unknown,
+): value is number | undefined {
+  return value === undefined || isNonNegativeInteger(value);
+}
+
+function isOptionalWorkKind(value: unknown): boolean {
+  return value === undefined || isWorkKind(value);
+}
+
+function isWorkKind(value: unknown): boolean {
+  return (
+    value === "feature-request" ||
+    value === "story" ||
+    value === "task" ||
+    value === "defect" ||
+    value === "decision"
+  );
+}
+
+function isOptionalScopeBindings(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (binding) =>
+          isRecord(binding) &&
+          typeof binding.scopeId === "string" &&
+          binding.scopeId.length > 0 &&
+          (binding.relation === "mounted-in" || binding.relation === "rolls-up-to"),
+      ))
+  );
+}
+
+function isOptionalWorkProvenance(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      (value.origin === "principal" || value.origin === "agent") &&
+      typeof value.actorPrincipalId === "string" &&
+      value.actorPrincipalId.length > 0 &&
+      isOptionalString(value.agentSessionId) &&
+      isOptionalString(value.proposedSponsorPrincipalId) &&
+      (value.sourceRefs === undefined ||
+        (Array.isArray(value.sourceRefs) &&
+          value.sourceRefs.every((reference) => typeof reference === "string"))) &&
+      typeof value.createdAt === "string" &&
+      value.createdAt.length > 0)
+  );
+}
+
+function isBoardViewFilters(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value.status === undefined ||
+      (Array.isArray(value.status) && value.status.every(isStoryStatus))) &&
+    (value.kind === undefined ||
+      (Array.isArray(value.kind) && value.kind.every(isWorkKind))) &&
+    isOptionalString(value.assigneePrincipalId) &&
+    isOptionalString(value.sponsorPrincipalId)
+  );
+}
+
+function orderedScopeMatches(
+  view: BoardView,
+  traversal: BoardTraversalResolver,
+): BoardScopeMatch[] {
+  const raw = traversal.resolve(view.roots, view.traversal);
+  const rootSet = new Set(view.roots);
+  const seen = new Set<string>();
+  const matches: BoardScopeMatch[] = [];
+  for (const match of raw) {
+    if (
+      !match ||
+      typeof match.scopeId !== "string" ||
+      typeof match.rootScopeId !== "string" ||
+      !rootSet.has(match.rootScopeId) ||
+      seen.has(match.scopeId)
+    ) {
+      continue;
+    }
+    seen.add(match.scopeId);
+    matches.push({ scopeId: match.scopeId, rootScopeId: match.rootScopeId });
+  }
+  // A resolver for `self` is allowed to return no rows; roots remain eligible.
+  if (view.traversal === "self") {
+    for (const root of view.roots) {
+      if (!seen.has(root)) matches.push({ scopeId: root, rootScopeId: root });
+    }
+  }
+  return matches;
+}
+
+function matchingScopeIds(story: Story, resultScopeIds: Set<string>): string[] {
+  const matched: string[] = [];
+  if (story.homeScopeId && resultScopeIds.has(story.homeScopeId))
+    matched.push(story.homeScopeId);
+  for (const binding of story.scopeBindings ?? []) {
+    if (
+      binding.relation === "rolls-up-to" &&
+      resultScopeIds.has(binding.scopeId) &&
+      !matched.includes(binding.scopeId)
+    ) {
+      matched.push(binding.scopeId);
+    }
+  }
+  return matched;
+}
+
+function matchesBoardFilters(story: Story, view: BoardView): boolean {
+  const { filters } = view;
+  return (
+    (filters.status === undefined || filters.status.includes(story.status)) &&
+    (filters.kind === undefined ||
+      (story.kind !== undefined && filters.kind.includes(story.kind))) &&
+    (filters.assigneePrincipalId === undefined ||
+      filters.assigneePrincipalId === story.assigneePrincipalId) &&
+    (filters.sponsorPrincipalId === undefined ||
+      filters.sponsorPrincipalId === story.provenance?.proposedSponsorPrincipalId)
+  );
+}
+
+function progressFor(children: Story[] | undefined): ChildProgress | undefined {
+  if (!children || children.length === 0) return undefined;
+  return {
+    total: children.length,
+    shipped: children.filter((child) => child.status === "shipped").length,
+  };
+}
+
+function groupFor(
+  story: Story,
+  view: BoardView,
+  matchedScopeIds: string[],
+  matches: BoardScopeMatch[],
+  rootOrder: Map<string, number>,
+): string {
+  switch (view.groupBy) {
+    case "status":
+      return story.status;
+    case "assignee":
+      return story.assigneePrincipalId ?? story.assignee ?? "unassigned";
+    case "kind":
+      return story.kind ?? "story";
+    case "scope": {
+      if (story.homeScopeId && matchedScopeIds.includes(story.homeScopeId))
+        return story.homeScopeId;
+      const matchingRoots = matches
+        .filter(({ scopeId }) => matchedScopeIds.includes(scopeId))
+        .sort(
+          (left, right) =>
+            (rootOrder.get(left.rootScopeId) ?? Number.MAX_SAFE_INTEGER) -
+              (rootOrder.get(right.rootScopeId) ?? Number.MAX_SAFE_INTEGER) ||
+            left.scopeId.localeCompare(right.scopeId),
+        );
+      return matchingRoots[0]?.rootScopeId ?? view.roots[0];
+    }
+  }
 }
 
 function isOptionalReviewDecision(

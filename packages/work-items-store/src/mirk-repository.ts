@@ -17,11 +17,14 @@ import {
   assertRevision,
   assignReview,
   decideReview,
+  filterBoardViews,
+  isBoardView,
   filterStories,
   isReviewItem,
   isStory,
   sortStories,
   transitionStory,
+  upsertBoardView,
   upsertStory,
 } from "./operations.js";
 import { createWorkItemsDocument } from "./sample.js";
@@ -31,6 +34,8 @@ import {
   resolveRoadmapDir,
 } from "./markdown-repository.js";
 import type {
+  BoardView,
+  BoardViewFilter,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -45,6 +50,7 @@ import type {
 const STORIES_COLLECTION = "stories";
 const INDEX_FILE = "index.md";
 const REVIEWS_FILE = "_reviews.md";
+const BOARD_VIEWS_FILE = "_board-views.md";
 const GIT_IDENTITY = [
   "-c",
   "user.name=Sigil Roadmap",
@@ -117,6 +123,13 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]> {
+    await this.ensureReady();
+    return filterBoardViews((await this.readDocument()).boardViews, filter).map(
+      (view) => structuredClone(view),
+    );
+  }
+
   async upsertStory(
     story: Story,
     expectedRevision?: number,
@@ -127,6 +140,18 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         storyIds: [story.id],
       }),
       () => `story ${story.id}: upsert`,
+    );
+  }
+
+  async upsertBoardView(
+    view: BoardView,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) => ({
+        ...upsertBoardView(document, view, expectedRevision),
+      }),
+      () => `board view ${view.id}: upsert`,
     );
   }
 
@@ -245,6 +270,12 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
           directory: ".",
           frontmatterFields: [
             "worktree",
+            "kind",
+            "homeScopeId",
+            "scopeBindings",
+            "parentWorkItemId",
+            "provenance",
+            "revision",
             "epicId",
             "epicTitle",
             "title",
@@ -254,6 +285,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
             "deps",
             "extraction",
             "assignee",
+            "assigneePrincipalId",
             "reviewDecision",
             "authoredBy",
             "createdAt",
@@ -303,6 +335,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       stories: sortStories(stories),
       comments,
       reviews: await this.readReviews(),
+      boardViews: await this.readBoardViews(),
       history: [],
     };
   }
@@ -382,6 +415,20 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     });
   }
 
+  private async readBoardViews(): Promise<BoardView[]> {
+    const path = join(this.directory, BOARD_VIEWS_FILE);
+    if (!existsSync(path)) return [];
+    const { data } = parseFrontmatter(await readFile(path, "utf8"));
+    const boardViews = Array.isArray(data.boardViews) ? data.boardViews : [];
+    return boardViews.map((view, index) => {
+      if (!isBoardView(view))
+        throw new Error(
+          `Roadmap store is corrupt: invalid board view at ${BOARD_VIEWS_FILE}[${index}].`,
+        );
+      return view;
+    });
+  }
+
   private async readRevision(): Promise<number> {
     const path = join(this.directory, INDEX_FILE);
     if (!existsSync(path)) return 0;
@@ -410,7 +457,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         ? document.stories
         : document.stories.filter((story) => storyIds.includes(story.id));
 
-    await this.withReviewsHidden(async () => {
+    await this.withSidecarsHidden(async () => {
       for (const story of stories) {
         assertSafeStoryId(story.id);
         const path = join(this.directory, `${story.id}.md`);
@@ -435,25 +482,30 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       "utf8",
     );
     await writeFile(
+      join(this.directory, BOARD_VIEWS_FILE),
+      serializeBoardViews(document.boardViews),
+      "utf8",
+    );
+    await writeFile(
       join(this.directory, INDEX_FILE),
       serializeIndex(document, this.now()),
       "utf8",
     );
   }
 
-  private async withReviewsHidden<T>(operation: () => Promise<T>): Promise<T> {
-    const source = join(this.directory, REVIEWS_FILE);
-    if (!existsSync(source)) return operation();
-
-    const hidden = join(
-      this.directory,
-      `.${REVIEWS_FILE}.${process.pid}.${Date.now()}.tmp`,
+  private async withSidecarsHidden<T>(operation: () => Promise<T>): Promise<T> {
+    const sources = [REVIEWS_FILE, BOARD_VIEWS_FILE]
+      .map((file) => join(this.directory, file))
+      .filter(existsSync);
+    if (sources.length === 0) return operation();
+    const hidden = sources.map((source, index) =>
+      join(this.directory, `.${index}.${process.pid}.${Date.now()}.tmp`),
     );
-    await rename(source, hidden);
+    await Promise.all(sources.map((source, index) => rename(source, hidden[index])));
     try {
       return await operation();
     } finally {
-      await rename(hidden, source);
+      await Promise.all(hidden.map((path, index) => rename(path, sources[index])));
     }
   }
 
@@ -495,6 +547,14 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
 function recordForStory(story: Story): Record<string, unknown> {
   const record: Record<string, unknown> = { id: story.id };
   if (story.worktree !== undefined) record.worktree = story.worktree;
+  if (story.kind !== undefined) record.kind = story.kind;
+  if (story.homeScopeId !== undefined) record.homeScopeId = story.homeScopeId;
+  if (story.scopeBindings !== undefined)
+    record.scopeBindings = story.scopeBindings;
+  if (story.parentWorkItemId !== undefined)
+    record.parentWorkItemId = story.parentWorkItemId;
+  if (story.provenance !== undefined) record.provenance = story.provenance;
+  if (story.revision !== undefined) record.revision = story.revision;
   record.epicId = story.epicId;
   record.epicTitle = story.epicTitle;
   record.title = story.title;
@@ -503,6 +563,8 @@ function recordForStory(story: Story): Record<string, unknown> {
   record.reviewGate = story.reviewGate;
   record.deps = story.deps;
   if (story.assignee !== undefined) record.assignee = story.assignee;
+  if (story.assigneePrincipalId !== undefined)
+    record.assigneePrincipalId = story.assigneePrincipalId;
   if (story.reviewDecision !== undefined)
     record.reviewDecision = story.reviewDecision;
   if (story.extraction !== undefined) record.extraction = story.extraction;
@@ -571,6 +633,14 @@ function serializeReviews(reviews: ReviewItem[]): string {
           .join("\n")
       : "_No review items yet._";
   return `${serializeFrontmatter({ reviews })}\n# Reviews\n\n${list}\n`;
+}
+
+function serializeBoardViews(boardViews: BoardView[]): string {
+  const list =
+    boardViews.length > 0
+      ? boardViews.map((view) => `- ${view.id} · ${view.name}`).join("\n")
+      : "_No saved board views yet._";
+  return `${serializeFrontmatter({ boardViews })}\n# Board views\n\n${list}\n`;
 }
 
 function serializeIndex(document: WorkItemsDocument, generatedAt: string): string {

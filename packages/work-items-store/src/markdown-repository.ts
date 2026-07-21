@@ -10,16 +10,21 @@ import {
   assertRevision,
   assignReview,
   decideReview,
+  filterBoardViews,
   filterStories,
+  isBoardView,
   isReviewItem,
   isStory,
   sortStories,
   transitionStory,
+  upsertBoardView,
   upsertStory,
 } from "./operations.js";
 import { createWorkItemsDocument } from "./sample.js";
 import type { WorkItemsRepository } from "./repository.js";
 import type {
+  BoardView,
+  BoardViewFilter,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -33,6 +38,7 @@ import type {
 
 const INDEX_FILE = "index.md";
 const REVIEWS_FILE = "_reviews.md";
+const BOARD_VIEWS_FILE = "_board-views.md";
 const GIT_IDENTITY = [
   "-c",
   "user.name=Sigil Roadmap",
@@ -94,6 +100,11 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     return filterStories(sortStories(document.stories), filter);
   }
 
+  async listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]> {
+    await this.ensureReady();
+    return filterBoardViews((await this.readDocument()).boardViews, filter);
+  }
+
   async upsertStory(
     story: Story,
     expectedRevision?: number,
@@ -101,6 +112,16 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     return this.mutate(
       (document) => upsertStory(document, story, expectedRevision),
       () => `story ${story.id}: upsert`,
+    );
+  }
+
+  async upsertBoardView(
+    view: BoardView,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) => upsertBoardView(document, view, expectedRevision),
+      () => `board view ${view.id}: upsert`,
     );
   }
 
@@ -224,6 +245,7 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
       stories,
       comments,
       reviews: await this.readReviews(dir),
+      boardViews: await this.readBoardViews(dir),
       history: [],
     };
   }
@@ -268,6 +290,20 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     });
   }
 
+  private async readBoardViews(dir: string): Promise<BoardView[]> {
+    const path = join(dir, BOARD_VIEWS_FILE);
+    if (!existsSync(path)) return [];
+    const { data } = parseFrontmatter(await readFile(path, "utf8"));
+    const boardViews = Array.isArray(data.boardViews) ? data.boardViews : [];
+    return boardViews.map((view, index) => {
+      if (!isBoardView(view))
+        throw new Error(
+          `Roadmap store is corrupt: invalid board view at ${BOARD_VIEWS_FILE}[${index}].`,
+        );
+      return view;
+    });
+  }
+
   private async readRevision(dir: string): Promise<number> {
     const path = join(dir, INDEX_FILE);
     if (!existsSync(path)) return 0;
@@ -302,6 +338,11 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     await writeFile(
       join(dir, REVIEWS_FILE),
       serializeReviews(document.reviews),
+      "utf8",
+    );
+    await writeFile(
+      join(dir, BOARD_VIEWS_FILE),
+      serializeBoardViews(document.boardViews),
       "utf8",
     );
     await writeFile(
@@ -392,6 +433,14 @@ function serializeStoryMarkdown(
 ): string {
   const frontmatter: Record<string, unknown> = { id: story.id };
   if (story.worktree !== undefined) frontmatter.worktree = story.worktree;
+  if (story.kind !== undefined) frontmatter.kind = story.kind;
+  if (story.homeScopeId !== undefined) frontmatter.homeScopeId = story.homeScopeId;
+  if (story.scopeBindings !== undefined)
+    frontmatter.scopeBindings = story.scopeBindings;
+  if (story.parentWorkItemId !== undefined)
+    frontmatter.parentWorkItemId = story.parentWorkItemId;
+  if (story.provenance !== undefined) frontmatter.provenance = story.provenance;
+  if (story.revision !== undefined) frontmatter.revision = story.revision;
   frontmatter.epicId = story.epicId;
   frontmatter.epicTitle = story.epicTitle;
   frontmatter.title = story.title;
@@ -401,6 +450,8 @@ function serializeStoryMarkdown(
   frontmatter.deps = story.deps;
   if (story.extraction !== undefined) frontmatter.extraction = story.extraction;
   if (story.assignee !== undefined) frontmatter.assignee = story.assignee;
+  if (story.assigneePrincipalId !== undefined)
+    frontmatter.assigneePrincipalId = story.assigneePrincipalId;
   if (story.reviewDecision !== undefined)
     frontmatter.reviewDecision = story.reviewDecision;
   frontmatter.authoredBy = story.authoredBy;
@@ -459,6 +510,14 @@ function serializeReviews(reviews: ReviewItem[]): string {
           .join("\n")
       : "_No review items yet._";
   return `${serializeFrontmatter({ reviews })}\n# Reviews\n\n${list}\n`;
+}
+
+function serializeBoardViews(boardViews: BoardView[]): string {
+  const list =
+    boardViews.length > 0
+      ? boardViews.map((view) => `- ${view.id} · ${view.name}`).join("\n")
+      : "_No saved board views yet._";
+  return `${serializeFrontmatter({ boardViews })}\n# Board views\n\n${list}\n`;
 }
 
 function serializeIndex(document: WorkItemsDocument, generatedAt: string): string {

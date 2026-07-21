@@ -90,6 +90,7 @@ export function createWorkItemsDocument(): WorkItemsDocument {
       ...story,
       worktree: story.worktree ?? DEFAULT_WORKTREE,
     })),
+    boardViews: [],
     comments: [],
     reviews: structuredClone(seedReviews),
     history: [],

@@ -9,14 +9,19 @@ import {
   assertRevision,
   assignReview,
   decideReview,
+  filterBoardViews,
   filterStories,
+  normalizeWorkItemsDocument,
   parseWorkItemsDocument,
   sortStories,
   transitionStory,
+  upsertBoardView,
   upsertStory,
 } from "./operations.js";
 import { createWorkItemsDocument } from "./sample.js";
 import type {
+  BoardView,
+  BoardViewFilter,
   ReviewAssignment,
   ReviewDecision,
   Story,
@@ -30,8 +35,13 @@ import type {
 export interface WorkItemsRepository {
   get(expectedRevision?: number): Promise<WorkItemsDocument>;
   list(filter?: StoryFilter): Promise<Story[]>;
+  listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]>;
   upsertStory(
     story: Story,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult>;
+  upsertBoardView(
+    view: BoardView,
     expectedRevision?: number,
   ): Promise<WorkItemsMutationResult>;
   transitionStory(
@@ -65,7 +75,7 @@ export class MemoryWorkItemsRepository implements WorkItemsRepository {
     now?: () => string;
   }) {
     this.document = structuredClone(
-      options?.document ?? createWorkItemsDocument(),
+      normalizeWorkItemsDocument(options?.document ?? createWorkItemsDocument()),
     );
     this.now = options?.now ?? (() => new Date().toISOString());
   }
@@ -81,11 +91,26 @@ export class MemoryWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]> {
+    return filterBoardViews(this.document.boardViews, filter).map((view) =>
+      structuredClone(view),
+    );
+  }
+
   async upsertStory(
     story: Story,
     expectedRevision?: number,
   ): Promise<WorkItemsMutationResult> {
     const result = upsertStory(this.document, story, expectedRevision);
+    this.document = result.document;
+    return structuredClone(result);
+  }
+
+  async upsertBoardView(
+    view: BoardView,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    const result = upsertBoardView(this.document, view, expectedRevision);
     this.document = result.document;
     return structuredClone(result);
   }
@@ -182,12 +207,28 @@ export class FileWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]> {
+    const document = await this.store.read();
+    return filterBoardViews(document.boardViews, filter).map((view) =>
+      structuredClone(view),
+    );
+  }
+
   async upsertStory(
     story: Story,
     expectedRevision?: number,
   ): Promise<WorkItemsMutationResult> {
     return this.mutate((document) =>
       upsertStory(document, story, expectedRevision),
+    );
+  }
+
+  async upsertBoardView(
+    view: BoardView,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate((document) =>
+      upsertBoardView(document, view, expectedRevision),
     );
   }
 

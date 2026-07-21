@@ -226,6 +226,37 @@ describe("MirkWorkItemsRepository", () => {
     );
   });
 
+  it("persists saved board views as a sidecar without changing story identity", async () => {
+    const directory = await makeDirectory();
+    const repository = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+    });
+    const initial = await repository.get();
+    const storyBefore = await readFile(join(directory, "S0.3.md"), "utf8");
+    const view = {
+      id: "project-a-roadmap",
+      ownerScopeId: "project-a",
+      name: "Project A roadmap",
+      visibility: "private" as const,
+      roots: ["project-a"],
+      traversal: "self-and-rollups" as const,
+      filters: {},
+      groupBy: "scope" as const,
+      revision: 1,
+    };
+
+    await repository.upsertBoardView(view, initial.revision);
+
+    const reopened = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+    });
+    expect(await reopened.listBoardViews()).toEqual([view]);
+    expect(await readFile(join(directory, "S0.3.md"), "utf8")).toBe(storyBefore);
+    expect((await reopened.list()).map(({ id }) => id)).toContain("S0.3");
+  });
+
   it("loads idea-stage stories (no acceptance criteria) and skips a corrupt file", async () => {
     const directory = await makeDirectory();
     // Seed the store so the collection + index exist.
