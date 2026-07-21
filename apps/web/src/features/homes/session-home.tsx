@@ -32,13 +32,10 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
           : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
       }
     >
-      <header className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          {view.header.icon ? (
-            <span aria-hidden>{view.header.icon}</span>
-          ) : null}
-          {view.header.name}
-        </h1>
+      <header
+        aria-label={`${view.header.name} overview`}
+        className="flex flex-col gap-1"
+      >
         {view.workspaceName ? (
           <p
             className="text-[11px] text-muted-foreground"
@@ -56,6 +53,9 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
         title="Produced here"
         count={view.artifacts.length}
         empty="This session hasn't produced anything yet."
+        emptyAction={
+          archived ? undefined : { label: "Ask your agent", href: "/chat" }
+        }
         compact={compact}
       >
         {view.artifacts.map((artifact, index) => (
@@ -77,6 +77,9 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
         title="Linked commitments"
         count={view.commitments.length}
         empty="No work is explicitly linked to this session."
+        emptyAction={
+          archived ? undefined : { label: "Request a feature", href: "/chat" }
+        }
         compact={compact}
       >
         {view.commitments.map((item, index) => (

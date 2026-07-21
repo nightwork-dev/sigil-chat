@@ -205,7 +205,10 @@ describe("project home", () => {
     const el = await render(
       <ProjectHome state={{ kind: "ready", view: projectView }} />,
     )
-    expect(el.textContent).toContain("Commerce Platform")
+    expect(
+      el.querySelector("header")?.getAttribute("aria-label"),
+    ).toBe("Commerce Platform overview")
+    expect(el.querySelector("h1")).toBeNull()
     expect(el.textContent).toContain("Checkout Reliability")
     expect(el.textContent).toContain("Retry storm triage")
     expect(el.textContent).toContain("Neve Laine")

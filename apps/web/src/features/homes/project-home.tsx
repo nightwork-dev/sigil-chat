@@ -38,13 +38,10 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
           : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
       }
     >
-      <header className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          {view.header.icon ? (
-            <span aria-hidden>{view.header.icon}</span>
-          ) : null}
-          {view.header.name}
-        </h1>
+      <header
+        aria-label={`${view.header.name} overview`}
+        className="flex flex-col gap-1"
+      >
         {view.header.description ? (
           <p className="text-sm text-muted-foreground">
             {view.header.description}
@@ -124,6 +121,7 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         title="Agents"
         count={view.agents.length}
         empty="No agents are available in this project."
+        emptyAction={{ label: "Browse agents", href: "/agents" }}
         compact={compact}
       >
         {view.agents.map((agent, index) => (
@@ -140,6 +138,9 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         title="Resources"
         count={view.resources.length}
         empty="No artifacts, evidence, or pages here yet."
+        emptyAction={
+          archived ? undefined : { label: "Ask your agent", href: "/chat" }
+        }
         compact={compact}
       >
         {view.resources.map((resource, index) => (
