@@ -172,11 +172,16 @@ set it. Gonk's registry `ApprovalProvider` is the consent-policy boundary for
 tool execution; transport authentication establishes identity but does not turn
 the browser preference into authority.
 
-Agent threads and the active-thread preference are currently deployment-global.
-There is no per-user owner on a thread record, so this remains a local,
-single-user development application. An authenticated deployment must bind
-list/get/create/fork/rename/archive/snapshot operations to an application
-principal and enforce thread ownership before exposing the session catalog.
+Agent threads are membership-scoped: every thread record carries
+`members: string[]`, and list/get/create/fork/rename/archive/snapshot
+operations filter by `isMember(thread.members, userId)`
+(`agent-threads-domain.ts`). The active-thread preference is per-principal
+and also carries the active project/workspace container selection
+(PRODUCT-CHROME-REWORK-SPEC §3.1). What remains open: Gonk's registry
+container tools (`apps/gonk/src/registry/containers.ts`) do not yet enforce
+principal membership on mutations — member management and cross-principal
+mutation stay out of scope until that lands (the chrome rework's §5 release
+boundary).
 
 Session and capability-catalog access is application authorization, not tool
 approval state. `GONK_MCP_KEY` protects the Gonk MCP transport; it does not

@@ -32,21 +32,52 @@
   `use-clipboard`, `use-attachments`, `lib/delimited`, and `lib/dotenv`.
   Sigil Chat's compose bar consumes them. Done.
 
-## Requested — agent operations surface
+## Product chrome — Projects as the visible organizing center
 
-A management console for the things an agent *is made of*. These are product
-surfaces over existing Gonk/eve substrate, not new engines.
+The shell presents the container hierarchy (Principal → Project → Workspace →
+Session) as the frame; feature surfaces are what you do INSIDE the active
+container. Spec: [`specs/PRODUCT-CHROME-REWORK-SPEC.md`](specs/PRODUCT-CHROME-REWORK-SPEC.md).
 
-- **Manage agents** — add / edit / view agent definitions (model, instructions,
-  connections, subagents). Surfaces the `defineAgent` layer.
-- **Manage skills** — add / edit / view skills. Canonical managed-skill
-  records, lifecycle, and authorization live in Gonk Core (`@gonk/skills`, see
-  the [skill-management provenance note](specs/AGENT-SKILL-MANAGEMENT-SPEC.md));
-  this is the Sigil catalog + authoring UX over that.
-- **Tool permissions & catalog** — manage tool permission defaults, view the
-  available tools, and see/set per-tool approval policy. Builds on the existing
-  client tool-approval preference (`agent-tool-approval.ts`) + the Gonk registry
-  (`apps/gonk/src/registry.ts`) and its `ApprovalProvider`.
+- **Active container + switcher (§3.1)** — a `Project ▸ Workspace` switcher in
+  the sidebar header on every route; the selection is app-global
+  (`ActiveContainerProvider`), persists per-principal in the extended
+  active-thread preference store, and scopes the conversation drawer's
+  default filter. Done.
+- **Breadcrumb (§3.4)** — `Project › Workspace › Surface`; the container
+  segment omits itself on principal-level routes. Done.
+- **Omnibar elevation (§3.3)** — Cmd+K switches projects/workspaces/sessions
+  (sessions scoped to the active workspace), jumps to surfaces, and sends
+  free text as a message through the one app-global session. Done.
+- **Presentation variants (§3.6)** — one session, many presentations: dock
+  (existing), sidecar (Review's right rail, bound to the selected passage),
+  inline (built; canvas-anchor mounting follows), omnibar-input. Variant
+  registry + Storybook showcase in sigil-design is the remaining piece (Q5).
+- **One presentation per region (§4.1)** — structural registry
+  (`agent-surface-registry`): the shell dock suppresses whenever a route
+  owns a fuller presentation; regression-tested. Done.
+- **Agent output projections** — tool-call parts render through a projection
+  registry (inline / overlay / ambient); `sigil-annotate`/`pin`/`highlight`
+  Gonk tools; `AnnotationOverlay` on Review passages + Studio nodes;
+  `AmbientPanel` working-commentary surface in Studio. Spec:
+  [`specs/AGENT-OUTPUT-PROJECTION-SPEC.md`](specs/AGENT-OUTPUT-PROJECTION-SPEC.md). Done.
+- *Open:* member-management / invitation UI (gated on registry-mutation
+  authz, spec §5); the Q1 sponsorship + relationship-memory model for agent
+  profiles (follow-up spec); the sigil-design variant registry + showcase.
+
+## Agent operations surface
+
+These ship today as product surfaces over the Gonk/eve substrate:
+
+- **Manage agents** — `/agents` roster + profile (identity, configuration,
+  skills, self-model, memory, sessions). Owner-only in full; non-owners get a
+  reduced projection (identity + portrait, §4.3). Done.
+- **Manage skills** — `/skills` catalog surface. Done.
+- **Tool permissions & catalog** — `/capabilities` surface over the Gonk
+  registry, with the client tool-approval preference
+  (`agent-tool-approval.ts`). Done.
+
+Remaining in this family: richer authoring flows (create/edit wizards beyond
+the current forms).
 
 ## Requested — agent memory & workspace
 
@@ -63,8 +94,6 @@ surfaces over existing Gonk/eve substrate, not new engines.
 
 ## Notes on sequencing
 
-The operations surfaces (agents / skills / tools) share a shell pattern — a
-manager list + detail/editor — and should reuse one composable "resource
-manager" rather than three bespoke screens. Memory / blackboard / REPL each
-need a substrate decision (Mirk vs. eve sandbox) and a short spec before build.
-None of these is started; they are captured here so nothing is lost.
+Memory / blackboard / REPL each need a substrate decision (Mirk vs. eve
+sandbox) and a short spec before build. None of these is started; they are
+captured here so nothing is lost.
