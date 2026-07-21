@@ -1,11 +1,13 @@
 // Route-side data sources for the homes.
 //
 // Honesty rule: a live page never shows fixture records as if they were real.
-// Scoped work comes from SC.5's permission-filtered server queries. Resources,
-// artifacts, and attention render empty until their real query lanes land.
+// Scoped work comes from SC.5's permission-filtered server queries. Live
+// artifacts come from the existing authenticated Gonk artifact manifest. Agent
+// activity/attention remains empty until a durable per-scope source exists.
 // The explicit `?fixtures=1` review flag is the only path that enables the
 // Northstar data needed to exercise the rich state matrix.
 
+import type { ArtifactRecord } from "@/lib/artifacts"
 import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 import type { Story } from "@workspace/work-items-store/types"
 
@@ -38,6 +40,31 @@ export interface LiveWorkInput {
   readonly sessionId?: string
   readonly sessionStories?: readonly Story[]
   readonly nav: ProjectWorkspaceNavSummary
+}
+
+export type ArtifactHomeKind = "project" | "workspace" | "session"
+
+export function artifactScopeForHome(
+  kind: ArtifactHomeKind,
+  id: string,
+): string {
+  return id.startsWith(`${kind}:`) ? id : `${kind}:${id}`
+}
+
+export function artifactRowsFromRecords(
+  artifacts: readonly ArtifactRecord[],
+  options: { readonly mountedFromName?: string } = {},
+): ResourceRow[] {
+  return [...artifacts]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .map((artifact) => ({
+      id: artifact.id,
+      name: artifact.filename,
+      kind: "artifact" as const,
+      ...(options.mountedFromName
+        ? { mountedFromName: options.mountedFromName }
+        : {}),
+    }))
 }
 
 export function liveWorkSource({
@@ -76,13 +103,17 @@ export function routeSources(
   fixtures: boolean,
   agents: readonly AgentRow[],
   work: ScopedWorkSource,
+  live: {
+    readonly resources?: readonly ResourceRow[]
+    readonly artifacts?: readonly ResourceRow[]
+  } = {},
 ): HomeRouteSources {
   if (!fixtures) {
     return {
       work,
       agents,
-      resources: [],
-      artifacts: [],
+      resources: live.resources ?? [],
+      artifacts: live.artifacts ?? [],
       attention: [],
     }
   }

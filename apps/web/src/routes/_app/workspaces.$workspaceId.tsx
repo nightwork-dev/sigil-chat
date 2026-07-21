@@ -11,13 +11,19 @@ import { useMemo } from "react"
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
+import { useArtifacts } from "@/lib/artifacts"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import {
   buildWorkspaceHome,
   type HomesAdapterInput,
 } from "@/features/homes/home-view-model"
 import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
-import { liveWorkSource, routeSources } from "@/features/homes/live-sources"
+import {
+  artifactRowsFromRecords,
+  artifactScopeForHome,
+  liveWorkSource,
+  routeSources,
+} from "@/features/homes/live-sources"
 import { WorkspaceHome } from "@/features/homes/workspace-home"
 import type { HomeState, WorkspaceHomeView } from "@/features/homes/types"
 import { useScopeHomeAccess, useScopeWork } from "@/lib/work-items"
@@ -49,6 +55,11 @@ function WorkspaceHomeRoute() {
     "self",
     !fixtures && access.data === "readable",
   )
+  const artifactScope =
+    !fixtures && access.data === "readable"
+      ? artifactScopeForHome("workspace", workspaceId)
+      : null
+  const artifacts = useArtifacts(artifactScope)
 
   const state: HomeState<WorkspaceHomeView> = useMemo(() => {
     const homeNav = fixtures ? fixtureNav : nav.data
@@ -66,7 +77,11 @@ function WorkspaceHomeRoute() {
       !homeNav ||
       !homeThreads ||
       (!fixtures && !access.data) ||
-      (!fixtures && !scopedWork.data && !scopedWork.isError)
+      (!fixtures && !scopedWork.data && !scopedWork.isError) ||
+      (!fixtures &&
+        Boolean(artifactScope) &&
+        !artifacts.data &&
+        !artifacts.isError)
     ) {
       return { kind: "loading" }
     }
@@ -83,6 +98,9 @@ function WorkspaceHomeRoute() {
         scopeStories: scopedWork.data?.items.map(({ story }) => story),
         nav: homeNav,
       }),
+      {
+        resources: artifactRowsFromRecords(artifacts.data ?? []),
+      },
     )
     const input: HomesAdapterInput = {
       nav: homeNav,
@@ -100,6 +118,9 @@ function WorkspaceHomeRoute() {
     roster.data,
     scopedWork.data,
     scopedWork.isError,
+    artifacts.data,
+    artifacts.isError,
+    artifactScope,
     access.data,
     access.isError,
     workspaceId,
