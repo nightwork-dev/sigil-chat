@@ -14,7 +14,7 @@ Currently authoritative for this product's design/implementation.
   explicit work rollups. Defines the principal overlay, entered-via
   perspective, per-resource resolution rules, scope-rooted board views, safe
   agent-authored feature requests, and the project/workspace/session home-view
-  direction. Draft product and architecture contract; supersedes the strict
+  direction. Ratified product and architecture contract; supersedes the strict
   hierarchy in `PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md` sections 1–3.
 
 - [`PRODUCT-HOMES-IA-PROPOSAL.md`](PRODUCT-HOMES-IA-PROPOSAL.md) —
