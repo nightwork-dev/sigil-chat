@@ -1,9 +1,10 @@
 // Extract agent annotation tool-call outputs from a session, keyed by anchor.
 //
-// This is the Review-surface half of overlay projection: the agent calls
+// The surface-agnostic half of overlay projection: the agent calls
 // sigil-annotate / pin / highlight, Gonk returns { anchorId, body, kind, label },
-// and this hook collects those outputs from the session messages so the surface
-// can mount an AnnotationOverlay beside each resolved anchor.
+// and this hook collects those outputs from the session messages so any surface
+// can mount an AnnotationOverlay beside each resolved anchor (a Review passage,
+// a Studio graph node, etc.).
 //
 // Pure extraction + a thin React hook over the app-global session. The hook is
 // Review-local for now (single consumer); promote to a shared module if a

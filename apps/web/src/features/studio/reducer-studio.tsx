@@ -44,6 +44,7 @@ import {
 import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
 import {
   type AttentionContext,
   type AttentionSelection,
@@ -72,6 +73,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
+import { AnnotationOverlay } from "@workspace/ui/components/annotation-overlay"
 import { DataLabel } from "@workspace/ui/components/data-label"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
@@ -612,6 +614,7 @@ function CanvasControlButton({
 }
 
 function ReducerNode({ data, selected }: NodeProps<ReducerFlowNode>) {
+  const agentAnnotations = useAgentAnnotationsByAnchor().get(data.node.id) ?? []
   return (
     <Card
       size="sm"
@@ -685,6 +688,21 @@ function ReducerNode({ data, selected }: NodeProps<ReducerFlowNode>) {
         <p className="border-t border-destructive/20 px-3 py-2 text-[10px] text-destructive">
           {data.error}
         </p>
+      ) : null}
+      {agentAnnotations.length > 0 ? (
+        <div className="space-y-1 border-t border-border/60 px-2 py-1.5">
+          {agentAnnotations.map((a) => (
+            <AnnotationOverlay
+              key={a.toolCallId}
+              kind={a.kind === "highlight" ? "highlight" : "note"}
+              label={a.label}
+              title={`Node: ${data.node.label}`}
+              body={<p>{a.body}</p>}
+              meta={<span>sigil-{a.kind} · agent</span>}
+            />
+          ))
+          }
+        </div>
       ) : null}
     </Card>
   )
