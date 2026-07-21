@@ -6,6 +6,7 @@ import {
   DEFAULT_EVE_ORIGIN,
   DEFAULT_GONK_MCP_URL,
   joinRuntimeUrl,
+  portlessSiblingUrl,
   readPublicWebEnvironment,
   readRuntimeTopology,
   RuntimeEnvironmentError,
@@ -37,6 +38,36 @@ describe("runtime topology", () => {
       gonkMcpUrl: DEFAULT_GONK_MCP_URL,
     });
     expect(readGonkServerEnvironment({})).toMatchObject({ port: 8808 });
+  });
+
+  it("keeps sibling services inside the current Portless worktree namespace", () => {
+    expect(
+      readRuntimeTopology({
+        PORTLESS_URL: "http://feature-auth.sigil-chat.localhost:1355",
+      }),
+    ).toEqual({
+      eveOrigin: "http://feature-auth.sigil-chat-agent.localhost:1355",
+      gonkMcpUrl: "http://feature-auth.sigil-chat-gonk.localhost:1355/mcp",
+    });
+    expect(
+      readRuntimeTopology({
+        PORTLESS_URL: "http://feature-auth.sigil-chat-agent.localhost:1355",
+      }).gonkMcpUrl,
+    ).toBe("http://feature-auth.sigil-chat-gonk.localhost:1355/mcp");
+    expect(portlessSiblingUrl("not a URL", "sigil-chat-agent")).toBeUndefined();
+  });
+
+  it("keeps explicit topology overrides authoritative under Portless", () => {
+    expect(
+      readRuntimeTopology({
+        PORTLESS_URL: "http://feature.sigil-chat.localhost:1355",
+        EVE_ORIGIN: "https://eve.example.test",
+        GONK_MCP_URL: "https://gonk.example.test/mcp",
+      }),
+    ).toEqual({
+      eveOrigin: "https://eve.example.test",
+      gonkMcpUrl: "https://gonk.example.test/mcp",
+    });
   });
 
   it("supports a plain numeric server port override", () => {

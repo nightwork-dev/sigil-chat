@@ -11,7 +11,7 @@
     "agent-threads:claim-legacy": "tsx scripts/claim-agent-thread-memberships.ts",
     "gaze:setup": "node scripts/setup-gaze-assets.mjs",
     "predev": "pnpm gaze:setup",
-    "dev": "portless sigil-chat vite dev --host",
+    "dev": "portless run --name sigil-chat vite dev --host",
     "prebuild": "pnpm gaze:setup",
     "build": "pnpm --filter @workspace/ui registry:build && vite build",
     "prebuild:static": "pnpm gaze:setup",
