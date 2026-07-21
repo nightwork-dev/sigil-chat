@@ -24,6 +24,7 @@ import {
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
 import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries.js"
+import type { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
 import { createSigilRegistry } from "./registry.js"
 import type { ContainerRegistries } from "./registry/containers.js"
 
@@ -40,7 +41,9 @@ export function createSigilMcpHandler({
   port: number
   portlessUrl?: string
   configuredAllowedHosts?: string
-  containers?: ContainerRegistries
+  containers?: ContainerRegistries & {
+    grants?: Pick<ScopeGrantRegistry, "listActive">
+  }
   scopeAuthorization?: ScopeAuthorizationPolicy
   /** Test/composition seam; production uses the complete Sigil registry. */
   source?: ToolRegistry
@@ -157,7 +160,9 @@ export function createSigilMcpHandler({
   })
 }
 
-function createSigilRegistryContainers(): ContainerRegistries {
+function createSigilRegistryContainers(): ContainerRegistries & {
+  grants?: Pick<ScopeGrantRegistry, "listActive">
+} {
   // Avoid a package-level registry open until this handler actually starts.
   // `createSigilRegistry` uses the same default when no explicit fixture is
   // supplied; keeping resolution here lets the policy and tool registry share

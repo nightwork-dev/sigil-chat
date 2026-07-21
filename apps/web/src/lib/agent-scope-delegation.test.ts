@@ -2,6 +2,8 @@ import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
 import { ProjectRegistry } from "../../../agent/agent/lib/project-registry"
+import { ScopeGrantRegistry } from "../../../agent/agent/lib/scope-grant-registry"
+import { ProjectWorkspaceScopeRegistry } from "../../../agent/agent/lib/scope-registry"
 import { WorkspaceRegistry } from "../../../agent/agent/lib/workspace-registry"
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 
@@ -134,25 +136,24 @@ describe("agent scope authorization", () => {
       createdAt: "2026-07-21T12:00:00.000Z",
       createdBy: "user-owner",
     })
-    const policy = {
-      authorize: ({
-        principalId,
-        resourceScope,
-      }: {
-        principalId: string
-        resourceScope: string
-      }) =>
-        principalId === "user-grantee" &&
-        resourceScope === "workspace:workspace-shared",
-    }
+    const grants = new ScopeGrantRegistry({
+      scopes: new ProjectWorkspaceScopeRegistry(projects, workspaces),
+      store: memoryKv(new Map()),
+    })
+    const grant = grants.create({
+      actions: ["read", "tool"],
+      createdBy: "user-owner",
+      principalId: "user-grantee",
+      resourceScope: "workspace:workspace-shared",
+    })
+    const registries = { grants, projects, workspaces }
 
     expect(() =>
       assertAuthorizedScope(
         "workspace:workspace-shared",
         "user-grantee",
         () => false,
-        { projects, workspaces },
-        policy,
+        registries,
       ),
     ).not.toThrow()
     expect(() =>
@@ -160,8 +161,17 @@ describe("agent scope authorization", () => {
         "project:project-home",
         "user-grantee",
         () => false,
-        { projects, workspaces },
-        policy,
+        registries,
+      ),
+    ).toThrow("NOT_AUTHORIZED")
+
+    grants.revoke(grant.id, "user-owner")
+    expect(() =>
+      assertAuthorizedScope(
+        "workspace:workspace-shared",
+        "user-grantee",
+        () => false,
+        registries,
       ),
     ).toThrow("NOT_AUTHORIZED")
   })

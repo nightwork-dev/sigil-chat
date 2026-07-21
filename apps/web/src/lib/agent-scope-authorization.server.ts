@@ -1,6 +1,6 @@
 import { getProjectWorkspaceRegistries } from "../../../agent/agent/lib/project-workspace-registries"
 import {
-  assertRegisteredScopeMembership,
+  createScopeGrantPolicy,
   type ScopeAuthorizationRegistries,
 } from "../../../agent/agent/lib/scope-authorization"
 import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
@@ -30,18 +30,16 @@ export function assertAuthorizedScope(
         ? resolvedRegistries.projects.get(id) !== undefined
         : resolvedRegistries.workspaces.get(id) !== undefined
     if (registered) {
-      if (policy) {
-        if (
-          !policy.authorize({
-            action: "tool",
-            principalId: userId,
-            resourceScope: scope,
-          })
-        ) {
-          throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
-        }
-      } else {
-        assertRegisteredScopeMembership(scope, userId, resolvedRegistries)
+      const authorization =
+        policy ?? createScopeGrantPolicy({ registries: resolvedRegistries })
+      if (
+        !authorization.authorize({
+          action: "tool",
+          principalId: userId,
+          resourceScope: scope,
+        })
+      ) {
+        throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
       }
       return
     }

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url"
 
 import { ProjectRegistry } from "./project-registry"
 import { ScopeLinkRegistry } from "./scope-link-registry"
+import { ScopeGrantRegistry } from "./scope-grant-registry"
 import { ProjectWorkspaceScopeRegistry } from "./scope-registry"
 import { WorkspaceRegistry } from "./workspace-registry"
 
@@ -13,6 +14,7 @@ export interface ProjectWorkspaceRegistries {
   workspaces: WorkspaceRegistry
   scopes: ProjectWorkspaceScopeRegistry
   links: ScopeLinkRegistry
+  grants: ScopeGrantRegistry
 }
 
 let registries: ProjectWorkspaceRegistries | undefined
@@ -42,6 +44,11 @@ export function getProjectWorkspaceRegistries(): ProjectWorkspaceRegistries {
     workspaces,
     scopes,
     links: new ScopeLinkRegistry({
+      cwd: agentDirectory,
+      projectRoot: storageRoot,
+      scopes,
+    }),
+    grants: new ScopeGrantRegistry({
       cwd: agentDirectory,
       projectRoot: storageRoot,
       scopes,

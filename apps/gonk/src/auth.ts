@@ -1,5 +1,6 @@
 import type { AgentMcpAuthorizationPolicy } from "@zigil/agent-gonk"
 import {
+  hasScopeGrant,
   type ScopeAuthorizationPolicy,
   type ScopeAuthorizationRequest,
 } from "@workspace/agent-contracts/scope-authorization"
@@ -12,6 +13,7 @@ import {
   type ResourceScope,
 } from "./artifact-scope.js"
 import type { ContainerRegistries } from "./registry/containers.js"
+import type { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
 
 export const authorizeSigilMcpRequest: AgentMcpAuthorizationPolicy = () => {
   // Sigil currently exposes one trusted service principal: possession of
@@ -24,15 +26,21 @@ export const authorizeSigilMcpRequest: AgentMcpAuthorizationPolicy = () => {
 }
 
 /**
- * Transitional policy adapter for the PROJ.1 registries. The only knowledge of
- * their old `workspace.projectId` shape stays here; SC.2 can replace this with
- * canonical-home records without changing principal transport or tools.
+ * Registry adapter for canonical homes plus durable exact-resource grants.
+ * Membership is evaluated at the canonical home; a direct grant is evaluated
+ * against the target identity and never against a mount or perspective.
  */
 export function createContainerScopeAuthorizationPolicy(
-  containers: Pick<ContainerRegistries, "projects" | "workspaces">,
+  containers: Pick<
+    ContainerRegistries,
+    "projects" | "workspaces"
+  > & { grants?: Pick<ScopeGrantRegistry, "listActive"> },
 ): ScopeAuthorizationPolicy {
   return {
     authorize(input: ScopeAuthorizationRequest): boolean {
+      if (hasScopeGrant(containers.grants?.listActive() ?? [], input)) {
+        return true
+      }
       const parsed = parseContainerScope(input.resourceScope)
       if (!parsed) return false
       if (parsed.tier === "project") {
@@ -46,7 +54,7 @@ export function createContainerScopeAuthorizationPolicy(
       return Boolean(
         workspace &&
           containers.projects
-            .get(workspace.projectId)
+            .get(workspace.homeScopeId ?? workspace.projectId)
             ?.members.some((member) => member.principalId === input.principalId),
       )
     },

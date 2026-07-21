@@ -4,6 +4,8 @@ import { passthrough, ToolRegistry } from "@gonk/tool-registry"
 import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 
 import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js"
+import { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
+import { ProjectWorkspaceScopeRegistry } from "../../agent/agent/lib/scope-registry.js"
 import { WorkspaceRegistry } from "../../agent/agent/lib/workspace-registry.js"
 import { createAgentMcpBearerHeaders } from "@zigil/agent-gonk"
 
@@ -18,10 +20,16 @@ const handlers: ReturnType<typeof createSigilMcpHandler>[] = []
 
 function containers() {
   const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+  const workspaces = new WorkspaceRegistry({
+    projects,
+    store: memoryKv(new Map()),
+  })
   return {
     projects,
-    workspaces: new WorkspaceRegistry({
-      projects,
+    workspaces,
+    grants: new ScopeGrantRegistry({
+      createId: () => crypto.randomUUID(),
+      scopes: new ProjectWorkspaceScopeRegistry(projects, workspaces),
       store: memoryKv(new Map()),
     }),
   }
@@ -104,13 +112,29 @@ describe("production MCP handler boundary", () => {
   it("projects Eve's signed end-user principal into a real tool context", async () => {
     const records = containers()
     records.projects.upsert({
-      id: "project-1",
-      name: "Project One",
-      description: "A scoped project.",
-      members: [{ principalId: "user-member", role: "member" }],
+      id: "project-home",
+      name: "Canonical home",
+      description: "The workspace's owner project.",
+      members: [{ principalId: "user-owner", role: "owner" }],
       settings: {},
       createdAt: "2026-07-21T12:00:00.000Z",
-      createdBy: "user-member",
+      createdBy: "user-owner",
+    })
+    records.workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      homeScopeId: "project-home",
+      name: "Shared workspace",
+      description: "A resource with a direct grant.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    const grant = records.grants.create({
+      actions: ["read", "tool"],
+      createdBy: "user-owner",
+      principalId: "user-1",
+      resourceScope: "workspace:workspace-shared",
     })
     const registry = new ToolRegistry()
     registry.register({
@@ -125,8 +149,8 @@ describe("production MCP handler boundary", () => {
     const proof = issueScopeDelegation(
       {
         expiresAt: Math.floor(Date.now() / 1_000) + 60,
-        scope: "project:project-1",
-        subject: "user-member",
+        scope: "workspace:workspace-shared",
+        subject: "user-1",
       },
       token,
     )
@@ -140,14 +164,14 @@ describe("production MCP handler boundary", () => {
       authenticateScopeDelegation({
         policy: createContainerScopeAuthorizationPolicy(records),
         proof,
-        scope: { tier: "project", id: "project-1" },
+        scope: { tier: "workspace", id: "workspace-shared" },
         secret: token,
       }),
-    ).resolves.toMatchObject({ principalId: "user-member" })
+    ).resolves.toMatchObject({ principalId: "user-1" })
     handlers.push(handler)
     const initialized = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
-        "x-sigil-scope": "project:project-1",
+        "x-sigil-scope": "workspace:workspace-shared",
         "x-sigil-scope-proof": proof,
       }),
     )
@@ -164,7 +188,7 @@ describe("production MCP handler boundary", () => {
           host: "127.0.0.1:8808",
           "mcp-session-id": sessionId!,
           ...createAgentMcpBearerHeaders(token),
-          "x-sigil-scope": "project:project-1",
+          "x-sigil-scope": "workspace:workspace-shared",
           "x-sigil-scope-proof": proof,
         },
         body: JSON.stringify({
@@ -179,13 +203,39 @@ describe("production MCP handler boundary", () => {
       result: {
         structuredContent: {
           principal: {
-            id: "user-member",
+            id: "user-1",
             kind: "human",
             identity: { method: "custom:scope-delegation" },
           },
         },
       },
     })
+
+    const user2Proof = issueScopeDelegation(
+      {
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "workspace:workspace-shared",
+        subject: "user-2",
+      },
+      token,
+    )
+    const user2 = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "workspace:workspace-shared",
+        "x-sigil-scope-proof": user2Proof,
+      }),
+    )
+    expect(user2.status).toBe(401)
+
+    records.grants.revoke(grant.id, "user-owner")
+    const revoked = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "workspace:workspace-shared",
+        // Reuse the same still-valid user-1 proof: only the durable grant changed.
+        "x-sigil-scope-proof": proof,
+      }),
+    )
+    expect(revoked.status).toBe(401)
   })
 })
 

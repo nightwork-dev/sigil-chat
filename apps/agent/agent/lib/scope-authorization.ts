@@ -11,10 +11,12 @@ import { verifyScopeDelegation } from "@workspace/agent-contracts/scope-delegati
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import type { ProjectRegistry } from "./project-registry"
 import type { WorkspaceRegistry } from "./workspace-registry"
+import type { ScopeGrantRegistry } from "./scope-grant-registry"
 
 export interface ScopeAuthorizationRegistries {
   projects: Pick<ProjectRegistry, "get">
   workspaces: Pick<WorkspaceRegistry, "get">
+  grants?: Pick<ScopeGrantRegistry, "listActive">
 }
 
 export interface ScopeGrantPolicyOptions {
@@ -24,15 +26,15 @@ export interface ScopeGrantPolicyOptions {
 }
 
 /**
- * The current registry adapter supplies canonical homes until SC.2's typed
- * scope records land. A future adapter can replace it without changing the
- * signed-delegation or Gonk boundary contracts.
+ * This adapter reads the canonical-home compatibility field at the registry
+ * boundary. Future resource families can provide their own home resolver
+ * without changing signed delegation or Gonk principal transport.
  */
 export function createScopeGrantPolicy(
   options: ScopeGrantPolicyOptions = {},
 ): ScopeAuthorizationPolicy {
   const registries = options.registries ?? getProjectWorkspaceRegistries()
-  const grants = options.grants ?? (() => [])
+  const grants = options.grants ?? (() => registries.grants?.listActive() ?? [])
   return {
     authorize(input): boolean {
       const request: ScopeAuthorizationRequest = {
@@ -123,7 +125,9 @@ export function assertRegisteredScopeMembership(
     // Legacy unregistered scope ids stay possession-gated until migration.
     return
   }
-  const project = registries.projects.get(workspace.projectId)
+  const project = registries.projects.get(
+    workspace.homeScopeId ?? workspace.projectId,
+  )
   if (
     !project ||
     !project.members.some((member) => member.principalId === principalId)
@@ -153,7 +157,9 @@ function canonicalHomeScope(
   if (!parsed) return undefined
   if (parsed.tier === "project") return scope
   const workspace = registries.workspaces.get(parsed.id)
-  return workspace ? `project:${workspace.projectId}` : undefined
+  return workspace
+    ? `project:${workspace.homeScopeId ?? workspace.projectId}`
+    : undefined
 }
 
 function parseContainerScope(
