@@ -29,7 +29,13 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        chown -R 10000:10000
+        if [ ! -s /var/lib/sigil-codex/auth.json ]
+        && [ -s /var/lib/sigil-eve/codex-home/auth.json ]; then
+        install -o 10000 -g 10000 -m 0600
+        /var/lib/sigil-eve/codex-home/auth.json
+        /var/lib/sigil-codex/auth.json;
+        fi
+        && chown -R 10000:10000
         /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
         /var/lib/sigil-blackboard /var/lib/sigil-codex /var/lib/sigil-identity
         /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents

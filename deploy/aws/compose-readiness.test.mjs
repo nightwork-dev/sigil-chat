@@ -138,6 +138,19 @@ test("only Eve receives the persistent Codex credential volume", () => {
   assert.match(gonk, /SIGIL_LOCAL_CODEX_IMAGE_GENERATION: disabled/)
 })
 
+test("storage initialization migrates a legacy Codex login once", () => {
+  const storageInit = compose.slice(
+    compose.indexOf("\n  storage-init:"),
+    compose.indexOf("\n  migrate:"),
+  )
+  assert.match(storageInit, /\[ ! -s \/var\/lib\/sigil-codex\/auth\.json \]/)
+  assert.match(
+    storageInit,
+    /\[ -s \/var\/lib\/sigil-eve\/codex-home\/auth\.json \]/,
+  )
+  assert.match(storageInit, /install -o 10000 -g 10000 -m 0600/)
+})
+
 test("production image disables KVM tools during Eve compilation", () => {
   const dockerfile = readFileSync(
     resolve(directory, "../../Dockerfile"),
