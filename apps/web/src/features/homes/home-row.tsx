@@ -55,6 +55,7 @@ export function MountChip({ ownerName }: { ownerName?: string }) {
 export interface HomeRowProps {
   readonly title: string
   readonly icon?: string
+  readonly leading?: ReactNode
   readonly description?: string
   readonly href?: string
   readonly trailing?: ReactNode
@@ -68,6 +69,7 @@ export interface HomeRowProps {
 export function HomeRow({
   title,
   icon,
+  leading,
   description,
   href,
   trailing,
@@ -77,6 +79,7 @@ export function HomeRow({
 }: HomeRowProps) {
   const body = (
     <>
+      {leading}
       {icon ? (
         <span aria-hidden className={compact ? "text-sm" : "text-base"}>
           {icon}

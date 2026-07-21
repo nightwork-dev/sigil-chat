@@ -4,6 +4,7 @@
 // quietly — projection, never authority (spec §2, §7).
 
 import { HomeSection } from "./home-section"
+import { AgentHomeRow } from "./agent-home-row"
 import { ArchivedBanner, HomeDenied, HomeSkeleton } from "./home-states"
 import { HomeRow, OwnershipChip } from "./home-row"
 import type { HomeState, WorkspaceHomeView } from "./types"
@@ -89,13 +90,11 @@ export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
         compact={compact}
       >
         {view.agents.map((agent, index) => (
-          <HomeRow
+          <AgentHomeRow
             key={agent.personaId}
+            agent={agent}
             first={index === 0}
             compact={compact}
-            title={agent.name}
-            description={agent.headline}
-            href={`/agents/${agent.personaId}`}
           />
         ))}
       </HomeSection>
