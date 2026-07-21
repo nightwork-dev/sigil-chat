@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest"
 import type { SigilAuthSession } from "./auth/server"
 import {
   createBoardTraversalResolver,
+  prepareBoardViewForUpsert,
   requireBoardViewMutationAccess,
   requireWorkItemsMutationAccess,
   type WorkItemsScopeAccess,
 } from "./work-items-access.server";
 import type { BoardView } from "@workspace/work-items-store/types";
-import { queryBoardView } from "../../../../packages/work-items-store/src/operations";
+import { queryBoardView } from "@workspace/work-items-store/operations";
 import type { Story } from "@workspace/work-items-store/types";
 
 function session(role: "member" | "owner"): SigilAuthSession {
@@ -35,9 +36,15 @@ const board: BoardView = {
   revision: 1,
 };
 
-function scopeAccess(allowed: readonly string[]): WorkItemsScopeAccess {
+function scopeAccess(
+  allowed: readonly string[],
+  actions?: string[],
+): WorkItemsScopeAccess {
   return {
-    canAccess: (_principalId, scopeId) => allowed.includes(scopeId),
+    canAccess: ({ scopeId, action }) => {
+      actions?.push(action);
+      return allowed.includes(scopeId);
+    },
     canonicalDescendants: (scopeId) =>
       scopeId === "project-a" ? ["project-a", "workspace-a"] : [scopeId],
     rollupSubjects: (scopeId) =>
@@ -86,6 +93,17 @@ describe("work-item mutation access", () => {
     ]);
   });
 
+  it("requests board.read for every traversal authorization", () => {
+    const actions: string[] = [];
+    createBoardTraversalResolver(
+      "user-1",
+      scopeAccess(["project-a", "workspace-a"], actions),
+    ).resolve(["project-a"], "self-and-rollups");
+
+    expect(actions).toHaveLength(4);
+    expect(new Set(actions)).toEqual(new Set(["board.read"]));
+  });
+
   it("deduplicates an overlapping multi-root traversal by first declared root", () => {
     const resolver = createBoardTraversalResolver("user-1", {
       canAccess: () => true,
@@ -122,6 +140,21 @@ describe("work-item mutation access", () => {
         scopeAccess(["project-a"]),
       ),
     ).toThrow("Board view scope is not available");
+  });
+
+  it("derives private ownership and rejects a takeover on update", () => {
+    const callerShaped = { ...board, ownerPrincipalId: "attacker" };
+    expect(prepareBoardViewForUpsert(callerShaped, "user-1")).toMatchObject({
+      ownerPrincipalId: "user-1",
+    });
+
+    const existing = { ...board, ownerPrincipalId: "user-1" };
+    expect(
+      prepareBoardViewForUpsert(callerShaped, "user-1", existing),
+    ).toMatchObject({ ownerPrincipalId: "user-1" });
+    expect(() =>
+      prepareBoardViewForUpsert(callerShaped, "user-2", existing),
+    ).toThrow("Board view was not found.");
   });
 });
 

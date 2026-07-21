@@ -11,7 +11,7 @@ import type { BoardView } from "@workspace/work-items-store/types";
 
 const viewer = { id: "principal-1", role: "member" as const, username: null };
 const access: WorkItemsScopeAccess = {
-  canAccess: (_principalId, scopeId) => scopeId !== "scope-hidden",
+  canAccess: ({ scopeId }) => scopeId !== "scope-hidden",
   canonicalDescendants: (scopeId) => [scopeId],
   rollupSubjects: (scopeId) => [scopeId],
 };
@@ -68,6 +68,34 @@ describe("authenticated work-items viewer", () => {
         access,
       ),
     ).toEqual([board("visible-board", ["scope-visible"])]);
+  });
+
+  it("uses discover for board lists and read for a selected board", () => {
+    const actions: string[] = [];
+    const actionAccess: WorkItemsScopeAccess = {
+      ...access,
+      canAccess: ({ scopeId, action }) => {
+        actions.push(action);
+        return scopeId !== "scope-hidden";
+      },
+    };
+    const visible = board("visible-board", ["scope-visible"]);
+
+    boardViewsVisibleToViewer([visible], viewer, actionAccess);
+    expect(new Set(actions)).toEqual(new Set(["board.discover"]));
+    actions.length = 0;
+    boardViewVisibleToViewer(visible, viewer, actionAccess);
+    expect(new Set(actions)).toEqual(new Set(["board.read"]));
+  });
+
+  it("does not expose a private board whose persisted owner is absent", () => {
+    expect(
+      boardViewsVisibleToViewer(
+        [{ ...board("legacy-private", ["scope-visible"]), ownerPrincipalId: undefined }],
+        viewer,
+        access,
+      ),
+    ).toEqual([]);
   });
 
   it("uses an opaque miss for an unauthorized board without disclosing its id", () => {

@@ -14,9 +14,20 @@ import type {
  * membership policy while that service is not materialized here yet.
  */
 export interface WorkItemsScopeAccess {
-  canAccess(principalId: string, scopeId: string): boolean;
+  canAccess(input: WorkItemsScopeAuthorizationRequest): boolean;
   canonicalDescendants(scopeId: string): readonly string[];
   rollupSubjects(scopeId: string): readonly string[];
+}
+
+export type WorkItemsScopeAction =
+  | "board.discover"
+  | "board.read"
+  | "board.write";
+
+export interface WorkItemsScopeAuthorizationRequest {
+  principalId: string;
+  scopeId: string;
+  action: WorkItemsScopeAction;
 }
 
 export function requireWorkItemsMutationAccess(
@@ -33,11 +44,15 @@ export function requireWorkItemsMutationAccess(
 export function currentWorkItemsScopeAccess(): WorkItemsScopeAccess {
   const registries = getProjectWorkspaceRegistries();
   return {
-    canAccess(principalId, scopeId) {
+    canAccess({ principalId, scopeId, action }) {
       const scope = registries.scopes.get(scopeId);
       if (!scope || (scope.kind !== "project" && scope.kind !== "workspace")) {
         return false;
       }
+      // SC.3 integration point: replace this legacy registry assertion with
+      // the grant service's action-exact authorize({ principalId, scopeId,
+      // action }) call. Do not collapse these board actions into tool access.
+      void action;
       try {
         assertAuthorizedScope(
           `${scope.kind}:${scopeId}`,
@@ -83,13 +98,28 @@ export function createBoardTraversalResolver(
       const matches: BoardScopeMatch[] = [];
       const seen = new Set<string>();
       for (const rootScopeId of roots) {
-        if (!access.canAccess(principalId, rootScopeId)) continue;
+        if (
+          !access.canAccess({
+            principalId,
+            scopeId: rootScopeId,
+            action: "board.read",
+          })
+        ) {
+          continue;
+        }
         const scopeIds =
           traversal === "self"
             ? [rootScopeId]
             : resolveRollupScopes(rootScopeId, access);
         for (const scopeId of scopeIds) {
-          if (seen.has(scopeId) || !access.canAccess(principalId, scopeId)) {
+          if (
+            seen.has(scopeId) ||
+            !access.canAccess({
+              principalId,
+              scopeId,
+              action: "board.read",
+            })
+          ) {
             continue;
           }
           seen.add(scopeId);
@@ -102,18 +132,55 @@ export function createBoardTraversalResolver(
 }
 
 /** A board is never evaluated if any saved root is outside the viewer grant. */
+export function canDiscoverBoardView(
+  view: BoardView,
+  principalId: string,
+  access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
+): boolean {
+  return canAccessBoardView(view, principalId, "board.discover", access);
+}
+
 export function canReadBoardView(
   view: BoardView,
   principalId: string,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): boolean {
+  return canAccessBoardView(view, principalId, "board.read", access);
+}
+
+function canAccessBoardView(
+  view: BoardView,
+  principalId: string,
+  action: "board.discover" | "board.read",
+  access: WorkItemsScopeAccess,
+): boolean {
   return (
-    (view.visibility !== "private" ||
-      view.ownerPrincipalId === undefined ||
-      view.ownerPrincipalId === principalId) &&
-    access.canAccess(principalId, view.ownerScopeId) &&
-    view.roots.every((scopeId) => access.canAccess(principalId, scopeId))
+    (view.visibility !== "private" || view.ownerPrincipalId === principalId) &&
+    access.canAccess({ principalId, scopeId: view.ownerScopeId, action }) &&
+    view.roots.every((scopeId) =>
+      access.canAccess({ principalId, scopeId, action }),
+    )
   );
+}
+
+/**
+ * Removes browser-asserted private ownership before persistence. Updating a
+ * private board retains its existing owner and refuses a mismatched principal.
+ */
+export function prepareBoardViewForUpsert(
+  view: BoardView,
+  principalId: string,
+  existing?: BoardView,
+): BoardView {
+  if (existing?.visibility === "private") {
+    if (!existing.ownerPrincipalId || existing.ownerPrincipalId !== principalId) {
+      throw new Error("Board view was not found.");
+    }
+    return { ...view, ownerPrincipalId: existing.ownerPrincipalId };
+  }
+  return view.visibility === "private"
+    ? { ...view, ownerPrincipalId: principalId }
+    : view;
 }
 
 /**
@@ -127,8 +194,18 @@ export function requireBoardViewMutationAccess(
 ): SigilAuthSession {
   requireSession(session);
   if (
-    !access.canAccess(session.user.id, view.ownerScopeId) ||
-    !view.roots.every((scopeId) => access.canAccess(session.user.id, scopeId))
+    !access.canAccess({
+      principalId: session.user.id,
+      scopeId: view.ownerScopeId,
+      action: "board.write",
+    }) ||
+    !view.roots.every((scopeId) =>
+      access.canAccess({
+        principalId: session.user.id,
+        scopeId,
+        action: "board.write",
+      }),
+    )
   ) {
     throw new Error("Board view scope is not available to this principal.");
   }

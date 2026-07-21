@@ -18,7 +18,7 @@ import type {
   StoryStatus,
   WorkItemsMutationResult,
 } from "@workspace/work-items-store/types";
-import { queryBoardView } from "../../../../packages/work-items-store/src/operations";
+import { queryBoardView } from "@workspace/work-items-store/operations";
 
 const listStoriesFn = createServerFn({ method: "GET" })
   .validator(
@@ -129,7 +129,7 @@ const upsertBoardViewFn = createServerFn({ method: "POST" })
     const { getSession } = await import("@/lib/auth/session");
     const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
       await import("@/lib/work-items-viewer.server");
-    const { requireBoardViewMutationAccess } =
+    const { prepareBoardViewForUpsert, requireBoardViewMutationAccess } =
       await import("@/lib/work-items-access.server");
     const session = await getSession();
     const viewer = authenticatedWorkItemsViewer(session);
@@ -139,9 +139,10 @@ const upsertBoardViewFn = createServerFn({ method: "POST" })
       (candidate) => candidate.id === data.view.id,
     );
     if (existing) boardViewVisibleToViewer(existing, viewer);
-    requireBoardViewMutationAccess(session, data.view);
+    const view = prepareBoardViewForUpsert(data.view, viewer.id, existing);
+    requireBoardViewMutationAccess(session, view);
     return workItemsRepository.upsertBoardView(
-      data.view,
+      view,
       data.expectedRevision,
     );
   });
@@ -536,7 +537,15 @@ function reconcileBoardViews(
       view,
     );
   }
-  return queryClient.invalidateQueries({
-    queryKey: [...workItemKeys.all(), "board-views", principalId],
-  });
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: [...workItemKeys.all(), "board-views", principalId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: workItemKeys.boardView(principalId, viewId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: workItemKeys.boardQuery(principalId, viewId),
+    }),
+  ]).then(() => undefined);
 }

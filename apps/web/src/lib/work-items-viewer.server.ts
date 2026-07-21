@@ -1,6 +1,7 @@
 import type { SigilAuthSession } from "@/lib/auth/server";
 import { requireSession } from "@/lib/auth/session";
 import {
+  canDiscoverBoardView,
   canReadBoardView,
   currentWorkItemsScopeAccess,
   type WorkItemsScopeAccess,
@@ -31,7 +32,9 @@ export function boardViewsVisibleToViewer(
   viewer: AuthenticatedWorkItemsViewer,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): BoardView[] {
-  return views.filter((view) => canReadBoardView(view, viewer.id, access));
+  return views.filter((view) =>
+    canDiscoverBoardView(view, viewer.id, access),
+  );
 }
 
 /**
