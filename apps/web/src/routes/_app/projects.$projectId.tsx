@@ -11,10 +11,16 @@ import { useMemo } from "react"
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
+import { useArtifacts } from "@/lib/artifacts"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { buildProjectHome } from "@/features/homes/home-view-model"
 import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
-import { liveWorkSource, routeSources } from "@/features/homes/live-sources"
+import {
+  artifactRowsFromRecords,
+  artifactScopeForHome,
+  liveWorkSource,
+  routeSources,
+} from "@/features/homes/live-sources"
 import { ProjectHome } from "@/features/homes/project-home"
 import type { HomeState, ProjectHomeView } from "@/features/homes/types"
 import { useScopeHomeAccess, useScopeWork } from "@/lib/work-items"
@@ -42,6 +48,11 @@ function ProjectHomeRoute() {
     "self-and-rollups",
     !fixtures && access.data === "readable",
   )
+  const artifactScope =
+    !fixtures && access.data === "readable"
+      ? artifactScopeForHome("project", projectId)
+      : null
+  const artifacts = useArtifacts(artifactScope)
 
   const state: HomeState<ProjectHomeView> = useMemo(() => {
     const homeNav = fixtures ? fixtureNav : nav.data
@@ -59,7 +70,11 @@ function ProjectHomeRoute() {
       !homeNav ||
       !homeThreads ||
       (!fixtures && !access.data) ||
-      (!fixtures && !scopedWork.data && !scopedWork.isError)
+      (!fixtures && !scopedWork.data && !scopedWork.isError) ||
+      (!fixtures &&
+        Boolean(artifactScope) &&
+        !artifacts.data &&
+        !artifacts.isError)
     ) {
       return { kind: "loading" }
     }
@@ -76,6 +91,9 @@ function ProjectHomeRoute() {
         scopeStories: scopedWork.data?.items.map(({ story }) => story),
         nav: homeNav,
       }),
+      {
+        resources: artifactRowsFromRecords(artifacts.data ?? []),
+      },
     )
     const view = buildProjectHome(
       {
@@ -97,6 +115,9 @@ function ProjectHomeRoute() {
     roster.data,
     scopedWork.data,
     scopedWork.isError,
+    artifacts.data,
+    artifacts.isError,
+    artifactScope,
     access.data,
     access.isError,
     projectId,

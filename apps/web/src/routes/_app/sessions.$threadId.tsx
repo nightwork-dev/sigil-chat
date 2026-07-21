@@ -10,10 +10,16 @@ import { useMemo } from "react"
 
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThread } from "@/lib/agent-threads"
+import { useArtifacts } from "@/lib/artifacts"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { resolveViaLabel } from "@/features/homes/home-view-model"
 import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
-import { liveWorkSource, routeSources } from "@/features/homes/live-sources"
+import {
+  artifactRowsFromRecords,
+  artifactScopeForHome,
+  liveWorkSource,
+  routeSources,
+} from "@/features/homes/live-sources"
 import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
 import { useSessionCommitments } from "@/lib/work-items"
@@ -39,6 +45,9 @@ function SessionHomeRoute() {
   const nav = useProjectWorkspaceNav()
   const compact = useMediaQuery("(max-width: 640px)")
   const commitments = useSessionCommitments(threadId, !fixtures)
+  const artifactScope =
+    !fixtures && thread.data ? artifactScopeForHome("session", threadId) : null
+  const artifacts = useArtifacts(artifactScope)
 
   const state: HomeState<SessionHomeView> = useMemo(() => {
     const homeThread = fixtures
@@ -56,7 +65,11 @@ function SessionHomeRoute() {
     if (
       !homeThread ||
       !homeNav ||
-      (!fixtures && !commitments.data && !commitments.isError)
+      (!fixtures && !commitments.data && !commitments.isError) ||
+      (!fixtures &&
+        Boolean(artifactScope) &&
+        !artifacts.data &&
+        !artifacts.isError)
     ) {
       return { kind: "loading" }
     }
@@ -77,6 +90,9 @@ function SessionHomeRoute() {
         sessionStories: commitments.data,
         nav: homeNav,
       }),
+      {
+        artifacts: artifactRowsFromRecords(artifacts.data ?? []),
+      },
     )
     const view: SessionHomeView = {
       header: {
@@ -100,6 +116,9 @@ function SessionHomeRoute() {
     nav.isLoading,
     commitments.data,
     commitments.isError,
+    artifacts.data,
+    artifacts.isError,
+    artifactScope,
     via,
     fixtures,
   ])

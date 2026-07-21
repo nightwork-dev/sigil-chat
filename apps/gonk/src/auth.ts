@@ -14,10 +14,28 @@ import {
 } from "./artifact-scope.js"
 import type { ContainerRegistries } from "./registry/containers.js"
 import type { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
+import { personalScopeId } from "../../agent/agent/lib/personal-scope.js"
 
 export interface SessionScopeOwnerLookup {
   owns(sessionId: string, principalId: string): boolean
+  homeScopeId(sessionId: string, principalId: string): string | undefined
+  listOwned?(principalId: string): readonly {
+    id: string
+    title: string
+  }[]
 }
+
+export interface SessionExecutionBindingLookup {
+  getBinding(sessionId: string): Promise<
+    | {
+        homeScopeId: string
+        subject: string
+      }
+    | undefined
+  >
+}
+
+export type DelegatedAgentReach = "principal" | "scope"
 
 export const authorizeSigilMcpRequest: AgentMcpAuthorizationPolicy = () => {
   // Sigil currently exposes one trusted service principal: possession of
@@ -45,29 +63,63 @@ export function createContainerScopeAuthorizationPolicy(
     authorize(input: ScopeAuthorizationRequest): boolean {
       const session = parseSessionScope(input.resourceScope)
       if (session) {
-        return sessionOwners?.owns(session.id, input.principalId) === true
-      }
-      if (hasScopeGrant(containers.grants?.listActive() ?? [], input)) {
-        return true
-      }
-      const parsed = parseContainerScope(input.resourceScope)
-      if (!parsed) return false
-      if (parsed.tier === "project") {
-        return Boolean(
-          containers.projects
-            .get(parsed.id)
-            ?.members.some((member) => member.principalId === input.principalId),
+        const homeScopeId = sessionOwners?.homeScopeId(
+          session.id,
+          input.principalId,
         )
+        if (!homeScopeId) return false
+        if (homeScopeId === personalScopeId(input.principalId)) return true
+        return authorizeContainerHome(containers, input, homeScopeId)
       }
-      const workspace = containers.workspaces.get(parsed.id)
-      return Boolean(
-        workspace &&
-          containers.projects
-            .get(workspace.homeScopeId ?? workspace.projectId)
-            ?.members.some((member) => member.principalId === input.principalId),
-      )
+      return authorizeContainerScope(containers, input)
     },
   }
+}
+
+function authorizeContainerHome(
+  containers: Pick<ContainerRegistries, "projects" | "workspaces"> & {
+    grants?: Pick<ScopeGrantRegistry, "listActive">
+  },
+  input: ScopeAuthorizationRequest,
+  homeScopeId: string,
+): boolean {
+  const tier = containers.workspaces.get(homeScopeId)
+    ? "workspace"
+    : containers.projects.get(homeScopeId)
+      ? "project"
+      : undefined
+  return tier
+    ? authorizeContainerScope(containers, {
+        ...input,
+        resourceScope: `${tier}:${homeScopeId}`,
+      })
+    : false
+}
+
+function authorizeContainerScope(
+  containers: Pick<ContainerRegistries, "projects" | "workspaces"> & {
+    grants?: Pick<ScopeGrantRegistry, "listActive">
+  },
+  input: ScopeAuthorizationRequest,
+): boolean {
+  const parsed = parseContainerScope(input.resourceScope)
+  if (!parsed) return false
+  if (parsed.tier === "project") {
+    const project = containers.projects.get(parsed.id)
+    if (!project) return false
+    if (hasScopeGrant(containers.grants?.listActive() ?? [], input)) return true
+    return project.members.some(
+      (member) => member.principalId === input.principalId,
+    )
+  }
+  const workspace = containers.workspaces.get(parsed.id)
+  if (!workspace) return false
+  if (hasScopeGrant(containers.grants?.listActive() ?? [], input)) return true
+  return Boolean(
+    containers.projects
+      .get(workspace.homeScopeId ?? workspace.projectId)
+      ?.members.some((member) => member.principalId === input.principalId),
+  )
 }
 
 /**
@@ -113,6 +165,25 @@ export async function authenticateScopeDelegation(input: {
     principalId: delegation.subject,
     scope: input.scope,
   }
+}
+
+/**
+ * A delegated turn receives principal-wide candidate reach only when its
+ * actor session is durably bound to that principal's personal scope. The
+ * active scope proof still authenticates the hop; this lookup classifies the
+ * already-bound agent and never grants access to any target resource.
+ */
+export async function resolveDelegatedAgentReach(input: {
+  actorSessionId?: string
+  bindings: SessionExecutionBindingLookup
+  principalId: string
+}): Promise<DelegatedAgentReach> {
+  if (!input.actorSessionId) return "scope"
+  const binding = await input.bindings.getBinding(input.actorSessionId)
+  return binding?.subject === input.principalId &&
+    binding.homeScopeId === personalScopeId(input.principalId)
+    ? "principal"
+    : "scope"
 }
 
 function parseSessionScope(scope: string): { id: string } | undefined {

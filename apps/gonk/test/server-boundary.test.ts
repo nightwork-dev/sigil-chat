@@ -270,6 +270,93 @@ describe("production MCP handler boundary", () => {
     expect(revoked.status).toBe(401)
   })
 
+  it("projects principal reach only from a personal agent's durable execution binding", async () => {
+    const records = containers()
+    records.projects.upsert({
+      id: "project-home",
+      name: "Canonical home",
+      description: "The workspace's owner project.",
+      members: [{ principalId: "user-1", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-1",
+    })
+    records.workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      homeScopeId: "project-home",
+      name: "Shared workspace",
+      description: "A principal-readable workspace.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-1",
+    })
+    const registry = new ToolRegistry()
+    registry.register({
+      name: "sigil-test-reach",
+      description: "Return the host-projected agent reach.",
+      approval: "read",
+      input: passthrough(),
+      handler: async (_input, context) => ({ data: context.host }),
+    })
+    const proof = issueScopeDelegation(
+      {
+        actorSessionId: "eve-personal",
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "workspace:workspace-shared",
+        subject: "user-1",
+      },
+      token,
+    )
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      containers: records,
+      executionBindings: {
+        getBinding: async (sessionId) =>
+          sessionId === "eve-personal"
+            ? {
+                homeScopeId: "personal-scope:user-1",
+                subject: "user-1",
+              }
+            : undefined,
+      },
+      port: 8808,
+      source: registry,
+    })
+    handlers.push(handler)
+    const initialized = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "workspace:workspace-shared",
+        "x-sigil-scope-proof": proof,
+      }),
+    )
+    expect(initialized.status).toBe(200)
+    const sessionId = initialized.headers.get("mcp-session-id")
+    expect(sessionId).toBeTruthy()
+
+    const response = await handler.handle(
+      mcpRequest(
+        sessionId!,
+        {
+          "x-sigil-scope": "workspace:workspace-shared",
+          "x-sigil-scope-proof": proof,
+        },
+        2,
+        "tools/call",
+        { name: "sigil-test-reach", arguments: {} },
+      ),
+    )
+
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        structuredContent: {
+          agentReach: "principal",
+          resourceScope: { id: "workspace-shared", tier: "workspace" },
+        },
+      },
+    })
+  })
+
   it("discovers and invokes feature intake with signed principal, session, and scope provenance", async () => {
     const records = containers()
     records.projects.upsert({
@@ -412,7 +499,11 @@ describe("production MCP handler boundary", () => {
     const sessionRecords = new Map<string, unknown>([
       [
         "thread:thread-owned",
-        { id: "thread-owned", members: ["user-1"] },
+        {
+          id: "thread-owned",
+          executionBinding: { homeScopeId: "personal-scope:user-1" },
+          members: ["user-1"],
+        },
       ],
     ])
     const sessionOwners = new MirkAgentThreadScopeOwnerRegistry({

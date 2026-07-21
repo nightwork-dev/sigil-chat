@@ -172,6 +172,13 @@ export interface SessionArtifactStoreOptions {
   readonly canAccessScope?: CanAccessScope
 }
 
+export class ArtifactScopeAccessDeniedError extends Error {
+  constructor(readonly scope: ResourceScope) {
+    super(`Access denied for ${scope.tier} scope: ${scope.id}`)
+    this.name = "ArtifactScopeAccessDeniedError"
+  }
+}
+
 /**
  * Resource metadata is persisted beside content-addressed bytes in the same
  * @mirk/artifact FileObjectStore. The manifest makes list-by-scope durable;
@@ -332,7 +339,7 @@ export class SessionArtifactStore {
     // This is the authz seam. Do not replace it with tier/id heuristics: a
     // project/persona scope's membership policy belongs to the auth layer.
     if (!(await this.canAccessScope(principal, scope))) {
-      throw new Error(`Access denied for ${scope.tier} scope: ${scope.id}`)
+      throw new ArtifactScopeAccessDeniedError(scope)
     }
   }
 

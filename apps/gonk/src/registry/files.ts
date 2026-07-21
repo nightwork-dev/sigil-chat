@@ -5,6 +5,7 @@ import {
 } from "@gonk/tool-registry";
 
 import {
+  ArtifactScopeAccessDeniedError,
   getSessionArtifactStore,
   type SessionArtifactMetadata,
   type SessionArtifactStore,
@@ -20,6 +21,31 @@ import { isRecord } from "./validators.js";
 
 const MAX_TEXT_CHARS = 200_000;
 
+interface ResourceUniverseProject {
+  readonly id: string;
+  readonly name: string;
+}
+
+interface ResourceUniverseWorkspace {
+  readonly id: string;
+  readonly name: string;
+}
+
+interface ResourceUniverseSession {
+  readonly id: string;
+  readonly title: string;
+}
+
+export interface ResourceUniverseRegistries {
+  readonly projects: { list(): readonly ResourceUniverseProject[] };
+  readonly workspaces: { list(): readonly ResourceUniverseWorkspace[] };
+  readonly sessions?: {
+    listOwned(principalId: string): readonly ResourceUniverseSession[];
+  };
+}
+
+interface DiscoverResourcesInput extends Record<string, never> {}
+
 export interface ResourceScopeInput {
   scope?: ResourceScope;
 }
@@ -31,7 +57,35 @@ export interface ReadFileInput extends ResourceScopeInput {
 export function registerFileTools(
   registry: ToolRegistry,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
+  universe?: ResourceUniverseRegistries,
 ): void {
+  if (universe) {
+    registry.register({
+      name: "sigil-resource-discover",
+      description:
+        "For a personal agent session, discover the current principal's readable project, workspace, and session resource scopes plus identity-deduplicated file metadata. Every scope is re-authorized live; use sigil-read-file with one returned scope to retrieve content.",
+      visibility: "always",
+      approval: "read",
+      input: shape<DiscoverResourcesInput>(
+        (value): value is DiscoverResourcesInput =>
+          isRecord(value) && Object.keys(value).length === 0,
+        "Expected an empty object.",
+      ),
+      inputJsonSchema: objectSchema({}),
+      hints: readHints,
+      handler: async (_input, ctx) => {
+        const principal = requirePrincipalReach(ctx);
+        return {
+          data: await discoverPrincipalResourceUniverse({
+            artifacts,
+            principal,
+            universe,
+          }),
+        };
+      },
+    });
+  }
+
   registry.register({
     name: "sigil-list-session-files",
     description:
@@ -113,6 +167,93 @@ export function registerFileTools(
   });
 }
 
+export async function discoverPrincipalResourceUniverse(input: {
+  artifacts: SessionArtifactStore;
+  principal: NonNullable<ToolContext["auth"]>["principal"];
+  universe: ResourceUniverseRegistries;
+}) {
+  const candidates = [
+    ...input.universe.projects.list().map((project) => ({
+      scope: { tier: "project" as const, id: project.id },
+      label: project.name,
+    })),
+    ...input.universe.workspaces.list().map((workspace) => ({
+      scope: { tier: "workspace" as const, id: workspace.id },
+      label: workspace.name,
+    })),
+    ...(input.universe.sessions?.listOwned(input.principal.id) ?? []).map(
+      (session) => ({
+        scope: { tier: "session" as const, id: session.id },
+        label: session.title,
+      }),
+    ),
+  ];
+  const scopes: Array<{
+    scope: ResourceScope;
+    label: string;
+    files: SessionArtifactMetadata[];
+  }> = [];
+  for (const candidate of candidates) {
+    try {
+      scopes.push({
+        ...candidate,
+        files: await input.artifacts.listByScope(
+          candidate.scope,
+          input.principal,
+        ),
+      });
+    } catch (error) {
+      if (error instanceof ArtifactScopeAccessDeniedError) continue;
+      throw error;
+    }
+  }
+
+  const resources = new Map<
+    string,
+    Omit<SessionArtifactMetadata, "scope"> & {
+      availableIn: ResourceScope[];
+    }
+  >();
+  for (const entry of scopes) {
+    for (const file of entry.files) {
+      const existing = resources.get(file.id);
+      if (existing) {
+        existing.availableIn.push(entry.scope);
+        continue;
+      }
+      const { scope: _scope, ...metadata } = file;
+      resources.set(file.id, {
+        ...metadata,
+        availableIn: [entry.scope],
+      });
+    }
+  }
+
+  return {
+    scopes: scopes.map(({ files: _files, ...scope }) => scope),
+    resources: [...resources.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    ),
+  };
+}
+
+function requirePrincipalReach(
+  ctx: ToolContext,
+): NonNullable<ToolContext["auth"]>["principal"] {
+  if (!isRecord(ctx.host) || ctx.host.agentReach !== "principal") {
+    throw new Error(
+      "Principal-wide resource discovery requires a personal agent session.",
+    );
+  }
+  const principal = ctx.auth?.principal;
+  if (!principal || principal.kind !== "human") {
+    throw new Error(
+      "Principal-wide resource discovery requires an authenticated human principal.",
+    );
+  }
+  return principal;
+}
+
 function isListFilesInput(value: unknown): value is ResourceScopeInput {
   return isRecord(value) && isScopeInput(value);
 }
@@ -148,6 +289,8 @@ export function requireResourceScope(
   ctx: ToolContext,
 ): ResourceScope {
   const hostScope = requestScope(ctx);
+  const principalReach =
+    isRecord(ctx.host) && ctx.host.agentReach === "principal";
   // The app-controlled turn scope (x-sigil-scope, e.g. project:evidence-room in
   // the Evidence Room) is AUTHORITATIVE and wins over any model-supplied scope.
   // The model routinely guesses a wrong scope (a focused doc's id, the route
@@ -155,7 +298,9 @@ export function requireResourceScope(
   // redirect a tool to a scope the workspace didn't authorize is also a
   // scope-confusion hazard. The requested scope is only a fallback when the host
   // set none.
-  const scope = normalizeScope(hostScope ?? requested);
+  const scope = normalizeScope(
+    principalReach && requested ? requested : hostScope ?? requested,
+  );
   if (!scope) {
     throw new Error(
       "File tools require a resource scope, either in the request or in the tool input.",

@@ -33,8 +33,10 @@ function dependencies(
       ),
     ),
     getSession: () => Promise.resolve(memberSession),
-    ownsThread: (userId, threadId) =>
-      userId === "user-1" && threadId === "thread-1",
+    ownedThreadHomeScope: (userId, threadId) =>
+      userId === "user-1" && threadId === "thread-1"
+        ? "personal-scope:user-1"
+        : undefined,
     readEnvironment: () => ({
       apiKey: "service-key",
       gonkMcpUrl: "https://tools.example.test/mcp",

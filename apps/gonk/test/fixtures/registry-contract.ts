@@ -956,6 +956,25 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-resource-discover",
+    description:
+      "For a personal agent session, discover the current principal's readable project, workspace, and session resource scopes plus identity-deduplicated file metadata. Every scope is re-authorized live; use sigil-read-file with one returned scope to retrieve content.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-list-session-files",
     description:
       "List files attached to the request's session, workspace, project, or persona resource scope. Omit scope to use the request's session scope.",

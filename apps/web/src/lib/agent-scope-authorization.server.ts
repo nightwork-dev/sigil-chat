@@ -7,11 +7,17 @@ import type {
   ScopeAuthorizationAction,
   ScopeAuthorizationPolicy,
 } from "@workspace/agent-contracts/scope-authorization"
+import { personalScopeId } from "../../../agent/agent/lib/personal-scope"
+
+export type OwnedThreadHomeScope = (
+  userId: string,
+  threadId: string,
+) => string | undefined
 
 export function assertAuthorizedScope(
   scope: string,
   userId: string,
-  ownsThread: (userId: string, threadId: string) => boolean,
+  ownedThreadHomeScope: OwnedThreadHomeScope,
   registries?: ScopeAuthorizationRegistries,
   policy?: ScopeAuthorizationPolicy,
   action: ScopeAuthorizationAction = "read",
@@ -21,8 +27,28 @@ export function assertAuthorizedScope(
   )
   if (!match) throw new Error("Agent resource scope is invalid.")
   if (match[1] === "session") {
-    if (!ownsThread(userId, match[2]!)) {
+    const homeScopeId = ownedThreadHomeScope(userId, match[2]!)
+    if (!homeScopeId) {
       throw new Error("Agent session was not found.")
+    }
+    if (homeScopeId === personalScopeId(userId)) return
+    const resolvedRegistries = registries ?? getProjectWorkspaceRegistries()
+    const homeScope = resolvedRegistries.workspaces.get(homeScopeId)
+      ? `workspace:${homeScopeId}`
+      : resolvedRegistries.projects.get(homeScopeId)
+        ? `project:${homeScopeId}`
+        : undefined
+    if (!homeScope) throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
+    const authorization =
+      policy ?? createScopeGrantPolicy({ registries: resolvedRegistries })
+    if (
+      !authorization.authorize({
+        action,
+        principalId: userId,
+        resourceScope: homeScope,
+      })
+    ) {
+      throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
     }
     return
   }

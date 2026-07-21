@@ -9,6 +9,8 @@ import {
   authenticateScopeDelegation,
   authorizeSigilMcpRequest,
   createContainerScopeAuthorizationPolicy,
+  resolveDelegatedAgentReach,
+  type SessionExecutionBindingLookup,
   type SessionScopeOwnerLookup,
 } from "./auth.js"
 import {
@@ -26,6 +28,7 @@ import {
 } from "./artifact-scope.js"
 import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries.js"
 import { MirkAgentThreadScopeOwnerRegistry } from "../../agent/agent/lib/agent-thread-scope-owners.js"
+import { MirkEveSessionOwnerStore } from "../../agent/agent/lib/eve-session-owners.js"
 import type { ScopeGrantRegistry } from "../../agent/agent/lib/scope-grant-registry.js"
 import { createSigilRegistry } from "./registry.js"
 import type { ContainerRegistries } from "./registry/containers.js"
@@ -36,6 +39,7 @@ export function createSigilMcpHandler({
   portlessUrl = process.env.PORTLESS_URL,
   configuredAllowedHosts = process.env.GONK_ALLOWED_HOSTS,
   containers,
+  executionBindings,
   sessionOwners,
   scopeAuthorization,
   source,
@@ -47,6 +51,7 @@ export function createSigilMcpHandler({
   containers?: ContainerRegistries & {
     grants?: Pick<ScopeGrantRegistry, "listActive">
   }
+  executionBindings?: SessionExecutionBindingLookup
   sessionOwners?: SessionScopeOwnerLookup
   scopeAuthorization?: ScopeAuthorizationPolicy
   /** Test/composition seam; production uses the complete Sigil registry. */
@@ -54,6 +59,8 @@ export function createSigilMcpHandler({
 }) {
   const resolvedContainers = containers ?? createSigilRegistryContainers()
   const resolvedSessionOwners = sessionOwners ?? createSessionOwnerLookup()
+  const resolvedExecutionBindings =
+    executionBindings ?? new MirkEveSessionOwnerStore()
   const authorization =
     scopeAuthorization ??
     createContainerScopeAuthorizationPolicy(
@@ -77,6 +84,12 @@ export function createSigilMcpHandler({
         artifacts,
         undefined,
         resolvedContainers,
+        resolvedSessionOwners.listOwned
+          ? {
+              listOwned: (principalId) =>
+                resolvedSessionOwners.listOwned!(principalId),
+            }
+          : undefined,
       ),
     serverName: "sigil-chat-gonk",
     serverVersion: "0.0.1",
@@ -110,6 +123,13 @@ export function createSigilMcpHandler({
         secret: apiKey,
       })
       if (resourceScope && !delegated) return null
+      const agentReach = delegated
+        ? await resolveDelegatedAgentReach({
+            actorSessionId: delegated.actorSessionId,
+            bindings: resolvedExecutionBindings,
+            principalId: delegated.principalId,
+          })
+        : undefined
       return {
         token: token ?? "",
         clientId: "sigil-chat-agent",
@@ -161,6 +181,7 @@ export function createSigilMcpHandler({
                   : {}),
               }
             : {}),
+          ...(agentReach ? { sigilAgentReach: agentReach } : {}),
         },
       }
     },
@@ -171,12 +192,23 @@ export function createSigilMcpHandler({
       const legacySessionScope = extra.authInfo?.extra?.[
         SIGIL_SESSION_SCOPE_AUTH_INFO_KEY
       ]
+      const agentReach = extra.authInfo?.extra?.sigilAgentReach
       return {
         host:
           resourceScope !== undefined
-            ? { resourceScope }
+            ? {
+                resourceScope,
+                ...(agentReach === "principal" || agentReach === "scope"
+                  ? { agentReach }
+                  : {}),
+              }
             : typeof legacySessionScope === "string"
-              ? { sessionScope: legacySessionScope }
+              ? {
+                  sessionScope: legacySessionScope,
+                  ...(agentReach === "principal" || agentReach === "scope"
+                    ? { agentReach }
+                    : {}),
+                }
               : undefined,
       }
     },
@@ -189,12 +221,18 @@ export function createSigilMcpHandler({
 
 function createSessionOwnerLookup(): SessionScopeOwnerLookup {
   let store: MirkAgentThreadScopeOwnerRegistry | undefined
+  const registry = () => (store ??= new MirkAgentThreadScopeOwnerRegistry())
   return {
     owns(sessionId, principalId) {
       // Tests and container-only callers do not pay to open the Mirk backend;
       // a session proof is the only path that needs the durable owner record.
-      store ??= new MirkAgentThreadScopeOwnerRegistry()
-      return store.owns(sessionId, principalId)
+      return registry().owns(sessionId, principalId)
+    },
+    homeScopeId(sessionId, principalId) {
+      return registry().homeScopeId(sessionId, principalId)
+    },
+    listOwned(principalId) {
+      return registry().listOwned(principalId)
     },
   }
 }

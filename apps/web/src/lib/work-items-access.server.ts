@@ -102,7 +102,7 @@ export function currentWorkItemsScopeAccess(): WorkItemsScopeAccess {
         assertAuthorizedScope(
           `${scope.kind}:${scopeId}`,
           principalId,
-          () => false,
+          () => undefined,
           registries,
           undefined,
           scopeAction,

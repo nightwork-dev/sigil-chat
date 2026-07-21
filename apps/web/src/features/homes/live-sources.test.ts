@@ -4,7 +4,12 @@ import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav";
 import type { Story } from "@workspace/work-items-store/types";
 
 import { fixtureWorkSource } from "./fixtures";
-import { liveWorkSource, routeSources } from "./live-sources";
+import {
+  artifactRowsFromRecords,
+  artifactScopeForHome,
+  liveWorkSource,
+  routeSources,
+} from "./live-sources";
 
 const nav: ProjectWorkspaceNavSummary = {
   personalProjectId: "project-personal",
@@ -71,10 +76,81 @@ describe("home route sources", () => {
     expect(sources.attention).toEqual([]);
   });
 
+  it("uses permission-filtered live artifacts when fixtures are disabled", () => {
+    const live = liveWorkSource({ nav });
+    const sources = routeSources(false, [], live, {
+      resources: artifactRowsFromRecords([
+        {
+          id: "older",
+          filename: "old-plan.md",
+          mediaType: "text/markdown",
+          size: 4,
+          createdAt: "2026-07-20T00:00:00.000Z",
+        },
+        {
+          id: "newer",
+          filename: "latest-brief.png",
+          mediaType: "image/png",
+          size: 12,
+          createdAt: "2026-07-21T00:00:00.000Z",
+        },
+      ]),
+    });
+
+    expect(sources.resources).toEqual([
+      { id: "newer", name: "latest-brief.png", kind: "artifact" },
+      { id: "older", name: "old-plan.md", kind: "artifact" },
+    ]);
+    expect(sources.artifacts).toEqual([]);
+  });
+
+  it("maps session artifacts separately from scope resources", () => {
+    const live = liveWorkSource({ nav });
+    const sources = routeSources(false, [], live, {
+      artifacts: artifactRowsFromRecords([
+        {
+          id: "matrix",
+          filename: "offer-matrix.csv",
+          mediaType: "text/csv",
+          size: 30,
+          createdAt: "2026-07-21T00:00:00.000Z",
+        },
+      ]),
+    });
+
+    expect(sources.resources).toEqual([]);
+    expect(sources.artifacts).toEqual([
+      { id: "matrix", name: "offer-matrix.csv", kind: "artifact" },
+    ]);
+  });
+
+  it("formats artifact scopes without double-prefixing qualified ids", () => {
+    expect(artifactScopeForHome("project", "project-1")).toBe(
+      "project:project-1",
+    );
+    expect(artifactScopeForHome("project", "personal:user-1")).toBe(
+      "project:personal:user-1",
+    );
+    expect(artifactScopeForHome("workspace", "workspace-1")).toBe(
+      "workspace:workspace-1",
+    );
+    expect(artifactScopeForHome("session", "thread-1")).toBe(
+      "session:thread-1",
+    );
+    expect(artifactScopeForHome("project", "project:already-qualified")).toBe(
+      "project:already-qualified",
+    );
+  });
+
   it("enables fixture work only behind the explicit review flag", () => {
     const live = liveWorkSource({ nav });
 
     expect(routeSources(false, [], live).work).toBe(live);
     expect(routeSources(true, [], live).work).toBe(fixtureWorkSource);
+    expect(
+      routeSources(true, [], live, {
+        resources: [{ id: "real", name: "real.md", kind: "artifact" }],
+      }).resources,
+    ).not.toEqual([{ id: "real", name: "real.md", kind: "artifact" }]);
   });
 });
