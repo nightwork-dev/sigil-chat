@@ -296,6 +296,26 @@ export function AgentChat({
 }
 
 /**
+ * Header layout per mount position. `flex-1` is correct ONLY in the rail —
+ * there the parent is a horizontal flex row and it fills the rail's width.
+ * In the surface position AgentChat is a vertical flex column, and the same
+ * class made the header GROW to eat the conversation's space (the dead-gap
+ * bug in the HUD card). Kept as an exported pure function so the regression
+ * has a test to go red against.
+ */
+export function agentChatHeaderClasses(
+  variant: "surface" | "rail",
+  showLeading: boolean,
+): string {
+  return cn(
+    "flex min-w-0 items-center gap-3",
+    variant === "rail" && "flex-1",
+    variant === "surface" && "shrink-0 border-b border-border px-3 py-2",
+    showLeading ? "justify-between" : "justify-end",
+  )
+}
+
+/**
  * The chat header content, extracted so a route can hoist it into the shell's
  * top rail (staticData.rail.top) instead of stacking it as a second header
  * row under the shell's breadcrumb rail. AgentChat renders it inline by
@@ -363,12 +383,7 @@ export function AgentChatHeader({
 
   return (
     <div
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-3",
-        variant === "surface" &&
-          "shrink-0 border-b border-border px-3 py-2",
-        showLeading ? "justify-between" : "justify-end",
-      )}
+      className={agentChatHeaderClasses(variant, showLeading)}
     >
       {showLeading ? (
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
