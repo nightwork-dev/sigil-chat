@@ -123,6 +123,12 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
     ) {
       return { focusScopeId: personalScopeId, viaScopeIds: [] };
     }
+    // A direct exact grant authorizes opening the scope even when its
+    // canonical/display path is intentionally undiscoverable. Non-empty via
+    // paths still go through the visibility-filtered nav resolver below.
+    if (requested.viaScopeIds.length === 0) {
+      return { focusScopeId: requested.focusScopeId, viaScopeIds: [] };
+    }
     const resolved = dependencies.resolvePerspective(
       requested,
       dependencies.loadNav(principalId),
@@ -250,10 +256,10 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
       );
       return thread;
     }
-    const workspaceId =
-      thread.workspaceId && canReadScope(principalId, thread.workspaceId)
-        ? thread.workspaceId
-        : undefined;
+    const workspaceId = thread.workspaceId?.trim() || undefined;
+    // A revoked legacy workspace session remains workspace content. Refuse to
+    // migrate it rather than silently rehoming its transcript as personal.
+    if (workspaceId) assertAuthorizedScope(principalId, workspaceId);
     const resolved = resolveCreation(principalId, {
       personaId: thread.personaId,
       ...(workspaceId ? { workspaceId } : {}),

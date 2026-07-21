@@ -45,12 +45,10 @@ const listAgentThreadsFn = createServerFn({ method: "GET" })
 const getAgentThreadFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    const { agentThreadRepository } =
+    const { agentThreadBindingService } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
-    const thread = agentThreadRepository.get(session.user.id, data.id);
-    if (!thread) throw new Error(`Agent thread ${data.id} was not found.`);
-    return thread;
+    return agentThreadBindingService.resolveExecution(session.user.id, data.id);
   });
 
 const createAgentThreadFn = createServerFn({ method: "POST" })

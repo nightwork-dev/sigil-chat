@@ -118,7 +118,15 @@ function fixture() {
     loadNav: () => nav,
     resolvePerspective: resolveScopePerspective,
   });
-  return { grants, personalScopes, repository, scopes, service, threadStore };
+  return {
+    grants,
+    nav,
+    personalScopes,
+    repository,
+    scopes,
+    service,
+    threadStore,
+  };
 }
 
 function grantWorkspace(
@@ -173,6 +181,34 @@ describe("agent thread binding service", () => {
       initialPerspective: { focusScopeId: WORKSPACE },
       additionalContextScopeIds: [WORKSPACE],
     });
+  });
+
+  it("opens an exact-granted scope directly when its nav path is undiscoverable", () => {
+    const { grants, nav, service } = fixture();
+    grantWorkspace(grants);
+    nav.projects.length = 0;
+    nav.workspaces.length = 0;
+
+    const thread = service.create(PRINCIPAL, {
+      personaId: "sigil-chat-eve",
+      workspaceId: WORKSPACE,
+      initialPerspective: { focusScopeId: WORKSPACE, viaScopeIds: [] },
+    });
+
+    expect(thread.executionBinding?.initialPerspective).toEqual({
+      focusScopeId: WORKSPACE,
+      viaScopeIds: [],
+    });
+    expect(() =>
+      service.create(PRINCIPAL, {
+        personaId: "sigil-chat-eve",
+        workspaceId: WORKSPACE,
+        initialPerspective: {
+          focusScopeId: WORKSPACE,
+          viaScopeIds: [PROJECT],
+        },
+      }),
+    ).toThrow("initial perspective is not available");
   });
 
   it("uses the authorized active workspace for existing UI create calls", () => {
@@ -246,6 +282,24 @@ describe("agent thread binding service", () => {
     const migrated = service.resolveExecution(PRINCIPAL, legacy.id);
     expect(migrated.executionBinding?.homeScopeId).toBe(WORKSPACE);
     expect(migrated.revision).toBe(legacy.revision + 1);
+  });
+
+  it("refuses to rehome a revoked legacy workspace thread as personal", () => {
+    const { grants, repository, service, threadStore } = fixture();
+    const grant = grantWorkspace(grants);
+    const legacy = repository.create(PRINCIPAL, {
+      personaId: "sigil-chat-eve",
+      workspaceId: WORKSPACE,
+    });
+    const stored = threadStore.get(`thread:${legacy.id}`)!;
+    delete stored.executionBinding;
+    threadStore.set(`thread:${legacy.id}`, stored);
+    grants.revoke(grant.id, OWNER);
+
+    expect(() => service.resolveExecution(PRINCIPAL, legacy.id)).toThrow(
+      "EVE_RESOURCE_SCOPE_NOT_AUTHORIZED",
+    );
+    expect(repository.get(PRINCIPAL, legacy.id)?.executionBinding).toBeUndefined();
   });
 
   it("migrates legacy unbound records to personal before fork or execution", () => {
