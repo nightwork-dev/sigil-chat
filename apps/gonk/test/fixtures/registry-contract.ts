@@ -502,6 +502,33 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-feature-request-propose",
+    description:
+      "Propose a durable product feature request from the current trusted principal and scope. Use only for durable product changes, defects, or capability requests; it creates idea-stage feature requests and blocks likely duplicates.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["title", "problem", "desiredOutcome"],
+      properties: [
+        "title",
+        "problem",
+        "desiredOutcome",
+        "evidence",
+        "sourceRefs",
+        "intendedScopeId",
+        "proposedSponsorPrincipalId",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-spec-list",
     description:
       "List durable product specifications in the roadmap, optionally filtered by lifecycle status or linked story id.",

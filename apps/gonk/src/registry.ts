@@ -31,6 +31,7 @@ import {
   registerReviewTools,
 } from "./registry/review.js";
 import { registerStoryTools } from "./registry/story.js";
+import { registerFeatureRequestTools } from "./registry/feature-request.js";
 import { registerSpecTools } from "./registry/spec.js";
 import {
   registerContainerTools,
@@ -62,6 +63,7 @@ export function createSigilRegistry(
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
   registerStoryTools(registry, workItems);
+  registerFeatureRequestTools(registry, workItems);
   registerSpecTools(registry, specsRepository);
   registerContainerTools(registry, containers);
   registerAnnotationTools(registry);
