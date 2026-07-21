@@ -5,7 +5,11 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
+import { useAgentPrincipalId } from "@/lib/agent-principal";
 import type {
+  BoardQueryResult,
+  BoardView,
+  BoardViewFilter,
   ReviewDecision,
   ReviewGate,
   Story,
@@ -14,6 +18,7 @@ import type {
   StoryStatus,
   WorkItemsMutationResult,
 } from "@workspace/work-items-store/types";
+import { queryBoardView } from "../../../../packages/work-items-store/src/operations";
 
 const listStoriesFn = createServerFn({ method: "GET" })
   .validator(
@@ -65,6 +70,80 @@ const getStoryFn = createServerFn({ method: "GET" })
     );
     if (!story) throw new Error(`Unknown story id: ${data.id}.`);
     return story;
+  });
+
+const listBoardViewsFn = createServerFn({ method: "GET" })
+  .validator((input?: { filter?: BoardViewFilter }) => input ?? {})
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer, boardViewsVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return boardViewsVisibleToViewer(
+      await workItemsRepository.listBoardViews(data.filter),
+      viewer,
+    );
+  });
+
+const getBoardViewFn = createServerFn({ method: "GET" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    return boardViewVisibleToViewer(
+      document.boardViews.find((view) => view.id === data.id),
+      viewer,
+    );
+  });
+
+const queryBoardViewFn = createServerFn({ method: "GET" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }): Promise<BoardQueryResult> => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { createBoardTraversalResolver } =
+      await import("@/lib/work-items-access.server");
+    const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const view = boardViewVisibleToViewer(
+      document.boardViews.find((candidate) => candidate.id === data.id),
+      viewer,
+    );
+    return queryBoardView(
+      document.stories,
+      view,
+      createBoardTraversalResolver(viewer.id),
+    );
+  });
+
+const upsertBoardViewFn = createServerFn({ method: "POST" })
+  .validator((input: { view: BoardView; expectedRevision?: number }) => input)
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const { requireBoardViewMutationAccess } =
+      await import("@/lib/work-items-access.server");
+    const session = await getSession();
+    const viewer = authenticatedWorkItemsViewer(session);
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const existing = document.boardViews.find(
+      (candidate) => candidate.id === data.view.id,
+    );
+    if (existing) boardViewVisibleToViewer(existing, viewer);
+    requireBoardViewMutationAccess(session, data.view);
+    return workItemsRepository.upsertBoardView(
+      data.view,
+      data.expectedRevision,
+    );
   });
 
 const upsertStoryFn = createServerFn({ method: "POST" })
@@ -236,6 +315,12 @@ export const workItemKeys = {
     [...workItemKeys.all(), storyId, "comments"] as const,
   addressed: (viewerId: string, filter?: StoryFilter) =>
     [...workItemKeys.all(), "addressed", viewerId, filter ?? {}] as const,
+  boardViews: (viewerId: string, filter?: BoardViewFilter) =>
+    [...workItemKeys.all(), "board-views", viewerId, filter ?? {}] as const,
+  boardView: (viewerId: string, id: string) =>
+    [...workItemKeys.all(), "board-view", viewerId, id] as const,
+  boardQuery: (viewerId: string, id: string) =>
+    [...workItemKeys.all(), "board-query", viewerId, id] as const,
 };
 
 export function useStories(
@@ -289,12 +374,61 @@ export function useStory(id: string | undefined) {
   });
 }
 
+export function useBoardViews(filter?: BoardViewFilter) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.boardViews(principalId, filter),
+    queryFn: () => listBoardViewsFn({ data: { filter } }),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useBoardView(id: string | undefined) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.boardView(principalId, id ?? "none"),
+    queryFn: () => getBoardViewFn({ data: { id: id ?? "" } }),
+    enabled: Boolean(id),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useBoardViewQuery(id: string | undefined) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.boardQuery(principalId, id ?? "none"),
+    queryFn: () => queryBoardViewFn({ data: { id: id ?? "" } }),
+    enabled: Boolean(id),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
 export function useUpsertStory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { story: Story; expectedRevision?: number }) =>
       upsertStoryFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+export function useUpsertBoardView() {
+  const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
+  return useMutation({
+    mutationFn: (input: { view: BoardView; expectedRevision?: number }) =>
+      upsertBoardViewFn({ data: input }),
+    onSuccess: (result, variables) =>
+      reconcileBoardViews(queryClient, principalId, variables.view.id, result),
   });
 }
 
@@ -385,4 +519,24 @@ function reconcileWorkItems(
     }
   }
   return queryClient.invalidateQueries({ queryKey: workItemKeys.all() });
+}
+
+function reconcileBoardViews(
+  queryClient: QueryClient,
+  principalId: string,
+  viewId: string,
+  result: WorkItemsMutationResult,
+): Promise<void> {
+  const view = result.document.boardViews.find(
+    (candidate) => candidate.id === viewId,
+  );
+  if (view) {
+    queryClient.setQueryData(
+      workItemKeys.boardView(principalId, view.id),
+      view,
+    );
+  }
+  return queryClient.invalidateQueries({
+    queryKey: [...workItemKeys.all(), "board-views", principalId],
+  });
 }

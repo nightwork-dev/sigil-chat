@@ -8,4 +8,13 @@ describe("work-items query isolation", () => {
       workItemKeys.addressed("principal-two"),
     );
   });
+
+  it("keys saved boards and board queries by the authenticated viewer id", () => {
+    expect(workItemKeys.boardViews("principal-one")).not.toEqual(
+      workItemKeys.boardViews("principal-two"),
+    );
+    expect(workItemKeys.boardQuery("principal-one", "board-1")).not.toEqual(
+      workItemKeys.boardQuery("principal-two", "board-1"),
+    );
+  });
 });
