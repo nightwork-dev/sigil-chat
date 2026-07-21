@@ -120,6 +120,9 @@ export interface ProjectHomeView {
   readonly workspaces: readonly WorkspaceListRow[]
   readonly sessions: readonly SessionRow[]
   readonly agents: readonly AgentRow[]
+  /** Artifacts, knowledge, evidence, saved views — homed here or mounted
+   *  into the project, identity-deduped upstream (spec §8.1, §11.1). */
+  readonly resources: readonly ResourceRow[]
   readonly work: readonly WorkSummaryItem[]
   readonly attention: readonly AttentionItem[]
 }

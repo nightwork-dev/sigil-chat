@@ -222,6 +222,7 @@ export function buildProjectHome(
       (thread) => mountedVia(input.nav, projectId, thread),
     ),
     agents: input.agents ?? [],
+    resources: input.resources ?? [],
     work: input.work.summariesForScope(projectId),
     attention: input.attention ?? [],
   }

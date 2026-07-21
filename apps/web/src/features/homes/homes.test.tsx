@@ -113,6 +113,7 @@ const projectView: ProjectHomeView = {
     },
   ],
   agents: fixtureAgents,
+  resources: fixtureResources,
   work: fixtureWorkSource.summariesForScope(NORTHSTAR.commerce),
   attention: fixtureAttention,
 }
@@ -196,7 +197,7 @@ describe("load lifecycle", () => {
 })
 
 describe("project home", () => {
-  it("composes workspaces, sessions, agents, work, and attention", async () => {
+  it("composes workspaces, sessions, agents, resources, work, and attention", async () => {
     const el = await render(
       <ProjectHome state={{ kind: "ready", view: projectView }} />,
     )
@@ -204,8 +205,14 @@ describe("project home", () => {
     expect(el.textContent).toContain("Checkout Reliability")
     expect(el.textContent).toContain("Retry storm triage")
     expect(el.textContent).toContain("Neve Laine")
+    expect(el.textContent).toContain("Holiday offer brief")
     expect(el.textContent).toContain("Split payment capture")
     expect(el.textContent).toContain("Offer eligibility rules spike")
+  })
+
+  it("labels a mounted resource with its home, quietly", async () => {
+    const el = await render(<ProjectHome state={{ kind: "ready", view: projectView }} />)
+    expect(el.textContent).toContain("Shared from Checkout Reliability")
   })
 
   it("labels a mounted workspace with its canonical owner, quietly", async () => {
