@@ -267,7 +267,7 @@ export function proposeFeatureRequest(
   assertRevision(document, expectedRevision);
   assertFeatureRequestProposalInput(input);
   assertFeatureRequestProposalContext(context);
-  const title = titleFromProblem(input.problem);
+  const title = input.title.trim();
   const homeScopeId = input.intendedScopeId?.trim() || context.currentScopeId;
   const duplicateDecision = decideFeatureRequestDuplicates(document, {
     title,
@@ -794,6 +794,8 @@ function assertFeatureRequestProposalInput(
 ): void {
   if (
     typeof input.problem !== "string" ||
+    typeof input.title !== "string" ||
+    input.title.trim().length === 0 ||
     input.problem.trim().length === 0 ||
     typeof input.desiredOutcome !== "string" ||
     input.desiredOutcome.trim().length === 0 ||
@@ -824,17 +826,6 @@ function assertFeatureRequestProposalContext(
   ) {
     throw new Error("Invalid feature request proposal context.");
   }
-}
-
-function titleFromProblem(problem: string): string {
-  const firstLine = problem
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line.length > 0);
-  const sentence = firstLine?.match(/^(.+?[.!?])(?:\s|$)/)?.[1] ?? firstLine;
-  if (!sentence) throw new Error("Invalid feature request proposal.");
-  return sentence.replace(/[.!?]+$/, "").slice(0, 120);
 }
 
 function featureRequestIntent(input: FeatureRequestProposalInput): string {

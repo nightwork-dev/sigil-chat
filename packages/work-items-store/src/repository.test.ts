@@ -218,6 +218,7 @@ describe("MemoryWorkItemsRepository", () => {
     const repository = new MemoryWorkItemsRepository();
     const created = await repository.proposeFeatureRequest(
       {
+        title: "Save filtered evidence boards",
         problem: "Users cannot save filtered evidence boards.",
         desiredOutcome:
           "Let users keep a durable board view for repeated evidence review.",
@@ -241,7 +242,7 @@ describe("MemoryWorkItemsRepository", () => {
         kind: "feature-request",
         homeScopeId: "workspace-a",
         status: "idea",
-        title: "Users cannot save filtered evidence boards",
+        title: "Save filtered evidence boards",
         provenance: {
           origin: "agent",
           actorPrincipalId: "user-1",
@@ -259,6 +260,7 @@ describe("MemoryWorkItemsRepository", () => {
 
     const exactDuplicate = await repository.proposeFeatureRequest(
       {
+        title: "save   filtered EVIDENCE boards!",
         problem: "users   cannot SAVE filtered evidence boards!",
         desiredOutcome: "Try to sneak past exact normalization.",
       },
@@ -282,6 +284,7 @@ describe("MemoryWorkItemsRepository", () => {
 
     const fuzzyDuplicate = await repository.proposeFeatureRequest(
       {
+        title: "Save filtered evidence board",
         problem: "Users cannot save filtered evidence board.",
         desiredOutcome: "Singular wording should still block.",
       },
@@ -308,6 +311,7 @@ describe("MemoryWorkItemsRepository", () => {
     const repository = new MemoryWorkItemsRepository();
     const created = await repository.proposeFeatureRequest(
       {
+        title: "Stable evidence card labels",
         problem: "Evidence cards need stable labels.",
         desiredOutcome: "Cards remain recognizable across chat turns.",
         proposedSponsorPrincipalId: "user-sponsor",

@@ -118,6 +118,7 @@ export interface WorkSponsorshipDecisionFilter {
 }
 
 export interface FeatureRequestProposalInput {
+  title: string;
   problem: string;
   desiredOutcome: string;
   evidence?: string[];

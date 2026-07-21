@@ -1,4 +1,5 @@
 import { shape, type ToolRegistry } from "@gonk/tool-registry";
+import type { AuthContext, AuthenticatedPrincipal } from "@gonk/auth";
 import type { WorkItemsRepository } from "@workspace/work-items-store/repository";
 import type { FeatureRequestProposalInput } from "@workspace/work-items-store/types";
 
@@ -9,9 +10,7 @@ const WORK_ITEMS_RESOURCE_KIND = "work-items-board";
 const WORK_ITEMS_RESOURCE_ID = "work-items";
 const WORK_ITEMS_OUTCOME_KIND = "work-items.changed";
 
-type FeatureRequestToolInput = FeatureRequestProposalInput & {
-  expectedRevision?: number;
-};
+type FeatureRequestToolInput = FeatureRequestProposalInput;
 
 type ScopeTarget = {
   tier: string;
@@ -31,11 +30,12 @@ export function registerFeatureRequestTools(
     approval: "write",
     input: shape<FeatureRequestToolInput>(
       isFeatureRequestToolInput,
-      "Expected problem, desiredOutcome, optional evidence/sourceRefs/intendedScopeId/proposedSponsorPrincipalId, and optional integer expectedRevision. Provenance, actor, session, timestamps, status, priority, assignment, and approval are server-derived or unavailable here.",
+      "Expected title, problem, desiredOutcome, and optional evidence/sourceRefs/intendedScopeId/proposedSponsorPrincipalId. Provenance, actor, session, timestamps, status, priority, assignment, approval, and revision control are server-derived or unavailable here.",
     ),
     inputJsonSchema: {
       type: "object",
       properties: {
+        title: { type: "string", minLength: 1 },
         problem: { type: "string", minLength: 1 },
         desiredOutcome: { type: "string", minLength: 1 },
         evidence: {
@@ -50,22 +50,17 @@ export function registerFeatureRequestTools(
         },
         intendedScopeId: { type: "string", minLength: 1 },
         proposedSponsorPrincipalId: { type: "string", minLength: 1 },
-        expectedRevision: { type: "integer", minimum: 0 },
       },
-      required: ["problem", "desiredOutcome"],
+      required: ["title", "problem", "desiredOutcome"],
       additionalProperties: false,
     },
     hints: writeHints,
     handler: async (input, context) => {
       const host = toHostContext(context.host);
       const target = resolveTargetScope(input.intendedScopeId, host);
-      const actorPrincipalId = context.auth?.principal.id;
-      if (!actorPrincipalId) {
-        throw new Error(
-          "Feature request proposals require a trusted authenticated principal.",
-        );
-      }
-      const authorization = await context.auth?.authorize({
+      const auth = requireHumanAuth(context.auth);
+      const principal = auth.principal;
+      const authorization = await auth.authorize({
         action: "application:scope.tool",
         resource: {
           kind: "application:scope",
@@ -73,13 +68,14 @@ export function registerFeatureRequestTools(
           scope: toAuthzScope(target.tier),
         },
       });
-      if (authorization?.outcome === "deny") {
+      if (authorization?.outcome !== "allow") {
         throw new Error(
-          `Principal ${actorPrincipalId} is not authorized for ${target.resourceScope}.`,
+          `Principal ${principal.id} is not authorized for ${target.resourceScope}.`,
         );
       }
       const result = await workItemsRepository.proposeFeatureRequest(
         {
+          title: input.title,
           problem: input.problem,
           desiredOutcome: input.desiredOutcome,
           ...(input.evidence ? { evidence: input.evidence } : {}),
@@ -90,12 +86,11 @@ export function registerFeatureRequestTools(
             : {}),
         },
         {
-          actorPrincipalId,
-          agentSessionId: resolveAgentSessionId(host),
+          actorPrincipalId: principal.id,
+          agentSessionId: resolveAgentSessionId(principal, host),
           currentScopeId: target.id,
           now: new Date().toISOString(),
         },
-        input.expectedRevision,
       );
       if (result.outcome === "duplicate") {
         return {
@@ -147,14 +142,15 @@ function isFeatureRequestToolInput(
   return (
     isRecord(value) &&
     hasOnlyKeys(value, [
+      "title",
       "problem",
       "desiredOutcome",
       "evidence",
       "sourceRefs",
       "intendedScopeId",
       "proposedSponsorPrincipalId",
-      "expectedRevision",
     ]) &&
+    isNonEmptyString(value.title) &&
     isNonEmptyString(value.problem) &&
     isNonEmptyString(value.desiredOutcome) &&
     isOptionalNonEmptyStringArray(value.evidence) &&
@@ -162,10 +158,25 @@ function isFeatureRequestToolInput(
     (value.intendedScopeId === undefined ||
       isNonEmptyString(value.intendedScopeId)) &&
     (value.proposedSponsorPrincipalId === undefined ||
-      isNonEmptyString(value.proposedSponsorPrincipalId)) &&
-    (value.expectedRevision === undefined ||
-      Number.isInteger(value.expectedRevision))
+      isNonEmptyString(value.proposedSponsorPrincipalId))
   );
+}
+
+function requireHumanAuth(
+  auth: AuthContext | undefined,
+): AuthContext & { principal: AuthenticatedPrincipal & { kind: "human" } } {
+  if (
+    !auth?.principal ||
+    auth.principal.kind !== "human" ||
+    !auth.principal.delegation
+  ) {
+    throw new Error(
+      "Feature request proposals require a delegated authenticated human principal.",
+    );
+  }
+  return auth as AuthContext & {
+    principal: AuthenticatedPrincipal & { kind: "human" };
+  };
 }
 
 function toHostContext(
@@ -205,24 +216,29 @@ function resolveTargetScope(
 ): ScopeTarget {
   const current =
     parseScope(host?.resourceScope) ?? parseSessionScope(host?.sessionScope);
-  const intended = parseScope(intendedScopeId);
-  if (intended) return intended;
-  if (intendedScopeId && current) {
-    return {
-      tier: current.tier,
-      id: intendedScopeId.trim(),
-      resourceScope: `${current.tier}:${intendedScopeId.trim()}`,
-    };
-  }
-  if (current) return current;
+  if (!current)
+    throw new Error(
+      "Feature request proposals require a trusted current resource or session scope.",
+    );
+  if (!intendedScopeId) return current;
+
+  const trimmed = intendedScopeId.trim();
+  const intended = parseScope(trimmed);
+  if (intended && intended.resourceScope === current.resourceScope)
+    return current;
+  if (!intended && trimmed === current.id) return current;
   throw new Error(
-    "Feature request proposals require a trusted current resource or session scope.",
+    "Feature request proposals cannot switch target scope from the authenticated request scope.",
   );
 }
 
 function resolveAgentSessionId(
+  principal: AuthenticatedPrincipal,
   host: { resourceScope?: unknown; sessionScope?: unknown } | undefined,
 ): string | undefined {
+  if (principal.delegation?.actorSessionId) {
+    return principal.delegation.actorSessionId;
+  }
   const resourceScope = parseScope(host?.resourceScope);
   if (resourceScope?.tier === "session") return resourceScope.id;
   const sessionScope = parseSessionScope(host?.sessionScope);
