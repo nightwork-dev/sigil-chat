@@ -11,15 +11,11 @@
 
 import {
   ArchiveIcon,
-  BracesIcon,
   FileCheck2Icon,
   FlaskConicalIcon,
   LibraryBigIcon,
-  MapIcon,
   MessageSquareIcon,
-  NetworkIcon,
   SettingsIcon,
-  SparklesIcon,
   ActivityIcon,
   UserRoundIcon,
 } from "lucide-react"
@@ -37,20 +33,18 @@ export function buildAppNav(options: {
       { to: "/evidence", label: "Evidence", icon: LibraryBigIcon },
       { to: "/artifacts", label: "Artifacts", icon: ArchiveIcon },
       { to: "/review", label: "Review", icon: FileCheck2Icon },
-      // Principal-level — agent definitions and the tool catalog; not scoped
-      // to a container (the breadcrumb omits the container segment here).
-      { to: "/agents", label: "Agent", icon: UserRoundIcon },
-      { to: "/capabilities", label: "Capabilities", icon: SparklesIcon },
-      { to: "/studio", label: "Studio", icon: NetworkIcon },
-      { to: "/skills", label: "Skills", icon: BracesIcon },
-      ...(options.internalWorkspaces
-        ? [
-            { to: "/labs", label: "Labs", icon: FlaskConicalIcon },
-            { to: "/roadmap", label: "Roadmap", icon: MapIcon },
-          ]
-        : []),
+      // Agent management — ONE entry into the management session (Agents |
+      // Skills | Capabilities share a tab header in the top rail; principal-
+      // level, so the breadcrumb omits the container segment here).
+      { to: "/agents", label: "Agents", icon: UserRoundIcon },
     ],
     footer: [
+      // Demos and experiments stay reachable, out of the front-and-center
+      // nav: the labs island indexes Studio, the roadmap board, and the
+      // interaction studies.
+      ...(options.internalWorkspaces
+        ? [{ to: "/labs", label: "Labs", icon: FlaskConicalIcon }]
+        : []),
       ...(options.owner
         ? [{ to: "/status", label: "Status", icon: ActivityIcon }]
         : []),

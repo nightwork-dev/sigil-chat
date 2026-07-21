@@ -19,8 +19,10 @@ import {
   agentPortraitUrl,
   agentRosterQueryOptions,
 } from "@/lib/agent-profile"
+import { ManagementTabs } from "@/components/management-tabs"
 
 export const Route = createFileRoute("/_app/agents/")({
+  staticData: { rail: { top: ManagementTabs } },
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(
       agentRosterQueryOptions(context.user.id),

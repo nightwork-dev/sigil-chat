@@ -8,7 +8,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { SkillsManager } from "@/features/skills-manager/skills-manager";
+import { ManagementTabs } from "@/components/management-tabs";
 
 export const Route = createFileRoute("/_app/skills")({
+  staticData: { rail: { top: ManagementTabs } },
   component: SkillsManager,
 });

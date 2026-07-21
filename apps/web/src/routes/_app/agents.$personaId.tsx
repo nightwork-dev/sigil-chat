@@ -14,8 +14,10 @@ import {
   agentProfileQueryOptions,
   agentPublicProfileQueryOptions,
 } from "@/lib/agent-profile"
+import { ManagementTabs } from "@/components/management-tabs"
 
 export const Route = createFileRoute("/_app/agents/$personaId")({
+  staticData: { rail: { top: ManagementTabs } },
   loader: ({ context, params }) => {
     // §4.3 — the loader branches on role: the full profile fn is owner-only,
     // so a non-owner's loader must never call it (that was the dead-end).

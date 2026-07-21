@@ -8,7 +8,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { CapabilitiesWorkspace } from "@/features/capabilities/capabilities-workspace"
+import { ManagementTabs } from "@/components/management-tabs"
 
 export const Route = createFileRoute("/_app/capabilities")({
+  staticData: { rail: { top: ManagementTabs } },
   component: CapabilitiesWorkspace,
 })
