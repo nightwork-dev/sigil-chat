@@ -71,6 +71,16 @@ describe("Eve resource-scope authorization", () => {
         secret: SECRET,
       }),
     ).toBeUndefined()
+
+    expect(
+      bindScopeDelegationToActorSession({
+        actorSessionId: "eve-session-2",
+        principalId: "user-1",
+        proof: delegated,
+        resourceScope: "workspace:workspace-1",
+        secret: SECRET,
+      }),
+    ).toBeUndefined()
   })
 
   it("accepts an exact signed principal and scope binding", () => {

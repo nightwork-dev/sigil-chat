@@ -128,7 +128,9 @@ export function bindScopeDelegationToActorSession(input: {
   if (
     !delegation ||
     delegation.subject !== principalId ||
-    delegation.scope !== resourceScope
+    delegation.scope !== resourceScope ||
+    (delegation.actorSessionId !== undefined &&
+      delegation.actorSessionId !== actorSessionId)
   ) {
     return undefined
   }

@@ -207,7 +207,10 @@ function preserveTurnResourceScope(
 
   const resourceScope = caller.attributes.sigilResourceScope
   const sessionScope = caller.attributes.sigilSessionScope
-  const scopeProof = caller.attributes.sigilScopeProof
+  const resultScopeProof = result.auth.attributes.sigilScopeProof
+  const callerScopeProof = caller.attributes.sigilScopeProof
+  const scopeProof =
+    typeof resultScopeProof === "string" ? resultScopeProof : callerScopeProof
   if (
     typeof resourceScope !== "string" &&
     typeof sessionScope !== "string" &&
