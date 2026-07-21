@@ -4,7 +4,7 @@ import { ProjectRegistry } from "./project-registry"
 import { WorkspaceRegistry } from "./workspace-registry"
 
 const agentDirectory = fileURLToPath(new URL("..", import.meta.url))
-const storageRoot = fileURLToPath(new URL("../../.data", import.meta.url))
+const localStorageRoot = fileURLToPath(new URL("../../.data", import.meta.url))
 
 export interface ProjectWorkspaceRegistries {
   projects: ProjectRegistry
@@ -22,6 +22,7 @@ let registries: ProjectWorkspaceRegistries | undefined
  */
 export function getProjectWorkspaceRegistries(): ProjectWorkspaceRegistries {
   if (registries) return registries
+  const storageRoot = resolveProjectWorkspaceStorageRoot()
   const projects = new ProjectRegistry({
     cwd: agentDirectory,
     projectRoot: storageRoot,
@@ -35,4 +36,11 @@ export function getProjectWorkspaceRegistries(): ProjectWorkspaceRegistries {
     }),
   }
   return registries
+}
+
+export function resolveProjectWorkspaceStorageRoot(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const configured = env.SIGIL_CONTAINER_REGISTRY_ROOT?.trim()
+  return configured || localStorageRoot
 }

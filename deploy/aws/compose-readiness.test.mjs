@@ -19,6 +19,11 @@ const rollbackWorkflow = readFileSync(
   resolve(directory, "../../.github/workflows/prod-rollback.yml"),
   "utf8",
 )
+const provisionHost = readFileSync(
+  resolve(directory, "provision-host.sh"),
+  "utf8",
+)
+const deploymentReadme = readFileSync(resolve(directory, "README.md"), "utf8")
 
 test("fresh deployment orders containers on Eve liveness, not model auth", () => {
   const eveService = compose.slice(
@@ -94,6 +99,33 @@ test("production services share writable blackboard storage", () => {
   assert.match(compose, /SIGIL_ARTIFACT_DIR: \/var\/lib\/sigil-gonk\/artifacts/)
 })
 
+test("web and Gonk share the authoritative container registry store", () => {
+  for (const serviceName of ["web", "gonk"]) {
+    const start = compose.indexOf(`\n  ${serviceName}:`)
+    const nextMatch = /\n  [a-z][a-z-]+:/g
+    nextMatch.lastIndex = start + serviceName.length + 4
+    const next = nextMatch.exec(compose)?.index ?? compose.length
+    const service = compose.slice(start, next)
+    assert.match(
+      service,
+      /SIGIL_CONTAINER_REGISTRY_ROOT: \/var\/lib\/sigil-containers/,
+    )
+    assert.match(
+      service,
+      /container_registry_data:\/var\/lib\/sigil-containers/,
+    )
+  }
+  const storageInit = compose.slice(
+    compose.indexOf("\n  storage-init:"),
+    compose.indexOf("\n  migrate:"),
+  )
+  assert.match(
+    storageInit,
+    /container_registry_data:\/var\/lib\/sigil-containers/,
+  )
+  assert.match(storageInit, /\/var\/lib\/sigil-containers/)
+})
+
 test("shared stores are initialized for one runtime filesystem identity", () => {
   const dockerfile = readFileSync(
     resolve(directory, "../../Dockerfile"),
@@ -119,6 +151,7 @@ test("shared stores are initialized for one runtime filesystem identity", () => 
     "gonk_data",
     "gonk_scope",
     "blackboard_data",
+    "container_registry_data",
     "codex_auth",
     "eve_identity",
   ]) {
@@ -149,6 +182,15 @@ test("storage initialization migrates a legacy Codex login once", () => {
     /\[ -s \/var\/lib\/sigil-eve\/codex-home\/auth\.json \]/,
   )
   assert.match(storageInit, /install -o 10000 -g 10000 -m 0600/)
+})
+
+test("host secrets are readable only by root and the runtime group", () => {
+  assert.match(provisionHost, /chown root:10000 "\$path"/)
+  assert.match(provisionHost, /chmod 0440 "\$path"/)
+  assert.doesNotMatch(provisionHost, /chmod 04(?:00|44) "\$path"/)
+  assert.match(deploymentReadme, /chown root:10000 \/srv\/sigil-chat\/secrets\/\*/)
+  assert.match(deploymentReadme, /chmod 0440 \/srv\/sigil-chat\/secrets\/\*/)
+  assert.doesNotMatch(deploymentReadme, /chmod 0400 \/srv\/sigil-chat\/secrets\/\*/)
 })
 
 test("production image disables KVM tools during Eve compilation", () => {

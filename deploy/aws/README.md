@@ -54,7 +54,8 @@ sudo chown -R 10004:10004 /srv/sigil-chat/caddy-data /srv/sigil-chat/caddy-confi
 openssl rand -base64 48 | sudo tee /srv/sigil-chat/secrets/better_auth_secret >/dev/null
 openssl rand -base64 48 | sudo tee /srv/sigil-chat/secrets/gonk_mcp_key >/dev/null
 openssl rand -base64 48 | sudo tee /srv/sigil-chat/secrets/invite_token_pepper >/dev/null
-sudo chmod 0400 /srv/sigil-chat/secrets/*
+sudo chown root:10000 /srv/sigil-chat/secrets/*
+sudo chmod 0440 /srv/sigil-chat/secrets/*
 
 node deploy/aws/verify-release.mjs sigil-images.env
 sudo deploy/aws/update-images.sh sigil-images.env

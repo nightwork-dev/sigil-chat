@@ -48,7 +48,7 @@ restore_previous_release() {
 # Clear interrupted layers before pulling, but retain complete candidate images
 # so a retry does not download them again.
 docker container prune -f
-docker image prune -f
+docker image prune -af
 compose_candidate pull
 compose_current stop edge web
 
