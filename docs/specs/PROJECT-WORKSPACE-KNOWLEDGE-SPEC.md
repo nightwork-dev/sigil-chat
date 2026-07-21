@@ -93,6 +93,21 @@ scratch surface per container.
 
 ### 4. Knowledgebase (KB.1)
 
+> **CORRECTED 2026-07-20 (David).** Sections 4–6 below designed an app-side
+> knowledge substrate. Gonk already owns that vertical: `@gonk/knowledge`
+> (authored pages, FTS keyword query **without embeddings by design**,
+> `[[wiki-links]]`+backlinks, supersession-with-provenance,
+> private/personal/team visibility on scope tiers, threat-scanned writes,
+> threshold-gated passive selection) + the temporal triples graph in
+> `@gonk/memory` via `@gonk/memory-tools`. The corrected plan is **adopt +
+> compose**, not build: adopt the Gonk contracts, add project/workspace
+> authz+visibility **upstream**, build the missing Eve host adapter (passive
+> injection + triples + reflector harvest), and keep Sigil to container policy,
+> teach/ratify UI, Evidence Room composition, and evaluation. KB no longer
+> depends on EMB.1 (knowledge is keyword-first). The authoritative writeup is
+> `KB-DESIGN-RECOMMENDATION.md` (CORRECTION section); the restated stories are
+> KB.1/KB.2/KB.3. Read the paragraphs below as the superseded build-it framing.
+
 A **knowledge document** is a deliberately authored artifact — distinct from
 chat debris: markdown + frontmatter `{ id, scope: {tier, id}, title, tags,
 authoredBy, revision, sourceRef? }`, stored via Mirk under the owning tier,
