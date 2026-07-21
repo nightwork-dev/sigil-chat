@@ -1,7 +1,7 @@
 # Scope composition and scoped work
 
 > Date: 2026-07-21
-> Status: Draft product and architecture contract
+> Status: Ratified product and architecture contract
 > Scope: Sigil Chat container organization, resource resolution, durable work,
 > agent-authored requests, and the product information architecture that exposes
 > them
