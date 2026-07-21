@@ -133,6 +133,9 @@ export function SidebarShell({
   accountMenu,
   workspaceSwitcher,
   breadcrumbContext,
+  viewContent,
+  statusRailStart,
+  statusRailEnd,
 }: ShellSlots & {
   accountMenu?: ReactNode
   /**
@@ -148,6 +151,23 @@ export function SidebarShell({
    * the separators.
    */
   breadcrumbContext?: ReactNode
+  /**
+   * View-owned content filling the top rail between the breadcrumb and the
+   * header actions (e.g. the chat surface's status + session switcher). One
+   * rail, one header — a view renders its header content here instead of
+   * stacking a second header row under the shell's.
+   */
+  viewContent?: ReactNode
+  /**
+   * Thin bottom status rail — start (left) region, for view-specific
+   * controls (canvas zoom, reframes).
+   */
+  statusRailStart?: ReactNode
+  /**
+   * Thin bottom status rail — end (right) region, for persistent app/agent
+   * data (attention context, chord hints, session status).
+   */
+  statusRailEnd?: ReactNode
 }) {
   const active = useActiveNav([...nav.items, ...(nav.footer ?? [])])
 
@@ -208,10 +228,26 @@ export function SidebarShell({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+          {viewContent ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              {viewContent}
+            </div>
+          ) : null}
           <HeaderActions actions={actions} />
         </header>
 
         <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+
+        {statusRailStart || statusRailEnd ? (
+          <footer className="flex h-7 shrink-0 items-center gap-2 border-t border-border px-2 text-[11px] text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+              {statusRailStart}
+            </div>
+            <div className="ml-auto flex items-center gap-2 overflow-hidden">
+              {statusRailEnd}
+            </div>
+          </footer>
+        ) : null}
       </SidebarInset>
     </SidebarProvider>
   )

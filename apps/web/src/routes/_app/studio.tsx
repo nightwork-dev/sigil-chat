@@ -12,5 +12,16 @@ import { createFileRoute } from "@tanstack/react-router"
 import { ReducerStudio } from "@/features/studio/reducer-studio"
 
 export const Route = createFileRoute("/_app/studio")({
+  // Canvas zoom/reframe controls stay ON the canvas (they need the ReactFlow
+  // context, which lives in the route subtree — the shell rail renders above
+  // it); the rail carries this view's chord hints.
+  staticData: {
+    rail: {
+      chords: [
+        { keys: "Scroll", label: "Zoom" },
+        { keys: "Drag", label: "Pan" },
+      ],
+    },
+  },
   component: ReducerStudio,
 })

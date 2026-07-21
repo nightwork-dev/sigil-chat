@@ -13,6 +13,8 @@ export interface Workspace {
   readonly projectId: string
   readonly name: string
   readonly description: string
+  /** Visual identity in the chrome (see Project.icon). */
+  readonly icon?: string
   readonly status: WorkspaceStatus
   readonly createdAt: string
   readonly createdBy: string

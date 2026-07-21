@@ -1,4 +1,4 @@
-import { AgentChat } from "@/components/agent/agent-chat"
+import { AgentChat, AgentChatHeader } from "@/components/agent/agent-chat"
 import { useRegisterAgentPresentation } from "@/lib/agent-surface-registry"
 import {
   setToolApprovalMode,
@@ -15,8 +15,23 @@ export function AppChat() {
   return (
     <AgentChat
       approvalMode={approvalMode}
+      hideHeader
       onApprovalModeChange={setToolApprovalMode}
       placeholder="Ask the agent, or tell it to use a Gonk tool…"
+    />
+  )
+}
+
+/** The chat surface's top-rail content — the SAME header AgentChat would
+ *  render inline, hoisted into the shell's rail (declared in chat.tsx's
+ *  staticData.rail.top). One header, one rail. */
+export function ChatRailTop() {
+  const approvalMode = useToolApprovalMode()
+  return (
+    <AgentChatHeader
+      approvalMode={approvalMode}
+      onApprovalModeChange={setToolApprovalMode}
+      variant="rail"
     />
   )
 }
