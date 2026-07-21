@@ -1,5 +1,8 @@
 import type { SigilAuthSession } from "./auth/server"
 import { AuthenticationRequiredError } from "./auth/session"
+import { assertAuthorizedScope } from "./agent-scope-authorization.server"
+import { blackboardStoreKey, type BlackboardScope } from "./blackboard-scope"
+import type { ScopeAuthorizationRegistries } from "../../../agent/agent/lib/scope-authorization"
 import type {
   BlackboardDoc,
   BlackboardRepository,
@@ -44,6 +47,58 @@ export async function writeOwnedBlackboard(
   )
   return blackboards.write(
     input.sessionId,
+    input.content,
+    "user",
+    input.expectedRevision,
+  )
+}
+
+/**
+ * The workspace/project tiers' shared scratch surface — same store, keyed by
+ * `blackboardStoreKey(scope)` (blackboard-scope.ts) instead of a bare thread
+ * id. Session-tier access still goes through `readOwnedBlackboard`/
+ * `writeOwnedBlackboard` above (unchanged, thread-ownership gated); this path
+ * covers workspace/project via the registry-backed membership check that
+ * already guards Eve's tool scope (`assertAuthorizedScope`), so a container
+ * blackboard opens to the same people who can act in that container.
+ */
+export function requireBlackboardScopeAccess(
+  session: SigilAuthSession | null,
+  scope: BlackboardScope,
+  ownsThread: (userId: string, threadId: string) => boolean,
+  registries?: ScopeAuthorizationRegistries,
+): SigilAuthSession {
+  if (!session) throw new AuthenticationRequiredError()
+  assertAuthorizedScope(
+    `${scope.tier}:${scope.id}`,
+    session.user.id,
+    ownsThread,
+    registries,
+  )
+  return session
+}
+
+export async function readScopedBlackboard(
+  session: SigilAuthSession | null,
+  scope: BlackboardScope,
+  ownsThread: (userId: string, threadId: string) => boolean,
+  blackboards: BlackboardRepository,
+  registries?: ScopeAuthorizationRegistries,
+): Promise<BlackboardDoc> {
+  requireBlackboardScopeAccess(session, scope, ownsThread, registries)
+  return blackboards.read(blackboardStoreKey(scope))
+}
+
+export async function writeScopedBlackboard(
+  session: SigilAuthSession | null,
+  input: { scope: BlackboardScope; content: string; expectedRevision: string },
+  ownsThread: (userId: string, threadId: string) => boolean,
+  blackboards: BlackboardRepository,
+  registries?: ScopeAuthorizationRegistries,
+): Promise<BlackboardDoc> {
+  requireBlackboardScopeAccess(session, input.scope, ownsThread, registries)
+  return blackboards.write(
+    blackboardStoreKey(input.scope),
     input.content,
     "user",
     input.expectedRevision,
