@@ -10,18 +10,18 @@
 // The compact HUD is a clean conversation surface: the heavy context inspector
 // and per-turn status live on the roomy /chat view, not this small panel.
 
-import { useState } from "react"
 import { Link, useRouterState } from "@tanstack/react-router"
 
 import { AgentHud } from "@/components/agent/agent-hud"
 import { setAgentHudDock, useAgentHudDock } from "@/lib/agent-hud-dock"
+import { useAgentHudOpen } from "@/lib/agent-hud-open"
 import {
   setToolApprovalMode,
   useToolApprovalMode,
 } from "@/lib/agent-tool-approval"
 
 export function ShellAgentHud() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useAgentHudOpen()
   const approvalMode = useToolApprovalMode()
   const dock = useAgentHudDock()
   const pathname = useRouterState({ select: (state) => state.location.pathname })

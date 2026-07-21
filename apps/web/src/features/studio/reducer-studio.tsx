@@ -46,6 +46,11 @@ import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
 import {
+  DemoAnnotationsProvider,
+  mergeDemoAnnotations,
+  useDemoAnnotations,
+} from "@/lib/demo-annotations"
+import {
   type AttentionContext,
   type AttentionSelection,
 } from "@zigil/agent-react/attention"
@@ -135,6 +140,14 @@ const REDUCER_GROUPS = [...registry.categories()].map(([label, reducers]) => ({
 const REDUCER_OPTIONS = REDUCER_GROUPS.flatMap((group) => group.items)
 
 export function ReducerStudio() {
+  return (
+    <DemoAnnotationsProvider>
+      <ReducerStudioInner />
+    </DemoAnnotationsProvider>
+  )
+}
+
+function ReducerStudioInner() {
   const documentQuery = useReducerGraph()
   const commandMutation = useReducerGraphCommand()
   const undoMutation = useReducerGraphUndo()
@@ -276,6 +289,7 @@ export function ReducerStudio() {
             <Button onClick={addNode} size="sm" variant="secondary">
               <PlusIcon /> <span className="hidden sm:inline">Add node</span>
             </Button>
+            <DemoAnnotationButton />
             <span className="hidden font-mono text-[10px] text-muted-foreground xl:inline">
               {document.nodes.length} nodes · {document.edges.length} edges ·
               rev {document.revision}
@@ -613,8 +627,37 @@ function CanvasControlButton({
   )
 }
 
+// Demo scaffolding: drop a synthetic annotation on the first graph node so the
+// overlay projection is visible deterministically, without waiting for the
+// agent to call sigil-annotate. Clearly labeled (variant: outline) so it reads
+// as a dev affordance, not a product feature.
+function DemoAnnotationButton() {
+  const demo = useDemoAnnotations()
+  const documentQuery = useReducerGraph()
+  if (!demo) return null
+  const firstNode = documentQuery.data?.nodes[0]
+  if (!firstNode) return null
+  return (
+    <Button
+      onClick={() =>
+        demo.add(firstNode.id, {
+          body: "This node feeds the launch calculation — check its inputs are current before relying on the output.",
+          kind: "highlight",
+          label: "Agent note (demo)",
+        })
+      }
+      size="sm"
+      variant="outline"
+    >
+      <span className="hidden sm:inline">Demo annotation</span>
+    </Button>
+  )
+}
+
 function ReducerNode({ data, selected }: NodeProps<ReducerFlowNode>) {
-  const agentAnnotations = useAgentAnnotationsByAnchor().get(data.node.id) ?? []
+  const realAnnotations = useAgentAnnotationsByAnchor().get(data.node.id)
+  const demoAnnotations = useDemoAnnotations()?.byAnchor.get(data.node.id)
+  const agentAnnotations = mergeDemoAnnotations(realAnnotations, demoAnnotations)
   return (
     <Card
       size="sm"
