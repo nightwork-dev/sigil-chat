@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
+import { projectAgentThreadSummary } from "@/lib/agent-threads-domain";
 import type {
   AgentThread,
   AgentThreadPreference,
@@ -36,8 +37,6 @@ const listAgentThreadsFn = createServerFn({ method: "GET" })
     const threads = data.includeArchived
       ? agentThreadRepository.list(session.user.id, true)
       : agentThreadRepository.ensureActive(session.user.id);
-    const { projectAgentThreadSummary } =
-      await import("@/lib/agent-threads-domain");
     return threads.map(projectAgentThreadSummary);
   });
 
@@ -53,7 +52,10 @@ const getAgentThreadFn = createServerFn({ method: "GET" })
   });
 
 const createAgentThreadFn = createServerFn({ method: "POST" })
-  .validator((input: { personaId: string; title?: string }) => input)
+  .validator(
+    (input: { personaId: string; title?: string; workspaceId?: string }) =>
+      input,
+  )
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
@@ -62,8 +64,48 @@ const createAgentThreadFn = createServerFn({ method: "POST" })
     if (!personaRegistry.exists(data.personaId)) {
       throw new Error(`Persona ${data.personaId} was not found.`);
     }
+    if (data.workspaceId) {
+      await requireWorkspaceMembership(session.user.id, data.workspaceId);
+    }
     return agentThreadRepository.create(session.user.id, data);
   });
+
+const rebindAgentThreadWorkspaceFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: { id: string; workspaceId?: string; expectedRevision?: number }) =>
+      input,
+  )
+  .handler(async ({ data }) => {
+    const { agentThreadRepository } =
+      await import("@/lib/agent-threads.server");
+    const session = await requireThreadSession();
+    if (data.workspaceId) {
+      await requireWorkspaceMembership(session.user.id, data.workspaceId);
+    }
+    return agentThreadRepository.rebindWorkspace(
+      session.user.id,
+      data.id,
+      data.workspaceId,
+      data.expectedRevision,
+    );
+  });
+
+async function requireWorkspaceMembership(
+  userId: string,
+  workspaceId: string,
+): Promise<void> {
+  const { getProjectWorkspaceRegistries } = await import(
+    "../../../agent/agent/lib/project-workspace-registries"
+  );
+  const { assertRegisteredScopeMembership } = await import(
+    "../../../agent/agent/lib/scope-authorization"
+  );
+  const registries = getProjectWorkspaceRegistries();
+  if (!registries.workspaces.get(workspaceId)) {
+    throw new Error(`Workspace ${workspaceId} was not found.`);
+  }
+  assertRegisteredScopeMembership(`workspace:${workspaceId}`, userId, registries);
+}
 
 const renameAgentThreadFn = createServerFn({ method: "POST" })
   .validator(
@@ -209,8 +251,11 @@ export function useCreateAgentThread() {
   const queryClient = useQueryClient();
   const principalId = useAgentPrincipalId();
   return useMutation({
-    mutationFn: (input: { personaId: string; title?: string }) =>
-      createAgentThreadFn({ data: input }),
+    mutationFn: (input: {
+      personaId: string;
+      title?: string;
+      workspaceId?: string;
+    }) => createAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
       cacheThread(queryClient, principalId, thread);
       cacheActivePreference(queryClient, principalId, {
@@ -219,6 +264,19 @@ export function useCreateAgentThread() {
         updatedAt: thread.updatedAt,
       });
     },
+  });
+}
+
+export function useRebindAgentThreadWorkspace() {
+  const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      workspaceId?: string;
+      expectedRevision?: number;
+    }) => rebindAgentThreadWorkspaceFn({ data: input }),
+    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
   });
 }
 
@@ -335,7 +393,7 @@ function cacheThread(
     agentThreadKeys.detail(principalId, thread.id),
     thread,
   );
-  const summary = projectCachedThreadSummary(thread);
+  const summary = projectAgentThreadSummary(thread);
   queryClient.setQueryData<AgentThreadSummary[]>(
     agentThreadKeys.list(principalId, true),
     (current) => upsertThread(current, summary),
@@ -373,19 +431,6 @@ function upsertThread(
       right.updatedAt.localeCompare(left.updatedAt) ||
       left.id.localeCompare(right.id),
   );
-}
-
-function projectCachedThreadSummary(thread: AgentThread): AgentThreadSummary {
-  return {
-    id: thread.id,
-    personaId: thread.personaId,
-    title: thread.title,
-    createdAt: thread.createdAt,
-    updatedAt: thread.updatedAt,
-    status: thread.status,
-    revision: thread.revision,
-    ...(thread.forkedFrom ? { forkedFrom: thread.forkedFrom } : {}),
-  };
 }
 
 async function requireThreadSession(): Promise<SigilAuthSession> {

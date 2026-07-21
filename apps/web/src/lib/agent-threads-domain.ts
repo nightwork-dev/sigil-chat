@@ -36,6 +36,14 @@ export interface AgentThread {
   };
   forkedFrom?: string;
   forkSeed?: AgentThreadForkSeed;
+  /**
+   * The workspace this thread is bound to. Optional and additive — an
+   * unbound thread (no workspaceId) is not an error state, it resolves to
+   * the user's personal project (see agent-thread-containers.ts). The
+   * containing project is never duplicated here: it is always derived
+   * through workspace containment, one registry lookup away.
+   */
+  workspaceId?: string;
 }
 
 export interface AgentThreadPreference {
@@ -53,6 +61,7 @@ export interface AgentThreadSummary {
   status: AgentThreadStatus;
   revision: number;
   forkedFrom?: string;
+  workspaceId?: string;
 }
 
 export interface AgentThreadKvStore<T> {
@@ -153,9 +162,10 @@ export class AgentThreadRepository {
 
   create(
     userId: string,
-    input: { personaId?: string; title?: string } = {},
+    input: { personaId?: string; title?: string; workspaceId?: string } = {},
   ): AgentThread {
     const timestamp = this.now().toISOString();
+    const workspaceId = normalizeWorkspaceId(input.workspaceId);
     const thread: AgentThread = {
       members: [userId],
       id: this.createId(),
@@ -170,10 +180,34 @@ export class AgentThreadRepository {
         events: [],
         compaction: emptyCompaction(timestamp),
       },
+      ...(workspaceId ? { workspaceId } : {}),
     };
     this.write(thread);
     this.setActive(userId, thread.id, timestamp);
     return cloneThread(thread);
+  }
+
+  /** Rebinds an existing thread to a different workspace, or unbinds it
+   *  (personal project) when `workspaceId` is undefined. Containment is
+   *  never encoded here — callers resolve/authorize the workspace id before
+   *  calling this. */
+  rebindWorkspace(
+    userId: string,
+    id: string,
+    workspaceId: string | undefined,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => {
+      const normalized = normalizeWorkspaceId(workspaceId);
+      const rebound = cloneThread(thread);
+      if (normalized) rebound.workspaceId = normalized;
+      else delete rebound.workspaceId;
+      return {
+        ...rebound,
+        updatedAt: timestamp,
+        revision: thread.revision + 1,
+      };
+    });
   }
 
   rename(
@@ -397,6 +431,7 @@ export function projectAgentThreadSummary(
     status: thread.status,
     revision: thread.revision,
     ...(thread.forkedFrom ? { forkedFrom: thread.forkedFrom } : {}),
+    ...(thread.workspaceId ? { workspaceId: thread.workspaceId } : {}),
   };
 }
 
@@ -469,6 +504,11 @@ function normalizePersonaId(personaId: string): string {
   if (!normalized)
     throw new Error("Agent thread persona id must be non-empty.");
   return normalized;
+}
+
+function normalizeWorkspaceId(workspaceId: string | undefined): string | undefined {
+  const normalized = workspaceId?.trim();
+  return normalized ? normalized : undefined;
 }
 
 function threadKey(id: string): string {

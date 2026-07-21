@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react"
+import { useCallback, useMemo, useState, type ReactNode } from "react"
 import {
   Popover,
   PopoverContent,
@@ -8,7 +8,6 @@ import {
 } from "@workspace/ui/components/popover"
 import {
   AlertTriangleIcon,
-  CheckIcon,
   ChevronRightIcon,
   FileIcon,
   GitForkIcon,
@@ -65,7 +64,6 @@ import {
 } from "@workspace/ui/components/select"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -98,7 +96,10 @@ import {
   useAgentRoster,
   type AgentPersonaSummary,
 } from "@/lib/agent-profile"
-import { useCreateAgentThread } from "@/lib/agent-threads"
+import { useAgentThreads, useCreateAgentThread } from "@/lib/agent-threads"
+import { deriveThreadProjectId } from "@/lib/agent-thread-containers"
+import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import { ProjectWorkspaceNav } from "@/components/agent/project-workspace-nav"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import {
   AGENT_SCOPE_HEADER,
@@ -147,6 +148,28 @@ export function AgentChat({
   const busy = isAgentSessionBusy(session)
   const showStatus = showStatusIndicator || statusLine !== null
   const showLeading = showStatus || threadControls !== null
+
+  // The blackboard's workspace/project tabs need the active thread's bound
+  // workspace and its derived (never stored) project — resolved through the
+  // registry-backed nav data, same as the conversation-sheet grouping.
+  const activeThreads = useAgentThreads()
+  const projectNav = useProjectWorkspaceNav()
+  const activeThreadSummary = activeThreads.data?.find(
+    (thread) => thread.id === threadControls?.activeThreadId,
+  )
+  const activeContainers = useMemo(() => {
+    if (!activeThreadSummary || !projectNav.data) return undefined
+    const nav = projectNav.data
+    const projectId = deriveThreadProjectId(
+      activeThreadSummary,
+      {
+        getWorkspaceProjectId: (id) =>
+          nav.workspaces.find((workspace) => workspace.id === id)?.projectId,
+      },
+      nav.personalProjectId,
+    )
+    return { workspaceId: activeThreadSummary.workspaceId, projectId }
+  }, [activeThreadSummary, projectNav.data])
 
   // Attachment queue lives in the reusable useAttachments core (INGRESS-CORES).
   // We inject the sigil-chat upload server fn; the hook owns the optimistic
@@ -261,7 +284,11 @@ export function AgentChat({
         showNewSession ? (
           <div className="flex shrink-0 items-center gap-1">
             {threadControls?.activeThreadId ? (
-              <SessionBlackboard sessionId={threadControls.activeThreadId} />
+              <SessionBlackboard
+                projectId={activeContainers?.projectId}
+                sessionId={threadControls.activeThreadId}
+                workspaceId={activeContainers?.workspaceId}
+              />
             ) : null}
             {showContextPrivacy ? (
               <ContextTray.Root attention={attention}>
@@ -477,6 +504,10 @@ function AgentSessionSwitcher({
   const activeThread = controls.threads.find(
     (thread) => thread.id === controls.activeThreadId,
   )
+  // controls.threads (AgentThreadControls, a published Sigil Agent contract)
+  // carries only id/title/updatedAt — it doesn't know about workspaceId. Pull
+  // the app's own thread summaries for container-aware grouping instead.
+  const threads = useAgentThreads()
 
   return (
     <Sheet>
@@ -499,40 +530,18 @@ function AgentSessionSwitcher({
         </span>
       </SheetTrigger>
       <SheetContent
-        className="w-[min(22rem,calc(100vw-1rem))]"
+        className="flex w-[min(22rem,calc(100vw-1rem))] flex-col"
         side="left"
       >
         <SheetHeader className="border-b border-border px-4 py-4">
           <SheetTitle>Conversations</SheetTitle>
         </SheetHeader>
-        <nav
-          aria-label="Agent conversations"
-          className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2"
-        >
-          {controls.threads.map((thread) => {
-            const active = thread.id === controls.activeThreadId
-            return (
-              <SheetClose
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-11 w-full items-start gap-2 rounded-md px-3 py-2 text-left text-sm leading-5 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                  active && "bg-muted text-foreground",
-                )}
-                disabled={busy}
-                key={thread.id}
-                onClick={() => void controls.selectThread(thread.id)}
-                render={<button type="button" />}
-              >
-                <span className="min-w-0 flex-1 whitespace-normal break-words">
-                  {thread.title}
-                </span>
-                {active ? (
-                  <CheckIcon className="mt-1 size-3.5 shrink-0 text-primary" />
-                ) : null}
-              </SheetClose>
-            )
-          })}
-        </nav>
+        <ProjectWorkspaceNav
+          activeThreadId={controls.activeThreadId}
+          busy={busy}
+          onSelectThread={(threadId) => void controls.selectThread(threadId)}
+          threads={threads.data ?? []}
+        />
       </SheetContent>
     </Sheet>
   )
