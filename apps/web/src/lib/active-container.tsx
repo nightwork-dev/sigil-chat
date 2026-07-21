@@ -18,9 +18,11 @@ import {
   useActiveAgentThreadPreference,
   useSetActiveContainer,
 } from "@/lib/agent-threads";
+import type { ScopePerspective } from "@/lib/agent-threads-domain";
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav";
 
 export interface ActiveContainer {
+  perspective: ScopePerspective | undefined;
   /** Always resolved once nav data loads — defaults to the personal project. */
   projectId: string | undefined;
   workspaceId: string | undefined;
@@ -45,24 +47,39 @@ export function ActiveContainerProvider({ children }: { children: ReactNode }) {
     const pref = preference.data;
     const data = nav.data;
 
+    const perspective = pref?.activePerspective;
     const workspace = data?.workspaces.find(
-      (w) => w.id === pref?.activeWorkspaceId,
+      (w) => w.id === perspective?.focusScopeId,
     );
-    // Containment wins over the stored project field — same derivation rule
-    // as threads. A stored workspace whose project disagrees with the stored
-    // project resolves through the workspace.
+    const focusProject = data?.projects.find(
+      (project) => project.id === perspective?.focusScopeId,
+    );
+    // Server validation ensures a stored via path is legal. If cached nav no
+    // longer recognizes it, fall back to canonical ownership, then personal.
     const projectId =
-      workspace?.projectId ?? pref?.activeProjectId ?? data?.personalProjectId;
+      workspace
+        ? perspective?.viaScopeIds.at(-1) ?? workspace.homeScopeId
+        : focusProject?.id ?? data?.personalProjectId;
     const project = data?.projects.find((p) => p.id === projectId);
 
     return {
+      perspective: workspace || focusProject ? perspective : undefined,
       projectId,
       workspaceId: workspace?.id,
       projectName: project?.name,
       workspaceName: workspace?.name,
       isReady: Boolean(preference.data && nav.data),
-      selectProject: (pid) => setActiveContainer.mutate({ projectId: pid }),
-      selectWorkspace: (wid) => setActiveContainer.mutate({ workspaceId: wid }),
+      selectProject: (pid) =>
+        setActiveContainer.mutate({
+          perspective: { focusScopeId: pid, viaScopeIds: [] },
+        }),
+      selectWorkspace: (wid) =>
+        setActiveContainer.mutate({
+          perspective: {
+            focusScopeId: wid,
+            viaScopeIds: projectId ? [projectId] : [],
+          },
+        }),
       clear: () => setActiveContainer.mutate({}),
     };
   }, [preference.data, nav.data, setActiveContainer]);

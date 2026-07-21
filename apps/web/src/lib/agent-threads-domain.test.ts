@@ -99,6 +99,10 @@ describe("AgentThreadRepository", () => {
     repo.setActiveContainer(USER_A, { projectId: "project-1" });
     expect(repo.getActivePreference(USER_A).activeProjectId).toBe("project-1");
     expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
+      focusScopeId: "project-1",
+      viaScopeIds: [],
+    });
 
     repo.setActiveContainer(USER_A, {
       projectId: "project-1",
@@ -107,6 +111,10 @@ describe("AgentThreadRepository", () => {
     expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBe(
       "workspace-1",
     );
+    expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
+      focusScopeId: "workspace-1",
+      viaScopeIds: ["project-1"],
+    });
 
     // Per-principal isolation: another principal's selection is untouched.
     expect(repo.getActivePreference(USER_B).activeProjectId).toBeUndefined();
@@ -115,6 +123,33 @@ describe("AgentThreadRepository", () => {
     repo.setActiveContainer(USER_A, {});
     expect(repo.getActivePreference(USER_A).activeProjectId).toBeUndefined();
     expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+  });
+
+  it("writes back a ScopePerspective for a legacy scalar container preference", () => {
+    const preferences = new MemoryKv<AgentThreadPreference>();
+    preferences.set(`active-thread:${USER_A}`, {
+      members: [USER_A],
+      activeProjectId: "project-1",
+      activeWorkspaceId: "workspace-1",
+      updatedAt: "2026-07-16T10:00:00.000Z",
+    });
+    const repo = new AgentThreadRepository({
+      defaultPersonaId: "agent-a",
+      threads: new MemoryKv(),
+      preferences,
+      now: () => new Date("2026-07-16T10:00:00.000Z"),
+    });
+
+    expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
+      focusScopeId: "workspace-1",
+      viaScopeIds: ["project-1"],
+    });
+    expect(
+      preferences.get(`active-thread:${USER_A}`)?.activePerspective,
+    ).toEqual({
+      focusScopeId: "workspace-1",
+      viaScopeIds: ["project-1"],
+    });
   });
 
   it("keeps the container selection when the active thread changes", () => {

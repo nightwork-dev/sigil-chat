@@ -112,6 +112,37 @@ describe("ScopeLinkRegistry", () => {
       expect.objectContaining({ action: "removed", before: created }),
     )
   })
+
+  it("traverses only the requested relation in deterministic order", () => {
+    const registry = createRegistry()
+    registry.create({
+      kind: "mounted-in",
+      subjectScopeId: "workspace-a",
+      targetScopeId: "project-a",
+      order: 2,
+      createdBy: "owner-1",
+    })
+    registry.create({
+      kind: "mounted-in",
+      subjectScopeId: "workspace-b",
+      targetScopeId: "project-a",
+      order: 1,
+      createdBy: "owner-1",
+    })
+    registry.create({
+      kind: "rolls-up-to",
+      subjectScopeId: "project-b",
+      targetScopeId: "project-a",
+      order: 0,
+      createdBy: "owner-1",
+    })
+
+    expect(registry.traverseSubjects("project-a", "mounted-in")).toEqual([
+      "project-a",
+      "workspace-b",
+      "workspace-a",
+    ])
+  })
 })
 
 function createRegistry(): ScopeLinkRegistry {

@@ -14,7 +14,9 @@ export interface ProjectWorkspaceNavSummary {
   }>;
   workspaces: Array<{
     id: string;
+    homeScopeId: string;
     projectId: string;
+    mountedProjectIds: string[];
     name: string;
     description: string;
     icon?: string;
@@ -39,7 +41,9 @@ const loadProjectWorkspaceNavFn = createServerFn({ method: "GET" }).handler(
       })),
       workspaces: nav.workspaces.map((workspace) => ({
         id: workspace.id,
+        homeScopeId: workspace.homeScopeId ?? workspace.projectId,
         projectId: workspace.projectId,
+        mountedProjectIds: workspace.mountedProjectIds,
         name: workspace.name,
         description: workspace.description,
         icon: workspace.icon,

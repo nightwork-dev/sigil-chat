@@ -6,6 +6,7 @@ import {
   type ScopeLink,
   type ScopeLinkKind,
   sortScopeLinks,
+  traverseScopeLinks,
   wouldCreateScopeLinkCycle,
 } from "./scope-graph"
 import type { ScopeRecord } from "./scope-registry"
@@ -119,6 +120,36 @@ export class ScopeLinkRegistry {
         return clone(value)
       }).filter((link) => kind === undefined || link.kind === kind),
     )
+  }
+
+  traverseSubjects(
+    targetScopeId: string,
+    kind: ScopeLinkKind,
+    maxDepth?: number,
+  ): string[] {
+    assertIdentifier("target scope id", targetScopeId)
+    return traverseScopeLinks({
+      rootScopeId: targetScopeId,
+      kind,
+      direction: "subjects",
+      links: this.list(kind),
+      maxDepth,
+    })
+  }
+
+  traverseTargets(
+    subjectScopeId: string,
+    kind: ScopeLinkKind,
+    maxDepth?: number,
+  ): string[] {
+    assertIdentifier("subject scope id", subjectScopeId)
+    return traverseScopeLinks({
+      rootScopeId: subjectScopeId,
+      kind,
+      direction: "targets",
+      links: this.list(kind),
+      maxDepth,
+    })
   }
 
   create(input: CreateScopeLinkInput): ScopeLink {

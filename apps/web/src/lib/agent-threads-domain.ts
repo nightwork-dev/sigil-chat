@@ -20,6 +20,13 @@ export interface AgentThreadForkSeed {
   messages: AgentThreadForkMessage[];
 }
 
+/** A validated display route to a focused scope; never an authority grant. */
+export interface ScopePerspective {
+  focusScopeId: string;
+  /** Ordered display path ending immediately before focusScopeId. */
+  viaScopeIds: string[];
+}
+
 export interface AgentThread {
   members: string[];
   id: string;
@@ -60,6 +67,12 @@ export interface AgentThreadPreference {
    */
   activeProjectId?: string;
   activeWorkspaceId?: string;
+  /**
+   * Replaces the scalar container preference. The server validates and
+   * canonicalizes it before write; the scalar fields remain as a temporary
+   * compatibility projection for callers not yet migrated to perspectives.
+   */
+  activePerspective?: ScopePerspective;
   updatedAt: string;
 }
 
@@ -328,9 +341,14 @@ export class AgentThreadRepository {
 
   getActivePreference(userId: string): AgentThreadPreference {
     const preference = this.preferences.get(activeThreadKey(userId));
-    return preference
-      ? structuredClone(preference)
-      : { members: [userId], updatedAt: this.now().toISOString() };
+    if (!preference) {
+      return { members: [userId], updatedAt: this.now().toISOString() };
+    }
+    const normalized = normalizePreferencePerspective(preference);
+    if (normalized !== preference) {
+      this.preferences.set(activeThreadKey(userId), normalized);
+    }
+    return structuredClone(normalized);
   }
 
   setActive(
@@ -367,16 +385,35 @@ export class AgentThreadRepository {
    */
   setActiveContainer(
     userId: string,
-    container: { projectId?: string; workspaceId?: string },
+    container: {
+      projectId?: string;
+      workspaceId?: string;
+      perspective?: ScopePerspective;
+    },
     updatedAt = this.now().toISOString(),
   ): AgentThreadPreference {
     // Same raw-read rule as setActive (see the comment there).
     const existing = this.preferences.get(activeThreadKey(userId));
+    const {
+      activePerspective: _activePerspective,
+      activeProjectId: _activeProjectId,
+      activeWorkspaceId: _activeWorkspaceId,
+      ...retained
+    } = existing ?? { members: [userId] };
+    const perspective =
+      normalizeScopePerspective(container.perspective) ??
+      legacyContainerPerspective({
+        activeProjectId: container.projectId,
+        activeWorkspaceId: container.workspaceId,
+      });
     const preference: AgentThreadPreference = {
-      ...existing,
+      ...retained,
       members: [userId],
-      activeProjectId: container.projectId,
-      activeWorkspaceId: container.workspaceId,
+      ...(container.projectId ? { activeProjectId: container.projectId } : {}),
+      ...(container.workspaceId
+        ? { activeWorkspaceId: container.workspaceId }
+        : {}),
+      ...(perspective ? { activePerspective: perspective } : {}),
       updatedAt,
     };
     this.preferences.set(activeThreadKey(userId), preference);
@@ -550,6 +587,73 @@ function normalizePersonaId(personaId: string): string {
 function normalizeWorkspaceId(workspaceId: string | undefined): string | undefined {
   const normalized = workspaceId?.trim();
   return normalized ? normalized : undefined;
+}
+
+export function isScopePerspective(value: unknown): value is ScopePerspective {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as ScopePerspective).focusScopeId === "string" &&
+    (value as ScopePerspective).focusScopeId.trim().length > 0 &&
+    Array.isArray((value as ScopePerspective).viaScopeIds) &&
+    (value as ScopePerspective).viaScopeIds.every(
+      (scopeId) => typeof scopeId === "string" && scopeId.trim().length > 0,
+    ) &&
+    new Set((value as ScopePerspective).viaScopeIds).size ===
+      (value as ScopePerspective).viaScopeIds.length
+  );
+}
+
+function normalizeScopePerspective(
+  perspective: ScopePerspective | undefined,
+): ScopePerspective | undefined {
+  if (!isScopePerspective(perspective)) return undefined;
+  return {
+    focusScopeId: perspective.focusScopeId.trim(),
+    viaScopeIds: perspective.viaScopeIds.map((scopeId) => scopeId.trim()),
+  };
+}
+
+function normalizePreferencePerspective(
+  preference: AgentThreadPreference,
+): AgentThreadPreference {
+  const perspective = normalizeScopePerspective(preference.activePerspective);
+  if (perspective) {
+    const unchanged =
+      preference.activePerspective?.focusScopeId === perspective.focusScopeId &&
+      preference.activePerspective.viaScopeIds.every(
+        (scopeId, index) => scopeId === perspective.viaScopeIds[index],
+      );
+    return unchanged ? preference : { ...preference, activePerspective: perspective };
+  }
+  const legacy = legacyContainerPerspective(preference);
+  if (!legacy) {
+    return preference.activePerspective === undefined
+      ? preference
+      : withoutActivePerspective(preference);
+  }
+  return { ...preference, activePerspective: legacy };
+}
+
+function legacyContainerPerspective(
+  container: Pick<AgentThreadPreference, "activeProjectId" | "activeWorkspaceId">,
+): ScopePerspective | undefined {
+  if (container.activeWorkspaceId) {
+    return {
+      focusScopeId: container.activeWorkspaceId,
+      viaScopeIds: container.activeProjectId ? [container.activeProjectId] : [],
+    };
+  }
+  return container.activeProjectId
+    ? { focusScopeId: container.activeProjectId, viaScopeIds: [] }
+    : undefined;
+}
+
+function withoutActivePerspective(
+  preference: AgentThreadPreference,
+): AgentThreadPreference {
+  const { activePerspective: _activePerspective, ...rest } = preference;
+  return rest;
 }
 
 function threadKey(id: string): string {

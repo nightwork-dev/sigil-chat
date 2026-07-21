@@ -13,6 +13,7 @@ import type {
   AgentThreadSnapshot,
   AgentThreadSummary,
   ForkAgentThreadInput,
+  ScopePerspective,
 } from "@/lib/agent-threads-domain";
 import type { SigilAuthSession } from "@/lib/auth/server";
 import { useAgentPrincipalId } from "@/lib/agent-principal";
@@ -196,7 +197,30 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
 }).handler(async () => {
   const { agentThreadRepository } = await import("@/lib/agent-threads.server");
   const session = await requireThreadSession();
-  return agentThreadRepository.getActivePreference(session.user.id);
+  const preference = agentThreadRepository.getActivePreference(session.user.id);
+  if (!preference.activePerspective) return preference;
+
+  const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
+    "@/lib/agent-thread-containers.server"
+  );
+  const nav = loadProjectWorkspaceNav(session.user.id);
+  const resolved = resolveScopePerspective(preference.activePerspective, nav);
+  if (!resolved) {
+    // The focus is no longer visible. Clear rather than retaining a stale id
+    // or trying to infer another scope.
+    return agentThreadRepository.setActiveContainer(session.user.id, {});
+  }
+  if (!resolved.diagnostic) return preference;
+  const workspace = nav.workspaces.find(
+    (entry) => entry.id === resolved.perspective.focusScopeId,
+  );
+  return agentThreadRepository.setActiveContainer(session.user.id, {
+    projectId: workspace
+      ? resolved.perspective.viaScopeIds.at(-1) ?? workspace.homeScopeId
+      : resolved.perspective.focusScopeId,
+    workspaceId: workspace?.id,
+    perspective: resolved.perspective,
+  });
 });
 
 const setActiveAgentThreadFn = createServerFn({ method: "POST" })
@@ -213,36 +237,50 @@ const setActiveAgentThreadFn = createServerFn({ method: "POST" })
 // write validates membership + containment against the registries before
 // persisting — the domain store deliberately does not know the registry.
 const setActiveContainerFn = createServerFn({ method: "POST" })
-  .validator((input: { projectId?: string; workspaceId?: string }) => input)
+  .validator(
+    (input: {
+      projectId?: string;
+      workspaceId?: string;
+      perspective?: ScopePerspective;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { loadProjectWorkspaceNav } = await import(
+    const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
       "@/lib/agent-thread-containers.server"
     );
     const session = await requireThreadSession();
     const nav = loadProjectWorkspaceNav(session.user.id);
 
-    const memberProjectIds = new Set(nav.projects.map((p) => p.id));
-    let projectId = data.projectId;
-    if (data.workspaceId) {
-      const workspace = nav.workspaces.find((w) => w.id === data.workspaceId);
-      if (!workspace) {
-        throw new Error(
-          `Workspace ${data.workspaceId} is not visible to this principal.`,
-        );
-      }
-      // Containment is authoritative — the project is derived, never trusted
-      // from the client (mirrors the thread.workspaceId rule in the domain).
-      projectId = workspace.projectId;
+    const requestedPerspective =
+      data.perspective ??
+      (data.workspaceId
+        ? {
+            focusScopeId: data.workspaceId,
+            viaScopeIds: data.projectId ? [data.projectId] : [],
+          }
+        : data.projectId
+          ? { focusScopeId: data.projectId, viaScopeIds: [] }
+          : undefined);
+    const resolved = requestedPerspective
+      ? resolveScopePerspective(requestedPerspective, nav)
+      : undefined;
+    if (requestedPerspective && !resolved) {
+      throw new Error("Requested scope is not visible to this principal.");
     }
-    if (projectId && !memberProjectIds.has(projectId)) {
-      throw new Error(`Project ${projectId} is not visible to this principal.`);
-    }
+    const perspective = resolved?.perspective;
+    const workspace = perspective
+      ? nav.workspaces.find((entry) => entry.id === perspective.focusScopeId)
+      : undefined;
+    const projectId = workspace
+      ? perspective?.viaScopeIds.at(-1) ?? workspace.homeScopeId
+      : perspective?.focusScopeId;
 
     return agentThreadRepository.setActiveContainer(session.user.id, {
       projectId,
-      workspaceId: data.workspaceId,
+      workspaceId: workspace?.id,
+      perspective,
     });
   });
 
@@ -289,7 +327,11 @@ export function useSetActiveContainer() {
   const principalId = useAgentPrincipalId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { projectId?: string; workspaceId?: string }) =>
+    mutationFn: (input: {
+      projectId?: string;
+      workspaceId?: string;
+      perspective?: ScopePerspective;
+    }) =>
       setActiveContainerFn({ data: input }),
     onSuccess: (preference) => {
       queryClient.setQueryData(agentThreadKeys.preference(principalId), preference);
