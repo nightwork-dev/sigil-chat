@@ -49,16 +49,20 @@ export function currentWorkItemsScopeAccess(): WorkItemsScopeAccess {
       if (!scope || (scope.kind !== "project" && scope.kind !== "workspace")) {
         return false;
       }
-      // SC.3 integration point: replace this legacy registry assertion with
-      // the grant service's action-exact authorize({ principalId, scopeId,
-      // action }) call. Do not collapse these board actions into tool access.
-      void action;
+      const scopeAction =
+        action === "board.discover"
+          ? "discover"
+          : action === "board.read"
+            ? "read"
+            : "tool";
       try {
         assertAuthorizedScope(
           `${scope.kind}:${scopeId}`,
           principalId,
           () => false,
           registries,
+          undefined,
+          scopeAction,
         );
         return true;
       } catch {
