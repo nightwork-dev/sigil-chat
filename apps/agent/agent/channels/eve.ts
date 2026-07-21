@@ -9,6 +9,7 @@ import {
   readSigilEveAuthEnvironment,
 } from "../lib/eve-auth"
 import { ForbiddenError } from "eve/channels/auth"
+import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import { MirkEveSessionOwnerStore } from "../lib/eve-session-owners"
 import {
   DEFAULT_PERSONA_ID,
@@ -53,6 +54,7 @@ const channel = createOwnedEveChannel({
     const rawToolApproval = request.headers.get("x-sigil-tool-approval")
     const toolApproval = parseToolApprovalPreference(rawToolApproval)
     let resourceScope: string | undefined
+    const scopeProof = request.headers.get(AGENT_SCOPE_PROOF_HEADER)?.trim()
     try {
       resourceScope = requireAuthorizedResourceScope({
         principalId: auth.principalId,
@@ -84,6 +86,11 @@ const channel = createOwnedEveChannel({
         ...(resourceScope
           ? {
               sigilResourceScope: resourceScope,
+              // The browser never chooses this value: Eve just verified the
+              // HMAC against the authenticated principal above. Preserve it
+              // so Gonk can derive that same principal rather than reverting
+              // to the shared service identity.
+              ...(scopeProof ? { sigilScopeProof: scopeProof } : {}),
               // Preserve the old attribute for hosts that still inspect it.
               sigilSessionScope: resourceScope,
             }

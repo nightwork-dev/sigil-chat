@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   issueScopeDelegation,
+  readScopeDelegation,
   verifyScopeDelegation,
 } from "./scope-delegation.server";
 
@@ -57,5 +58,19 @@ describe("agent scope delegation", () => {
 
     expect(verifyScopeDelegation(`${proof}x`, expected, SECRET)).toBe(false);
     expect(verifyScopeDelegation("not-a-token", expected, SECRET)).toBe(false);
+  });
+
+  it("returns a signed subject only after integrity and expiry validation", () => {
+    const proof = issueScopeDelegation(
+      { expiresAt: 200, scope: "workspace:launch", subject: "user-1" },
+      SECRET,
+    );
+
+    expect(readScopeDelegation(proof, 199, SECRET)).toMatchObject({
+      scope: "workspace:launch",
+      subject: "user-1",
+    });
+    expect(readScopeDelegation(proof, 200, SECRET)).toBeUndefined();
+    expect(readScopeDelegation(`${proof}x`, 199, SECRET)).toBeUndefined();
   });
 });

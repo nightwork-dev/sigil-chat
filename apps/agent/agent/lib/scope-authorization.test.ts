@@ -3,7 +3,10 @@ import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
 import { ProjectRegistry } from "./project-registry"
-import { requireAuthorizedResourceScope } from "./scope-authorization"
+import {
+  createScopeGrantPolicy,
+  requireAuthorizedResourceScope,
+} from "./scope-authorization"
 import { WorkspaceRegistry } from "./workspace-registry"
 
 const SECRET = "test-only-scope-authorization-secret"
@@ -119,6 +122,63 @@ describe("Eve resource-scope authorization", () => {
         registries: stores,
       }),
     ).toBe("workspace:workspace-1")
+  })
+
+  it("honors an explicit workspace grant without granting its canonical project", () => {
+    const stores = registries()
+    stores.projects.upsert({
+      id: "project-home",
+      name: "Home project",
+      description: "The workspace's canonical home.",
+      members: [{ principalId: "user-owner", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    stores.workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      name: "Shared workspace",
+      description: "Mounted elsewhere without changing its home.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    let grants = [
+      {
+        actions: ["read", "tool"] as const,
+        principalId: "user-grantee",
+        resourceScope: "workspace:workspace-shared",
+      },
+    ]
+    const policy = createScopeGrantPolicy({
+      grants: () => grants,
+      registries: stores,
+    })
+
+    expect(
+      policy.authorize({
+        action: "read",
+        principalId: "user-grantee",
+        resourceScope: "workspace:workspace-shared",
+      }),
+    ).toBe(true)
+    expect(
+      policy.authorize({
+        action: "read",
+        principalId: "user-grantee",
+        resourceScope: "project:project-home",
+      }),
+    ).toBe(false)
+
+    grants = []
+    expect(
+      policy.authorize({
+        action: "tool",
+        principalId: "user-grantee",
+        resourceScope: "workspace:workspace-shared",
+      }),
+    ).toBe(false)
   })
 
   it("keeps an unregistered scope possession-gated", () => {

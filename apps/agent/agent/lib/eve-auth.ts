@@ -207,7 +207,12 @@ function preserveTurnResourceScope(
 
   const resourceScope = caller.attributes.sigilResourceScope
   const sessionScope = caller.attributes.sigilSessionScope
-  if (typeof resourceScope !== "string" && typeof sessionScope !== "string") {
+  const scopeProof = caller.attributes.sigilScopeProof
+  if (
+    typeof resourceScope !== "string" &&
+    typeof sessionScope !== "string" &&
+    typeof scopeProof !== "string"
+  ) {
     return result
   }
 
@@ -223,6 +228,7 @@ function preserveTurnResourceScope(
         ...(typeof sessionScope === "string"
           ? { sigilSessionScope: sessionScope }
           : {}),
+        ...(typeof scopeProof === "string" ? { sigilScopeProof: scopeProof } : {}),
       },
     },
   }

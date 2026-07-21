@@ -1,4 +1,11 @@
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
+import {
+  hasScopeGrant,
+  type ScopeAuthorizationAction,
+  type ScopeAuthorizationPolicy,
+  type ScopeAuthorizationRequest,
+  type ScopeGrant,
+} from "@workspace/agent-contracts/scope-authorization"
 import { verifyScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
@@ -10,10 +17,44 @@ export interface ScopeAuthorizationRegistries {
   workspaces: Pick<WorkspaceRegistry, "get">
 }
 
+export interface ScopeGrantPolicyOptions {
+  /** Read on every authorization attempt; never cache revocable grants. */
+  grants?: () => readonly ScopeGrant[]
+  registries?: ScopeAuthorizationRegistries
+}
+
+/**
+ * The current registry adapter supplies canonical homes until SC.2's typed
+ * scope records land. A future adapter can replace it without changing the
+ * signed-delegation or Gonk boundary contracts.
+ */
+export function createScopeGrantPolicy(
+  options: ScopeGrantPolicyOptions = {},
+): ScopeAuthorizationPolicy {
+  const registries = options.registries ?? getProjectWorkspaceRegistries()
+  const grants = options.grants ?? (() => [])
+  return {
+    authorize(input): boolean {
+      const request: ScopeAuthorizationRequest = {
+        ...input,
+        canonicalHomeScope: canonicalHomeScope(input.resourceScope, registries),
+      }
+      if (hasScopeGrant(grants(), request)) return true
+      return hasRegisteredScopeMembership(
+        request.resourceScope,
+        request.principalId,
+        registries,
+      )
+    },
+  }
+}
+
 export function requireAuthorizedResourceScope(input: {
+  action?: ScopeAuthorizationAction
   principalId: string
   request: Request
   secret: string | undefined
+  policy?: ScopeAuthorizationPolicy
   registries?: ScopeAuthorizationRegistries
 }): string | undefined {
   const scope = input.request.headers.get("x-sigil-scope")?.trim()
@@ -35,11 +76,21 @@ export function requireAuthorizedResourceScope(input: {
   ) {
     throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
   }
-  assertRegisteredScopeMembership(
-    scope,
-    input.principalId,
-    input.registries ?? getProjectWorkspaceRegistries(),
-  )
+  // Non-container legacy scopes are possession-gated by their signed proof;
+  // do not open the registry just to validate a session scope.
+  if (!parseContainerScope(scope) && !input.policy) return scope
+  const registries = input.registries ?? getProjectWorkspaceRegistries()
+  const policy =
+    input.policy ?? createScopeGrantPolicy({ registries })
+  if (
+    !policy.authorize({
+      action: input.action ?? "tool",
+      principalId: input.principalId,
+      resourceScope: scope,
+    })
+  ) {
+    throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
+  }
   return scope
 }
 
@@ -79,6 +130,30 @@ export function assertRegisteredScopeMembership(
   ) {
     throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
   }
+}
+
+function hasRegisteredScopeMembership(
+  scope: string,
+  principalId: string,
+  registries: ScopeAuthorizationRegistries,
+): boolean {
+  try {
+    assertRegisteredScopeMembership(scope, principalId, registries)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function canonicalHomeScope(
+  scope: string,
+  registries: ScopeAuthorizationRegistries,
+): string | undefined {
+  const parsed = parseContainerScope(scope)
+  if (!parsed) return undefined
+  if (parsed.tier === "project") return scope
+  const workspace = registries.workspaces.get(parsed.id)
+  return workspace ? `project:${workspace.projectId}` : undefined
 }
 
 function parseContainerScope(

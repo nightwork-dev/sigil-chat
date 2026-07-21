@@ -3,12 +3,14 @@ import {
   assertRegisteredScopeMembership,
   type ScopeAuthorizationRegistries,
 } from "../../../agent/agent/lib/scope-authorization"
+import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
 
 export function assertAuthorizedScope(
   scope: string,
   userId: string,
   ownsThread: (userId: string, threadId: string) => boolean,
-  registries: ScopeAuthorizationRegistries = getProjectWorkspaceRegistries(),
+  registries?: ScopeAuthorizationRegistries,
+  policy?: ScopeAuthorizationPolicy,
 ): void {
   const match = /^(session|workspace|project|persona):([^\s:][^\s]*)$/.exec(
     scope,
@@ -21,13 +23,26 @@ export function assertAuthorizedScope(
     return
   }
   if (match[1] === "project" || match[1] === "workspace") {
+    const resolvedRegistries = registries ?? getProjectWorkspaceRegistries()
     const id = match[2]!
     const registered =
       match[1] === "project"
-        ? registries.projects.get(id) !== undefined
-        : registries.workspaces.get(id) !== undefined
+        ? resolvedRegistries.projects.get(id) !== undefined
+        : resolvedRegistries.workspaces.get(id) !== undefined
     if (registered) {
-      assertRegisteredScopeMembership(scope, userId, registries)
+      if (policy) {
+        if (
+          !policy.authorize({
+            action: "tool",
+            principalId: userId,
+            resourceScope: scope,
+          })
+        ) {
+          throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
+        }
+      } else {
+        assertRegisteredScopeMembership(scope, userId, resolvedRegistries)
+      }
       return
     }
     // Legacy unregistered scope ids stay possession-gated until migration.

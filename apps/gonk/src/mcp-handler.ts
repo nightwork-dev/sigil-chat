@@ -1,15 +1,29 @@
 import { GONK_AUTH_INFO_PRINCIPAL } from "@gonk/tool-registry-mcp"
 import { checkBearer } from "@gonk/tool-registry-mcp/http"
+import type { ToolRegistry } from "@gonk/tool-registry"
 import { createAgentWebMcpHandler } from "@zigil/agent-gonk"
+import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
+import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
 
-import { authorizeSigilMcpRequest } from "./auth.js"
 import {
+  authenticateScopeDelegation,
+  authorizeSigilMcpRequest,
+  createContainerScopeAuthorizationPolicy,
+} from "./auth.js"
+import {
+  createScopeAccessCheck,
+  getArtifactStore,
+  SessionArtifactStore,
+} from "./artifact-store.js"
+import {
+  formatScopeHeader,
   normalizeScopeHeaders,
   SIGIL_SCOPE_AUTH_INFO_KEY,
   SIGIL_SCOPE_HEADER,
   SIGIL_SESSION_SCOPE_AUTH_INFO_KEY,
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
+import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries.js"
 import { createSigilRegistry } from "./registry.js"
 import type { ContainerRegistries } from "./registry/containers.js"
 
@@ -19,22 +33,35 @@ export function createSigilMcpHandler({
   portlessUrl = process.env.PORTLESS_URL,
   configuredAllowedHosts = process.env.GONK_ALLOWED_HOSTS,
   containers,
+  scopeAuthorization,
+  source,
 }: {
   apiKey: string
   port: number
   portlessUrl?: string
   configuredAllowedHosts?: string
   containers?: ContainerRegistries
+  scopeAuthorization?: ScopeAuthorizationPolicy
+  /** Test/composition seam; production uses the complete Sigil registry. */
+  source?: ToolRegistry
 }) {
+  const resolvedContainers = containers ?? createSigilRegistryContainers()
+  const authorization =
+    scopeAuthorization ?? createContainerScopeAuthorizationPolicy(resolvedContainers)
+  const artifacts = new SessionArtifactStore(getArtifactStore(), {
+    canAccessScope: createScopeAccessCheck(authorization),
+  })
   return createAgentWebMcpHandler({
-    source: createSigilRegistry(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      containers,
-    ),
+    source:
+      source ??
+      createSigilRegistry(
+        undefined,
+        undefined,
+        undefined,
+        artifacts,
+        undefined,
+        resolvedContainers,
+      ),
     serverName: "sigil-chat-gonk",
     serverVersion: "0.0.1",
     allowedHosts: [
@@ -60,22 +87,41 @@ export function createSigilMcpHandler({
         request.headers.get(SIGIL_SCOPE_HEADER) ?? undefined,
         request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
       )
+      const delegated = await authenticateScopeDelegation({
+        policy: authorization,
+        proof: request.headers.get(AGENT_SCOPE_PROOF_HEADER) ?? undefined,
+        scope: resourceScope,
+        secret: apiKey,
+      })
+      if (resourceScope && !delegated) return null
       return {
         token: token ?? "",
         clientId: "sigil-chat-agent",
         scopes: [],
         extra: {
-          [GONK_AUTH_INFO_PRINCIPAL]: {
-            id: "service:static-bearer:sigil-chat-agent",
-            kind: "service",
-            identity: {
-              issuer: "sigil-chat",
-              subject: "sigil-chat-agent",
-              method: "service-token",
-            },
-            roles: ["agent"],
-            scopes: [],
-          },
+          [GONK_AUTH_INFO_PRINCIPAL]: delegated
+            ? {
+                id: delegated.principalId,
+                kind: "human",
+                identity: {
+                  issuer: "sigil-chat",
+                  subject: delegated.principalId,
+                  method: "custom:scope-delegation",
+                },
+                roles: ["member"],
+                scopes: [formatScopeHeader(delegated.scope)!],
+              }
+            : {
+                id: "service:static-bearer:sigil-chat-agent",
+                kind: "service",
+                identity: {
+                  issuer: "sigil-chat",
+                  subject: "sigil-chat-agent",
+                  method: "service-token",
+                },
+                roles: ["agent"],
+                scopes: [],
+              },
           ...(resourceScope
             ? {
                 [SIGIL_SCOPE_AUTH_INFO_KEY]: resourceScope,
@@ -109,4 +155,12 @@ export function createSigilMcpHandler({
     enableJsonResponse: true,
     writeToolPolicy: "permissive",
   })
+}
+
+function createSigilRegistryContainers(): ContainerRegistries {
+  // Avoid a package-level registry open until this handler actually starts.
+  // `createSigilRegistry` uses the same default when no explicit fixture is
+  // supplied; keeping resolution here lets the policy and tool registry share
+  // the exact same authoritative records.
+  return getProjectWorkspaceRegistries()
 }

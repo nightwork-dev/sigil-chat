@@ -6,24 +6,55 @@ import { WorkspaceRegistry } from "../../../agent/agent/lib/workspace-registry"
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 
 describe("agent scope authorization", () => {
+  const emptyRegistries = () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    return {
+      projects,
+      workspaces: new WorkspaceRegistry({
+        projects,
+        store: memoryKv(new Map()),
+      }),
+    }
+  }
+
   it("requires a session scope to belong to the authenticated user", () => {
     const ownsThread = (userId: string, threadId: string) =>
       userId === "user-1" && threadId === "thread-1"
 
     expect(() =>
-      assertAuthorizedScope("session:thread-1", "user-1", ownsThread),
+      assertAuthorizedScope(
+        "session:thread-1",
+        "user-1",
+        ownsThread,
+        emptyRegistries(),
+      ),
     ).not.toThrow()
     expect(() =>
-      assertAuthorizedScope("session:thread-1", "user-2", ownsThread),
+      assertAuthorizedScope(
+        "session:thread-1",
+        "user-2",
+        ownsThread,
+        emptyRegistries(),
+      ),
     ).toThrow("not found")
   })
 
   it("rejects malformed scope strings", () => {
     expect(() =>
-      assertAuthorizedScope("session:", "user-1", () => true),
+      assertAuthorizedScope(
+        "session:",
+        "user-1",
+        () => true,
+        emptyRegistries(),
+      ),
     ).toThrow("invalid")
     expect(() =>
-      assertAuthorizedScope("global:anything", "user-1", () => true),
+      assertAuthorizedScope(
+        "global:anything",
+        "user-1",
+        () => true,
+        emptyRegistries(),
+      ),
     ).toThrow("invalid")
   })
 
@@ -79,15 +110,86 @@ describe("agent scope authorization", () => {
     ).toThrow("NOT_AUTHORIZED")
   })
 
-  it("preserves the unregistered evidence-room scope and rejects other legacy scopes", () => {
+  it("can issue a workspace proof from an explicit resource grant without granting its home project", () => {
+    const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+    const workspaces = new WorkspaceRegistry({
+      projects,
+      store: memoryKv(new Map()),
+    })
+    projects.upsert({
+      id: "project-home",
+      name: "Home project",
+      description: "Canonical workspace home.",
+      members: [{ principalId: "user-owner", role: "owner" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    workspaces.upsert({
+      id: "workspace-shared",
+      projectId: "project-home",
+      name: "Shared workspace",
+      description: "Directly granted resource.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-owner",
+    })
+    const policy = {
+      authorize: ({
+        principalId,
+        resourceScope,
+      }: {
+        principalId: string
+        resourceScope: string
+      }) =>
+        principalId === "user-grantee" &&
+        resourceScope === "workspace:workspace-shared",
+    }
+
     expect(() =>
-      assertAuthorizedScope("project:evidence-room", "user-1", () => false),
+      assertAuthorizedScope(
+        "workspace:workspace-shared",
+        "user-grantee",
+        () => false,
+        { projects, workspaces },
+        policy,
+      ),
     ).not.toThrow()
     expect(() =>
-      assertAuthorizedScope("project:other", "user-1", () => false),
+      assertAuthorizedScope(
+        "project:project-home",
+        "user-grantee",
+        () => false,
+        { projects, workspaces },
+        policy,
+      ),
+    ).toThrow("NOT_AUTHORIZED")
+  })
+
+  it("preserves the unregistered evidence-room scope and rejects other legacy scopes", () => {
+    expect(() =>
+      assertAuthorizedScope(
+        "project:evidence-room",
+        "user-1",
+        () => false,
+        emptyRegistries(),
+      ),
+    ).not.toThrow()
+    expect(() =>
+      assertAuthorizedScope(
+        "project:other",
+        "user-1",
+        () => false,
+        emptyRegistries(),
+      ),
     ).toThrow("not available")
     expect(() =>
-      assertAuthorizedScope("persona:any", "user-1", () => false),
+      assertAuthorizedScope(
+        "persona:any",
+        "user-1",
+        () => false,
+        emptyRegistries(),
+      ),
     ).toThrow("not available")
   })
 })
