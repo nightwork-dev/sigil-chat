@@ -10,8 +10,10 @@ import {
   deriveThreadProjectId,
   type WorkspaceContainmentLookup,
 } from "@/lib/agent-thread-containers";
-import type { AgentThreadSummary } from "@/lib/agent-threads-domain";
-import type { ScopePerspective } from "@/lib/agent-threads-domain";
+import type {
+  AgentThreadSummary,
+  ScopePerspective,
+} from "@/lib/agent-threads-domain";
 
 export interface NavigableWorkspace extends Workspace {
   /** Additional projects from which this workspace may be entered. */
