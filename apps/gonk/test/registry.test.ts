@@ -93,7 +93,137 @@ function humanAuth(principalId: string, scope: string): AuthContext {
   };
 }
 
+function delegatedHumanAuth(principalId: string, scope: string): AuthContext {
+  const auth = humanAuth(principalId, scope);
+  return {
+    ...auth,
+    principal: {
+      ...auth.principal,
+      delegation: {
+        actorKind: "agent",
+        actor: {
+          issuer: "sigil:test",
+          subject: "sigil-chat-agent",
+          method: "service-token",
+        },
+        actorId: "agent:sigil-chat-agent",
+        actorSessionId: "eve-session-1",
+        metadata: { channelId: "thread-1" },
+      },
+    },
+  };
+}
+
 describe("Sigil Chat Gonk registry", () => {
+  it("links the stock installation roadmap from a fresh repository", async () => {
+    const { registry } = await makeRegistry();
+    const context = makeBaseContext({
+      auth: delegatedHumanAuth("user-1", "installation:default"),
+    });
+
+    await expect(
+      collectToolOutcome(
+        registry.invoke(
+          "sigil-session-commitment-link",
+          { workItemId: "S0.3", expectedRevision: 0 },
+          context,
+        ),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        outcome: "linked",
+        workItem: {
+          id: "S0.3",
+          homeScopeId: "installation:default",
+          scopeBindings: [
+            { scopeId: "session:thread-1", relation: "mounted-in" },
+          ],
+        },
+      },
+    });
+  });
+
+  it("re-authorizes session commitments through the live container policy", async () => {
+    const {
+      registry,
+      workItemsRepository,
+      projectRegistry,
+    } = await makeRegistry();
+    const project = projectRegistry.upsert({
+      id: "project-1",
+      name: "Project One",
+      description: "Authorized work home.",
+      members: [{ principalId: "user-1", role: "owner" }],
+      settings: { visibility: "shared" },
+      createdAt: "2026-07-20T12:00:00.000Z",
+      createdBy: "user-1",
+    });
+    await workItemsRepository.upsertStory({
+      id: "S1",
+      kind: "story",
+      homeScopeId: project.id,
+      scopeBindings: [],
+      provenance: {
+        origin: "principal",
+        actorPrincipalId: "user-1",
+        createdAt: "2026-07-20T12:00:00.000Z",
+      },
+      revision: 1,
+      epicId: "E1",
+      epicTitle: "Session commitments",
+      title: "Use live home authorization",
+      intent: "Do not mistake registry admission for work-item access.",
+      acceptanceCriteria: [],
+      status: "idea",
+      routing: "implementation",
+      reviewGate: "none",
+      deps: [],
+      authoredBy: "user-1",
+      createdAt: "2026-07-20T12:00:00.000Z",
+      updatedAt: "2026-07-20T12:00:00.000Z",
+    });
+    const context = makeBaseContext({
+      auth: delegatedHumanAuth("user-1", "project:project-1"),
+    });
+
+    await expect(
+      collectToolOutcome(
+        registry.invoke(
+          "sigil-session-commitment-link",
+          { workItemId: "S1", expectedRevision: 1 },
+          context,
+        ),
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { outcome: "linked" } });
+
+    projectRegistry.upsert(
+      {
+        ...project,
+        members: [{ principalId: "user-2", role: "owner" }],
+      },
+      { expectedRevision: project.revision },
+    );
+
+    await expect(
+      collectToolOutcome(
+        registry.invoke("sigil-session-commitment-list", {}, context),
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { workItems: [] } });
+    await expect(
+      collectToolOutcome(
+        registry.invoke(
+          "sigil-session-commitment-unlink",
+          { workItemId: "S1" },
+          context,
+        ),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      message: "Work item was not found or is not authorized.",
+    });
+  });
+
   it("omits local Codex image generation when production disables it", async () => {
     vi.stubEnv("SIGIL_LOCAL_CODEX_IMAGE_GENERATION", "disabled");
     const { registry } = await makeRegistry();

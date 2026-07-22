@@ -91,6 +91,7 @@ export function createSigilMcpHandler({
                 resolvedSessionOwners.listOwned!(principalId),
             }
           : undefined,
+        authorization,
       ),
     serverName: "sigil-chat-gonk",
     serverVersion: "0.0.1",

@@ -1,4 +1,5 @@
 import { ToolRegistry } from "@gonk/tool-registry";
+import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization";
 import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries.js";
 import {
   getSessionArtifactStore,
@@ -17,6 +18,7 @@ import {
   type WorkItemsRepository,
 } from "@workspace/work-items-store";
 import { specsRepository } from "@workspace/work-items-store/specs";
+import { INSTALLATION_WORK_ITEMS_SCOPE_ID } from "@workspace/work-items-store/types";
 
 import { sigilApprovalProvider } from "./registry/approval.js";
 import { registerBlackboardTools } from "./registry/blackboard.js";
@@ -34,6 +36,8 @@ import {
 import { registerStoryTools } from "./registry/story.js";
 import { registerFeatureRequestTools } from "./registry/feature-request.js";
 import { registerRequestTools } from "./registry/request.js";
+import { registerSessionCommitmentTools } from "./registry/session-commitment.js";
+import { createContainerScopeAuthorizationPolicy } from "./auth.js";
 import { registerSpecTools } from "./registry/spec.js";
 import {
   registerContainerTools,
@@ -57,6 +61,8 @@ export function createSigilRegistry(
   skills = createSkillRegistry(),
   containers: ContainerRegistries = getProjectWorkspaceRegistries(),
   sessions?: ResourceUniverseRegistries["sessions"],
+  scopeAuthorization: ScopeAuthorizationPolicy =
+    createContainerScopeAuthorizationPolicy(containers),
 ): ToolRegistry {
   const registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
@@ -68,6 +74,22 @@ export function createSigilRegistry(
   registerStoryTools(registry, workItems);
   registerFeatureRequestTools(registry, workItems);
   registerRequestTools(registry, workItems);
+  registerSessionCommitmentTools(
+    registry,
+    workItems,
+    ({ homeScopeId, principalId }) => {
+      if (homeScopeId === INSTALLATION_WORK_ITEMS_SCOPE_ID) return true;
+      const resourceScope = resolveWorkItemHomeScope(homeScopeId, containers);
+      return (
+        resourceScope !== undefined &&
+        scopeAuthorization.authorize({
+          action: "tool",
+          principalId,
+          resourceScope,
+        })
+      );
+    },
+  );
   registerSpecTools(registry, specsRepository);
   registerContainerTools(registry, containers);
   registerAnnotationTools(registry);
@@ -91,4 +113,17 @@ export function createSigilRegistry(
   registerBlackboardTools(registry);
 
   return registry;
+}
+
+function resolveWorkItemHomeScope(
+  homeScopeId: string,
+  containers: ContainerRegistries,
+): string | undefined {
+  const separator = homeScopeId.indexOf(":");
+  if (separator > 0 && separator < homeScopeId.length - 1) return homeScopeId;
+
+  const project = containers.projects.get(homeScopeId);
+  const workspace = containers.workspaces.get(homeScopeId);
+  if (Boolean(project) === Boolean(workspace)) return undefined;
+  return project ? `project:${homeScopeId}` : `workspace:${homeScopeId}`;
 }

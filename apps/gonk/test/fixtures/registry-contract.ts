@@ -622,6 +622,63 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-session-commitment-list",
+    description:
+      "List durable work items explicitly mounted into the current authenticated Eve application thread. Results are filtered by live authorization for each work item's canonical home.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: ["expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-session-commitment-link",
+    description:
+      "Mount one authorized work item into the current authenticated Eve application thread. The link is idempotent and writes only a mounted-in session scope binding.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["workItemId"],
+      properties: ["workItemId", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-session-commitment-unlink",
+    description:
+      "Remove this authenticated Eve application thread's exact mounted-in session binding from one authorized work item. Other bindings and work status are preserved.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["workItemId"],
+      properties: ["workItemId", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-spec-list",
     description:
       "List durable product specifications in the roadmap, optionally filtered by lifecycle status or linked story id.",

@@ -2,11 +2,12 @@ import { getProjectWorkspaceRegistries } from "../../../agent/agent/lib/project-
 import { assertAuthorizedScope } from "./agent-scope-authorization.server";
 import type { SigilAuthSession } from "./auth/server";
 import { requireOwner, requireSession } from "./auth/session";
-import type {
-  BoardScopeMatch,
-  BoardTraversalResolver,
-  BoardView,
-  Story,
+import {
+  INSTALLATION_WORK_ITEMS_SCOPE_ID,
+  type BoardScopeMatch,
+  type BoardTraversalResolver,
+  type BoardView,
+  type Story,
 } from "@workspace/work-items-store/types";
 
 /**
@@ -198,7 +199,11 @@ export function visibleSessionCommitments(
         sessionScopeIds.has(binding.scopeId),
       );
     if (!linked || !story.homeScopeId) return false;
-    if (sessionScopeIds.has(story.homeScopeId)) return true;
+    if (
+      sessionScopeIds.has(story.homeScopeId) ||
+      story.homeScopeId === INSTALLATION_WORK_ITEMS_SCOPE_ID
+    )
+      return true;
     return access.canAccess({
       principalId,
       scopeId: story.homeScopeId,

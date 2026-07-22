@@ -228,6 +228,19 @@ describe("session commitment visibility", () => {
       ).map((item) => item.id),
     ).toEqual(["visible", "session-owned"]);
   });
+
+  it("keeps the authenticated installation roadmap visible when linked", () => {
+    const installed = linked(story("installed", "installation:default"));
+
+    expect(
+      visibleSessionCommitments(
+        [installed],
+        "thread-a",
+        "user-1",
+        scopeAccess([]),
+      ).map((item) => item.id),
+    ).toEqual(["installed"]);
+  });
 });
 
 describe("sponsorship decision access", () => {

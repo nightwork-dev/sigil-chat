@@ -1,8 +1,12 @@
-import type { ReviewItem, Story, WorkItemsDocument } from "./types.js";
+import {
+  INSTALLATION_WORK_ITEMS_SCOPE_ID,
+  type ReviewItem,
+  type Story,
+  type WorkItemsDocument,
+} from "./types.js";
 
 const SEED_TIMESTAMP = "2026-07-18T00:00:00.000Z";
 const DEFAULT_WORKTREE = "sigil-chat-dev";
-const DEFAULT_HOME_SCOPE = "installation:default";
 
 function scopedSeed(
   story: Omit<
@@ -13,7 +17,7 @@ function scopedSeed(
   return {
     ...story,
     kind: "story",
-    homeScopeId: DEFAULT_HOME_SCOPE,
+    homeScopeId: INSTALLATION_WORK_ITEMS_SCOPE_ID,
     scopeBindings: [],
     provenance: {
       origin: "principal",

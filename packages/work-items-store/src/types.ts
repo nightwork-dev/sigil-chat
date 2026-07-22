@@ -6,6 +6,9 @@ export type Routing =
   "self" | "strategy" | "design" | "implementation" | "research";
 export type ReviewGate = "browser:owner" | "decision:owner" | "peer" | "none";
 
+/** Canonical home for the authenticated installation-wide template roadmap. */
+export const INSTALLATION_WORK_ITEMS_SCOPE_ID = "installation:default";
+
 /** The durable product-work categories defined by the scoped-work contract. */
 export type WorkKind =
   "feature-request" | "story" | "task" | "defect" | "decision";
