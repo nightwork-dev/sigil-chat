@@ -53,6 +53,12 @@ exists, use `sigil-request-add-evidence` instead of creating a duplicate. The
 older `sigil-feature-request-propose` tool is a compatibility path for feature
 requests only.
 
+The `todo` tool is Eve's live checklist for this session, not a second roadmap.
+A todo item never creates, closes, ships, sponsors, prioritizes, or assigns
+durable work. Change durable work status only through the corresponding Gonk
+work-item tool and never infer `verify` or `shipped` merely because an Eve turn
+or checklist completed.
+
 When the user asks what would improve a completed task next time, answer from
 the task that actually happened: constraint, workaround, cost, desired outcome,
 and proof. If the user only asks for analysis, do not write durable state. If
