@@ -17,14 +17,17 @@ import {
 } from "./sigil-context"
 
 const SESSION_AUTH = {
-  attributes: { sigilPersonaId: "agent-a" } as Record<string, string>,
+  attributes: sessionAttributes("personal-scope:user-1") as Record<
+    string,
+    string
+  >,
   authenticator: "test",
   principalId: "user-1",
   principalType: "user",
 }
 
 describe("Sigil Eve context integration", () => {
-  it("omits oversized legacy blackboards from turn context", () => {
+  it("omits oversized blackboards from turn context", () => {
     expect(
       blackboardContextBlock("x".repeat(MAX_BLACKBOARD_CONTENT_CHARS + 1)),
     ).toBeUndefined()
@@ -151,7 +154,10 @@ describe("Sigil Eve context integration", () => {
       identityFloor: () => "STABLE_IDENTITY_FLOOR",
       recallLatestTurn: (input) => {
         recalls.push(input)
-        return "## Relevant memory\n- The launch code word is marigold."
+        return scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: "## Relevant memory\n- The launch code word is marigold.",
+        })
       },
     })
     const send = vi.fn(async () => session())
@@ -166,11 +172,244 @@ describe("Sigil Eve context integration", () => {
         personaId: "agent-a",
         principalId: "user-1",
         query: "What is the launch code word?",
+        activeResourceScope: undefined,
+        targetAudience: { kind: "personal", principalId: "user-1" },
       },
     ])
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("STABLE_IDENTITY_FLOOR")
     expect(JSON.stringify(payload)).toContain("marigold")
+  })
+
+  it("keeps personal recall continuity while viewing another workspace", async () => {
+    const recalls: Array<{
+      activeResourceScope?: string
+      targetAudience: { kind: string; principalId?: string; scopeId?: string }
+    }> = []
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes(
+          "personal-scope:user-1",
+          "workspace:ws-2",
+        ),
+      },
+      compiler: compilerWith([]),
+      recallLatestTurn: (input) => {
+        recalls.push(input)
+        return scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: "## Relevant memory\n- PERSONAL_CONTINUITY",
+        })
+      },
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "Continue our work" })
+
+    expect(recalls).toEqual([
+      expect.objectContaining({
+        activeResourceScope: "workspace:ws-2",
+        targetAudience: { kind: "personal", principalId: "user-1" },
+      }),
+    ])
+    expect(JSON.stringify(firstSendCall(send)[0])).toContain(
+      "PERSONAL_CONTINUITY",
+    )
+  })
+
+  it("skips recall entirely when the immutable session binding is absent", async () => {
+    const recallLatestTurn = vi.fn(() =>
+      scopedRecall({
+        audience: { kind: "personal", principalId: "user-1" },
+        content: "SHOULD_NOT_BE_READ",
+      }),
+    )
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: { sigilPersonaId: "agent-a" },
+      },
+      compiler: compilerWith([]),
+      recallLatestTurn,
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    expect(recallLatestTurn).not.toHaveBeenCalled()
+    expect(JSON.stringify(firstSendCall(send)[0])).not.toContain(
+      "SHOULD_NOT_BE_READ",
+    )
+  })
+
+  it("adds labelled recall when its audience and sources are still authorized", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
+      },
+      authorizeMemorySource: () => true,
+      compiler: compilerWith([]),
+      recallLatestTurn: () =>
+        scopedRecall({
+          audience: { kind: "scope", scopeId: "ws-1" },
+          sources: [{ scopeId: "ws-1", resourceKey: "doc:launch" }],
+          content: "## Relevant memory\n- LABELLED_ALLOWED_RECALL",
+        }),
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).toContain("LABELLED_ALLOWED_RECALL")
+  })
+
+  it("quarantines labelled recall when a source is revoked or denied", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
+      },
+      authorizeMemorySource: ({ source }) =>
+        source.resourceKey !== "doc:launch",
+      compiler: compilerWith([]),
+      recallLatestTurn: () =>
+        scopedRecall({
+          audience: { kind: "scope", scopeId: "ws-1" },
+          sources: [{ scopeId: "ws-1", resourceKey: "doc:launch" }],
+          content: "## Relevant memory\n- REVOKED_SOURCE_RECALL",
+        }),
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).not.toContain("REVOKED_SOURCE_RECALL")
+  })
+
+  it("quarantines the whole combined recall block when any mixed source is denied", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
+      },
+      authorizeMemorySource: ({ source }) =>
+        source.resourceKey !== "doc:denied",
+      compiler: compilerWith([]),
+      recallLatestTurn: () => ({
+        content:
+          "## Relevant memory\n- ALLOWED_PART\n- DENIED_PART_SHOULD_HIDE_ALL",
+        selectedRecordIds: ["memory-1", "memory-2"],
+        records: [
+          {
+            id: "memory-1",
+            labels: {
+              audience: { kind: "scope", scopeId: "ws-1" },
+              sources: [{ scopeId: "ws-1", resourceKey: "doc:allowed" }],
+            },
+          },
+          {
+            id: "memory-2",
+            labels: {
+              audience: { kind: "scope", scopeId: "ws-1" },
+              sources: [{ scopeId: "ws-1", resourceKey: "doc:denied" }],
+            },
+          },
+        ],
+        receipt: { kind: "test" },
+      }),
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).not.toContain("ALLOWED_PART")
+    expect(JSON.stringify(payload)).not.toContain("DENIED_PART_SHOULD_HIDE_ALL")
+  })
+
+  it("quarantines labelled recall when its target audience does not match the active scope", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
+      },
+      authorizeMemorySource: () => true,
+      compiler: compilerWith([]),
+      recallLatestTurn: () =>
+        scopedRecall({
+          audience: { kind: "scope", scopeId: "ws-2" },
+          sources: [{ scopeId: "ws-2" }],
+          content: "## Relevant memory\n- WRONG_AUDIENCE_RECALL",
+        }),
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).not.toContain("WRONG_AUDIENCE_RECALL")
+  })
+
+  it("does not ambiently inject personal recall into a shared workspace context", async () => {
+    const channel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: sessionAttributes("ws-1", "workspace:ws-1"),
+      },
+      compiler: compilerWith([]),
+      recallLatestTurn: () =>
+        scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: "## Relevant memory\n- PERSONAL_SHOULD_STAY_PRIVATE",
+        }),
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "What do we remember?" })
+
+    const [payload] = firstSendCall(send)
+    expect(JSON.stringify(payload)).not.toContain(
+      "PERSONAL_SHOULD_STAY_PRIVATE",
+    )
+  })
+
+  it("rejects unlabelled adapter recall in every target", async () => {
+    const personalChannel = testChannel({
+      compiler: compilerWith([]),
+      recallLatestTurn: (() =>
+        "## Relevant memory\n- UNLABELLED_RECALL") as never,
+    })
+    const sharedChannel = testChannel({
+      auth: {
+        ...SESSION_AUTH,
+        attributes: {
+          ...sessionAttributes("ws-1", "workspace:ws-1"),
+        },
+      },
+      compiler: compilerWith([]),
+      recallLatestTurn: (() =>
+        "## Relevant memory\n- UNLABELLED_RECALL") as never,
+    })
+    const personalSend = vi.fn(async () => session())
+    const sharedSend = vi.fn(async () => session())
+
+    await postSession(personalChannel, personalSend, {
+      message: "What do we remember?",
+    })
+    await postSession(sharedChannel, sharedSend, {
+      message: "What do we remember?",
+    })
+
+    expect(JSON.stringify(firstSendCall(personalSend)[0])).not.toContain(
+      "UNLABELLED_RECALL",
+    )
+    expect(JSON.stringify(firstSendCall(sharedSend)[0])).not.toContain(
+      "UNLABELLED_RECALL",
+    )
   })
 
   it("omits recall when the host finds nothing authorized and relevant", async () => {
@@ -191,7 +430,11 @@ describe("Sigil Eve context integration", () => {
       compiler: compilerWith([]),
       identityFloor: () => "STABLE_IDENTITY_FLOOR",
       maxTokens: 20,
-      recallLatestTurn: () => `RECALL_MARKER ${"x".repeat(200)}`,
+      recallLatestTurn: () =>
+        scopedRecall({
+          audience: { kind: "personal", principalId: "user-1" },
+          content: `RECALL_MARKER ${"x".repeat(200)}`,
+        }),
     })
     const send = vi.fn(async () => session())
 
@@ -387,6 +630,7 @@ describe("Sigil Eve context integration", () => {
 
 function testChannel(options: {
   auth?: typeof SESSION_AUTH
+  authorizeMemorySource?: SigilContextOptions["authorizeMemorySource"]
   compiler: ContextCompiler
   identityFloor?: (input: {
     eveSessionId: string
@@ -401,6 +645,7 @@ function testChannel(options: {
   return eveChannel({
     auth: [() => options.auth ?? SESSION_AUTH],
     onMessage: createSigilEveOnMessage({
+      authorizeMemorySource: options.authorizeMemorySource,
       compiler: options.compiler,
       identityFloor: options.identityFloor,
       maxTokens: options.maxTokens,
@@ -409,6 +654,14 @@ function testChannel(options: {
       recallLatestTurn: options.recallLatestTurn,
     }),
   })
+}
+
+function sessionAttributes(homeScopeId: string, resourceScope?: string) {
+  return {
+    sigilPersonaId: "agent-a",
+    sigilExecutionBinding: JSON.stringify({ homeScopeId }),
+    ...(resourceScope ? { sigilResourceScope: resourceScope } : {}),
+  }
 }
 
 async function postSession(
@@ -572,6 +825,29 @@ function session() {
 
 function firstSendCall(send: ReturnType<typeof vi.fn>) {
   return send.mock.calls[0] as [unknown, ...unknown[]]
+}
+
+function scopedRecall(input: {
+  audience:
+    | { kind: "personal"; principalId: string }
+    | { kind: "scope"; scopeId: string }
+  sources?: readonly { scopeId: string; resourceKey?: string }[]
+  content: string
+}) {
+  return {
+    content: input.content,
+    selectedRecordIds: ["memory-1"],
+    records: [
+      {
+        id: "memory-1",
+        labels: {
+          audience: input.audience,
+          sources: input.sources ?? [],
+        },
+      },
+    ],
+    receipt: { kind: "test" },
+  }
 }
 
 function tenantContextContributor(tenantId: string): ContextContributor {

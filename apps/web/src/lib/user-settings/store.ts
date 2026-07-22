@@ -7,8 +7,10 @@ import { randomUUID } from "node:crypto"
 import type { Client } from "@libsql/client"
 
 import type {
+  SettingContributingLinkKind,
   SettingDefinition,
   SettingKey,
+  SettingResolutionScopeKind,
   SettingScopeKind,
   UserSettingRecord,
 } from "./registry"
@@ -78,6 +80,185 @@ export interface ResolvedSetting<T = unknown> {
   /** Which tier supplied the value, or "default" when nothing was ever written. */
   source: SettingScopeKind | "default"
   revision: number | null
+}
+
+export type SettingContributionVisibility =
+  | { readonly kind: "discoverable" }
+  | {
+      readonly kind: "hidden-mandatory-policy"
+      /** A policy class only: never a scope id, name, or inaccessible value. */
+      readonly policyClass:
+        "installation-policy" | "organization-policy" | "project-policy"
+    }
+
+/**
+ * An explicit input to SC.4 setting resolution. `order` is semantic
+ * precedence (least to most specific), not database/query order.
+ */
+export interface SettingResolutionCandidate<T> {
+  readonly scopeId: string
+  readonly scopeKind: SettingResolutionScopeKind
+  readonly order: number
+  readonly value: T
+  readonly linkKind?: SettingContributingLinkKind
+  readonly visibility: SettingContributionVisibility
+}
+
+export type SettingContributionReceipt =
+  | {
+      readonly kind: "scope"
+      readonly scopeId: string
+      readonly scopeKind: SettingResolutionScopeKind
+    }
+  | {
+      readonly kind: "mandatory-policy"
+      readonly policyClass:
+        "installation-policy" | "organization-policy" | "project-policy"
+    }
+
+export interface ResolvedSettingWithReceipt<T> {
+  readonly value: T
+  readonly receipt: readonly SettingContributionReceipt[]
+}
+
+/**
+ * Pure, definition-owned SC.4 resolution. It intentionally does not read the
+ * legacy `user_settings` table; callers provide already-authorized candidate
+ * scopes and a discoverability projection for the receipt.
+ */
+export function resolveSettingCandidates<T>(
+  definition: SettingDefinition<T>,
+  candidates: readonly SettingResolutionCandidate<T>[],
+): ResolvedSettingWithReceipt<T> {
+  const eligible = candidates
+    .filter((candidate) => isEligibleSettingContribution(definition, candidate))
+    .sort(compareSettingCandidates)
+
+  if (eligible.length === 0) {
+    return { value: definition.defaultValue, receipt: [] }
+  }
+
+  if (definition.mergeMode === "replace") {
+    const contribution = eligible.at(-1)
+    if (!contribution) return { value: definition.defaultValue, receipt: [] }
+    return {
+      value: contribution.value,
+      receipt: [toReceipt(contribution)],
+    }
+  }
+
+  if (definition.mergeMode === "deep-merge") {
+    const value = eligible.reduce<Record<string, unknown>>(
+      (merged, contribution) => {
+        if (!isPlainRecord(contribution.value)) {
+          throw new Error(
+            `Setting "${definition.key}" requires record contributions.`,
+          )
+        }
+        return mergePlainRecords(merged, contribution.value)
+      },
+      {},
+    )
+    return { value: value as T, receipt: eligible.map(toReceipt) }
+  }
+
+  if (definition.mergeMode === "set-union") {
+    const value: unknown[] = []
+    for (const contribution of eligible) {
+      if (!Array.isArray(contribution.value)) {
+        throw new Error(
+          `Setting "${definition.key}" requires array contributions.`,
+        )
+      }
+      for (const member of contribution.value) {
+        if (!value.some((existing) => Object.is(existing, member)))
+          value.push(member)
+      }
+    }
+    return { value: value as T, receipt: eligible.map(toReceipt) }
+  }
+
+  return {
+    value: definition.mergeMode.resolve({
+      defaultValue: definition.defaultValue,
+      contributions: eligible.map((contribution) => contribution.value),
+    }),
+    receipt: eligible.map(toReceipt),
+  }
+}
+
+function isEligibleSettingContribution<T>(
+  definition: SettingDefinition<T>,
+  candidate: SettingResolutionCandidate<T>,
+): boolean {
+  if (!definition.allowedScopeKinds.includes(candidate.scopeKind)) return false
+  if (
+    candidate.linkKind !== undefined &&
+    !definition.allowedContributingLinkKinds.includes(candidate.linkKind)
+  ) {
+    return false
+  }
+  if (
+    candidate.scopeKind === "personal" &&
+    !definition.allowsPersonalOverride
+  ) {
+    return false
+  }
+
+  // Defensively enforce the invariant even if an invalid definition entered
+  // through an untyped boundary: security cannot resolve via a composition
+  // link or a personal scope.
+  return !(
+    definition.affectsSecurity &&
+    (candidate.scopeKind === "personal" || candidate.linkKind !== undefined)
+  )
+}
+
+function compareSettingCandidates<T>(
+  left: SettingResolutionCandidate<T>,
+  right: SettingResolutionCandidate<T>,
+): number {
+  return (
+    left.order - right.order ||
+    left.scopeKind.localeCompare(right.scopeKind) ||
+    left.scopeId.localeCompare(right.scopeId) ||
+    (left.linkKind ?? "").localeCompare(right.linkKind ?? "")
+  )
+}
+
+function toReceipt<T>(
+  contribution: SettingResolutionCandidate<T>,
+): SettingContributionReceipt {
+  if (contribution.visibility.kind === "hidden-mandatory-policy") {
+    return {
+      kind: "mandatory-policy",
+      policyClass: contribution.visibility.policyClass,
+    }
+  }
+  return {
+    kind: "scope",
+    scopeId: contribution.scopeId,
+    scopeKind: contribution.scopeKind,
+  }
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function mergePlainRecords(
+  base: Record<string, unknown>,
+  contribution: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...base }
+  for (const [key, value] of Object.entries(contribution)) {
+    const existing = merged[key]
+    merged[key] =
+      isPlainRecord(existing) && isPlainRecord(value)
+        ? mergePlainRecords(existing, value)
+        : value
+  }
+  return merged
 }
 
 // Walks an explicit, already most- to least-specific ordered tier list and

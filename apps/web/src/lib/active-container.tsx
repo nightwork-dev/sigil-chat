@@ -18,9 +18,17 @@ import {
   useActiveAgentThreadPreference,
   useSetActiveContainer,
 } from "@/lib/agent-threads";
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav";
+import type {
+  AgentThreadPreference,
+  ScopePerspective,
+} from "@/lib/agent-threads-domain";
+import {
+  useProjectWorkspaceNav,
+  type ProjectWorkspaceNavSummary,
+} from "@/lib/project-workspace-nav";
 
 export interface ActiveContainer {
+  perspective: ScopePerspective | undefined;
   /** Always resolved once nav data loads — defaults to the personal project. */
   projectId: string | undefined;
   workspaceId: string | undefined;
@@ -36,33 +44,63 @@ export interface ActiveContainer {
 
 const ActiveContainerContext = createContext<ActiveContainer | null>(null);
 
+export function resolveActiveContainerSelection(
+  preference: AgentThreadPreference | undefined,
+  nav: ProjectWorkspaceNavSummary | undefined,
+): Pick<
+  ActiveContainer,
+  | "perspective"
+  | "projectId"
+  | "workspaceId"
+  | "projectName"
+  | "workspaceName"
+> {
+  const perspective = preference?.activePerspective;
+  const workspace = nav?.workspaces.find(
+    (entry) => entry.id === perspective?.focusScopeId,
+  );
+  const focusProject = nav?.projects.find(
+    (project) => project.id === perspective?.focusScopeId,
+  );
+  // A directly granted workspace can be visible while its canonical project
+  // is not. Only an already-visible via crumb becomes the legacy project
+  // projection; do not recover a hidden canonical home or substitute personal.
+  const projectId = workspace
+    ? perspective?.viaScopeIds.at(-1)
+    : focusProject?.id ?? nav?.personalProjectId;
+  const project = nav?.projects.find((entry) => entry.id === projectId);
+
+  return {
+    perspective: workspace || focusProject ? perspective : undefined,
+    projectId,
+    workspaceId: workspace?.id,
+    projectName: project?.name,
+    workspaceName: workspace?.name,
+  };
+}
+
 export function ActiveContainerProvider({ children }: { children: ReactNode }) {
   const preference = useActiveAgentThreadPreference();
   const nav = useProjectWorkspaceNav();
   const setActiveContainer = useSetActiveContainer();
 
   const value = useMemo<ActiveContainer>(() => {
-    const pref = preference.data;
-    const data = nav.data;
-
-    const workspace = data?.workspaces.find(
-      (w) => w.id === pref?.activeWorkspaceId,
-    );
-    // Containment wins over the stored project field — same derivation rule
-    // as threads. A stored workspace whose project disagrees with the stored
-    // project resolves through the workspace.
-    const projectId =
-      workspace?.projectId ?? pref?.activeProjectId ?? data?.personalProjectId;
-    const project = data?.projects.find((p) => p.id === projectId);
+    const selection = resolveActiveContainerSelection(preference.data, nav.data);
 
     return {
-      projectId,
-      workspaceId: workspace?.id,
-      projectName: project?.name,
-      workspaceName: workspace?.name,
+      ...selection,
       isReady: Boolean(preference.data && nav.data),
-      selectProject: (pid) => setActiveContainer.mutate({ projectId: pid }),
-      selectWorkspace: (wid) => setActiveContainer.mutate({ workspaceId: wid }),
+      selectProject: (pid) =>
+        setActiveContainer.mutate({
+          perspective: { focusScopeId: pid, viaScopeIds: [] },
+        }),
+      selectWorkspace: (wid) =>
+        setActiveContainer.mutate({
+          perspective: {
+            focusScopeId: wid,
+            viaScopeIds: selection.projectId ? [selection.projectId] : [],
+          },
+        }),
       clear: () => setActiveContainer.mutate({}),
     };
   }, [preference.data, nav.data, setActiveContainer]);

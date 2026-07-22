@@ -73,7 +73,7 @@ function SetupPage() {
     <div className="grid min-h-svh place-items-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Set up {SITE.title}</CardTitle>
+          <CardTitle>Set up {SITE.name}</CardTitle>
           <CardDescription>
             Create the first account. It becomes the installation owner.
           </CardDescription>

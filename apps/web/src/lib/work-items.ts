@@ -5,7 +5,12 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
+import { useAgentPrincipalId } from "@/lib/agent-principal";
 import type {
+  BoardQueryResult,
+  BoardTraversal,
+  BoardView,
+  BoardViewFilter,
   ReviewDecision,
   ReviewGate,
   Story,
@@ -13,7 +18,9 @@ import type {
   StoryFilter,
   StoryStatus,
   WorkItemsMutationResult,
+  WorkSponsorshipDecision,
 } from "@workspace/work-items-store/types";
+import { queryBoardView } from "@workspace/work-items-store/operations";
 
 const listStoriesFn = createServerFn({ method: "GET" })
   .validator(
@@ -65,6 +72,161 @@ const getStoryFn = createServerFn({ method: "GET" })
     );
     if (!story) throw new Error(`Unknown story id: ${data.id}.`);
     return story;
+  });
+
+const listBoardViewsFn = createServerFn({ method: "GET" })
+  .validator((input?: { filter?: BoardViewFilter }) => input ?? {})
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer, boardViewsVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    return boardViewsVisibleToViewer(
+      await workItemsRepository.listBoardViews(data.filter),
+      viewer,
+    );
+  });
+
+const getBoardViewFn = createServerFn({ method: "GET" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    return boardViewVisibleToViewer(
+      document.boardViews.find((view) => view.id === data.id),
+      viewer,
+    );
+  });
+
+const queryBoardViewFn = createServerFn({ method: "GET" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }): Promise<BoardQueryResult> => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { createBoardTraversalResolver } =
+      await import("@/lib/work-items-access.server");
+    const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const view = boardViewVisibleToViewer(
+      document.boardViews.find((candidate) => candidate.id === data.id),
+      viewer,
+    );
+    return queryBoardView(
+      document.stories,
+      view,
+      createBoardTraversalResolver(viewer.id),
+    );
+  });
+
+const queryScopeWorkFn = createServerFn({ method: "GET" })
+  .validator((input: { scopeId: string; traversal: BoardTraversal }) => input)
+  .handler(async ({ data }): Promise<BoardQueryResult> => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { createBoardTraversalResolver, currentWorkItemsScopeAccess } =
+      await import("@/lib/work-items-access.server");
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const access = currentWorkItemsScopeAccess();
+    if (
+      !access.canAccess({
+        principalId: viewer.id,
+        scopeId: data.scopeId,
+        action: "board.read",
+      })
+    ) {
+      throw new Error("Scoped work was not found.");
+    }
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const view: BoardView = {
+      id: `scope-home:${data.scopeId}`,
+      ownerScopeId: data.scopeId,
+      ownerPrincipalId: viewer.id,
+      name: "Scope home",
+      visibility: "private",
+      roots: [data.scopeId],
+      traversal: data.traversal,
+      filters: {},
+      groupBy: "status",
+      revision: 0,
+    };
+    return queryBoardView(
+      document.stories,
+      view,
+      createBoardTraversalResolver(viewer.id, access),
+    );
+  });
+
+const queryScopeHomeAccessFn = createServerFn({ method: "GET" })
+  .validator((scopeId: string) => scopeId)
+  .handler(async ({ data: scopeId }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const { currentWorkItemsScopeAccess, scopeHomeAccessSignal } =
+      await import("@/lib/work-items-access.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    return scopeHomeAccessSignal(
+      viewer.id,
+      scopeId,
+      currentWorkItemsScopeAccess(),
+    );
+  });
+
+const listSessionCommitmentsFn = createServerFn({ method: "GET" })
+  .validator((input: { threadId: string }) => input)
+  .handler(async ({ data }): Promise<Story[]> => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { agentThreadRepository } =
+      await import("@/lib/agent-threads.server");
+    if (!agentThreadRepository.get(viewer.id, data.threadId)) {
+      throw new Error("Agent session was not found.");
+    }
+    const { currentWorkItemsScopeAccess, visibleSessionCommitments } =
+      await import("@/lib/work-items-access.server");
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    return visibleSessionCommitments(
+      document.stories,
+      data.threadId,
+      viewer.id,
+      currentWorkItemsScopeAccess(),
+    );
+  });
+
+const upsertBoardViewFn = createServerFn({ method: "POST" })
+  .validator((input: { view: BoardView; expectedRevision?: number }) => input)
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
+      await import("@/lib/work-items-viewer.server");
+    const { prepareBoardViewForUpsert, requireBoardViewMutationAccess } =
+      await import("@/lib/work-items-access.server");
+    const session = await getSession();
+    const viewer = authenticatedWorkItemsViewer(session);
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const existing = document.boardViews.find(
+      (candidate) => candidate.id === data.view.id,
+    );
+    if (existing) boardViewVisibleToViewer(existing, viewer);
+    const view = prepareBoardViewForUpsert(data.view, viewer.id, existing);
+    requireBoardViewMutationAccess(session, view, undefined, existing);
+    return workItemsRepository.upsertBoardView(
+      view,
+      data.expectedRevision,
+    );
   });
 
 const upsertStoryFn = createServerFn({ method: "POST" })
@@ -226,6 +388,70 @@ const addCommentFn = createServerFn({ method: "POST" })
     return result;
   });
 
+const listSponsorshipDecisionsFn = createServerFn({ method: "GET" })
+  .validator((input: { workItemId: string }) => input)
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { authenticatedWorkItemsViewer } = await import(
+      "@/lib/work-items-viewer.server"
+    );
+    const viewer = authenticatedWorkItemsViewer(await getSession());
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const workItem = document.stories.find(
+      (candidate) => candidate.id === data.workItemId,
+    );
+    if (!workItem) throw new Error("Feature request was not found.");
+    const proposedSponsor = workItem.provenance?.proposedSponsorPrincipalId;
+    if (proposedSponsor !== viewer.id) return [];
+    return workItemsRepository.listSponsorshipDecisions({
+      workItemId: workItem.id,
+      sponsorPrincipalId: viewer.id,
+    });
+  });
+
+const decideSponsorshipFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      workItemId: string;
+      decision: WorkSponsorshipDecision["decision"];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { getSession } = await import("@/lib/auth/session");
+    const { requireSponsorshipDecisionAccess } = await import(
+      "@/lib/work-items-access.server"
+    );
+    const session = await getSession();
+    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const document = await workItemsRepository.get();
+    const workItem = document.stories.find(
+      (candidate) => candidate.id === data.workItemId,
+    );
+    if (!workItem) throw new Error("Feature request was not found.");
+    const sponsor = requireSponsorshipDecisionAccess(session, workItem).user.id;
+    const prior = document.sponsorshipDecisions.filter(
+      (candidate) =>
+        candidate.workItemId === workItem.id &&
+        candidate.sponsorPrincipalId === sponsor,
+    );
+    const decision: WorkSponsorshipDecision = {
+      id: crypto.randomUUID(),
+      workItemId: workItem.id,
+      sponsorPrincipalId: sponsor,
+      decision: data.decision,
+      decidedByPrincipalId: sponsor,
+      decidedAt: new Date().toISOString(),
+      revision:
+        prior.reduce((max, candidate) => Math.max(max, candidate.revision), 0) +
+        1,
+    };
+    return workItemsRepository.recordSponsorshipDecision(
+      decision,
+      document.revision,
+    );
+  });
+
 export const workItemKeys = {
   all: () => ["work-items"] as const,
   list: (filter?: StoryFilter) =>
@@ -234,8 +460,26 @@ export const workItemKeys = {
   reviews: () => [...workItemKeys.all(), "reviews"] as const,
   comments: (storyId: string) =>
     [...workItemKeys.all(), storyId, "comments"] as const,
+  sponsorship: (storyId: string, viewerId: string) =>
+    [...workItemKeys.all(), storyId, "sponsorship", viewerId] as const,
   addressed: (viewerId: string, filter?: StoryFilter) =>
     [...workItemKeys.all(), "addressed", viewerId, filter ?? {}] as const,
+  boardViews: (viewerId: string, filter?: BoardViewFilter) =>
+    [...workItemKeys.all(), "board-views", viewerId, filter ?? {}] as const,
+  boardView: (viewerId: string, id: string) =>
+    [...workItemKeys.all(), "board-view", viewerId, id] as const,
+  boardQuery: (viewerId: string, id: string) =>
+    [...workItemKeys.all(), "board-query", viewerId, id] as const,
+  scopeQuery: (viewerId: string, scopeId: string, traversal: BoardTraversal) =>
+    [
+      ...workItemKeys.all(),
+      "scope-query",
+      viewerId,
+      scopeId,
+      traversal,
+    ] as const,
+  sessionCommitments: (viewerId: string, threadId: string) =>
+    [...workItemKeys.all(), "session-commitments", viewerId, threadId] as const,
 };
 
 export function useStories(
@@ -289,12 +533,103 @@ export function useStory(id: string | undefined) {
   });
 }
 
+export function useBoardViews(filter?: BoardViewFilter) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.boardViews(principalId, filter),
+    queryFn: () => listBoardViewsFn({ data: { filter } }),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useBoardView(id: string | undefined) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.boardView(principalId, id ?? "none"),
+    queryFn: () => getBoardViewFn({ data: { id: id ?? "" } }),
+    enabled: Boolean(id),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useBoardViewQuery(id: string | undefined) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.boardQuery(principalId, id ?? "none"),
+    queryFn: () => queryBoardViewFn({ data: { id: id ?? "" } }),
+    enabled: Boolean(id),
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useScopeWork(
+  scopeId: string,
+  traversal: BoardTraversal,
+  enabled = true,
+) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.scopeQuery(principalId, scopeId, traversal),
+    queryFn: () => queryScopeWorkFn({ data: { scopeId, traversal } }),
+    enabled: enabled && scopeId.length > 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
+export function useScopeHomeAccess(scopeId: string, enabled = true) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: ["scope-home-access", principalId, scopeId] as const,
+    queryFn: () => queryScopeHomeAccessFn({ data: scopeId }),
+    enabled: enabled && scopeId.length > 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+  });
+}
+
+export function useSessionCommitments(threadId: string, enabled = true) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.sessionCommitments(principalId, threadId),
+    queryFn: () => listSessionCommitmentsFn({ data: { threadId } }),
+    enabled: enabled && threadId.length > 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+  });
+}
+
 export function useUpsertStory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { story: Story; expectedRevision?: number }) =>
       upsertStoryFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
+  });
+}
+
+export function useUpsertBoardView() {
+  const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
+  return useMutation({
+    mutationFn: (input: { view: BoardView; expectedRevision?: number }) =>
+      upsertBoardViewFn({ data: input }),
+    onSuccess: (result, variables) =>
+      reconcileBoardViews(queryClient, principalId, variables.view.id, result),
   });
 }
 
@@ -369,6 +704,38 @@ export function useAddComment() {
   });
 }
 
+export function useSponsorshipDecisions(workItemId: string | undefined) {
+  const principalId = useAgentPrincipalId();
+  return useQuery({
+    queryKey: workItemKeys.sponsorship(workItemId ?? "none", principalId),
+    queryFn: () =>
+      listSponsorshipDecisionsFn({ data: { workItemId: workItemId ?? "" } }),
+    enabled: Boolean(workItemId),
+  });
+}
+
+export function useDecideSponsorship() {
+  const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
+  return useMutation({
+    mutationFn: (input: {
+      workItemId: string;
+      decision: WorkSponsorshipDecision["decision"];
+    }) => decideSponsorshipFn({ data: input }),
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(
+        workItemKeys.sponsorship(variables.workItemId, principalId),
+        result.document.sponsorshipDecisions.filter(
+          (candidate) =>
+            candidate.workItemId === variables.workItemId &&
+            candidate.sponsorPrincipalId === principalId,
+        ),
+      );
+      return reconcileWorkItems(queryClient, result);
+    },
+  });
+}
+
 function reconcileWorkItems(
   queryClient: QueryClient,
   result: WorkItemsMutationResult,
@@ -385,4 +752,32 @@ function reconcileWorkItems(
     }
   }
   return queryClient.invalidateQueries({ queryKey: workItemKeys.all() });
+}
+
+function reconcileBoardViews(
+  queryClient: QueryClient,
+  principalId: string,
+  viewId: string,
+  result: WorkItemsMutationResult,
+): Promise<void> {
+  const view = result.document.boardViews.find(
+    (candidate) => candidate.id === viewId,
+  );
+  if (view) {
+    queryClient.setQueryData(
+      workItemKeys.boardView(principalId, view.id),
+      view,
+    );
+  }
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: [...workItemKeys.all(), "board-views", principalId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: workItemKeys.boardView(principalId, viewId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: workItemKeys.boardQuery(principalId, viewId),
+    }),
+  ]).then(() => undefined);
 }

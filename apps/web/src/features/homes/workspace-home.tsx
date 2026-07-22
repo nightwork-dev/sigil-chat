@@ -1,0 +1,203 @@
+// WorkspaceHome — one initiative: purpose, sessions, participants, resources,
+// current work, recent attention (SC.7). Entered via a non-owner path, the
+// via project stays in the breadcrumb and the canonical owner is labelled
+// quietly — projection, never authority (spec §2, §7).
+
+import { HomeSection } from "./home-section"
+import { AgentHomeRow } from "./agent-home-row"
+import { ArchivedBanner, HomeDenied, HomeSkeleton } from "./home-states"
+import { HomeRow, OwnershipChip } from "./home-row"
+import type { HomeState, WorkspaceHomeView } from "./types"
+
+export interface WorkspaceHomeProps {
+  readonly state: HomeState<WorkspaceHomeView>
+  readonly compact?: boolean
+}
+
+const RESOURCE_KIND_LABEL: Record<string, string> = {
+  artifact: "Artifact",
+  evidence: "Evidence",
+  knowledge: "Knowledge",
+  "saved-view": "Saved view",
+}
+
+export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
+  if (state.kind === "loading") return <HomeSkeleton />
+  if (state.kind === "denied")
+    return <HomeDenied discoverable={state.discoverable} />
+  if (state.kind === "not-found") return <HomeDenied discoverable={false} />
+
+  const { view } = state
+  const archived = view.header.status === "archived"
+
+  return (
+    <div
+      data-testid="workspace-home"
+      className={
+        compact
+          ? "flex flex-col gap-4 p-3 pb-20"
+          : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
+      }
+    >
+      <header
+        aria-label={`${view.header.name} overview`}
+        className="flex flex-col gap-1"
+      >
+        {view.ownership ? <OwnershipChip label={view.ownership} /> : null}
+        {view.header.description ? (
+          <p className="text-sm text-muted-foreground">
+            {view.header.description}
+          </p>
+        ) : null}
+      </header>
+
+      {archived ? <ArchivedBanner what="workspace" /> : null}
+
+      <HomeSection
+        title="Sessions"
+        count={view.sessions.length}
+        empty="No sessions in this workspace yet."
+        emptyAction={
+          archived ? undefined : { label: "Open chat", href: "/chat" }
+        }
+        compact={compact}
+      >
+        {view.sessions.map((session, index) => (
+          <HomeRow
+            key={session.id}
+            first={index === 0}
+            compact={compact}
+            title={session.title}
+            href={session.href}
+            trailing={
+              session.status === "archived" ? (
+                <span className="text-[10px] text-muted-foreground">
+                  Archived
+                </span>
+              ) : undefined
+            }
+          />
+        ))}
+      </HomeSection>
+
+      <HomeSection
+        title="Agents"
+        count={view.agents.length}
+        empty="No agents are available in this workspace."
+        emptyAction={{ label: "Browse agents", href: "/agents" }}
+        compact={compact}
+      >
+        {view.agents.map((agent, index) => (
+          <AgentHomeRow
+            key={agent.personaId}
+            agent={agent}
+            first={index === 0}
+            compact={compact}
+          />
+        ))}
+      </HomeSection>
+
+      <HomeSection
+        title="Resources"
+        count={view.resources.length}
+        empty="No artifacts, evidence, or pages here yet."
+        emptyAction={
+          archived ? undefined : { label: "Ask your agent", href: "/chat" }
+        }
+        compact={compact}
+      >
+        {view.resources.map((resource, index) => (
+          <HomeRow
+            key={resource.id}
+            first={index === 0}
+            compact={compact}
+            title={resource.name}
+            nativeHref={resource.nativeHref}
+            description={
+              resource.mountedFromName
+                ? `Shared from ${resource.mountedFromName}`
+                : undefined
+            }
+            trailing={
+              <span className="rounded-full border border-border px-1.5 py-px text-[10px] text-muted-foreground">
+                {RESOURCE_KIND_LABEL[resource.kind] ?? resource.kind}
+              </span>
+            }
+          />
+        ))}
+      </HomeSection>
+
+      <HomeSection
+        title="Work"
+        count={view.work.length}
+        empty="No work is tracked here yet."
+        emptyAction={
+          archived ? undefined : { label: "Request a feature", href: "/chat" }
+        }
+        compact={compact}
+      >
+        {view.work.map((item, index) => (
+          <HomeRow
+            key={item.id}
+            first={index === 0}
+            compact={compact}
+            title={item.title}
+            href={item.href}
+            trailing={
+              <span
+                data-testid="work-status"
+                className="rounded-full border border-border px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+              >
+                {item.status}
+              </span>
+            }
+          />
+        ))}
+      </HomeSection>
+
+      {view.activity.length > 0 ? (
+        <HomeSection
+          title="Recent activity"
+          count={view.activity.length}
+          empty=""
+          compact={compact}
+        >
+          {view.activity.map((item, index) => (
+            <HomeRow
+              key={item.id}
+              first={index === 0}
+              compact={compact}
+              title={item.summary}
+              description={item.agentName}
+              href={item.href}
+            />
+          ))}
+        </HomeSection>
+      ) : null}
+
+      {view.attention.length > 0 ? (
+        <HomeSection
+          title="Attention"
+          count={view.attention.length}
+          empty=""
+          compact={compact}
+        >
+          {view.attention.map((item, index) => (
+            <HomeRow
+              key={item.id}
+              first={index === 0}
+              compact={compact}
+              title={item.subject}
+              description={
+                item.notedFromName
+                  ? `${item.agentName} · noted from ${item.notedFromName}`
+                  : item.agentName
+              }
+              href={item.href}
+            />
+          ))}
+        </HomeSection>
+      ) : null}
+    </div>
+  )
+}

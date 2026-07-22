@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
 
-import { getSession, requireOwner } from "./auth/session"
+import { getSession, requireSession } from "./auth/session"
 import { personaRegistry } from "./agent-profile.server"
 
 export async function readAgentPortraitFromRequest(
@@ -8,7 +8,7 @@ export async function readAgentPortraitFromRequest(
 ): Promise<Response> {
   const session = await getSession(request.headers)
   try {
-    requireOwner(session)
+    requireSession(session)
   } catch (error) {
     const status =
       error instanceof Error && "status" in error

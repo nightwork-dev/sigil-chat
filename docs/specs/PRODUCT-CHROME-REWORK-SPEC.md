@@ -2,6 +2,13 @@
 
 > Worktree: `sigil-chat-chrome` (branch `prod1/chrome-rework`, off `dev`)
 > Status: **Draft product/UX spec — for David's review before implementation.**
+> Revised by: [`PRODUCT-HOMES-IA-PROPOSAL.md`](PRODUCT-HOMES-IA-PROPOSAL.md)
+> (SC.7, implemented through `5bbcd44`). The homes supersede two pieces here:
+> §3.2's flat feature nav becomes home-oriented surfaces reached through the
+> perspective control (breadcrumb split control + `/home`), and the active
+> container becomes `ScopePerspective` (focus + via). Everything else — the
+> one-rail layout, `staticData.rail`, one-presentation-per-region, the
+> variant family, the omnibar — stands as written.
 > Builds on: PROJ.1 (registries + workspace tier) and PROJ.2 (thread binding +
 > project-aware chat nav), both on `dev`. This is the *product-level expression*
 > of that plumbing: the container hierarchy already exists in the domain; the

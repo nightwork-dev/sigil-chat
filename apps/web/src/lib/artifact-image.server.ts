@@ -10,7 +10,7 @@ interface ArtifactImageEnvironment {
 export interface ArtifactImageDependencies {
   fetcher: typeof fetch
   getSession: (headers: Headers) => Promise<SigilAuthSession | null>
-  ownsThread: (userId: string, threadId: string) => boolean
+  ownedThreadHomeScope: (userId: string, threadId: string) => string | undefined
   readEnvironment: () => ArtifactImageEnvironment
 }
 
@@ -34,7 +34,11 @@ export async function readArtifactImage(
   const scope = url.searchParams.get("scope") ?? ""
   if (!key || key.includes("..")) return new Response(null, { status: 404 })
   try {
-    assertAuthorizedScope(scope, session.user.id, dependencies.ownsThread)
+    assertAuthorizedScope(
+      scope,
+      session.user.id,
+      dependencies.ownedThreadHomeScope,
+    )
   } catch {
     return new Response(null, { status: 404 })
   }
@@ -75,8 +79,8 @@ export async function readArtifactImageFromRequest(
   return readArtifactImage(request, {
     fetcher: fetch,
     getSession,
-    ownsThread: (userId, threadId) =>
-      Boolean(agentThreadRepository.get(userId, threadId)),
+    ownedThreadHomeScope: (userId, threadId) =>
+      agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
     readEnvironment: () => environment.readGonkClientEnvironment(process.env),
   })
 }

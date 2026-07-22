@@ -11,7 +11,7 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 export interface AttachmentUploadDependencies {
   fetcher: typeof fetch
   getSession: () => Promise<SigilAuthSession | null>
-  ownsThread: (userId: string, threadId: string) => boolean
+  ownedThreadHomeScope: (userId: string, threadId: string) => string | undefined
   readEnvironment: () => {
     apiKey?: string
     gonkMcpUrl: string
@@ -29,7 +29,14 @@ export async function uploadAgentAttachment(
   if (typeof scope !== "string" || scope.trim().length === 0) {
     throw new Error("Attachment upload requires a resource scope.")
   }
-  assertAuthorizedScope(scope, session.user.id, dependencies.ownsThread)
+  assertAuthorizedScope(
+    scope,
+    session.user.id,
+    dependencies.ownedThreadHomeScope,
+    undefined,
+    undefined,
+    "tool",
+  )
 
   const file = data.get("file")
   if (!(file instanceof File)) {
@@ -79,8 +86,8 @@ export async function uploadAgentAttachmentFromRequest(
   return uploadAgentAttachment(data, {
     fetcher: fetch,
     getSession,
-    ownsThread: (userId, threadId) =>
-      Boolean(agentThreadRepository.get(userId, threadId)),
+    ownedThreadHomeScope: (userId, threadId) =>
+      agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
     readEnvironment: () => readGonkClientEnvironment(process.env),
   })
 }

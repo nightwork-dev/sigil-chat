@@ -133,6 +133,7 @@ export function SidebarShell({
   accountMenu,
   workspaceSwitcher,
   breadcrumbContext,
+  breadcrumbPage,
   viewContent,
   statusRailStart,
   statusRailEnd,
@@ -151,6 +152,12 @@ export function SidebarShell({
    * the separators.
    */
   breadcrumbContext?: ReactNode
+  /**
+   * App-owned current-page crumb. Omit to use the active navigation label.
+   * Container-home routes use this to avoid presenting the nav fallback as
+   * their current surface.
+   */
+  breadcrumbPage?: ReactNode
   /**
    * View-owned content filling the top rail between the breadcrumb and the
    * header actions (e.g. the chat surface's status + session switcher). One
@@ -216,15 +223,20 @@ export function SidebarShell({
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="min-h-0">
-        <header className="flex min-h-9 items-center gap-2 border-b border-border px-3 pt-[env(safe-area-inset-top)]">
-          <SidebarTrigger className="md:hidden" />
+      <SidebarInset className="min-h-0 overflow-hidden">
+        <header className="flex min-h-11 items-center gap-2 border-b border-border px-3 pt-[env(safe-area-inset-top)] md:min-h-9">
+          <SidebarTrigger className="-ml-3 size-11 md:hidden" />
           <Separator orientation="vertical" className="h-4 md:hidden" />
           <Breadcrumb>
             <BreadcrumbList>
               {breadcrumbContext}
               <BreadcrumbItem>
-                <BreadcrumbPage className="text-xs">{active?.label ?? nav.brand?.label ?? "Home"}</BreadcrumbPage>
+                <BreadcrumbPage className="text-xs">
+                  {breadcrumbPage ??
+                    active?.label ??
+                    nav.brand?.label ??
+                    "Home"}
+                </BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -236,10 +248,12 @@ export function SidebarShell({
           <HeaderActions actions={actions} />
         </header>
 
-        <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+          {children}
+        </div>
 
         {statusRailStart || statusRailEnd ? (
-          <footer className="flex h-7 shrink-0 items-center gap-2 border-t border-border px-2 text-[11px] text-muted-foreground">
+          <footer className="flex h-11 shrink-0 items-center gap-2 border-t border-border px-2 text-[11px] text-muted-foreground md:h-7">
             <div className="flex min-w-0 items-center gap-2 overflow-hidden">
               {statusRailStart}
             </div>

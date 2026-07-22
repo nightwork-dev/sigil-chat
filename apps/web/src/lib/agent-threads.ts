@@ -13,9 +13,11 @@ import type {
   AgentThreadSnapshot,
   AgentThreadSummary,
   ForkAgentThreadInput,
+  ScopePerspective,
 } from "@/lib/agent-threads-domain";
 import type { SigilAuthSession } from "@/lib/auth/server";
 import { useAgentPrincipalId } from "@/lib/agent-principal";
+import { invalidateHomeSignals } from "@/lib/home-signals";
 
 export type {
   AgentThread,
@@ -25,49 +27,51 @@ export type {
   AgentThreadSnapshot,
   AgentThreadStatus,
   AgentThreadSummary,
+  CreateAgentThreadInput,
   ForkAgentThreadInput,
 } from "@/lib/agent-threads-domain";
 
 const listAgentThreadsFn = createServerFn({ method: "GET" })
   .validator((input: { includeArchived?: boolean }) => input)
   .handler(async ({ data }) => {
-    const { agentThreadRepository } =
+    const { agentThreadBindingService, agentThreadRepository } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
     const threads = data.includeArchived
       ? agentThreadRepository.list(session.user.id, true)
-      : agentThreadRepository.ensureActive(session.user.id);
+      : agentThreadBindingService.ensureActive(session.user.id);
     return threads.map(projectAgentThreadSummary);
   });
 
 const getAgentThreadFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    const { agentThreadRepository } =
+    const { agentThreadBindingService } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
-    const thread = agentThreadRepository.get(session.user.id, data.id);
-    if (!thread) throw new Error(`Agent thread ${data.id} was not found.`);
-    return thread;
+    return agentThreadBindingService.resolveExecution(session.user.id, data.id);
   });
 
 const createAgentThreadFn = createServerFn({ method: "POST" })
   .validator(
-    (input: { personaId: string; title?: string; workspaceId?: string }) =>
-      input,
+    (input: {
+      personaId: string;
+      title?: string;
+      workspaceId?: string;
+      sessionKind?: "workspace" | "personal";
+      initialPerspective?: ScopePerspective;
+      additionalContextScopeIds?: string[];
+    }) => input,
   )
   .handler(async ({ data }) => {
-    const { agentThreadRepository } =
+    const { agentThreadBindingService } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
     const { personaRegistry } = await import("@/lib/agent-profile.server");
     if (!personaRegistry.exists(data.personaId)) {
       throw new Error(`Persona ${data.personaId} was not found.`);
     }
-    if (data.workspaceId) {
-      await requireWorkspaceMembership(session.user.id, data.workspaceId);
-    }
-    return agentThreadRepository.create(session.user.id, data);
+    return agentThreadBindingService.create(session.user.id, data);
   });
 
 const rebindAgentThreadWorkspaceFn = createServerFn({ method: "POST" })
@@ -94,17 +98,19 @@ async function requireWorkspaceMembership(
   userId: string,
   workspaceId: string,
 ): Promise<void> {
-  const { getProjectWorkspaceRegistries } = await import(
-    "../../../agent/agent/lib/project-workspace-registries"
-  );
-  const { assertRegisteredScopeMembership } = await import(
-    "../../../agent/agent/lib/scope-authorization"
-  );
+  const { getProjectWorkspaceRegistries } =
+    await import("../../../agent/agent/lib/project-workspace-registries");
+  const { assertRegisteredScopeMembership } =
+    await import("../../../agent/agent/lib/scope-authorization");
   const registries = getProjectWorkspaceRegistries();
   if (!registries.workspaces.get(workspaceId)) {
     throw new Error(`Workspace ${workspaceId} was not found.`);
   }
-  assertRegisteredScopeMembership(`workspace:${workspaceId}`, userId, registries);
+  assertRegisteredScopeMembership(
+    `workspace:${workspaceId}`,
+    userId,
+    registries,
+  );
 }
 
 const renameAgentThreadFn = createServerFn({ method: "POST" })
@@ -172,10 +178,10 @@ const saveAgentThreadSnapshotFn = createServerFn({ method: "POST" })
 const forkAgentThreadFn = createServerFn({ method: "POST" })
   .validator((input: ForkAgentThreadInput) => input)
   .handler(async ({ data }) => {
-    const { agentThreadRepository } =
+    const { agentThreadBindingService } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
-    return agentThreadRepository.fork(session.user.id, data);
+    return agentThreadBindingService.fork(session.user.id, data);
   });
 
 const consumeAgentThreadForkSeedFn = createServerFn({ method: "POST" })
@@ -196,7 +202,33 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
 }).handler(async () => {
   const { agentThreadRepository } = await import("@/lib/agent-threads.server");
   const session = await requireThreadSession();
-  return agentThreadRepository.getActivePreference(session.user.id);
+  const preference = agentThreadRepository.getActivePreference(session.user.id);
+  if (!preference.activePerspective) return preference;
+
+  const {
+    legacyContainerProjection,
+    loadProjectWorkspaceNav,
+    resolveScopePerspective,
+  } = await import("@/lib/agent-thread-containers.server");
+  const nav = loadProjectWorkspaceNav(session.user.id);
+  const resolved = resolveScopePerspective(preference.activePerspective, nav);
+  if (!resolved) {
+    // The focus is no longer visible. Clear rather than retaining a stale id
+    // or trying to infer another scope.
+    return agentThreadRepository.setActiveContainer(session.user.id, {});
+  }
+  const legacy = legacyContainerProjection(resolved.perspective, nav);
+  if (
+    !resolved.diagnostic &&
+    preference.activeProjectId === legacy.projectId &&
+    preference.activeWorkspaceId === legacy.workspaceId
+  ) {
+    return preference;
+  }
+  return agentThreadRepository.setActiveContainer(session.user.id, {
+    ...legacy,
+    perspective: resolved.perspective,
+  });
 });
 
 const setActiveAgentThreadFn = createServerFn({ method: "POST" })
@@ -213,36 +245,48 @@ const setActiveAgentThreadFn = createServerFn({ method: "POST" })
 // write validates membership + containment against the registries before
 // persisting — the domain store deliberately does not know the registry.
 const setActiveContainerFn = createServerFn({ method: "POST" })
-  .validator((input: { projectId?: string; workspaceId?: string }) => input)
+  .validator(
+    (input: {
+      projectId?: string;
+      workspaceId?: string;
+      perspective?: ScopePerspective;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { loadProjectWorkspaceNav } = await import(
-      "@/lib/agent-thread-containers.server"
-    );
+    const {
+      legacyContainerProjection,
+      loadProjectWorkspaceNav,
+      resolveScopePerspective,
+    } = await import("@/lib/agent-thread-containers.server");
     const session = await requireThreadSession();
     const nav = loadProjectWorkspaceNav(session.user.id);
 
-    const memberProjectIds = new Set(nav.projects.map((p) => p.id));
-    let projectId = data.projectId;
-    if (data.workspaceId) {
-      const workspace = nav.workspaces.find((w) => w.id === data.workspaceId);
-      if (!workspace) {
-        throw new Error(
-          `Workspace ${data.workspaceId} is not visible to this principal.`,
-        );
-      }
-      // Containment is authoritative — the project is derived, never trusted
-      // from the client (mirrors the thread.workspaceId rule in the domain).
-      projectId = workspace.projectId;
+    const requestedPerspective =
+      data.perspective ??
+      (data.workspaceId
+        ? {
+            focusScopeId: data.workspaceId,
+            viaScopeIds: data.projectId ? [data.projectId] : [],
+          }
+        : data.projectId
+          ? { focusScopeId: data.projectId, viaScopeIds: [] }
+          : undefined);
+    const resolved = requestedPerspective
+      ? resolveScopePerspective(requestedPerspective, nav)
+      : undefined;
+    if (requestedPerspective && !resolved) {
+      throw new Error("Requested scope is not visible to this principal.");
     }
-    if (projectId && !memberProjectIds.has(projectId)) {
-      throw new Error(`Project ${projectId} is not visible to this principal.`);
-    }
+    const perspective = resolved?.perspective;
+    const legacy = perspective
+      ? legacyContainerProjection(perspective, nav)
+      : {};
 
     return agentThreadRepository.setActiveContainer(session.user.id, {
-      projectId,
-      workspaceId: data.workspaceId,
+      ...legacy,
+      perspective,
     });
   });
 
@@ -268,12 +312,12 @@ export function useAgentThreads(includeArchived = false) {
   });
 }
 
-export function useAgentThread(id: string | undefined) {
+export function useAgentThread(id: string | undefined, enabled = true) {
   const principalId = useAgentPrincipalId();
   return useQuery({
     queryKey: agentThreadKeys.detail(principalId, id ?? "none"),
     queryFn: () => getAgentThreadFn({ data: { id: id ?? "" } }),
-    enabled: Boolean(id),
+    enabled: enabled && Boolean(id),
   });
 }
 
@@ -289,10 +333,16 @@ export function useSetActiveContainer() {
   const principalId = useAgentPrincipalId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { projectId?: string; workspaceId?: string }) =>
-      setActiveContainerFn({ data: input }),
+    mutationFn: (input: {
+      projectId?: string;
+      workspaceId?: string;
+      perspective?: ScopePerspective;
+    }) => setActiveContainerFn({ data: input }),
     onSuccess: (preference) => {
-      queryClient.setQueryData(agentThreadKeys.preference(principalId), preference);
+      queryClient.setQueryData(
+        agentThreadKeys.preference(principalId),
+        preference,
+      );
     },
   });
 }
@@ -305,6 +355,9 @@ export function useCreateAgentThread() {
       personaId: string;
       title?: string;
       workspaceId?: string;
+      sessionKind?: "workspace" | "personal";
+      initialPerspective?: ScopePerspective;
+      additionalContextScopeIds?: string[];
     }) => createAgentThreadFn({ data: input }),
     onSuccess: (thread) => {
       cacheThread(queryClient, principalId, thread);
@@ -326,7 +379,10 @@ export function useRebindAgentThreadWorkspace() {
       workspaceId?: string;
       expectedRevision?: number;
     }) => rebindAgentThreadWorkspaceFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
+    onSuccess: async (thread) => {
+      cacheThread(queryClient, principalId, thread);
+      await invalidateHomeSignals(queryClient, principalId);
+    },
   });
 }
 
@@ -339,7 +395,10 @@ export function useRenameAgentThread() {
       title: string;
       expectedRevision?: number;
     }) => renameAgentThreadFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
+    onSuccess: async (thread) => {
+      cacheThread(queryClient, principalId, thread);
+      await invalidateHomeSignals(queryClient, principalId);
+    },
   });
 }
 
@@ -354,6 +413,7 @@ export function useArchiveAgentThread() {
       await queryClient.invalidateQueries({
         queryKey: agentThreadKeys.preference(principalId),
       });
+      await invalidateHomeSignals(queryClient, principalId);
     },
   });
 }
@@ -379,6 +439,7 @@ export function useDeleteAgentThread() {
       await queryClient.invalidateQueries({
         queryKey: agentThreadKeys.preference(principalId),
       });
+      await invalidateHomeSignals(queryClient, principalId);
     },
   });
 }
@@ -392,7 +453,10 @@ export function useSaveAgentThreadSnapshot() {
       snapshot: AgentThreadSnapshot;
       expectedRevision?: number;
     }) => saveAgentThreadSnapshotFn({ data: input }),
-    onSuccess: (thread) => cacheThread(queryClient, principalId, thread),
+    onSuccess: async (thread) => {
+      cacheThread(queryClient, principalId, thread);
+      await invalidateHomeSignals(queryClient, principalId);
+    },
   });
 }
 

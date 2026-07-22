@@ -10,6 +10,9 @@ import { createFileRoute, redirect } from "@tanstack/react-router"
 import { RoadmapWorkspace } from "@/features/roadmap/roadmap-workspace"
 
 export const Route = createFileRoute("/_app/roadmap")({
+  validateSearch: (search: Record<string, unknown>): { story?: string } => ({
+    ...(typeof search.story === "string" ? { story: search.story } : {}),
+  }),
   beforeLoad: () => {
     if (
       !import.meta.env.DEV &&
@@ -23,5 +26,12 @@ export const Route = createFileRoute("/_app/roadmap")({
 
 function RoadmapRoute() {
   const { user } = Route.useRouteContext()
-  return <RoadmapWorkspace viewer={user} />
+  const { story } = Route.useSearch()
+  return (
+    <RoadmapWorkspace
+      key={story ?? "roadmap"}
+      viewer={user}
+      initialSelectedId={story}
+    />
+  )
 }

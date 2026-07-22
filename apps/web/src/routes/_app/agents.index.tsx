@@ -8,17 +8,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowRightIcon } from "lucide-react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar"
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-import {
-  agentPortraitUrl,
-  agentRosterQueryOptions,
-} from "@/lib/agent-profile"
+import { AgentPortrait } from "@/components/agents/agent-portrait"
+import { agentRosterQueryOptions } from "@/lib/agent-profile"
 import { ManagementTabs } from "@/components/management-tabs"
 
 export const Route = createFileRoute("/_app/agents/")({
@@ -51,11 +44,6 @@ function AgentRoster() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {personas.map((persona) => {
-            const initial = persona.name.slice(0, 1).toUpperCase()
-            const portraitUrl = agentPortraitUrl(
-              persona.id,
-              persona.hasPortrait,
-            )
             return (
               <Link
                 key={persona.id}
@@ -65,14 +53,13 @@ function AgentRoster() {
               >
                 <Card className="h-full transition-colors group-hover:border-primary/40 group-focus-visible:border-primary/40">
                   <CardContent className="flex items-center gap-4 p-4">
-                    <Avatar className="size-11">
-                      {portraitUrl ? (
-                        <AvatarImage src={portraitUrl} alt="" />
-                      ) : null}
-                      <AvatarFallback className="font-medium text-primary">
-                        {initial}
-                      </AvatarFallback>
-                    </Avatar>
+                    <AgentPortrait
+                      personaId={persona.id}
+                      name={persona.name}
+                      hasPortrait={persona.hasPortrait}
+                      className="size-11"
+                      fallbackClassName="font-medium text-primary"
+                    />
                     <div className="min-w-0 flex-1">
                       <h2 className="truncate font-medium">{persona.name}</h2>
                       <p className="line-clamp-2 text-sm text-muted-foreground">

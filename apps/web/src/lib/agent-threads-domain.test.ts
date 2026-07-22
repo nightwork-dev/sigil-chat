@@ -99,6 +99,10 @@ describe("AgentThreadRepository", () => {
     repo.setActiveContainer(USER_A, { projectId: "project-1" });
     expect(repo.getActivePreference(USER_A).activeProjectId).toBe("project-1");
     expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
+      focusScopeId: "project-1",
+      viaScopeIds: [],
+    });
 
     repo.setActiveContainer(USER_A, {
       projectId: "project-1",
@@ -107,6 +111,10 @@ describe("AgentThreadRepository", () => {
     expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBe(
       "workspace-1",
     );
+    expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
+      focusScopeId: "workspace-1",
+      viaScopeIds: ["project-1"],
+    });
 
     // Per-principal isolation: another principal's selection is untouched.
     expect(repo.getActivePreference(USER_B).activeProjectId).toBeUndefined();
@@ -115,6 +123,64 @@ describe("AgentThreadRepository", () => {
     repo.setActiveContainer(USER_A, {});
     expect(repo.getActivePreference(USER_A).activeProjectId).toBeUndefined();
     expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+  });
+
+  it("writes back a ScopePerspective for a legacy scalar container preference", () => {
+    const preferences = new MemoryKv<AgentThreadPreference>();
+    preferences.set(`active-thread:${USER_A}`, {
+      members: [USER_A],
+      activeProjectId: "project-1",
+      activeWorkspaceId: "workspace-1",
+      updatedAt: "2026-07-16T10:00:00.000Z",
+    });
+    const repo = new AgentThreadRepository({
+      defaultPersonaId: "agent-a",
+      threads: new MemoryKv(),
+      preferences,
+      now: () => new Date("2026-07-16T10:00:00.000Z"),
+    });
+
+    expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
+      focusScopeId: "workspace-1",
+      viaScopeIds: ["project-1"],
+    });
+    expect(
+      preferences.get(`active-thread:${USER_A}`)?.activePerspective,
+    ).toEqual({
+      focusScopeId: "workspace-1",
+      viaScopeIds: ["project-1"],
+    });
+  });
+
+  it("persists a direct workspace perspective without a hidden project projection", () => {
+    const preferences = new MemoryKv<AgentThreadPreference>();
+    preferences.set(`active-thread:${USER_A}`, {
+      members: [USER_A],
+      activeProjectId: "project-hidden",
+      activeWorkspaceId: "workspace-b",
+      activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+      updatedAt: "2026-07-21T00:00:00.000Z",
+    });
+    const repo = new AgentThreadRepository({
+      defaultPersonaId: "agent-a",
+      threads: new MemoryKv(),
+      preferences,
+      now: () => new Date("2026-07-21T00:00:00.000Z"),
+    });
+
+    const preference = repo.setActiveContainer(USER_A, {
+      workspaceId: "workspace-b",
+      perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+    });
+
+    expect(preference).toMatchObject({
+      activeWorkspaceId: "workspace-b",
+      activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+    });
+    expect(preference.activeProjectId).toBeUndefined();
+    expect(
+      preferences.get(`active-thread:${USER_A}`)?.activeProjectId,
+    ).toBeUndefined();
   });
 
   it("keeps the container selection when the active thread changes", () => {
@@ -164,6 +230,38 @@ describe("AgentThreadRepository", () => {
     expect(repo.get(USER_A, created.id)?.personaId).toBe("agent-default");
     expect(threads.get(`thread:${created.id}`)?.personaId).toBe(
       "agent-default",
+    );
+  });
+
+  it("creates immutable execution bindings with deduped additional context", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A, {
+      personaId: "agent-a",
+      title: "Personal reach",
+      executionBinding: {
+        principalId: USER_A,
+        personaId: "agent-a",
+        homeScopeId: "personal-scope:user-a",
+        initialPerspective: {
+          focusScopeId: "personal-scope:user-a",
+          viaScopeIds: [],
+        },
+        additionalContextScopeIds: ["workspace-1", "workspace-1", "project-1"],
+      },
+    });
+
+    expect(thread.executionBinding).toEqual({
+      principalId: USER_A,
+      personaId: "agent-a",
+      homeScopeId: "personal-scope:user-a",
+      initialPerspective: {
+        focusScopeId: "personal-scope:user-a",
+        viaScopeIds: [],
+      },
+      additionalContextScopeIds: ["workspace-1", "project-1"],
+    });
+    expect(projectAgentThreadSummary(thread).executionBinding).toEqual(
+      thread.executionBinding,
     );
   });
 
@@ -269,9 +367,23 @@ describe("AgentThreadRepository", () => {
     );
   });
 
-  it("rebinds a thread's workspace and can unbind it back to the personal project", () => {
+  it("rejects workspace rebinding for immutable execution-bound threads", () => {
     const repo = repository();
     const thread = repo.create(USER_A, { workspaceId: "workspace-1" });
+
+    expect(() =>
+      repo.rebindWorkspace(
+        USER_A,
+        thread.id,
+        "workspace-2",
+        thread.revision,
+      ),
+    ).toThrow("Bound agent thread home scope cannot be changed");
+  });
+
+  it("keeps legacy unbound workspace rebinding available before binding migration", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
 
     const rebound = repo.rebindWorkspace(
       USER_A,
@@ -280,18 +392,44 @@ describe("AgentThreadRepository", () => {
       thread.revision,
     );
     expect(rebound.workspaceId).toBe("workspace-2");
-    expect(rebound.revision).toBe(thread.revision + 1);
+    expect(rebound.executionBinding).toBeUndefined();
+  });
 
-    const unbound = repo.rebindWorkspace(
+  it("owner-only migrates a legacy thread to one immutable execution binding", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
+    const binding = {
+      principalId: USER_A,
+      personaId: thread.personaId,
+      homeScopeId: "personal-scope:user-a",
+      initialPerspective: {
+        focusScopeId: "personal-scope:user-a",
+        viaScopeIds: [],
+      },
+      additionalContextScopeIds: [],
+    };
+
+    expect(() =>
+      repo.bindExecution(USER_B, thread.id, {
+        ...binding,
+        principalId: USER_B,
+      }),
+    ).toThrow(AgentThreadNotFoundError);
+
+    const migrated = repo.bindExecution(
       USER_A,
       thread.id,
-      undefined,
-      rebound.revision,
+      binding,
+      thread.revision,
     );
-    expect(unbound.workspaceId).toBeUndefined();
-    expect(projectAgentThreadSummary(unbound)).not.toHaveProperty(
-      "workspaceId",
-    );
+    expect(migrated.executionBinding).toEqual(binding);
+    expect(migrated.revision).toBe(thread.revision + 1);
+    expect(() =>
+      repo.bindExecution(USER_A, thread.id, {
+        ...binding,
+        homeScopeId: "workspace-2",
+      }),
+    ).toThrow("execution binding is immutable");
   });
 
   it("rejects stale optimistic writes", () => {
@@ -369,6 +507,7 @@ describe("AgentThreadRepository", () => {
 
     expect(fork.forkedFrom).toBe(source.id);
     expect(fork.personaId).toBe(source.personaId);
+    expect(fork.executionBinding).toEqual(source.executionBinding);
     expect(fork.eve).toEqual({
       session: { streamIndex: 0 },
       events: [],
@@ -391,6 +530,29 @@ describe("AgentThreadRepository", () => {
         },
       ],
     });
+  });
+
+  it("forks from the source thread's immutable execution binding", () => {
+    const repo = repository();
+    const source = repo.create(USER_A, {
+      personaId: "agent-a",
+      executionBinding: {
+        principalId: USER_A,
+        personaId: "agent-a",
+        homeScopeId: "personal-scope:user-a",
+        initialPerspective: {
+          focusScopeId: "workspace-1",
+          viaScopeIds: ["project-1"],
+        },
+        additionalContextScopeIds: ["project-1"],
+      },
+    });
+
+    const fork = repo.fork(USER_A, { sourceThreadId: source.id });
+
+    expect(fork.executionBinding).toEqual(source.executionBinding);
+    expect(fork.executionBinding?.principalId).toBe(USER_A);
+    expect(fork.executionBinding?.personaId).toBe(source.personaId);
   });
 
   it("does not re-ingest a persisted fork packet when forking a fork", () => {

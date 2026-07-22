@@ -10,7 +10,10 @@ const MAX_PREVIEW_BYTES = 80_000
 export interface ArtifactAccessDependencies {
   readonly fetcher: typeof fetch
   readonly getSession: () => Promise<SigilAuthSession | null>
-  readonly ownsThread: (userId: string, threadId: string) => boolean
+  readonly ownedThreadHomeScope: (
+    userId: string,
+    threadId: string,
+  ) => string | undefined
   readonly readEnvironment: () => { apiKey?: string; gonkMcpUrl: string }
 }
 
@@ -103,7 +106,11 @@ async function authorizedArtifactRequest(
     value: SigilAuthSession | null,
   ) => asserts value is SigilAuthSession = requireSession
   assertSession(candidate)
-  assertAuthorizedScope(scope, candidate.user.id, dependencies.ownsThread)
+  assertAuthorizedScope(
+    scope,
+    candidate.user.id,
+    dependencies.ownedThreadHomeScope,
+  )
   const { apiKey, gonkMcpUrl } = dependencies.readEnvironment()
   if (!apiKey)
     throw new Error("GONK_MCP_KEY is not configured for artifact access.")
@@ -122,8 +129,8 @@ async function artifactAccessDependencies(): Promise<ArtifactAccessDependencies>
   return {
     fetcher: fetch,
     getSession,
-    ownsThread: (userId, threadId) =>
-      Boolean(agentThreadRepository.get(userId, threadId)),
+    ownedThreadHomeScope: (userId, threadId) =>
+      agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
     readEnvironment: () => readGonkClientEnvironment(process.env),
   }
 }

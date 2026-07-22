@@ -21,6 +21,8 @@ function session(userId: string): SigilAuthSession {
 describe("blackboard server boundary", () => {
   const ownsThread = (userId: string, threadId: string) =>
     userId === "user-1" && threadId === "thread-1"
+  const ownedThreadHomeScope = (userId: string, threadId: string) =>
+    ownsThread(userId, threadId) ? "personal-scope:user-1" : undefined
 
   it("rejects anonymous access", () => {
     expect(() => requireBlackboardAccess(null, "thread-1", ownsThread)).toThrow(
@@ -97,16 +99,28 @@ describe("blackboard server boundary", () => {
       writeScopedBlackboard(
         session("user-1"),
         { scope, content: "Workspace scratch", expectedRevision: "" },
-        ownsThread,
+        ownedThreadHomeScope,
         blackboards,
         registries,
       ),
     ).resolves.toMatchObject({ content: "Workspace scratch" })
     await expect(
-      readScopedBlackboard(session("user-1"), scope, ownsThread, blackboards, registries),
+      readScopedBlackboard(
+        session("user-1"),
+        scope,
+        ownedThreadHomeScope,
+        blackboards,
+        registries,
+      ),
     ).resolves.toMatchObject({ content: "Workspace scratch" })
     await expect(
-      readScopedBlackboard(session("user-2"), scope, ownsThread, blackboards, registries),
+      readScopedBlackboard(
+        session("user-2"),
+        scope,
+        ownedThreadHomeScope,
+        blackboards,
+        registries,
+      ),
     ).rejects.toThrow()
     // Reading the same id as a session tier hits a different store key —
     // the workspace note does not leak into a same-named session blackboard.
@@ -156,7 +170,7 @@ describe("blackboard server boundary", () => {
         content: "Workspace foo secret",
         expectedRevision: "",
       },
-      () => false,
+      () => undefined,
       blackboards,
       registries,
     )
@@ -168,7 +182,10 @@ describe("blackboard server boundary", () => {
       readScopedBlackboard(
         session("user-1"),
         { tier: "session", id: "workspace:foo" },
-        ownsColonShapedThread,
+        (userId, threadId) =>
+          ownsColonShapedThread(userId, threadId)
+            ? "personal-scope:user-1"
+            : undefined,
         blackboards,
         registries,
       ),

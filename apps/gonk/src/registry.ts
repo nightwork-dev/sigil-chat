@@ -16,12 +16,14 @@ import {
   workItemsRepository,
   type WorkItemsRepository,
 } from "@workspace/work-items-store";
+import { specsRepository } from "@workspace/work-items-store/specs";
 
 import { sigilApprovalProvider } from "./registry/approval.js";
 import { registerBlackboardTools } from "./registry/blackboard.js";
 import { registerGraphTools } from "./registry/graph.js";
 import { registerImageTools } from "./registry/image.js";
 import { registerFileTools } from "./registry/files.js";
+import type { ResourceUniverseRegistries } from "./registry/files.js";
 import { registerEvidenceTools } from "./registry/evidence.js";
 import { registerDistillTools } from "./registry/distill.js";
 import { registerDemoSeedTools } from "./registry/demo-seed.js";
@@ -30,6 +32,8 @@ import {
   registerReviewTools,
 } from "./registry/review.js";
 import { registerStoryTools } from "./registry/story.js";
+import { registerFeatureRequestTools } from "./registry/feature-request.js";
+import { registerSpecTools } from "./registry/spec.js";
 import {
   registerContainerTools,
   type ContainerRegistries,
@@ -51,6 +55,7 @@ export function createSigilRegistry(
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
   skills = createSkillRegistry(),
   containers: ContainerRegistries = getProjectWorkspaceRegistries(),
+  sessions?: ResourceUniverseRegistries["sessions"],
 ): ToolRegistry {
   const registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
@@ -60,6 +65,8 @@ export function createSigilRegistry(
   registerGraphTools(registry, repository);
   registerReviewTools(registry, reviews);
   registerStoryTools(registry, workItems);
+  registerFeatureRequestTools(registry, workItems);
+  registerSpecTools(registry, specsRepository);
   registerContainerTools(registry, containers);
   registerAnnotationTools(registry);
   registerSkillTools(registry, skills);
@@ -72,7 +79,10 @@ export function createSigilRegistry(
       ? null
       : undefined,
   );
-  registerFileTools(registry, artifacts);
+  registerFileTools(registry, artifacts, {
+    ...containers,
+    ...(sessions ? { sessions } : {}),
+  });
   registerEvidenceTools(registry, artifacts);
   registerDistillTools(registry, artifacts);
   registerDemoSeedTools(registry, artifacts);

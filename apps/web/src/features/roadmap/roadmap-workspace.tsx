@@ -103,7 +103,13 @@ function storyTarget(story: StoryData): AttentionSelection {
   }
 }
 
-export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
+export function RoadmapWorkspace({
+  viewer,
+  initialSelectedId,
+}: {
+  viewer: CurrentSessionUser
+  initialSelectedId?: string
+}) {
   const [addressedOnly, setAddressedOnly] = useState(false)
   const allStoriesQuery = useStories()
   const addressedStoriesQuery = useStories(undefined, {
@@ -113,9 +119,13 @@ export function RoadmapWorkspace({ viewer }: { viewer: CurrentSessionUser }) {
   const stories = addressedOnly ? addressedStoriesQuery : allStoriesQuery
   const reviews = useReviews()
   const isMobile = useIsMobile()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [pane, setPane] = useState<AsidePane>("queue")
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSelectedId ?? null,
+  )
+  const [pane, setPane] = useState<AsidePane>(
+    initialSelectedId ? "detail" : "queue",
+  )
+  const [sheetOpen, setSheetOpen] = useState(Boolean(initialSelectedId))
 
   const boardStories = stories.data ?? []
   const allStories = allStoriesQuery.data ?? []

@@ -9,8 +9,16 @@ import { requireResourceScope } from "../src/registry/files.js";
 // where a model-guessed `session:<doc-key>` clobbered the correct
 // `project:evidence-room` corpus, so evidence-ask/read-file searched the wrong
 // scope and always came back empty.
-function hostCtx(resourceScope?: string): ToolContext {
-  return { host: resourceScope ? { resourceScope } : {} } as unknown as ToolContext;
+function hostCtx(
+  resourceScope?: string,
+  agentReach?: "principal" | "scope",
+): ToolContext {
+  return {
+    host: {
+      ...(resourceScope ? { resourceScope } : {}),
+      ...(agentReach ? { agentReach } : {}),
+    },
+  } as unknown as ToolContext;
 }
 
 describe("requireResourceScope", () => {
@@ -35,6 +43,24 @@ describe("requireResourceScope", () => {
       tier: "workspace",
       id: "feature-1",
     });
+  });
+
+  it("lets a personal agent select another exact scope for live re-authorization", () => {
+    expect(
+      requireResourceScope(
+        { tier: "workspace", id: "cross-project" },
+        hostCtx("project:personal", "principal"),
+      ),
+    ).toEqual({ tier: "workspace", id: "cross-project" });
+  });
+
+  it("keeps a scope-homed agent inside the host scope", () => {
+    expect(
+      requireResourceScope(
+        { tier: "workspace", id: "cross-project" },
+        hostCtx("workspace:native", "scope"),
+      ),
+    ).toEqual({ tier: "workspace", id: "native" });
   });
 
   it("throws when neither host nor request supplies a scope", () => {

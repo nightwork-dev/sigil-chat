@@ -24,6 +24,11 @@ import { FilesystemManagedSkillRegistry } from "@gonk/skills"
 import type { UserContent } from "ai"
 import type { EveMessageContext, EveMessageResult } from "eve/channels/eve"
 import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
+import type {
+  ScopedMemoryAudienceLabel,
+  ScopedMemoryRecallDelivery,
+  ScopedMemorySourceLabel,
+} from "./memory"
 
 type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
@@ -37,6 +42,10 @@ export interface SigilContextOptions {
   model?: string
   requestedContributorIds?: readonly string[]
   pinnedResourceKeys?: readonly string[]
+  authorizeMemorySource?: (input: {
+    principalId: string
+    source: ScopedMemorySourceLabel
+  }) => boolean | Promise<boolean>
   /**
    * Reads the session's shared blackboard (S3.2). When provided, the current
    * session's blackboard content is injected into every turn's context so a
@@ -61,7 +70,12 @@ export interface SigilContextOptions {
     personaId: string
     principalId: string
     query: string
-  }) => string | undefined
+    activeResourceScope?: string
+    targetAudience: ScopedMemoryAudienceLabel
+  }) =>
+    | ScopedMemoryRecallDelivery
+    | undefined
+    | Promise<ScopedMemoryRecallDelivery | undefined>
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -99,6 +113,11 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       const principalId = requireNonBlankCallerPrincipal(caller.principalId)
       const personaId = requireCallerPersona(caller)
       const eveSessionId = nonBlank(ctx.eve.sessionId) ?? `new:${principalId}`
+      const activeResourceScope = readScopeAttribute(ctx.eve.caller)
+      const targetAudience = recallTargetAudience({
+        principalId,
+        sessionHomeScopeId: readExecutionHomeScope(ctx.eve.caller),
+      })
       if (options.identityFloor) {
         const identity = options
           .identityFloor({
@@ -109,29 +128,36 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
           .trim()
         if (identity.length > 0) blocks.push(identity)
       }
-      if (options.recallLatestTurn) {
-        const recalled = options
-          .recallLatestTurn({
-            eveSessionId,
-            personaId,
-            principalId,
-            query: messageToQuery(message),
-          })
-          ?.trim()
+      if (options.recallLatestTurn && targetAudience) {
+        const recalled = await options.recallLatestTurn({
+          eveSessionId,
+          personaId,
+          principalId,
+          query: messageToQuery(message),
+          activeResourceScope,
+          targetAudience,
+        })
+        const authorizedRecall = await authorizeRecallForTarget({
+          authorizeMemorySource: options.authorizeMemorySource,
+          principalId,
+          recalled,
+          targetAudience,
+        })
         if (recalled) {
           const candidate = [
             ...blocks,
-            recalled,
+            authorizedRecall,
             ...(compiledContent ? [compiledContent] : []),
           ].join("\n\n")
           if (
-            await contextFitsBudget(
+            authorizedRecall &&
+            (await contextFitsBudget(
               candidate,
               options.maxTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
               options.model,
-            )
+            ))
           ) {
-            blocks.push(recalled)
+            blocks.push(authorizedRecall)
           }
         }
       }
@@ -228,7 +254,7 @@ function sessionIdFromScope(scope: string | undefined): string | null {
   const trimmed = scope.trim()
   if (trimmed.length === 0) return null
   const separator = trimmed.indexOf(":")
-  if (separator < 0) return trimmed // legacy bare id = session scope
+  if (separator < 0) return null
   const id = trimmed.slice(separator + 1).trim()
   return trimmed.slice(0, separator) === "session" && id.length > 0 ? id : null
 }
@@ -238,6 +264,94 @@ function readScopeAttribute(
 ): string | undefined {
   const value = caller?.attributes.sigilResourceScope
   return typeof value === "string" ? value : undefined
+}
+
+function recallTargetAudience(input: {
+  principalId: string
+  sessionHomeScopeId: string | undefined
+}): ScopedMemoryAudienceLabel | undefined {
+  const sessionHomeScopeId = nonBlank(input.sessionHomeScopeId)
+  if (sessionHomeScopeId === undefined) return undefined
+  if (sessionHomeScopeId.startsWith("personal-scope:")) {
+    const personalPrincipalId = sessionHomeScopeId
+      .slice("personal-scope:".length)
+      .trim()
+    return personalPrincipalId === input.principalId
+      ? { kind: "personal", principalId: input.principalId }
+      : undefined
+  }
+  return { kind: "scope", scopeId: sessionHomeScopeId }
+}
+
+async function authorizeRecallForTarget(input: {
+  authorizeMemorySource?: SigilContextOptions["authorizeMemorySource"]
+  principalId: string
+  recalled: ScopedMemoryRecallDelivery | undefined
+  targetAudience: ScopedMemoryAudienceLabel
+}): Promise<string | undefined> {
+  if (input.recalled === undefined) return undefined
+  if (typeof input.recalled !== "object" || input.recalled === null) {
+    return undefined
+  }
+  const content = input.recalled.content.trim()
+  if (!content || input.recalled.records.length === 0) return undefined
+
+  for (const record of input.recalled.records) {
+    if (record.labels === undefined) return undefined
+    if (
+      !audienceAllowsRecall({
+        recordAudience: record.labels.audience,
+        targetAudience: input.targetAudience,
+      })
+    ) {
+      return undefined
+    }
+    for (const source of record.labels.sources) {
+      if (
+        !input.authorizeMemorySource ||
+        !(await input.authorizeMemorySource({
+          principalId: input.principalId,
+          source,
+        }))
+      ) {
+        return undefined
+      }
+    }
+  }
+
+  return content
+}
+
+function audienceAllowsRecall(input: {
+  recordAudience: ScopedMemoryAudienceLabel
+  targetAudience: ScopedMemoryAudienceLabel
+}) {
+  if (
+    input.recordAudience.kind === "personal" ||
+    input.targetAudience.kind === "personal"
+  ) {
+    return (
+      input.recordAudience.kind === "personal" &&
+      input.targetAudience.kind === "personal" &&
+      input.recordAudience.principalId === input.targetAudience.principalId
+    )
+  }
+  return input.recordAudience.scopeId === input.targetAudience.scopeId
+}
+
+function readExecutionHomeScope(
+  caller: EveMessageContext["eve"]["caller"],
+): string | undefined {
+  const raw = caller?.attributes.sigilExecutionBinding
+  if (typeof raw !== "string" || !raw.trim()) return undefined
+  try {
+    const binding = JSON.parse(raw) as Record<string, unknown>
+    return typeof binding.homeScopeId === "string"
+      ? nonBlank(binding.homeScopeId)
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export async function compileSigilContextForMessage(input: {

@@ -26,11 +26,6 @@ import { toast } from "sonner"
 import type { MemoryRecord } from "@gonk/memory"
 
 import { cn } from "@workspace/ui/lib/utils"
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   Card,
@@ -50,7 +45,6 @@ import { Input } from "@workspace/ui/components/input"
 import { Textarea } from "@workspace/ui/components/textarea"
 
 import {
-  agentPortraitUrl,
   useAgentMemoryActions,
   useAgentProfile,
   useAgentPublicProfile,
@@ -58,6 +52,7 @@ import {
   useUploadAgentPortrait,
   type AgentProfile as AgentProfileData,
 } from "@/lib/agent-profile"
+import { AgentPortrait } from "@/components/agents/agent-portrait"
 import {
   useAgentRuntimeCatalog,
   type AgentCatalog,
@@ -113,20 +108,20 @@ function Header({ className }: { className?: string }) {
   const { persona, hasPortrait, lineage } = useProfile()
   const createThread = useCreateAgentThread()
   const navigate = useNavigate()
-  const initial = (persona.name ?? persona.id).slice(0, 1).toUpperCase()
-  const portraitUrl = agentPortraitUrl(persona.id, hasPortrait)
+  const personaName = persona.name ?? persona.id
 
   return (
     <header
       data-slot="agent-profile-header"
       className={cn("flex items-start gap-5", className)}
     >
-      <Avatar className="size-20">
-        {portraitUrl ? <AvatarImage src={portraitUrl} alt="" /> : null}
-        <AvatarFallback className="text-2xl font-medium text-primary">
-          {initial}
-        </AvatarFallback>
-      </Avatar>
+      <AgentPortrait
+        personaId={persona.id}
+        name={personaName}
+        hasPortrait={hasPortrait}
+        className="size-20"
+        fallbackClassName="text-2xl font-medium text-primary"
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-1">
         <h1 className="truncate text-xl font-semibold">
           {persona.name ?? persona.id}
@@ -913,18 +908,16 @@ function PublicAgentProfileView({ personaId }: { personaId: string }) {
     )
   }
 
-  const portraitUrl = agentPortraitUrl(data.id, data.hasPortrait)
-  const initial = data.name.slice(0, 1).toUpperCase()
-
   return (
     <div className="mx-auto max-w-xl p-6">
       <div className="flex items-start gap-4">
-        <Avatar className="size-16">
-          {portraitUrl ? <AvatarImage src={portraitUrl} alt="" /> : null}
-          <AvatarFallback className="text-xl font-medium text-primary">
-            {initial}
-          </AvatarFallback>
-        </Avatar>
+        <AgentPortrait
+          personaId={data.id}
+          name={data.name}
+          hasPortrait={data.hasPortrait}
+          className="size-16"
+          fallbackClassName="text-xl font-medium text-primary"
+        />
         <div className="min-w-0">
           <h1 className="truncate text-lg font-medium">{data.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">

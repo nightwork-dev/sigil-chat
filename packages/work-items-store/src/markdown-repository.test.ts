@@ -196,6 +196,30 @@ describe("MarkdownWorkItemsRepository", () => {
     ]);
   });
 
+  it("persists a saved board view without rewriting legacy stories", async () => {
+    const { dir, repo } = await makeStore();
+    const initial = await repo.get();
+    const before = await readFile(join(dir, "S0.3.md"), "utf8");
+    const view = {
+      id: "project-a-roadmap",
+      ownerScopeId: "project-a",
+      name: "Project A roadmap",
+      visibility: "private" as const,
+      roots: ["project-a"],
+      traversal: "self-and-rollups" as const,
+      filters: { kind: ["story" as const] },
+      groupBy: "status" as const,
+      revision: 1,
+    };
+
+    await repo.upsertBoardView(view, initial.revision);
+
+    const reopened = new MarkdownWorkItemsRepository({ dir });
+    expect(await reopened.listBoardViews()).toEqual([view]);
+    expect(await readFile(join(dir, "S0.3.md"), "utf8")).toBe(before);
+    expect(existsSync(join(dir, "_board-views.md"))).toBe(true);
+  });
+
   it("rejects a stale mutation on the optimistic revision counter", async () => {
     const { repo } = await makeStore();
     const initial = await repo.get();

@@ -1,12 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import {
-  mkdir,
-  readFile,
-  readdir,
-  rename,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { MarkdownStore } from "@mirk/store-markdown";
@@ -17,20 +11,28 @@ import {
   assertRevision,
   assignReview,
   decideReview,
+  filterBoardViews,
+  isBoardView,
   filterStories,
   isReviewItem,
+  isWorkSponsorshipDecision,
+  proposeFeatureRequest,
+  recordSponsorshipDecision,
   isStory,
   sortStories,
   transitionStory,
+  upsertBoardView,
   upsertStory,
 } from "./operations.js";
 import { createWorkItemsDocument } from "./sample.js";
 import type { WorkItemsRepository } from "./repository.js";
-import {
-  assertSafeStoryId,
-  resolveRoadmapDir,
-} from "./markdown-repository.js";
+import { assertSafeStoryId, resolveRoadmapDir } from "./markdown-repository.js";
 import type {
+  BoardView,
+  BoardViewFilter,
+  FeatureRequestProposalContext,
+  FeatureRequestProposalInput,
+  FeatureRequestProposalResult,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -40,11 +42,15 @@ import type {
   StoryStatus,
   WorkItemsDocument,
   WorkItemsMutationResult,
+  WorkSponsorshipDecision,
+  WorkSponsorshipDecisionFilter,
 } from "./types.js";
 
 const STORIES_COLLECTION = "stories";
 const INDEX_FILE = "index.md";
 const REVIEWS_FILE = "_reviews.md";
+const BOARD_VIEWS_FILE = "_board-views.md";
+const SPONSORSHIP_DECISIONS_FILE = "_sponsorship-decisions.md";
 const GIT_IDENTITY = [
   "-c",
   "user.name=Sigil Roadmap",
@@ -117,6 +123,13 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]> {
+    await this.ensureReady();
+    return filterBoardViews((await this.readDocument()).boardViews, filter).map(
+      (view) => structuredClone(view),
+    );
+  }
+
   async upsertStory(
     story: Story,
     expectedRevision?: number,
@@ -127,6 +140,18 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         storyIds: [story.id],
       }),
       () => `story ${story.id}: upsert`,
+    );
+  }
+
+  async upsertBoardView(
+    view: BoardView,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) => ({
+        ...upsertBoardView(document, view, expectedRevision),
+      }),
+      () => `board view ${view.id}: upsert`,
     );
   }
 
@@ -201,6 +226,49 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async proposeFeatureRequest(
+    input: FeatureRequestProposalInput,
+    context: FeatureRequestProposalContext,
+    expectedRevision?: number,
+  ): Promise<FeatureRequestProposalResult> {
+    return this.runExclusive(async () => {
+      await this.ensureReady();
+      const result = proposeFeatureRequest(
+        await this.readDocument(),
+        input,
+        context,
+        expectedRevision,
+      );
+      if (result.changedIds.length > 0) {
+        await this.persistDocument(result.document, result.changedIds);
+        if (result.outcome === "created")
+          this.commit(`feature request ${result.workItem.id}: propose`);
+      }
+      return structuredClone(result);
+    });
+  }
+
+  async recordSponsorshipDecision(
+    decision: WorkSponsorshipDecision,
+    expectedRevision?: number,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) =>
+        recordSponsorshipDecision(document, decision, expectedRevision),
+      () => `sponsorship ${decision.id}: ${decision.decision}`,
+    );
+  }
+
+  async listSponsorshipDecisions(
+    filter?: WorkSponsorshipDecisionFilter,
+  ): Promise<WorkSponsorshipDecision[]> {
+    await this.ensureReady();
+    return filterSponsorshipDecisions(
+      (await this.readDocument()).sponsorshipDecisions,
+      filter,
+    );
+  }
+
   private async mutate(
     operation: (document: WorkItemsDocument) => MutationResult,
     message: (result: MutationResult) => string,
@@ -212,7 +280,11 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         await this.persistDocument(result.document, result.storyIds);
         this.commit(message(result));
       }
-      const { commitMessage: _commitMessage, storyIds: _storyIds, ...clean } = result;
+      const {
+        commitMessage: _commitMessage,
+        storyIds: _storyIds,
+        ...clean
+      } = result;
       void _commitMessage;
       void _storyIds;
       return structuredClone(clean);
@@ -231,7 +303,10 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
   }
 
   private async initialize(): Promise<void> {
-    const dir = resolveRoadmapDir(process.env.SIGIL_ROADMAP_DIR, this.dirOption);
+    const dir = resolveRoadmapDir(
+      process.env.SIGIL_ROADMAP_DIR,
+      this.dirOption,
+    );
     this.resolvedDir = dir;
     await mkdir(dir, { recursive: true });
 
@@ -245,6 +320,12 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
           directory: ".",
           frontmatterFields: [
             "worktree",
+            "kind",
+            "homeScopeId",
+            "scopeBindings",
+            "parentWorkItemId",
+            "provenance",
+            "revision",
             "epicId",
             "epicTitle",
             "title",
@@ -254,6 +335,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
             "deps",
             "extraction",
             "assignee",
+            "assigneePrincipalId",
             "reviewDecision",
             "authoredBy",
             "createdAt",
@@ -303,6 +385,8 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       stories: sortStories(stories),
       comments,
       reviews: await this.readReviews(),
+      boardViews: await this.readBoardViews(),
+      sponsorshipDecisions: await this.readSponsorshipDecisions(),
       history: [],
     };
   }
@@ -320,11 +404,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
 
     const records: Array<{ story: Story; comments: StoryComment[] }> = [];
     for (const name of entries) {
-      if (
-        !name.endsWith(".md") ||
-        name === INDEX_FILE ||
-        name.startsWith("_")
-      )
+      if (!name.endsWith(".md") || name === INDEX_FILE || name.startsWith("_"))
         continue;
 
       const id = name.slice(0, -3);
@@ -382,6 +462,36 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     });
   }
 
+  private async readBoardViews(): Promise<BoardView[]> {
+    const path = join(this.directory, BOARD_VIEWS_FILE);
+    if (!existsSync(path)) return [];
+    const { data } = parseFrontmatter(await readFile(path, "utf8"));
+    const boardViews = Array.isArray(data.boardViews) ? data.boardViews : [];
+    return boardViews.map((view, index) => {
+      if (!isBoardView(view))
+        throw new Error(
+          `Roadmap store is corrupt: invalid board view at ${BOARD_VIEWS_FILE}[${index}].`,
+        );
+      return view;
+    });
+  }
+
+  private async readSponsorshipDecisions(): Promise<WorkSponsorshipDecision[]> {
+    const path = join(this.directory, SPONSORSHIP_DECISIONS_FILE);
+    if (!existsSync(path)) return [];
+    const { data } = parseFrontmatter(await readFile(path, "utf8"));
+    const decisions = Array.isArray(data.sponsorshipDecisions)
+      ? data.sponsorshipDecisions
+      : [];
+    return decisions.map((decision, index) => {
+      if (!isWorkSponsorshipDecision(decision))
+        throw new Error(
+          `Roadmap store is corrupt: invalid sponsorship decision at ${SPONSORSHIP_DECISIONS_FILE}[${index}].`,
+        );
+      return decision;
+    });
+  }
+
   private async readRevision(): Promise<number> {
     const path = join(this.directory, INDEX_FILE);
     if (!existsSync(path)) return 0;
@@ -410,20 +520,17 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         ? document.stories
         : document.stories.filter((story) => storyIds.includes(story.id));
 
-    await this.withReviewsHidden(async () => {
+    await this.withSidecarsHidden(async () => {
       for (const story of stories) {
         assertSafeStoryId(story.id);
         const path = join(this.directory, `${story.id}.md`);
         const original = existsSync(path)
           ? await readFile(path, "utf8")
           : undefined;
-        store.put<StoryRecord>(
-          STORIES_COLLECTION,
-          {
-            ...recordForStory(story),
-            comments: commentsByStory.get(story.id) ?? [],
-          } as StoryRecord,
-        );
+        store.put<StoryRecord>(STORIES_COLLECTION, {
+          ...recordForStory(story),
+          comments: commentsByStory.get(story.id) ?? [],
+        } as StoryRecord);
         if (original !== undefined)
           await restoreFrontmatterOrder(path, original);
       }
@@ -435,25 +542,39 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       "utf8",
     );
     await writeFile(
+      join(this.directory, BOARD_VIEWS_FILE),
+      serializeBoardViews(document.boardViews),
+      "utf8",
+    );
+    await writeFile(
+      join(this.directory, SPONSORSHIP_DECISIONS_FILE),
+      serializeSponsorshipDecisions(document.sponsorshipDecisions),
+      "utf8",
+    );
+    await writeFile(
       join(this.directory, INDEX_FILE),
       serializeIndex(document, this.now()),
       "utf8",
     );
   }
 
-  private async withReviewsHidden<T>(operation: () => Promise<T>): Promise<T> {
-    const source = join(this.directory, REVIEWS_FILE);
-    if (!existsSync(source)) return operation();
-
-    const hidden = join(
-      this.directory,
-      `.${REVIEWS_FILE}.${process.pid}.${Date.now()}.tmp`,
+  private async withSidecarsHidden<T>(operation: () => Promise<T>): Promise<T> {
+    const sources = [REVIEWS_FILE, BOARD_VIEWS_FILE, SPONSORSHIP_DECISIONS_FILE]
+      .map((file) => join(this.directory, file))
+      .filter(existsSync);
+    if (sources.length === 0) return operation();
+    const hidden = sources.map((_, index) =>
+      join(this.directory, `.${index}.${process.pid}.${Date.now()}.tmp`),
     );
-    await rename(source, hidden);
+    await Promise.all(
+      sources.map((source, index) => rename(source, hidden[index])),
+    );
     try {
       return await operation();
     } finally {
-      await rename(hidden, source);
+      await Promise.all(
+        hidden.map((path, index) => rename(path, sources[index])),
+      );
     }
   }
 
@@ -495,6 +616,13 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
 function recordForStory(story: Story): Record<string, unknown> {
   const record: Record<string, unknown> = { id: story.id };
   if (story.worktree !== undefined) record.worktree = story.worktree;
+  record.kind = story.kind;
+  record.homeScopeId = story.homeScopeId;
+  record.scopeBindings = story.scopeBindings;
+  if (story.parentWorkItemId !== undefined)
+    record.parentWorkItemId = story.parentWorkItemId;
+  record.provenance = story.provenance;
+  record.revision = story.revision;
   record.epicId = story.epicId;
   record.epicTitle = story.epicTitle;
   record.title = story.title;
@@ -503,6 +631,8 @@ function recordForStory(story: Story): Record<string, unknown> {
   record.reviewGate = story.reviewGate;
   record.deps = story.deps;
   if (story.assignee !== undefined) record.assignee = story.assignee;
+  if (story.assigneePrincipalId !== undefined)
+    record.assigneePrincipalId = story.assigneePrincipalId;
   if (story.reviewDecision !== undefined)
     record.reviewDecision = story.reviewDecision;
   if (story.extraction !== undefined) record.extraction = story.extraction;
@@ -532,7 +662,9 @@ function parseCriteria(markdown: string): string[] {
 }
 
 function stringifyCriteria(value: unknown): string {
-  return (value as string[]).map((criterion) => `- [ ] ${criterion}`).join("\n");
+  return (value as string[])
+    .map((criterion) => `- [ ] ${criterion}`)
+    .join("\n");
 }
 
 function parseCommentsMarkdown(markdown: string): unknown {
@@ -546,7 +678,9 @@ function parseCommentsMarkdown(markdown: string): unknown {
       typeof entry !== "object" ||
       typeof (entry as { id?: unknown }).id !== "string"
     ) {
-      throw new Error(`Roadmap store contains an invalid comment at index ${index}.`);
+      throw new Error(
+        `Roadmap store contains an invalid comment at index ${index}.`,
+      );
     }
     return entry;
   });
@@ -573,7 +707,49 @@ function serializeReviews(reviews: ReviewItem[]): string {
   return `${serializeFrontmatter({ reviews })}\n# Reviews\n\n${list}\n`;
 }
 
-function serializeIndex(document: WorkItemsDocument, generatedAt: string): string {
+function serializeBoardViews(boardViews: BoardView[]): string {
+  const list =
+    boardViews.length > 0
+      ? boardViews.map((view) => `- ${view.id} · ${view.name}`).join("\n")
+      : "_No saved board views yet._";
+  return `${serializeFrontmatter({ boardViews })}\n# Board views\n\n${list}\n`;
+}
+
+function serializeSponsorshipDecisions(
+  sponsorshipDecisions: WorkSponsorshipDecision[],
+): string {
+  const list =
+    sponsorshipDecisions.length > 0
+      ? sponsorshipDecisions
+          .map(
+            (decision) =>
+              `- ${decision.id} · ${decision.workItemId} · ` +
+              `${decision.sponsorPrincipalId} · ${decision.decision}`,
+          )
+          .join("\n")
+      : "_No sponsorship decisions yet._";
+  return `${serializeFrontmatter({ sponsorshipDecisions })}\n# Sponsorship decisions\n\n${list}\n`;
+}
+
+function filterSponsorshipDecisions(
+  decisions: WorkSponsorshipDecision[],
+  filter?: WorkSponsorshipDecisionFilter,
+): WorkSponsorshipDecision[] {
+  return decisions
+    .filter(
+      (decision) =>
+        (filter?.workItemId === undefined ||
+          decision.workItemId === filter.workItemId) &&
+        (filter?.sponsorPrincipalId === undefined ||
+          decision.sponsorPrincipalId === filter.sponsorPrincipalId),
+    )
+    .map((decision) => structuredClone(decision));
+}
+
+function serializeIndex(
+  document: WorkItemsDocument,
+  generatedAt: string,
+): string {
   const rows = sortStories(document.stories)
     .map((story) => renderIndexLine(story))
     .join("\n");
@@ -589,8 +765,7 @@ function parseFrontmatter(raw: string): {
   body: string;
 } {
   const normalized = raw.replace(/^﻿/, "");
-  if (!normalized.startsWith("---\n"))
-    return { data: {}, body: normalized };
+  if (!normalized.startsWith("---\n")) return { data: {}, body: normalized };
   const end = normalized.indexOf("\n---", 4);
   if (end === -1) return { data: {}, body: normalized };
   const yamlText = normalized.slice(4, end);
@@ -647,7 +822,9 @@ function frontmatterParts(
   return { start: 4, end, yaml: normalized.slice(4, end) };
 }
 
-function frontmatterBlocks(yaml: string): Array<{ key: string; lines: string[] }> {
+function frontmatterBlocks(
+  yaml: string,
+): Array<{ key: string; lines: string[] }> {
   const blocks: Array<{ key: string; lines: string[] }> = [];
   for (const line of yaml.split("\n")) {
     const match = /^([^\s#:][^:]*):(?:\s|$)/.exec(line);

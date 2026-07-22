@@ -19,6 +19,13 @@ Three services, each with a narrow, non-overlapping job:
 | Eve | `apps/agent` | Durable sessions, streaming, interruption, model calls via local Codex | `http://sigil-chat-agent.localhost:1355` |
 | Gonk MCP | `apps/gonk` | Application tool registry, dispatched over authenticated Streamable HTTP MCP | `http://sigil-chat-gonk.localhost:1355/mcp` |
 
+Those are the primary-checkout URLs. In a linked worktree, Portless prefixes
+all three with the same branch-derived namespace—for example,
+`http://feature-auth.sigil-chat.localhost:1355` and
+`http://feature-auth.sigil-chat-agent.localhost:1355`. The apps derive their
+sibling-service URLs from that namespace unless an explicit topology override
+is set, so multiple full stacks can run without colliding.
+
 Eve discovers Gonk's tools through `apps/agent/agent/connections/gonk.ts`; new
 tools go in `apps/gonk/src/registry.ts`, not into Eve directly (see below).
 
@@ -35,7 +42,9 @@ pnpm install
 pnpm dev
 ```
 
-Turbo starts the three Portless services listed above. To run the services on
+Turbo starts the three worktree-aware Portless services listed above. The web
+tab title and procedural favicon use the same namespace so parallel stacks are
+visually distinct. To run the services on
 plain, unproxied ports instead — no Portless daemon, no `.localhost` routing —
 set `PORTLESS=0`:
 
@@ -143,7 +152,7 @@ always-current source of truth for every component that exists.
 
 ## Extending
 
-Four task-oriented guides in [`docs/guides/`](docs/guides/) cover the things
+Five task-oriented guides in [`docs/guides/`](docs/guides/) cover the things
 this README only points at:
 
 - [`adding-a-tool.md`](docs/guides/adding-a-tool.md) — the end-to-end worked
@@ -159,6 +168,9 @@ this README only points at:
   in sync: a tool result becoming a React Query cache update via
   `@zigil/agent-react-query` domain outcomes, and workspace selection state
   reaching the agent through the attention/context tray.
+- [`rebranding-the-app.md`](docs/guides/rebranding-the-app.md) — one public
+  branding configuration for app chrome, browser/share metadata, the PWA
+  manifest, and worktree-specific tab titles and procedural favicons.
 - [`trimming-the-template.md`](docs/guides/trimming-the-template.md) — the
   honest boilerplate map: which routes and workspace packages are core,
   which are pattern-reference demos, which are inherited `sigil-design`

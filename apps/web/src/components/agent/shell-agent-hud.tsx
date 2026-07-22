@@ -35,13 +35,13 @@ export function ShellAgentHud() {
 
   return (
     <AgentHud.Root
-      className="fixed bottom-4 right-4 z-40 max-sm:inset-x-2 max-sm:bottom-2 max-sm:right-auto"
+      className="fixed bottom-4 right-4 z-40 max-sm:inset-x-2 max-sm:bottom-14 max-sm:right-auto"
       dock={dock}
       onDockChange={setAgentHudDock}
       onOpenChange={setOpen}
       open={open}
     >
-      <AgentHud.Trigger />
+      <AgentHud.Trigger className="max-sm:min-h-11" />
       <AgentHud.Panel
         navigationTarget={<Link to="/chat" />}
         chatProps={{

@@ -7,6 +7,10 @@ import {
 } from "@mirk/artifact"
 import { FileObjectStore } from "@mirk/artifact/fs"
 import type { AuthenticatedPrincipal } from "@gonk/auth"
+import type {
+  ScopeAuthorizationAction,
+  ScopeAuthorizationPolicy,
+} from "@workspace/agent-contracts/scope-authorization"
 
 import {
   formatScopeHeader,
@@ -146,8 +150,33 @@ export function canAccessScope(
   return true
 }
 
+/** Bridge application policy to a real artifact boundary. */
+export function createScopeAccessCheck(
+  policy: ScopeAuthorizationPolicy,
+  action: ScopeAuthorizationAction = "read",
+): CanAccessScope {
+  return (principal, scope) => {
+    const principalId = principalIdentifier(principal)
+    return (
+      principalId !== undefined &&
+      policy.authorize({
+        action,
+        principalId,
+        resourceScope: formatScopeHeader(scope)!,
+      })
+    )
+  }
+}
+
 export interface SessionArtifactStoreOptions {
   readonly canAccessScope?: CanAccessScope
+}
+
+export class ArtifactScopeAccessDeniedError extends Error {
+  constructor(readonly scope: ResourceScope) {
+    super(`Access denied for ${scope.tier} scope: ${scope.id}`)
+    this.name = "ArtifactScopeAccessDeniedError"
+  }
 }
 
 /**
@@ -310,7 +339,7 @@ export class SessionArtifactStore {
     // This is the authz seam. Do not replace it with tier/id heuristics: a
     // project/persona scope's membership policy belongs to the auth layer.
     if (!(await this.canAccessScope(principal, scope))) {
-      throw new Error(`Access denied for ${scope.tier} scope: ${scope.id}`)
+      throw new ArtifactScopeAccessDeniedError(scope)
     }
   }
 
@@ -415,4 +444,10 @@ function extensionFromFilename(filename: string | undefined): string | undefined
   if (!filename) return undefined
   const match = /\.([a-zA-Z0-9]+)$/.exec(filename)
   return match?.[1]?.toLowerCase()
+}
+
+function principalIdentifier(principal: ScopePrincipal): string | undefined {
+  if (typeof principal !== "object" || principal === null) return undefined
+  const id = (principal as { id?: unknown }).id
+  return typeof id === "string" && id.length > 0 ? id : undefined
 }

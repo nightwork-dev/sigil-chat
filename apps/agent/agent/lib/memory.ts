@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import {
   StoreBackedMemoryRecordStore,
+  type MemoryRecord,
   type MemoryRecordDraft,
 } from "@gonk/memory"
 import {
@@ -27,6 +28,45 @@ const personaRegistry = new PersonaRegistry(
   { ...scopeEnv, cwd: personaDir },
   "eve",
 )
+const memoryRecordStore = new StoreBackedMemoryRecordStore({ scopeEnv })
+
+const SOURCE_SCOPE_EVIDENCE_PREFIX = "sigil-chat:source-scope:"
+const SOURCE_RESOURCE_EVIDENCE_PREFIX = "sigil-chat:source-resource:"
+const AUDIENCE_PERSONAL_EVIDENCE_PREFIX = "sigil-chat:audience-personal:"
+const AUDIENCE_SCOPE_EVIDENCE_PREFIX = "sigil-chat:audience-scope:"
+
+export interface ScopedMemorySourceLabel {
+  readonly scopeId: string
+  readonly resourceKey?: string
+}
+
+export type ScopedMemoryAudienceLabel =
+  | {
+      readonly kind: "personal"
+      readonly principalId: string
+    }
+  | {
+      readonly kind: "scope"
+      readonly scopeId: string
+    }
+
+export interface ScopedMemoryLabels {
+  readonly sources: readonly ScopedMemorySourceLabel[]
+  readonly audience: ScopedMemoryAudienceLabel
+}
+
+export interface ScopedMemoryRecordProjection {
+  readonly id: string
+  readonly labels: ScopedMemoryLabels | undefined
+}
+
+export interface ScopedMemoryRecallDelivery {
+  /** Append-only context for the latest turn after Sigil's scope filter runs. */
+  readonly content: string
+  readonly selectedRecordIds: readonly string[]
+  readonly records: readonly ScopedMemoryRecordProjection[]
+  readonly receipt: unknown
+}
 
 // First-boot seed ONLY. The persona RECORD is the source of truth for the
 // agent's identity from then on: an operator edits the record (or Agent
@@ -50,10 +90,6 @@ ensureEveHostedPersona(personaRegistry, personaSeed, {
   rootKind: "agents",
 })
 
-// Read back what the registry actually holds — the operator's authored
-// identity, not the seed we may have written months ago.
-const persona = personaRegistry.get(personaSeed.id) ?? personaSeed
-
 export const DEFAULT_PERSONA_ID =
   process.env.SIGIL_DEFAULT_PERSONA_ID ?? personaSeed.id
 
@@ -70,7 +106,7 @@ export function personaHost(
   const record = personaRegistry.get(personaId)
   if (!record) throw new Error(`No such persona: ${personaId}`)
   const host = new EveMemoryHost({
-    store: new StoreBackedMemoryRecordStore({ scopeEnv }),
+    store: memoryRecordStore,
     persona: {
       record,
       authoredBaseId: `${record.id}-v1`,
@@ -154,7 +190,15 @@ export function memoryDraft(
   personaId: string,
   principalId: string,
   content: string,
+  labels?: {
+    readonly sources?: readonly ScopedMemorySourceLabel[]
+    readonly audience?: ScopedMemoryAudienceLabel
+  },
 ): MemoryRecordDraft {
+  const audience = labels?.audience ?? {
+    kind: "personal",
+    principalId,
+  }
   return {
     kind: "preference",
     subject: { kind: "principal", id: principalId },
@@ -168,9 +212,192 @@ export function memoryDraft(
       disclosure: { kind: "same-as-recall" },
     },
     content,
-    evidence: [{ kind: "tool", id: "sigil-memory" }],
+    evidence: [
+      { kind: "tool", id: "sigil-memory" },
+      ...sourceLabelsToEvidence(labels?.sources ?? []),
+      audienceLabelToEvidence(audience),
+    ],
     author: { kind: "principal", id: principalId },
   }
+}
+
+export function memoryLabelsForSession(
+  attributes: Readonly<Record<string, unknown>>,
+  principalId: string,
+): {
+  readonly sources: readonly ScopedMemorySourceLabel[]
+  readonly audience: ScopedMemoryAudienceLabel
+} {
+  const executionBinding = executionBindingFromAttributes(attributes)
+  if (!executionBinding) {
+    throw new Error("Memory actions require an immutable session binding.")
+  }
+  const homeScopeId = executionBinding.homeScopeId
+  if (homeScopeId.startsWith("personal-scope:")) {
+    if (homeScopeId !== `personal-scope:${principalId}`) {
+      throw new Error("Memory session home does not belong to this principal.")
+    }
+    const activeSource = containerScopeId(attributes.sigilResourceScope)
+    return {
+      audience: { kind: "personal", principalId },
+      sources: activeSource ? [{ scopeId: activeSource }] : [],
+    }
+  }
+
+  const activeSource = containerScopeId(attributes.sigilResourceScope)
+  return {
+    audience: { kind: "scope", scopeId: homeScopeId },
+    sources: [{ scopeId: activeSource ?? homeScopeId }],
+  }
+}
+
+export function automaticScopedMemoryRecallForTurn(input: {
+  personaId: string
+  turn: TrustedMemoryTurn
+  query: string
+}): ScopedMemoryRecallDelivery | undefined {
+  const delivery = personaHost(input.personaId).automaticRecallForTurn(
+    input.turn,
+    input.query,
+  )
+  const content = delivery.message?.content.trim()
+  if (!content) return undefined
+
+  return {
+    content,
+    selectedRecordIds: delivery.selectedRecordIds,
+    records: delivery.selectedRecordIds.map((id) => {
+      const record = memoryRecordStore.get(id)
+      return {
+        id,
+        labels: record ? scopedMemoryLabelsFromRecord(record) : undefined,
+      }
+    }),
+    receipt: delivery.receipt,
+  }
+}
+
+export function scopedMemoryLabelsFromRecord(
+  record: MemoryRecord,
+): ScopedMemoryLabels | undefined {
+  const sources = sourceLabelsFromEvidence(record.provenance.evidence)
+  const audience = audienceLabelFromEvidence(record.provenance.evidence)
+
+  if (audience) {
+    return {
+      sources,
+      audience,
+    }
+  }
+  return undefined
+}
+
+function sourceLabelsToEvidence(
+  sources: readonly ScopedMemorySourceLabel[],
+): MemoryRecordDraft["evidence"] {
+  return sources.map((source) =>
+    source.resourceKey
+      ? {
+          kind: "record" as const,
+          id: `${SOURCE_RESOURCE_EVIDENCE_PREFIX}${source.scopeId}|${source.resourceKey}`,
+        }
+      : {
+          kind: "record",
+          id: `${SOURCE_SCOPE_EVIDENCE_PREFIX}${source.scopeId}`,
+        },
+  )
+}
+
+function audienceLabelToEvidence(
+  audience: ScopedMemoryAudienceLabel,
+): MemoryRecordDraft["evidence"][number] {
+  if (audience.kind === "personal") {
+    return {
+      kind: "record",
+      id: `${AUDIENCE_PERSONAL_EVIDENCE_PREFIX}${audience.principalId}`,
+    }
+  }
+  return {
+    kind: "record",
+    id: `${AUDIENCE_SCOPE_EVIDENCE_PREFIX}${audience.scopeId}`,
+  }
+}
+
+function sourceLabelsFromEvidence(
+  evidence: readonly MemoryRecord["provenance"]["evidence"][number][],
+): ScopedMemorySourceLabel[] {
+  const scopeOnly = new Set<string>()
+  const resources = new Map<string, ScopedMemorySourceLabel>()
+  for (const item of evidence) {
+    if (item.kind !== "record") continue
+    if (item.id.startsWith(SOURCE_SCOPE_EVIDENCE_PREFIX)) {
+      const scopeId = item.id.slice(SOURCE_SCOPE_EVIDENCE_PREFIX.length)
+      if (scopeId) scopeOnly.add(scopeId)
+      continue
+    }
+    if (item.id.startsWith(SOURCE_RESOURCE_EVIDENCE_PREFIX)) {
+      const encoded = item.id.slice(SOURCE_RESOURCE_EVIDENCE_PREFIX.length)
+      const separator = encoded.indexOf("|")
+      if (separator < 1) continue
+      const scopeId = encoded.slice(0, separator)
+      const resourceKey = encoded.slice(separator + 1)
+      if (scopeId && resourceKey) {
+        resources.set(`${scopeId}\u0000${resourceKey}`, {
+          scopeId,
+          resourceKey,
+        })
+      }
+    }
+  }
+  const resourceScopes = new Set(
+    [...resources.values()].map((source) => source.scopeId),
+  )
+  return [
+    ...[...scopeOnly]
+      .filter((scopeId) => !resourceScopes.has(scopeId))
+      .map((scopeId) => ({ scopeId })),
+    ...resources.values(),
+  ]
+}
+
+function audienceLabelFromEvidence(
+  evidence: readonly MemoryRecord["provenance"]["evidence"][number][],
+): ScopedMemoryAudienceLabel | undefined {
+  for (const item of evidence) {
+    if (item.kind !== "record") continue
+    if (item.id.startsWith(AUDIENCE_PERSONAL_EVIDENCE_PREFIX)) {
+      const principalId = item.id.slice(
+        AUDIENCE_PERSONAL_EVIDENCE_PREFIX.length,
+      )
+      if (principalId) return { kind: "personal", principalId }
+    }
+    if (item.id.startsWith(AUDIENCE_SCOPE_EVIDENCE_PREFIX)) {
+      const scopeId = item.id.slice(AUDIENCE_SCOPE_EVIDENCE_PREFIX.length)
+      if (scopeId) return { kind: "scope", scopeId }
+    }
+  }
+  return undefined
+}
+
+function executionBindingFromAttributes(
+  attributes: Readonly<Record<string, unknown>>,
+): { homeScopeId: string } | undefined {
+  const raw = attributes.sigilExecutionBinding
+  if (typeof raw !== "string" || !raw.trim()) return undefined
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>
+    return typeof value.homeScopeId === "string" && value.homeScopeId.trim()
+      ? { homeScopeId: value.homeScopeId.trim() }
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function containerScopeId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  const match = /^(?:project|workspace):(.+)$/.exec(value.trim())
+  return match?.[1]?.trim() || undefined
 }
 
 export function sessionPersonaId(

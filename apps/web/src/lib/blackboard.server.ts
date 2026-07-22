@@ -1,8 +1,12 @@
 import type { SigilAuthSession } from "./auth/server"
 import { AuthenticationRequiredError } from "./auth/session"
-import { assertAuthorizedScope } from "./agent-scope-authorization.server"
+import {
+  assertAuthorizedScope,
+  type OwnedThreadHomeScope,
+} from "./agent-scope-authorization.server"
 import { blackboardStoreKey, type BlackboardScope } from "./blackboard-scope"
 import type { ScopeAuthorizationRegistries } from "../../../agent/agent/lib/scope-authorization"
+import type { ScopeAuthorizationAction } from "@workspace/agent-contracts/scope-authorization"
 import type {
   BlackboardDoc,
   BlackboardRepository,
@@ -65,15 +69,18 @@ export async function writeOwnedBlackboard(
 export function requireBlackboardScopeAccess(
   session: SigilAuthSession | null,
   scope: BlackboardScope,
-  ownsThread: (userId: string, threadId: string) => boolean,
+  ownedThreadHomeScope: OwnedThreadHomeScope,
   registries?: ScopeAuthorizationRegistries,
+  action: ScopeAuthorizationAction = "read",
 ): SigilAuthSession {
   if (!session) throw new AuthenticationRequiredError()
   assertAuthorizedScope(
     `${scope.tier}:${scope.id}`,
     session.user.id,
-    ownsThread,
+    ownedThreadHomeScope,
     registries,
+    undefined,
+    action,
   )
   return session
 }
@@ -81,22 +88,34 @@ export function requireBlackboardScopeAccess(
 export async function readScopedBlackboard(
   session: SigilAuthSession | null,
   scope: BlackboardScope,
-  ownsThread: (userId: string, threadId: string) => boolean,
+  ownedThreadHomeScope: OwnedThreadHomeScope,
   blackboards: BlackboardRepository,
   registries?: ScopeAuthorizationRegistries,
 ): Promise<BlackboardDoc> {
-  requireBlackboardScopeAccess(session, scope, ownsThread, registries)
+  requireBlackboardScopeAccess(
+    session,
+    scope,
+    ownedThreadHomeScope,
+    registries,
+    "read",
+  )
   return blackboards.read(blackboardStoreKey(scope))
 }
 
 export async function writeScopedBlackboard(
   session: SigilAuthSession | null,
   input: { scope: BlackboardScope; content: string; expectedRevision: string },
-  ownsThread: (userId: string, threadId: string) => boolean,
+  ownedThreadHomeScope: OwnedThreadHomeScope,
   blackboards: BlackboardRepository,
   registries?: ScopeAuthorizationRegistries,
 ): Promise<BlackboardDoc> {
-  requireBlackboardScopeAccess(session, input.scope, ownsThread, registries)
+  requireBlackboardScopeAccess(
+    session,
+    input.scope,
+    ownedThreadHomeScope,
+    registries,
+    "tool",
+  )
   return blackboards.write(
     blackboardStoreKey(input.scope),
     input.content,

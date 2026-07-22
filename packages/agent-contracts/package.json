@@ -18,8 +18,11 @@
   },
   "exports": {
     "./client-command": "./src/client-command.ts",
+    "./scope-authorization": "./src/scope-authorization.ts",
     "./scope-delegation": "./src/scope-delegation.ts",
     "./scope-delegation.server": "./src/scope-delegation.server.ts",
+    "./session-binding": "./src/session-binding.ts",
+    "./session-binding.server": "./src/session-binding.server.ts",
     "./ui-highlight": "./src/ui-highlight.ts"
   }
 }

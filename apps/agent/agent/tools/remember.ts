@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools"
 import { z } from "zod"
 import {
   memoryDraft,
+  memoryLabelsForSession,
   memoryTurn,
   personaHost,
   sessionPersonaId,
@@ -19,7 +20,12 @@ export default defineTool({
     const personaId = sessionPersonaId(auth.attributes)
     return personaHost(personaId).remember(
       memoryTurn(ctx.session.id, principalId),
-      memoryDraft(personaId, principalId, content),
+      memoryDraft(
+        personaId,
+        principalId,
+        content,
+        memoryLabelsForSession(auth.attributes, principalId),
+      ),
     )
   },
 })

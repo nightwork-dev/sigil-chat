@@ -14,7 +14,8 @@ const issueAgentScopeProof = createServerFn({ method: "POST" })
   .validator((scope: string) => scope)
   .handler(async ({ data: scope }): Promise<ScopeProofReceipt> => {
     const { getSession, requireSession } = await import("./auth/session")
-    const { agentThreadRepository } = await import("./agent-threads.server")
+    const { ownedAgentThreadHomeScope } =
+      await import("./agent-threads.server")
     const { issueScopeDelegation } =
       await import("@workspace/agent-contracts/scope-delegation.server")
     const session = await getSession()
@@ -24,8 +25,13 @@ const issueAgentScopeProof = createServerFn({ method: "POST" })
     assertSession(session)
     const { assertAuthorizedScope } =
       await import("./agent-scope-authorization.server")
-    assertAuthorizedScope(scope, session.user.id, (userId, threadId) =>
-      Boolean(agentThreadRepository.get(userId, threadId)),
+    assertAuthorizedScope(
+      scope,
+      session.user.id,
+      ownedAgentThreadHomeScope,
+      undefined,
+      undefined,
+      "tool",
     )
     const secret = process.env.GONK_MCP_KEY?.trim()
     if (!secret) throw new Error("Agent scope delegation is unavailable.")

@@ -44,13 +44,49 @@ export function readRuntimeTopology(
   env: RuntimeEnvironment,
 ): SigilRuntimeTopology {
   return {
-    eveOrigin: parseHttpUrl(env.EVE_ORIGIN, DEFAULT_EVE_ORIGIN, "EVE_ORIGIN"),
+    eveOrigin: parseHttpUrl(
+      env.EVE_ORIGIN,
+      portlessSiblingUrl(env.PORTLESS_URL, "sigil-chat-agent") ??
+        DEFAULT_EVE_ORIGIN,
+      "EVE_ORIGIN",
+    ),
     gonkMcpUrl: parseHttpUrl(
       env.GONK_MCP_URL,
-      DEFAULT_GONK_MCP_URL,
+      portlessSiblingUrl(env.PORTLESS_URL, "sigil-chat-gonk", "/mcp") ??
+        DEFAULT_GONK_MCP_URL,
       "GONK_MCP_URL",
     ),
   };
+}
+
+/** Resolve another Sigil service inside the same Portless worktree namespace.
+ * Explicit EVE_ORIGIN/GONK_MCP_URL values still win in readRuntimeTopology. */
+export function portlessSiblingUrl(
+  currentUrl: string | undefined,
+  targetService: string,
+  pathname = "",
+): string | undefined {
+  if (!currentUrl?.trim()) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(currentUrl);
+  } catch {
+    return undefined;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return undefined;
+  }
+  const labels = parsed.hostname.split(".");
+  const serviceIndex = labels.findIndex((label) =>
+    ["sigil-chat", "sigil-chat-agent", "sigil-chat-gonk"].includes(label),
+  );
+  if (serviceIndex < 0) return undefined;
+  labels[serviceIndex] = targetService;
+  parsed.hostname = labels.join(".");
+  parsed.pathname = pathname || "/";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.href.replace(/\/$/, "");
 }
 
 export function readPublicWebEnvironment(
