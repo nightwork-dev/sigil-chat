@@ -32,8 +32,16 @@ try {
 
   const port = await reservePort()
   child = spawn(
-    join(fixtureDirectory, "node_modules", ".bin", "eve"),
-    ["dev", "--no-ui", "--host", "127.0.0.1", "--port", String(port)],
+    process.execPath,
+    [
+      join(fixtureDirectory, "node_modules", "eve", "bin", "eve.js"),
+      "dev",
+      "--no-ui",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+    ],
     {
       cwd: fixtureDirectory,
       env: {
@@ -103,17 +111,11 @@ async function waitForInfoRoute(processHandle, port) {
     try {
       const response = await fetch(url)
       if (response.status === 200) return response
-      if (response.status !== 503) {
-        throw new Error(`Cold-boot info route returned HTTP ${response.status}`)
-      }
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.startsWith("Cold-boot info route returned")
-      ) {
-        throw error
-      }
-    }
+      // Eve 0.27 starts Nitro before its first compiler publication. During
+      // that narrow window /eve/v1/info can return 500 (missing manifest)
+      // rather than 503; cold boot is healthy if the compiler publishes and
+      // the same route becomes ready before the deadline.
+    } catch {}
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
   }
 

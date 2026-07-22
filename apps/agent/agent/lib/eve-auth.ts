@@ -244,14 +244,9 @@ function preserveTurnResourceScope(
 
   const resourceScope = caller.attributes.sigilResourceScope
   const sessionScope = caller.attributes.sigilSessionScope
-  const resultScopeProof = result.auth.attributes.sigilScopeProof
-  const callerScopeProof = caller.attributes.sigilScopeProof
-  const scopeProof =
-    typeof resultScopeProof === "string" ? resultScopeProof : callerScopeProof
   if (
     typeof resourceScope !== "string" &&
-    typeof sessionScope !== "string" &&
-    typeof scopeProof !== "string"
+    typeof sessionScope !== "string"
   ) {
     return result
   }
@@ -267,9 +262,6 @@ function preserveTurnResourceScope(
           : {}),
         ...(typeof sessionScope === "string"
           ? { sigilSessionScope: sessionScope }
-          : {}),
-        ...(typeof scopeProof === "string"
-          ? { sigilScopeProof: scopeProof }
           : {}),
       },
     },
@@ -352,7 +344,7 @@ function principalFromPayload(
   }
 }
 
-function principalSubject(caller: SessionAuthContext): string {
+export function principalSubject(caller: SessionAuthContext): string {
   return caller.subject?.trim() || caller.principalId.trim()
 }
 
@@ -371,7 +363,7 @@ function requiredExecutionBinding(
   return binding
 }
 
-function executionBindingFromCaller(
+export function executionBindingFromCaller(
   caller: SessionAuthContext,
 ): AgentSessionExecutionBinding | undefined {
   const raw = caller.attributes.sigilExecutionBinding

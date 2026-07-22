@@ -120,13 +120,14 @@ Every route file carries the mandatory ancestor-path + chrome-description
 header comment (see any file above for the format) — this prevents
 duplicate-`<main>`/nested-chrome bugs. Preserve it when adding routes.
 
-## The `@zigil/agent-*` packages
+## The agent runtime packages
 
-`apps/web` consumes released packages rather than owning agent runtime logic
-directly:
+`apps/web` consumes Eve directly for its runtime client and released packages
+for the remaining shared integration surfaces:
 
-- `@zigil/agent-surface` — neutral agent contracts
-- `@zigil/agent-eve` — Eve host adapter
+- `eve` — host runtime plus native client, stream, message, and channel surfaces
+- `@zigil/agent-surface` — transitional neutral contracts retained until the
+  current React adapters stop requiring them
 - `@zigil/agent-react` — React integration surfaces
 - `@zigil/agent-react-query` — React Query hooks/state over agent contracts
 - `@zigil/agent-gonk` (consumed by `apps/gonk`) — Gonk registry adapter
@@ -139,11 +140,12 @@ The current ownership split is:
 - **Sigil Design** owns shared graph, review, chat, text-editor,
   SpotlightScrim, and FloatingDock surfaces.
 - **Gonk Core** owns context, skills, retrieval, auth, and MCP contracts.
-- **Sigil Agent** owns neutral agent contracts plus Eve, React Query, Gonk,
-  and registry adapters/components.
+- **Eve** owns the host runtime and native client/channel contracts.
+- **Sigil Agent** owns the retained neutral, React Query, Gonk, and registry
+  adapters/components while its redundant Eve wrapper is retired.
 - **Sigil Chat** (this repo) is the real product composition and retains app
-  policy, domain reconciliation, attention projection, sessions, and
-  persistence wiring.
+  policy, the temporary native-Eve compatibility seam, domain reconciliation,
+  attention projection, sessions, and persistence wiring.
 
 Add application tools in `apps/gonk/src/registry.ts`. Eve discovers that
 registry through `apps/agent/agent/connections/gonk.ts` — do not hand-copy

@@ -159,8 +159,8 @@ export function memoryTurn(
     "authenticated principal",
   )
 
-  // Eve 0.25.2 exposes `ctx.eve.sessionId` only for continuation requests.
-  // A new-session onMessage hook has no durable Eve id yet, so bind it to a
+  // Eve exposes `ctx.eve.sessionId` only when a durable session id exists.
+  // A new-session onMessage hook can lack one, so bind it to a
   // stable, principal-scoped provisional identity instead. Never let the host
   // receive an absent or whitespace-only identity.
   const executionSessionId =

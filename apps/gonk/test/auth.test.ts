@@ -1,35 +1,37 @@
-import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
+import { createSignedDelegationProvider } from "@gonk/eve-host/guard"
+import {
+  SIGIL_GONK_DELEGATION_AUDIENCE,
+  SIGIL_GONK_DELEGATION_ISSUER,
+} from "@workspace/agent-contracts/gonk-turn-delegation"
 import { describe, expect, it } from "vitest"
 
 import {
-  authenticateScopeDelegation,
+  authenticateEveTurnDelegation,
   createContainerScopeAuthorizationPolicy,
   resolveDelegatedAgentReach,
 } from "../src/auth.js"
 import { personalScopeId } from "../../agent/agent/lib/personal-scope.js"
 
-const SECRET = "test-scope-delegation-secret"
+const SECRET = "test-turn-delegation-secret-32bytes"
 
-describe("Gonk scope-delegation authentication", () => {
+describe("Gonk Eve turn-delegation authentication", () => {
   it("projects Eve's signed end-user principal only while live policy allows it", async () => {
     let authorized = true
-    const proof = issueScopeDelegation(
-      {
-        expiresAt: 200,
-        scope: "workspace:holiday-launch",
-        subject: "user-grantee",
-      },
-      SECRET,
-    )
+    const token = issueTurnDelegation({
+      activeResourceScope: "workspace:holiday-launch",
+      subject: "user-grantee",
+    })
     const input = {
+      bindings: bindingLookup("user-grantee"),
       now: 100,
       policy: { authorize: () => authorized },
-      proof,
       scope: { tier: "workspace" as const, id: "holiday-launch" },
       secret: SECRET,
+      token,
     }
 
-    await expect(authenticateScopeDelegation(input)).resolves.toEqual({
+    await expect(authenticateEveTurnDelegation(input)).resolves.toMatchObject({
+      actorSessionId: "eve-session-1",
       principalId: "user-grantee",
       scope: { tier: "workspace", id: "holiday-launch" },
     })
@@ -37,22 +39,33 @@ describe("Gonk scope-delegation authentication", () => {
     // This is deliberately the same still-unexpired proof: revocation is a
     // policy read, not a cache expiry event.
     authorized = false
-    await expect(authenticateScopeDelegation(input)).resolves.toBeUndefined()
+    await expect(authenticateEveTurnDelegation(input)).resolves.toBeUndefined()
   })
 
-  it("rejects a proof when the supplied scope differs from its signed target", async () => {
-    const proof = issueScopeDelegation(
-      { expiresAt: 200, scope: "project:brand", subject: "user-a" },
-      SECRET,
-    )
+  it("rejects a bearer when scope or durable execution binding differs", async () => {
+    const token = issueTurnDelegation({
+      activeResourceScope: "project:brand",
+      subject: "user-a",
+    })
 
     await expect(
-      authenticateScopeDelegation({
+      authenticateEveTurnDelegation({
+        bindings: bindingLookup("user-a"),
         now: 100,
         policy: { authorize: () => true },
-        proof,
         scope: { tier: "project", id: "commerce" },
         secret: SECRET,
+        token,
+      }),
+    ).resolves.toBeUndefined()
+    await expect(
+      authenticateEveTurnDelegation({
+        bindings: bindingLookup("user-a", { personaId: "other-persona" }),
+        now: 100,
+        policy: { authorize: () => true },
+        scope: { tier: "project", id: "brand" },
+        secret: SECRET,
+        token,
       }),
     ).resolves.toBeUndefined()
   })
@@ -64,7 +77,9 @@ describe("delegated agent reach", () => {
       getBinding: async (sessionId: string) =>
         sessionId === "eve-personal"
           ? {
+              applicationThreadId: "thread-1",
               homeScopeId: personalScopeId("user-a"),
+              personaId: "persona-1",
               subject: "user-a",
             }
           : undefined,
@@ -89,6 +104,47 @@ describe("delegated agent reach", () => {
     ).resolves.toBe("scope")
   })
 })
+
+function issueTurnDelegation(input: {
+  activeResourceScope: string
+  subject: string
+}) {
+  return createSignedDelegationProvider({
+    issuer: SIGIL_GONK_DELEGATION_ISSUER,
+    audience: SIGIL_GONK_DELEGATION_AUDIENCE,
+    secret: SECRET,
+    authorize: () => ({ outcome: "deny", reason: "test" }),
+  }).issue({
+    issuer: SIGIL_GONK_DELEGATION_ISSUER,
+    audience: SIGIL_GONK_DELEGATION_AUDIENCE,
+    issuedAt: 100,
+    expiresAt: 200,
+    subject: input.subject,
+    channelId: "thread-1",
+    personaId: "persona-1",
+    eveSessionId: "eve-session-1",
+    correlationId: "turn-1",
+    delegationId: "delegation-1",
+    activeResourceScope: input.activeResourceScope,
+  }, 100)
+}
+
+function bindingLookup(
+  subject: string,
+  overrides: Partial<{
+    applicationThreadId: string
+    personaId: string
+  }> = {},
+) {
+  return {
+    getBinding: async () => ({
+      applicationThreadId: overrides.applicationThreadId ?? "thread-1",
+      homeScopeId: personalScopeId(subject),
+      personaId: overrides.personaId ?? "persona-1",
+      subject,
+    }),
+  }
+}
 
 describe("container scope authorization", () => {
   it("does not let a stale exact grant revive a deleted container", () => {

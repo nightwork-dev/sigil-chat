@@ -2,11 +2,10 @@ import { GONK_AUTH_INFO_PRINCIPAL } from "@gonk/tool-registry-mcp"
 import { checkBearer } from "@gonk/tool-registry-mcp/http"
 import type { ToolRegistry } from "@gonk/tool-registry"
 import { createAgentWebMcpHandler } from "@zigil/agent-gonk"
-import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
 
 import {
-  authenticateScopeDelegation,
+  authenticateEveTurnDelegation,
   authorizeSigilMcpRequest,
   createContainerScopeAuthorizationPolicy,
   resolveDelegatedAgentReach,
@@ -103,26 +102,28 @@ export function createSigilMcpHandler({
         .filter(Boolean) ?? []),
     ],
     authenticate: async (request) => {
-      if (
-        !checkBearer(request.headers.get("authorization") ?? undefined, apiKey)
-      ) {
-        return null
-      }
-      const token = request.headers.get("authorization")?.replace(
-        /^Bearer\s+/i,
-        "",
-      )
+      const authorizationHeader =
+        request.headers.get("authorization") ?? undefined
+      const serviceRequest = checkBearer(authorizationHeader, apiKey)
+      const token = readBearer(authorizationHeader)
       const resourceScope = normalizeScopeHeaders(
         request.headers.get(SIGIL_SCOPE_HEADER) ?? undefined,
         request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
       )
-      const delegated = await authenticateScopeDelegation({
-        policy: authorization,
-        proof: request.headers.get(AGENT_SCOPE_PROOF_HEADER) ?? undefined,
-        scope: resourceScope,
-        secret: apiKey,
-      })
-      if (resourceScope && !delegated) return null
+      // The long-lived key authenticates unscoped service operations. It must
+      // never be accepted as a human/scoped tool caller. Eve uses a fresh,
+      // turn-bound signed bearer for that path.
+      if (serviceRequest && resourceScope) return null
+      const delegated = serviceRequest
+        ? undefined
+        : await authenticateEveTurnDelegation({
+            bindings: resolvedExecutionBindings,
+            policy: authorization,
+            scope: resourceScope,
+            secret: apiKey,
+            token,
+          })
+      if (!serviceRequest && !delegated) return null
       const agentReach = delegated
         ? await resolveDelegatedAgentReach({
             actorSessionId: delegated.actorSessionId,
@@ -142,22 +143,24 @@ export function createSigilMcpHandler({
                 identity: {
                   issuer: "sigil-chat",
                   subject: delegated.principalId,
-                  method: "custom:scope-delegation",
+                  method: "custom:eve-turn-delegation",
                 },
-                ...(delegated.actorSessionId
-                  ? {
-                      delegation: {
-                        actorKind: "agent" as const,
-                        actor: {
-                          issuer: "sigil-chat",
-                          subject: "sigil-chat-agent",
-                          method: "service-token" as const,
-                        },
-                        actorId: "agent:sigil-chat-agent",
-                        actorSessionId: delegated.actorSessionId,
-                      },
-                    }
-                  : {}),
+                delegation: {
+                  actorKind: "agent" as const,
+                  actor: {
+                    issuer: "sigil-chat",
+                    subject: "sigil-chat-agent",
+                    method: "service-token" as const,
+                  },
+                  actorId: "agent:sigil-chat-agent",
+                  actorSessionId: delegated.actorSessionId,
+                  metadata: {
+                    channelId: delegated.channelId,
+                    correlationId: delegated.correlationId,
+                    delegationId: delegated.delegationId,
+                    personaId: delegated.personaId,
+                  },
+                },
                 roles: ["member"],
                 scopes: [formatScopeHeader(delegated.scope)!],
               }
@@ -217,6 +220,11 @@ export function createSigilMcpHandler({
     enableJsonResponse: true,
     writeToolPolicy: "permissive",
   })
+}
+
+function readBearer(authorization: string | undefined): string | undefined {
+  const match = authorization?.match(/^Bearer\s+(.+)$/i)
+  return match?.[1]
 }
 
 function createSessionOwnerLookup(): SessionScopeOwnerLookup {

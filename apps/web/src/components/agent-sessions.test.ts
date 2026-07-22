@@ -51,7 +51,7 @@ const harness = vi.hoisted(() => ({
 let repository: AgentThreadRepository;
 const TEST_USER_ID = "session-test-user";
 
-vi.mock("@zigil/agent-eve", () => ({
+vi.mock("@/lib/eve-runtime-session", () => ({
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
     harness.eveCallbacks = callbacks;
     return {
@@ -160,8 +160,14 @@ vi.mock("@/lib/agent-threads", () => ({
   }),
 }));
 
-vi.mock("@/lib/agent-session-binding", () => ({
-  getAgentSessionBindingProof: vi.fn(async () => "signed-session-binding"),
+vi.mock("@/lib/agent-turn-bootstrap", () => ({
+  getAgentTurnBootstrap: vi.fn(
+    (input: { resourceScope?: string; threadId: string }) =>
+      Promise.resolve({
+        sessionBindingProof: "signed-session-binding",
+        ...(input.resourceScope ? { scopeProof: "signed-scope-proof" } : {}),
+      }),
+  ),
 }));
 
 let container: HTMLDivElement;
@@ -249,8 +255,31 @@ describe("AppAgentSessions persistence call site", () => {
       revision: thread.revision + 3,
       title: "Name the rollback owner",
     });
+    expect(harness.lastEveSendInput?.headers).toMatchObject({
+      "x-sigil-persona-id": "agent-a",
+      "x-sigil-session-binding": "signed-session-binding",
+    });
     expect(repository.get(TEST_USER_ID, thread.id)?.forkSeed).toBeUndefined();
     expect(container.textContent).not.toContain("Agent session was not saved");
+  });
+
+  it("attaches an authorized resource-scope proof without replacing the session binding proof", async () => {
+    repository.create(TEST_USER_ID, { title: "Scoped thread" });
+    await renderSessions();
+
+    await act(async () => {
+      await harness.session?.send({
+        headers: { "x-sigil-scope": "workspace:review-room" },
+        message: "Use the workspace",
+      });
+    });
+
+    expect(harness.lastEveSendInput?.headers).toMatchObject({
+      "x-sigil-persona-id": "agent-a",
+      "x-sigil-scope": "workspace:review-room",
+      "x-sigil-session-binding": "signed-session-binding",
+      "x-sigil-scope-proof": "signed-scope-proof",
+    });
   });
 
   it("does not consume the fork seed or rename on a failed turn, and retries cleanly", async () => {

@@ -4,8 +4,8 @@ import { readAgentEnvironment } from "@workspace/runtime-env/server"
 
 const { model } = readAgentEnvironment(process.env)
 
-// Attachments are inlined by @zigil/agent-eve in the browser before send — see
-// its toEveSendMessage. A host-side model middleware CANNOT do this: the AI
+// Attachments are inlined by the web app's Eve client before send. A host-side
+// model middleware CANNOT do this: the AI
 // SDK's message pipeline downloads (and SSRF-rejects) local URL file parts
 // upstream of any model call, so inlining has to happen before the message
 // enters that pipeline.

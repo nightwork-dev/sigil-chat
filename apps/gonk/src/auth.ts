@@ -1,12 +1,15 @@
 import type { AgentMcpAuthorizationPolicy } from "@zigil/agent-gonk"
+import { createSignedDelegationProvider } from "@gonk/eve-host/guard"
 import {
   hasScopeGrant,
   type ScopeAuthorizationPolicy,
   type ScopeAuthorizationRequest,
 } from "@workspace/agent-contracts/scope-authorization"
 import {
-  readScopeDelegation,
-} from "@workspace/agent-contracts/scope-delegation.server"
+  SIGIL_GONK_DELEGATION_AUDIENCE,
+  SIGIL_GONK_DELEGATION_ISSUER,
+  SIGIL_GONK_DELEGATION_TTL_MS,
+} from "@workspace/agent-contracts/gonk-turn-delegation"
 
 import {
   formatScopeHeader,
@@ -28,7 +31,9 @@ export interface SessionScopeOwnerLookup {
 export interface SessionExecutionBindingLookup {
   getBinding(sessionId: string): Promise<
     | {
+        applicationThreadId: string
         homeScopeId: string
+        personaId: string
         subject: string
       }
     | undefined
@@ -123,45 +128,69 @@ function authorizeContainerScope(
 }
 
 /**
- * Convert Eve's signed, user-bound delegation into the Gonk principal. This
- * both proves the identity survived the host hop and re-reads authorization on
- * every MCP request, so an unexpired proof cannot outlive a revoked grant.
+ * Convert Eve's turn-bound bearer into the Gonk principal. The bearer proves
+ * which authenticated Eve turn is calling; the durable binding proves that
+ * turn still belongs to the same application thread, persona, and user. Live
+ * authorization is deliberately re-read on every MCP request, so neither an
+ * unexpired bearer nor a warm MCP session can outlive a revoked grant.
  */
-export async function authenticateScopeDelegation(input: {
+export async function authenticateEveTurnDelegation(input: {
+  bindings: SessionExecutionBindingLookup
   now?: number
   policy: ScopeAuthorizationPolicy
-  proof: string | undefined
   scope: ResourceScope | undefined
   secret: string
+  token: string | undefined
 }): Promise<
   | {
-      actorSessionId?: string
+      actorSessionId: string
+      channelId: string
+      correlationId: string
+      delegationId: string
+      personaId: string
       principalId: string
       scope: ResourceScope
     }
   | undefined
 > {
-  if (!input.scope || !input.proof) return undefined
-  const delegation = readScopeDelegation(
-    input.proof,
-    input.now ?? Math.floor(Date.now() / 1_000),
-    input.secret,
-  )
+  if (!input.scope || !input.token) return undefined
+  const provider = createSignedDelegationProvider({
+    issuer: SIGIL_GONK_DELEGATION_ISSUER,
+    audience: SIGIL_GONK_DELEGATION_AUDIENCE,
+    secret: input.secret,
+    authorize: () => ({
+      outcome: "deny",
+      reason: "Gonk applies its application authorization policy separately.",
+    }),
+    maxTtlMs: SIGIL_GONK_DELEGATION_TTL_MS,
+  })
+  let delegation
+  try {
+    delegation = provider.verify(input.token, input.now ?? Date.now())
+  } catch {
+    return undefined
+  }
+  const scope = formatScopeHeader(input.scope)
+  const binding = await input.bindings.getBinding(delegation.eveSessionId)
   if (
-    !delegation ||
-    delegation.scope !== formatScopeHeader(input.scope) ||
+    !scope ||
+    delegation.activeResourceScope !== scope ||
+    !binding ||
+    binding.subject !== delegation.subject ||
+    binding.applicationThreadId !== delegation.channelId ||
+    binding.personaId !== delegation.personaId ||
     !input.policy.authorize({
       action: "tool",
       principalId: delegation.subject,
-      resourceScope: delegation.scope,
+      resourceScope: scope,
     })
-  ) {
-    return undefined
-  }
+  ) return undefined
   return {
-    ...(delegation.actorSessionId
-      ? { actorSessionId: delegation.actorSessionId }
-      : {}),
+    actorSessionId: delegation.eveSessionId,
+    channelId: delegation.channelId,
+    correlationId: delegation.correlationId,
+    delegationId: delegation.delegationId,
+    personaId: delegation.personaId,
     principalId: delegation.subject,
     scope: input.scope,
   }

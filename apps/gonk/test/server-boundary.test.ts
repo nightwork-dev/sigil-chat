@@ -1,7 +1,11 @@
 import type { KvStore } from "@gonk/store/types"
+import { createSignedDelegationProvider } from "@gonk/eve-host/guard"
 import { afterEach, describe, expect, it } from "vitest"
 import { passthrough, ToolRegistry } from "@gonk/tool-registry"
-import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
+import {
+  SIGIL_GONK_DELEGATION_AUDIENCE,
+  SIGIL_GONK_DELEGATION_ISSUER,
+} from "@workspace/agent-contracts/gonk-turn-delegation"
 import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository"
 
 import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js"
@@ -13,13 +17,13 @@ import { createAgentMcpBearerHeaders } from "@zigil/agent-gonk"
 import { createSigilMcpHandler } from "../src/mcp-handler.js"
 import { MirkAgentThreadScopeOwnerRegistry } from "../../agent/agent/lib/agent-thread-scope-owners.js"
 import {
-  authenticateScopeDelegation,
+  authenticateEveTurnDelegation,
   createContainerScopeAuthorizationPolicy,
 } from "../src/auth.js"
 import { sigilApprovalProvider } from "../src/registry/approval.js"
 import { registerFeatureRequestTools } from "../src/registry/feature-request.js"
 
-const token = "sigil-server-boundary-token"
+const token = "sigil-server-boundary-token-32bytes"
 const handlers: ReturnType<typeof createSigilMcpHandler>[] = []
 
 function containers() {
@@ -150,33 +154,35 @@ describe("production MCP handler boundary", () => {
         data: { principal: context.auth?.principal },
       }),
     })
-    const proof = issueScopeDelegation(
+    const bindingRecords = new Map<string, TestExecutionBinding>()
+    const proof = issueTurnDelegation(
       {
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "workspace:workspace-shared",
         subject: "user-1",
       },
-      token,
+      bindingRecords,
     )
     const handler = createSigilMcpHandler({
       apiKey: token,
       containers: records,
+      executionBindings: bindingLookup(bindingRecords),
       port: 8808,
       source: registry,
     })
     await expect(
-      authenticateScopeDelegation({
+      authenticateEveTurnDelegation({
+        bindings: bindingLookup(bindingRecords),
         policy: createContainerScopeAuthorizationPolicy(records),
-        proof,
         scope: { tier: "workspace", id: "workspace-shared" },
         secret: token,
+        token: proof,
       }),
     ).resolves.toMatchObject({ principalId: "user-1" })
     handlers.push(handler)
     const initialized = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${proof}`,
         "x-sigil-scope": "workspace:workspace-shared",
-        "x-sigil-scope-proof": proof,
       }),
     )
     expect(initialized.status).toBe(200)
@@ -191,9 +197,8 @@ describe("production MCP handler boundary", () => {
           "content-type": "application/json",
           host: "127.0.0.1:8808",
           "mcp-session-id": sessionId!,
-          ...createAgentMcpBearerHeaders(token),
+          authorization: `Bearer ${proof}`,
           "x-sigil-scope": "workspace:workspace-shared",
-          "x-sigil-scope-proof": proof,
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
@@ -210,27 +215,26 @@ describe("production MCP handler boundary", () => {
           principal: {
             id: "user-1",
             kind: "human",
-            identity: { method: "custom:scope-delegation" },
+            identity: { method: "custom:eve-turn-delegation" },
           },
         },
       },
     })
-    expect(
-      responseBody.result.structuredContent.principal,
-    ).not.toHaveProperty("delegation")
+    expect(responseBody.result.structuredContent.principal).toMatchObject({
+      delegation: { actorSessionId: "eve-session-user-1" },
+    })
 
-    const user2Proof = issueScopeDelegation(
+    const user2Proof = issueTurnDelegation(
       {
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "workspace:workspace-shared",
         subject: "user-2",
       },
-      token,
+      bindingRecords,
     )
     const user2 = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${user2Proof}`,
         "x-sigil-scope": "workspace:workspace-shared",
-        "x-sigil-scope-proof": user2Proof,
       }),
     )
     expect(user2.status).toBe(401)
@@ -241,18 +245,17 @@ describe("production MCP handler boundary", () => {
       principalId: "user-read-only",
       resourceScope: "workspace:workspace-shared",
     })
-    const readOnlyProof = issueScopeDelegation(
+    const readOnlyProof = issueTurnDelegation(
       {
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "workspace:workspace-shared",
         subject: "user-read-only",
       },
-      token,
+      bindingRecords,
     )
     const readOnly = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${readOnlyProof}`,
         "x-sigil-scope": "workspace:workspace-shared",
-        "x-sigil-scope-proof": readOnlyProof,
       }),
     )
     // A signed proof is not a tool permission: a read-only grant cannot
@@ -262,9 +265,9 @@ describe("production MCP handler boundary", () => {
     records.grants.revoke(grant.id, "user-owner")
     const revoked = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${proof}`,
         "x-sigil-scope": "workspace:workspace-shared",
-        // Reuse the same still-valid user-1 proof: only the durable grant changed.
-        "x-sigil-scope-proof": proof,
+        // Reuse the same still-valid user-1 bearer: only the durable grant changed.
       }),
     )
     expect(revoked.status).toBe(401)
@@ -299,35 +302,27 @@ describe("production MCP handler boundary", () => {
       input: passthrough(),
       handler: async (_input, context) => ({ data: context.host }),
     })
-    const proof = issueScopeDelegation(
+    const bindingRecords = new Map<string, TestExecutionBinding>()
+    const proof = issueTurnDelegation(
       {
         actorSessionId: "eve-personal",
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "workspace:workspace-shared",
         subject: "user-1",
       },
-      token,
+      bindingRecords,
     )
     const handler = createSigilMcpHandler({
       apiKey: token,
       containers: records,
-      executionBindings: {
-        getBinding: async (sessionId) =>
-          sessionId === "eve-personal"
-            ? {
-                homeScopeId: "personal-scope:user-1",
-                subject: "user-1",
-              }
-            : undefined,
-      },
+      executionBindings: bindingLookup(bindingRecords),
       port: 8808,
       source: registry,
     })
     handlers.push(handler)
     const initialized = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${proof}`,
         "x-sigil-scope": "workspace:workspace-shared",
-        "x-sigil-scope-proof": proof,
       }),
     )
     expect(initialized.status).toBe(200)
@@ -338,8 +333,8 @@ describe("production MCP handler boundary", () => {
       mcpRequest(
         sessionId!,
         {
+          authorization: `Bearer ${proof}`,
           "x-sigil-scope": "workspace:workspace-shared",
-          "x-sigil-scope-proof": proof,
         },
         2,
         "tools/call",
@@ -383,22 +378,23 @@ describe("production MCP handler boundary", () => {
       security: { approvalProvider: sigilApprovalProvider },
     })
     registerFeatureRequestTools(registry, repository)
-    const proof = issueScopeDelegation(
+    const bindingRecords = new Map<string, TestExecutionBinding>()
+    const proof = issueTurnDelegation(
       {
         actorSessionId: "eve-session-42",
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "workspace:workspace-feature-intake",
         subject: "user-1",
       },
-      token,
+      bindingRecords,
     )
     const scopeHeaders = {
+      authorization: `Bearer ${proof}`,
       "x-sigil-scope": "workspace:workspace-feature-intake",
-      "x-sigil-scope-proof": proof,
     }
     const handler = createSigilMcpHandler({
       apiKey: token,
       containers: records,
+      executionBindings: bindingLookup(bindingRecords),
       port: 8808,
       source: registry,
     })
@@ -455,43 +451,23 @@ describe("production MCP handler boundary", () => {
       },
     })
 
-    const legacyProof = issueScopeDelegation(
+    const unboundProof = issueTurnDelegation(
       {
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        actorSessionId: "eve-session-unbound",
         scope: "workspace:workspace-feature-intake",
         subject: "user-1",
       },
-      token,
+      bindingRecords,
     )
-    const legacyHeaders = {
+    bindingRecords.delete("eve-session-unbound")
+    const unboundHeaders = {
+      authorization: `Bearer ${unboundProof}`,
       "x-sigil-scope": "workspace:workspace-feature-intake",
-      "x-sigil-scope-proof": legacyProof,
     }
-    const legacyInitialized = await handler.handle(
-      initializeRequest("127.0.0.1:8808", legacyHeaders),
+    const unboundInitialized = await handler.handle(
+      initializeRequest("127.0.0.1:8808", unboundHeaders),
     )
-    expect(legacyInitialized.status).toBe(200)
-    const legacySessionId = legacyInitialized.headers.get("mcp-session-id")
-    expect(legacySessionId).toBeTruthy()
-    const legacyInvocation = await handler.handle(
-      mcpRequest(legacySessionId!, legacyHeaders, 4, "tools/call", {
-        name: "sigil-feature-request-propose",
-        arguments: {
-          title: "Untrusted legacy proposal",
-          problem: "This proof has no trusted Eve actor session.",
-          desiredOutcome: "The proposal fails closed.",
-        },
-      }),
-    )
-    expect(await legacyInvocation.json()).toMatchObject({
-      result: {
-        structuredContent: {
-          error: {
-            message: expect.stringContaining("trusted actor session"),
-          },
-        },
-      },
-    })
+    expect(unboundInitialized.status).toBe(401)
     await expect(repository.get()).resolves.toMatchObject({ revision: 1 })
   })
 
@@ -509,42 +485,42 @@ describe("production MCP handler boundary", () => {
     const sessionOwners = new MirkAgentThreadScopeOwnerRegistry({
       store: memoryKv(sessionRecords),
     })
+    const bindingRecords = new Map<string, TestExecutionBinding>()
     const handler = createSigilMcpHandler({
       apiKey: token,
       containers: containers(),
+      executionBindings: bindingLookup(bindingRecords),
       port: 8808,
       sessionOwners,
     })
     handlers.push(handler)
-    const proof = issueScopeDelegation(
+    const proof = issueTurnDelegation(
       {
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "session:thread-owned",
         subject: "user-1",
       },
-      token,
+      bindingRecords,
     )
 
     const owner = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${proof}`,
         "x-sigil-scope": "session:thread-owned",
-        "x-sigil-scope-proof": proof,
       }),
     )
     expect(owner.status).toBe(200)
 
-    const outsiderProof = issueScopeDelegation(
+    const outsiderProof = issueTurnDelegation(
       {
-        expiresAt: Math.floor(Date.now() / 1_000) + 60,
         scope: "session:thread-owned",
         subject: "user-2",
       },
-      token,
+      bindingRecords,
     )
     const outsider = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${outsiderProof}`,
         "x-sigil-scope": "session:thread-owned",
-        "x-sigil-scope-proof": outsiderProof,
       }),
     )
     expect(outsider.status).toBe(401)
@@ -552,15 +528,68 @@ describe("production MCP handler boundary", () => {
     sessionRecords.delete("thread:thread-owned")
     const revoked = await handler.handle(
       initializeRequest("127.0.0.1:8808", {
+        authorization: `Bearer ${proof}`,
         "x-sigil-scope": "session:thread-owned",
-        // Reuse the same unexpired proof. Deleting the web-owned thread
+        // Reuse the same unexpired bearer. Deleting the web-owned thread
         // revokes the scope because Gonk reads membership on every request.
-        "x-sigil-scope-proof": proof,
       }),
     )
     expect(revoked.status).toBe(401)
   })
 })
+
+interface TestExecutionBinding {
+  applicationThreadId: string
+  homeScopeId: string
+  personaId: string
+  subject: string
+}
+
+function issueTurnDelegation(
+  input: {
+    actorSessionId?: string
+    scope: string
+    subject: string
+  },
+  bindings: Map<string, TestExecutionBinding>,
+): string {
+  const eveSessionId = input.actorSessionId ?? `eve-session-${input.subject}`
+  const channelId = input.scope.startsWith("session:")
+    ? input.scope.slice("session:".length)
+    : `thread-${input.subject}`
+  const personaId = "persona-default"
+  bindings.set(eveSessionId, {
+    applicationThreadId: channelId,
+    homeScopeId: `personal-scope:${input.subject}`,
+    personaId,
+    subject: input.subject,
+  })
+  const now = Date.now()
+  return createSignedDelegationProvider({
+    issuer: SIGIL_GONK_DELEGATION_ISSUER,
+    audience: SIGIL_GONK_DELEGATION_AUDIENCE,
+    secret: token,
+    authorize: () => ({ outcome: "deny", reason: "test" }),
+  }).issue({
+    issuer: SIGIL_GONK_DELEGATION_ISSUER,
+    audience: SIGIL_GONK_DELEGATION_AUDIENCE,
+    issuedAt: now,
+    expiresAt: now + 60_000,
+    subject: input.subject,
+    channelId,
+    personaId,
+    eveSessionId,
+    correlationId: `turn-${input.subject}`,
+    delegationId: `delegation-${input.subject}`,
+    activeResourceScope: input.scope,
+  }, now)
+}
+
+function bindingLookup(bindings: Map<string, TestExecutionBinding>) {
+  return {
+    getBinding: async (sessionId: string) => bindings.get(sessionId),
+  }
+}
 
 function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
   return {

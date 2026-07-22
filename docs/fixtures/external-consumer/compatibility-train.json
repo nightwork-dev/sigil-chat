@@ -8,7 +8,7 @@
     "@gonk/tool-registry-mcp": "0.3.1",
     "@zigil/agent-gonk": "0.1.0"
   },
-  "applicationTrain": {
+  "recordedApplicationTrain": {
     "eveHost": "0.25.2",
     "webEveCompatibilityDependency": "0.24.4",
     "@zigil/agent-eve": "0.1.5",
@@ -21,7 +21,7 @@
     "@gonk/memory": "0.5.1-mem2.5",
     "@gonk/persona": "0.5.1-mem2.5"
   },
-  "notYetPublic": [
+  "notYetPublicAtVerification": [
     "@zigil/agent-eve@0.1.5",
     "@zigil/agent-react@0.1.1",
     "@zigil/agent-react-query@0.1.1",

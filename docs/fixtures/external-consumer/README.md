@@ -2,8 +2,9 @@
 
 This standalone generated-app-shaped consumer owns one `fixture-echo` tool and one `fixture-resource` context contributor. It uses released packages only; it does not import `@workspace/*`, Sigil Chat `apps/*`, or route output.
 
-The fixture pins the publicly available subset of the current application
-train in `compatibility-train.json`. Install it from the public npm registry,
+The fixture pins the publicly available subset of the application train that
+was verified on 2026-07-20 in `compatibility-train.json`. It is a dated proof,
+not a live dependency projection. Install it from the public npm registry,
 outside the parent pnpm workspace:
 
 ```bash
@@ -19,5 +20,6 @@ pnpm dev
 
 This is deliberately a boundary proof, not a claim that the entire Sigil Chat
 application train is public. The compatibility manifest also records the exact
-memory, persona, Eve-host, and React adapter versions used by the application;
-those rows remain blocked until those versions are published to npm.
+memory, persona, Eve-host, and React adapter versions that were used by the
+application at the proof point, including the versions that were not public
+then.

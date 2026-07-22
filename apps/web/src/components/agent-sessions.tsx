@@ -26,7 +26,6 @@ import type {
   AgentSendInput,
   AgentThreadControls,
 } from "@zigil/agent-surface/contracts"
-import { useEveRuntimeSession } from "@zigil/agent-eve"
 import {
   addContextAttachment,
   removeTurnContextAttachment,
@@ -61,8 +60,8 @@ import {
 } from "@/lib/agent-session-persistence"
 import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projector"
 import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
-import { getAgentScopeProof } from "@/lib/agent-scope-delegation"
-import { getAgentSessionBindingProof } from "@/lib/agent-session-binding"
+import { getAgentTurnBootstrap } from "@/lib/agent-turn-bootstrap"
+import { useEveRuntimeSession } from "@/lib/eve-runtime-session"
 
 export function AppAgentSessions({
   children,
@@ -322,12 +321,12 @@ function ActiveAgentSession({
         turnActive.current = true
         try {
           const resourceScope = input.headers?.[AGENT_SCOPE_HEADER]
-          const [scopeProof, sessionBindingProof] = await Promise.all([
-            resourceScope
-              ? getAgentScopeProof(resourceScope, principalId)
-              : Promise.resolve(undefined),
-            getAgentSessionBindingProof(thread.id, principalId),
-          ])
+          const { scopeProof, sessionBindingProof } =
+            await getAgentTurnBootstrap({
+              principalId,
+              threadId: thread.id,
+              ...(resourceScope ? { resourceScope } : {}),
+            })
           const result = await eveSession.send({
             ...input,
             headers: {

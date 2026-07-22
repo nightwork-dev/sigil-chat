@@ -21,7 +21,6 @@ import {
   SIGIL_SCOPE_HEADER,
   SIGIL_SESSION_SCOPE_HEADER,
 } from "./artifact-scope.js"
-import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 
 // Local dev: load the repo-root .env (the single source of truth this process
 // shares with the Eve host — apps/agent/.env is a symlink to the same file, and
@@ -58,7 +57,7 @@ const serviceBearerKey: string = apiKey
 const handler = createSigilMcpHandler({ apiKey, port })
 const mcpSessionScopes = new Map<
   string,
-  { bearer: string; scope: ResourceScope; scopeProof: string }
+  { bearer: string; scope: ResourceScope }
 >()
 
 const server = createServer((request, response) => {
@@ -144,32 +143,21 @@ async function handleRequest(
       request.headers.get(SIGIL_SCOPE_HEADER) ?? undefined,
       request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
     )
-    const requestedScopeProof =
-      request.headers.get(AGENT_SCOPE_PROOF_HEADER) ?? undefined
     const remembered = sessionId ? mcpSessionScopes.get(sessionId) : undefined
     const scope =
       requestedScope ??
       (remembered?.bearer === bearer ? remembered.scope : undefined)
-    const scopeProof =
-      requestedScopeProof ??
-      (remembered?.bearer === bearer ? remembered.scopeProof : undefined)
     if (scope && !request.headers.has(SIGIL_SCOPE_HEADER)) {
       const headers = new Headers(request.headers)
       headers.set(SIGIL_SCOPE_HEADER, formatScopeHeader(scope)!)
-      if (scopeProof) headers.set(AGENT_SCOPE_PROOF_HEADER, scopeProof)
-      request = new Request(request, { headers })
-    } else if (scopeProof && !request.headers.has(AGENT_SCOPE_PROOF_HEADER)) {
-      const headers = new Headers(request.headers)
-      headers.set(AGENT_SCOPE_PROOF_HEADER, scopeProof)
       request = new Request(request, { headers })
     }
     const response = await handler.handle(request)
     const establishedSessionId = response.headers.get("mcp-session-id")
-    if (establishedSessionId && requestedScope && requestedScopeProof) {
+    if (establishedSessionId && requestedScope) {
       mcpSessionScopes.set(establishedSessionId, {
         bearer,
         scope: requestedScope,
-        scopeProof: requestedScopeProof,
       })
     }
     await writeWebResponse(outgoing, response)

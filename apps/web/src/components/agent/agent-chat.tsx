@@ -171,7 +171,7 @@ export function AgentChat({
 
   // A pasted image URL is already usable — add it by reference (no upload).
   // Delivery to the model (inline vs. let the host fetch it) is handled
-  // downstream in @zigil/agent-eve + the agent host middleware.
+  // downstream in the app-owned Eve client adapter + the agent host middleware.
   const handleAttachUrl = useCallback(
     (url: string) => addUrl(url, { mediaType: imageMediaTypeFromUrl(url) }),
     [addUrl],
@@ -665,7 +665,7 @@ function AgentMessage({
     responses: readonly AgentToolInputResponse[],
   ) => void | Promise<void>
 }) {
-  // A text attachment rides in as its own text part (agent-eve emits
+  // A text attachment rides in as its own text part (the app's Eve adapter emits
   // `Attached file: <name>\n\n```\n<body>\n``` `). The model reads it verbatim,
   // but rendering it inline would dump the whole file into the bubble — so peel
   // those out here and render a collapsible chip below instead. Display-only:
@@ -842,9 +842,10 @@ function AttachmentPreview({
   )
 }
 
-// Matches the exact shape agent-eve emits for a textual attachment. Anchored so
-// a part that merely mentions a file (typed prose) never matches; the trailing
-// `$` lets the greedy body span internal ``` fences to the final closing fence.
+// Matches the exact shape the app's Eve adapter emits for a textual attachment.
+// Anchored so a part that merely mentions a file (typed prose) never matches;
+// the trailing `$` lets the greedy body span internal ``` fences to the final
+// closing fence.
 const TEXT_ATTACHMENT_PATTERN = /^Attached file: ([^\n]+)\n\n```\n([\s\S]*)\n```$/
 
 function parseTextAttachment(

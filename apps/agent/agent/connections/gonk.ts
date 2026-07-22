@@ -1,6 +1,6 @@
 import { defineMcpClientConnection } from "eve/connections";
-import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation";
 import { readGonkClientEnvironment } from "@workspace/runtime-env/server";
+import { createGonkTurnAuthProvider } from "../lib/gonk-turn-delegation";
 import { toolApprovalModeFor } from "../lib/tool-approval-preference";
 
 const { apiKey: token, gonkMcpUrl } = readGonkClientEnvironment(process.env);
@@ -17,26 +17,14 @@ export default defineMcpClientConnection({
     ) === "always"
       ? "not-applicable"
       : "user-approval",
+  auth: (context) => createGonkTurnAuthProvider(context, token),
   headers: ({ session }): Readonly<Record<string, string>> => {
     const resourceScope =
       session.auth.current?.attributes.sigilResourceScope ??
       session.auth.current?.attributes.sigilSessionScope
-    const scopeProof = session.auth.current?.attributes.sigilScopeProof
     if (typeof resourceScope !== "string" || resourceScope.length === 0) {
       return {}
     }
-    return {
-      "x-sigil-scope": resourceScope,
-      ...(typeof scopeProof === "string" && scopeProof.length > 0
-        ? { [AGENT_SCOPE_PROOF_HEADER]: scopeProof }
-        : {}),
-    }
+    return { "x-sigil-scope": resourceScope }
   },
-  ...(token
-    ? {
-        auth: {
-          getToken: async () => ({ token }),
-        },
-      }
-    : {}),
 });

@@ -17,9 +17,9 @@
 - **Attachments** — upload (drag-drop / paste / paste-URL / pick, multiple),
   optimistic queue, preview chips, delivery to the model. Images → vision;
   text documents (md/csv/txt/json/code) → readable text. **Delivery is inlined
-  browser-side** by `@zigil/agent-eve` (the AI SDK SSRF-guards local URL
-  downloads upstream of the model, so a URL reference can't reach the model —
-  bytes must ride in the turn). Working; two follow-ups below.
+  browser-side** by the app-owned Eve client adapter (the AI SDK SSRF-guards
+  local URL downloads upstream of the model, so a URL reference can't reach
+  the model — bytes must ride in the turn). Working; two follow-ups below.
   - *Follow-up: durable reload.* Inlining bloats the turn and eve does not
     persist large inline content, so attachment thumbnails don't survive a
     refresh. A durable design can't use a URL reference (SSRF guard) — needs a
@@ -78,6 +78,12 @@ These ship today as product surfaces over the Gonk/eve substrate:
 
 Remaining in this family: richer authoring flows (create/edit wizards beyond
 the current forms).
+
+- **Eve/Gonk turn convergence (S9.3)** — one web turn bootstrap replaces two
+  proof-minting calls; Eve now issues a short-lived, turn-bound bearer for each
+  Gonk tool execution; Gonk checks it against the durable session binding and
+  live scope authorization. Slack is the next useful channel validator after
+  external identity linking, not a second tool/auth pipeline. Done.
 
 ## Requested — agent memory & workspace
 

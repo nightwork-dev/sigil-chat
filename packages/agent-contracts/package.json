@@ -18,6 +18,7 @@
   },
   "exports": {
     "./client-command": "./src/client-command.ts",
+    "./gonk-turn-delegation": "./src/gonk-turn-delegation.ts",
     "./scope-authorization": "./src/scope-authorization.ts",
     "./scope-delegation": "./src/scope-delegation.ts",
     "./scope-delegation.server": "./src/scope-delegation.server.ts",
