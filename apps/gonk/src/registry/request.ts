@@ -79,8 +79,23 @@ export function registerRequestTools(
       additionalProperties: false,
     },
     hints: readHints,
-    handler: async (input) => {
-      const result = await workItemsRepository.searchRequests(input.filter);
+    handler: async (input, context) => {
+      const target = resolveTargetScope(undefined, toHostContext(context.host));
+      await requireScopeAccess(context.auth, target);
+      if (
+        input.filter?.homeScopeId &&
+        !matchesTargetScope(input.filter.homeScopeId, target)
+      ) {
+        const revision = (
+          await workItemsRepository.searchRequests({ homeScopeId: target.id })
+        ).revision;
+        assertRevision(revision, input.expectedRevision);
+        return { data: { revision, requests: [] } };
+      }
+      const result = await workItemsRepository.searchRequests({
+        ...input.filter,
+        homeScopeId: target.id,
+      });
       assertRevision(result.revision, input.expectedRevision);
       return { data: result };
     },
@@ -106,8 +121,14 @@ export function registerRequestTools(
       additionalProperties: false,
     },
     hints: readHints,
-    handler: async (input) => {
-      const result = await workItemsRepository.inspectRequest(input.id);
+    handler: async (input, context) => {
+      const target = resolveTargetScope(undefined, toHostContext(context.host));
+      await requireScopeAccess(context.auth, target);
+      const result = await opaqueRequestLookup(() =>
+        workItemsRepository.inspectRequest(input.id),
+      );
+      if (result.request.homeScopeId !== target.id)
+        throw new Error("Request was not found.");
       assertRevision(result.revision, input.expectedRevision);
       return { data: result };
     },
@@ -193,10 +214,13 @@ export function registerRequestTools(
     inputJsonSchema: requestEvidenceSchema(),
     hints: writeHints,
     handler: async (input, context) => {
-      const inspect = await workItemsRepository.inspectRequest(input.requestId);
-      const host = toHostContext(context.host);
-      const target = resolveTargetScope(inspect.request.homeScopeId, host);
+      const target = resolveTargetScope(undefined, toHostContext(context.host));
       const principal = await requireScopeWrite(context.auth, target);
+      const inspect = await opaqueRequestLookup(() =>
+        workItemsRepository.inspectRequest(input.requestId),
+      );
+      if (inspect.request.homeScopeId !== target.id)
+        throw new Error("Request was not found.");
       const result = await workItemsRepository.addRequestEvidence(
         input,
         {
@@ -243,6 +267,13 @@ async function requireScopeWrite(
   auth: AuthContext | undefined,
   target: ScopeTarget,
 ): Promise<AuthenticatedPrincipal & { kind: "human" }> {
+  return requireScopeAccess(auth, target);
+}
+
+async function requireScopeAccess(
+  auth: AuthContext | undefined,
+  target: ScopeTarget,
+): Promise<AuthenticatedPrincipal & { kind: "human" }> {
   if (
     !auth?.principal ||
     auth.principal.kind !== "human" ||
@@ -266,6 +297,19 @@ async function requireScopeWrite(
     );
   }
   return auth.principal as AuthenticatedPrincipal & { kind: "human" };
+}
+
+async function opaqueRequestLookup<T>(lookup: () => Promise<T>): Promise<T> {
+  try {
+    return await lookup();
+  } catch {
+    throw new Error("Request was not found.");
+  }
+}
+
+function matchesTargetScope(value: string, target: ScopeTarget): boolean {
+  const trimmed = value.trim();
+  return trimmed === target.id || trimmed === target.resourceScope;
 }
 
 function toHostContext(

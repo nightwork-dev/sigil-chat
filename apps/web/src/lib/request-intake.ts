@@ -20,6 +20,20 @@ type HumanRequestInput = FeatureRequestProposalInput & {
   expectedRevision?: number
 }
 
+type ScopedRequestEvidenceInput = AddRequestEvidenceInput & {
+  currentScopeId: string
+}
+
+type RequestScopeAccess = {
+  canAccess(input: {
+    principalId: string
+    scopeId: string
+    action: "board.read" | "board.write"
+  }): boolean
+}
+
+const opaqueRequestMessage = "Request was not found."
+
 const searchRequestsFn = createServerFn({ method: "GET" })
   .validator((input?: { filter?: RequestFilter }) => input ?? {})
   .handler(async ({ data }): Promise<RequestSearchResult> => {
@@ -27,9 +41,16 @@ const searchRequestsFn = createServerFn({ method: "GET" })
     const { authenticatedWorkItemsViewer } = await import(
       "@/lib/work-items-viewer.server"
     )
-    authenticatedWorkItemsViewer(await getSession())
+    const { currentWorkItemsScopeAccess } = await import(
+      "@/lib/work-items-access.server"
+    )
+    const viewer = authenticatedWorkItemsViewer(await getSession())
     const { workItemsRepository } = await import("@workspace/work-items-store")
-    return workItemsRepository.searchRequests(data.filter)
+    return filterVisibleRequestSearchResult(
+      await workItemsRepository.searchRequests(data.filter),
+      viewer.id,
+      currentWorkItemsScopeAccess(),
+    )
   })
 
 const inspectRequestFn = createServerFn({ method: "GET" })
@@ -39,9 +60,16 @@ const inspectRequestFn = createServerFn({ method: "GET" })
     const { authenticatedWorkItemsViewer } = await import(
       "@/lib/work-items-viewer.server"
     )
-    authenticatedWorkItemsViewer(await getSession())
+    const { currentWorkItemsScopeAccess } = await import(
+      "@/lib/work-items-access.server"
+    )
+    const viewer = authenticatedWorkItemsViewer(await getSession())
     const { workItemsRepository } = await import("@workspace/work-items-store")
-    return workItemsRepository.inspectRequest(data.id)
+    return requireReadableRequestInspectResult(
+      await opaqueRequestLookup(() => workItemsRepository.inspectRequest(data.id)),
+      viewer.id,
+      currentWorkItemsScopeAccess(),
+    )
   })
 
 const createHumanRequestFn = createServerFn({ method: "POST" })
@@ -85,7 +113,7 @@ const createHumanRequestFn = createServerFn({ method: "POST" })
   })
 
 const addRequestEvidenceFn = createServerFn({ method: "POST" })
-  .validator((input: AddRequestEvidenceInput) => input)
+  .validator((input: ScopedRequestEvidenceInput) => input)
   .handler(async ({ data }): Promise<WorkItemsMutationResult> => {
     const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer } = await import(
@@ -95,18 +123,24 @@ const addRequestEvidenceFn = createServerFn({ method: "POST" })
       "@/lib/work-items-access.server"
     )
     const viewer = authenticatedWorkItemsViewer(await getSession())
+    requireWritableScope(
+      data.currentScopeId,
+      viewer.id,
+      currentWorkItemsScopeAccess(),
+    )
     const { workItemsRepository } = await import("@workspace/work-items-store")
-    const inspected = await workItemsRepository.inspectRequest(data.requestId)
-    if (
-      !currentWorkItemsScopeAccess().canAccess({
-        principalId: viewer.id,
-        scopeId: inspected.request.homeScopeId,
-        action: "board.write",
-      })
-    ) {
-      throw new Error("Request intake scope was not found.")
+    const inspected = requireWritableRequestInspectResult(
+      await opaqueRequestLookup(() =>
+        workItemsRepository.inspectRequest(data.requestId),
+      ),
+      viewer.id,
+      currentWorkItemsScopeAccess(),
+    )
+    if (inspected.request.homeScopeId !== data.currentScopeId) {
+      throw new Error(opaqueRequestMessage)
     }
-    return workItemsRepository.addRequestEvidence(data, {
+    const { currentScopeId: _currentScopeId, ...evidenceInput } = data
+    return workItemsRepository.addRequestEvidence(evidenceInput, {
       actorPrincipalId: viewer.id,
       requesterId: viewer.id,
       requesterKind: "human",
@@ -161,7 +195,7 @@ export function useCreateHumanRequest() {
 export function useAddRequestEvidence() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: AddRequestEvidenceInput) =>
+    mutationFn: (input: ScopedRequestEvidenceInput) =>
       addRequestEvidenceFn({ data: input }),
     onSuccess: (result) => reconcileRequest(queryClient, result),
   })
@@ -188,4 +222,71 @@ function reconcileRequest(
   return queryClient.invalidateQueries({ queryKey: requestKeys.all() })
 }
 
-export type { HumanRequestInput }
+export function filterVisibleRequestSearchResult(
+  result: RequestSearchResult,
+  principalId: string,
+  access: RequestScopeAccess,
+): RequestSearchResult {
+  return {
+    ...result,
+    requests: result.requests.filter((request) =>
+      access.canAccess({
+        principalId,
+        scopeId: request.homeScopeId,
+        action: "board.read",
+      }),
+    ),
+  }
+}
+
+export function requireReadableRequestInspectResult(
+  result: RequestInspectResult,
+  principalId: string,
+  access: RequestScopeAccess,
+): RequestInspectResult {
+  if (
+    !access.canAccess({
+      principalId,
+      scopeId: result.request.homeScopeId,
+      action: "board.read",
+    })
+  ) {
+    throw new Error(opaqueRequestMessage)
+  }
+  return result
+}
+
+export function requireWritableRequestInspectResult(
+  result: RequestInspectResult,
+  principalId: string,
+  access: RequestScopeAccess,
+): RequestInspectResult {
+  requireWritableScope(result.request.homeScopeId, principalId, access)
+  return result
+}
+
+function requireWritableScope(
+  scopeId: string,
+  principalId: string,
+  access: RequestScopeAccess,
+): void {
+  if (
+    !access.canAccess({
+      principalId,
+      scopeId,
+      action: "board.write",
+    })
+  ) {
+    throw new Error(opaqueRequestMessage)
+  }
+}
+
+async function opaqueRequestLookup<T>(lookup: () => Promise<T>): Promise<T> {
+  try {
+    return await lookup()
+  } catch {
+    throw new Error(opaqueRequestMessage)
+  }
+}
+
+export type { HumanRequestInput, ScopedRequestEvidenceInput }

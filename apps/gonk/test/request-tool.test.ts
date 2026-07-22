@@ -10,15 +10,20 @@ import { describe, expect, it, vi } from "vitest";
 import { sigilApprovalProvider } from "../src/registry/approval.js";
 import { registerRequestTools } from "../src/registry/request.js";
 
-function setup(options?: { auth?: AuthContext }) {
+function setup(options?: {
+  auth?: AuthContext;
+  host?: { resourceScope?: unknown; sessionScope?: unknown };
+}) {
   const repository = new MemoryWorkItemsRepository();
   const registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
   });
   registerRequestTools(registry, repository);
   const context = makeBaseContext({
-    auth: options?.auth ?? allowedAuth(),
-    host: {
+    ...(options && "auth" in options
+      ? { auth: options.auth }
+      : { auth: allowedAuth() }),
+    host: options?.host ?? {
       resourceScope: { tier: "workspace", id: "workspace-a" },
       sessionScope: "thread-a",
     },
@@ -155,7 +160,124 @@ describe("request intake tools", () => {
     });
     vi.useRealTimers();
   });
+
+  it("does not leak cross-scope requests through search", async () => {
+    const { context, registry, repository } = setup();
+    await seedRequest(repository, {
+      currentScopeId: "workspace-b",
+      title: "Hidden workspace evidence intake",
+    });
+
+    await expect(
+      collectToolOutcome(
+        registry.invoke(
+          "sigil-request-search",
+          { filter: { homeScopeId: "workspace-b", query: "Hidden" } },
+          context,
+        ),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { requests: [] },
+    });
+
+    await expect(
+      collectToolOutcome(
+        registry.invoke(
+          "sigil-request-search",
+          { filter: { query: "Hidden workspace" } },
+          context,
+        ),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { requests: [] },
+    });
+  });
+
+  it("makes unknown and cross-scope inspect failures opaque", async () => {
+    const { context, registry, repository } = setup();
+    await seedRequest(repository, {
+      currentScopeId: "workspace-b",
+      title: "Hidden inspect request",
+    });
+
+    const hidden = await collectToolOutcome(
+      registry.invoke("sigil-request-inspect", { id: "FR.1" }, context),
+    );
+    const unknown = await collectToolOutcome(
+      registry.invoke("sigil-request-inspect", { id: "FR.999" }, context),
+    );
+
+    expect(hidden).toMatchObject({
+      ok: false,
+      message: "Request was not found.",
+    });
+    expect(unknown).toEqual(hidden);
+  });
+
+  it("authorizes the current scope before opaque evidence lookup", async () => {
+    const { context, registry, repository } = setup();
+    await seedRequest(repository, {
+      currentScopeId: "workspace-b",
+      title: "Hidden evidence request",
+    });
+
+    const hidden = await addEvidence(registry, context, "FR.1");
+    const unknown = await addEvidence(registry, context, "FR.999");
+
+    expect(hidden).toMatchObject({
+      ok: false,
+      message: "Request was not found.",
+    });
+    expect(unknown).toEqual(hidden);
+    await expect(repository.get()).resolves.toMatchObject({ revision: 1 });
+  });
 });
+
+async function addEvidence(
+  registry: ToolRegistry,
+  context: Parameters<ToolRegistry["invoke"]>[2],
+  requestId: string,
+) {
+  return collectToolOutcome(
+    registry.invoke(
+      "sigil-request-add-evidence",
+      {
+        requestId,
+        evidence: {
+          constraint: "Repeated task cannot attach evidence.",
+          workaround: "Manual note.",
+          cost: "The request strength is hidden.",
+          expectedImprovement: "Evidence appends to the canonical request.",
+        },
+      },
+      context,
+    ),
+  );
+}
+
+async function seedRequest(
+  repository: MemoryWorkItemsRepository,
+  input: { currentScopeId: string; title: string },
+) {
+  return repository.proposeFeatureRequest(
+    {
+      requestKind: "workflow",
+      title: input.title,
+      problem: "A hidden workspace has a durable request.",
+      desiredOutcome: "Unauthorized callers cannot infer its existence.",
+    },
+    {
+      actorPrincipalId: "user-hidden",
+      requesterId: "user-hidden",
+      requesterKind: "human",
+      originMode: "human-direct",
+      currentScopeId: input.currentScopeId,
+      now: "2026-07-22T03:30:00.000Z",
+    },
+  );
+}
 
 function allowedAuth(): AuthContext {
   return {
