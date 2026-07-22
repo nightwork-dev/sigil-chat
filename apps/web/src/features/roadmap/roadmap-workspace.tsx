@@ -389,7 +389,7 @@ function RoadmapCard({
         onMouseEnter={() => onHover(story.id)}
         onMouseLeave={() => onHover(null)}
         className={cn(
-          "flex w-full flex-col gap-2 rounded-md border bg-card p-3 text-left transition-colors",
+          "group flex w-full flex-col gap-2 rounded-md border bg-card p-3 text-left transition-colors",
           selected
             ? "border-primary ring-1 ring-primary/30"
             : relationship === "prerequisite"
@@ -397,7 +397,9 @@ function RoadmapCard({
               : relationship === "dependent"
                 ? "border-info/70 bg-info/10"
                 : "border-border hover:border-border/80 hover:bg-muted/40",
-          !selected && unresolvedPrerequisites.length > 0 && "border-destructive/70",
+          !selected &&
+            unresolvedPrerequisites.length > 0 &&
+            "border-muted-foreground/20 hover:border-warning/50",
           relationshipsActive && relationship === "unrelated" && "opacity-45",
         )}
       >
@@ -425,7 +427,7 @@ function RoadmapCard({
           </button>
           {unresolvedPrerequisites.length > 0 ? (
             <span
-              className="mt-0.5 shrink-0 text-destructive"
+              className="mt-0.5 shrink-0 text-muted-foreground/35 transition-colors group-hover:text-warning"
               title={`Blocked by unresolved prerequisites: ${unresolvedPrerequisites.join(", ")}`}
             >
               <TriangleAlertIcon className="size-3.5" aria-hidden="true" />
@@ -442,16 +444,6 @@ function RoadmapCard({
         <div className="pl-5">
           <Story.Meta />
         </div>
-        {relationship === "prerequisite" || relationship === "dependent" ? (
-          <span
-            className={cn(
-              "pl-5 text-[0.625rem] font-medium",
-              relationship === "prerequisite" ? "text-warning" : "text-info",
-            )}
-          >
-            {relationship === "prerequisite" ? "Prerequisite" : "Dependent"}
-          </span>
-        ) : null}
       </div>
     </Story.Root>
   )
