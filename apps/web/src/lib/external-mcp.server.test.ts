@@ -723,6 +723,7 @@ async function createFixture() {
     isProduction: true,
     registrationOpen: false,
     secret: "test-secret-with-at-least-thirty-two-characters",
+    socialProviders: {},
     trustedOrigins: ["https://chat.example.test"],
   }
   const auth = createSigilAuth({ client, environment, kysely })
