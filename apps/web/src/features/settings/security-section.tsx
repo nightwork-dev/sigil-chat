@@ -13,8 +13,11 @@ import { Input } from "@workspace/ui/components/input"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 
 import { authClient } from "@/lib/auth/client"
+import { useAuthAccounts } from "@/lib/auth/accounts"
 import { useAuthSessions, useRevokeSession } from "@/lib/auth/sessions"
+import type { LoginMethods } from "@/lib/auth/login-methods"
 import { InvitesSection } from "./invites-section"
+import { SignInMethods } from "./sign-in-methods"
 
 function formatTimestamp(value: string): string {
   const date = new Date(value)
@@ -58,7 +61,9 @@ function ChangePasswordForm() {
 
   const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword
   const canSubmit =
-    currentPassword.length > 0 && newPassword.length >= 8 && newPassword === confirmPassword
+    currentPassword.length > 0 &&
+    newPassword.length >= 8 &&
+    newPassword === confirmPassword
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -215,16 +220,32 @@ function SessionsList({ userId }: { userId: string }) {
 
 export function SecuritySection({
   isOwner,
+  loginMethods,
+  providerLinkError,
   userId,
 }: {
   isOwner: boolean
+  loginMethods: LoginMethods
+  providerLinkError: boolean
   userId: string
 }) {
+  const accountsQuery = useAuthAccounts(userId)
+  const hasPassword = accountsQuery.data?.some(
+    ({ providerId }) => providerId === "credential",
+  )
+
   return (
     <div className="flex max-w-xl flex-col gap-6 p-4">
-      <section className="rounded-lg border border-border p-3">
-        <ChangePasswordForm />
-      </section>
+      <SignInMethods
+        loginMethods={loginMethods}
+        providerLinkError={providerLinkError}
+        userId={userId}
+      />
+      {hasPassword ? (
+        <section className="rounded-lg border border-border p-3">
+          <ChangePasswordForm />
+        </section>
+      ) : null}
       <section className="flex flex-col gap-3">
         <SectionHeader>Active sessions</SectionHeader>
         <SessionsList userId={userId} />

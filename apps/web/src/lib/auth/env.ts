@@ -9,7 +9,7 @@ import {
 } from "node:fs"
 import { dirname, resolve } from "node:path"
 
-import type { MagicLinkEmailConfig } from "./magic-link-email.server"
+import type { AuthEmailConfig } from "./auth-email.server"
 
 export interface SocialProviderCredentials {
   clientId: string
@@ -33,7 +33,7 @@ export interface AuthEnvironment {
   databaseUrl: string
   installationId: string
   isProduction: boolean
-  magicLinkEmail?: MagicLinkEmailConfig
+  authEmail?: AuthEmailConfig
   registrationOpen: boolean
   secret: string
   socialProviders: SocialProviderEnvironment
@@ -149,10 +149,10 @@ export function readAuthEnvironment(
   const installationId =
     source.SIGIL_INSTALLATION_ID ??
     (isProduction ? undefined : "sigil-chat-local")
-  const magicLinkApiKey = source.RESEND_API_KEY?.trim()
-  const magicLinkFrom = source.SIGIL_AUTH_EMAIL_FROM?.trim()
+  const authEmailApiKey = source.RESEND_API_KEY?.trim()
+  const authEmailFrom = source.SIGIL_AUTH_EMAIL_FROM?.trim()
 
-  if (Boolean(magicLinkApiKey) !== Boolean(magicLinkFrom)) {
+  if (Boolean(authEmailApiKey) !== Boolean(authEmailFrom)) {
     throw new Error(
       "RESEND_API_KEY and SIGIL_AUTH_EMAIL_FROM must be configured together",
     )
@@ -180,8 +180,8 @@ export function readAuthEnvironment(
     databaseUrl,
     installationId,
     isProduction,
-    ...(magicLinkApiKey && magicLinkFrom
-      ? { magicLinkEmail: { apiKey: magicLinkApiKey, from: magicLinkFrom } }
+    ...(authEmailApiKey && authEmailFrom
+      ? { authEmail: { apiKey: authEmailApiKey, from: authEmailFrom } }
       : {}),
     registrationOpen: source.SIGIL_AUTH_REGISTRATION === "open",
     secret,

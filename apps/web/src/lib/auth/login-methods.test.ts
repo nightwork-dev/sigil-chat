@@ -6,7 +6,7 @@ describe("resolveLoginMethods", () => {
   it("returns only methods backed by complete server configuration", () => {
     expect(
       resolveLoginMethods({
-        magicLinkEmail: {
+        authEmail: {
           apiKey: "resend-key",
           from: "Sigil <signin@example.test>",
         },
@@ -20,6 +20,7 @@ describe("resolveLoginMethods", () => {
         },
       }),
     ).toEqual({
+      authEmailAvailable: true,
       magicLinkAvailable: true,
       socialProviderIds: ["okta", "github"],
     })

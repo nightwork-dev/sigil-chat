@@ -7,9 +7,9 @@
 // fetching channel data.
 
 import { useRef, useState, type FormEvent } from "react"
-import { createFileRoute, useRouter } from "@tanstack/react-router"
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
 
-import { Button } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import {
   Card,
   CardContent,
@@ -58,7 +58,8 @@ function loginErrorCallback(returnTo: string | undefined) {
 function LoginPage() {
   const router = useRouter()
   const { error, returnTo } = Route.useSearch()
-  const { magicLinkAvailable, socialProviderIds } = Route.useLoaderData()
+  const { authEmailAvailable, magicLinkAvailable, socialProviderIds } =
+    Route.useLoaderData()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [feedback, setFeedback] = useState<LoginFeedback | null>(() =>
@@ -180,7 +181,21 @@ function LoginPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="password">Password</Label>
+                {authEmailAvailable ? (
+                  <Link
+                    className={buttonVariants({
+                      className: "h-auto px-0",
+                      size: "sm",
+                      variant: "link",
+                    })}
+                    to="/forgot-password"
+                  >
+                    Forgot password?
+                  </Link>
+                ) : null}
+              </div>
               <Input
                 autoComplete="current-password"
                 className="h-11 text-base md:text-sm"

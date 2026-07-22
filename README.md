@@ -95,6 +95,11 @@ closed registration, a provider-verified matching email may link to an
 owner/invite-created account; open registration additionally requires that the
 local email was already verified.
 
+When `RESEND_API_KEY` and `SIGIL_AUTH_EMAIL_FROM` are both configured, the app
+also enables magic-link sign-in, email verification, and password recovery.
+The Security settings page lists connected sign-in methods and lets a user link
+or unlink configured providers while preserving at least one usable account.
+
 The browser obtains a five-minute, Eve-audience JWT from the authenticated web
 session. Eve verifies it against the web app's JWKS and binds every created Eve
 session to the verified subject before returning its session id. Until the

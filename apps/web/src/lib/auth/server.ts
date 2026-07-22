@@ -14,7 +14,11 @@ import type { Kysely } from "kysely"
 
 import { createAuthDatabase, type AuthDatabase } from "./db"
 import { readAuthEnvironment, type AuthEnvironment } from "./env"
-import { sendMagicLinkEmail } from "./magic-link-email.server"
+import {
+  sendMagicLinkEmail,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "./auth-email.server"
 import { assertAuthMigrationsApplied } from "./migrations"
 import {
   createRegistrationPolicy,
@@ -105,6 +109,22 @@ export function createSigilAuthOptions(
       maxPasswordLength: 128,
       // Better Auth's own default floor; no symbol/composition rules.
       minPasswordLength: 8,
+      resetPasswordTokenExpiresIn: 30 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: ({ user, url }) =>
+        sendPasswordResetEmail(
+          environment.authEmail,
+          { email: user.email, url },
+          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+        ),
+    },
+    emailVerification: {
+      sendVerificationEmail: ({ user, url }) =>
+        sendVerificationEmail(
+          environment.authEmail,
+          { email: user.email, url },
+          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+        ),
     },
     rateLimit: {
       enabled: true,
@@ -114,6 +134,9 @@ export function createSigilAuthOptions(
         "/sign-in/oauth2": { max: 10, window: 60 },
         "/sign-in/social": { max: 10, window: 60 },
         "/sign-up/email": { max: 3, window: 60 },
+        "/request-password-reset": { max: 3, window: 60 },
+        "/reset-password": { max: 5, window: 60 },
+        "/send-verification-email": { max: 3, window: 60 },
       },
       max: 100,
       window: 60,
@@ -155,7 +178,7 @@ export function createSigilAuthOptions(
         expiresIn: 15 * 60,
         sendMagicLink: ({ email, url }) =>
           sendMagicLinkEmail(
-            environment.magicLinkEmail,
+            environment.authEmail,
             { email, url },
             { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
           ),

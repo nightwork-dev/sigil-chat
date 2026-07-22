@@ -11,7 +11,11 @@
 
 import { createFileRoute } from "@tanstack/react-router"
 
-import { SettingsPage, type SettingsSection } from "@/features/settings/settings-page"
+import {
+  SettingsPage,
+  type SettingsSection,
+} from "@/features/settings/settings-page"
+import { fetchLoginMethods } from "@/lib/auth/login-methods"
 
 const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   "account",
@@ -30,20 +34,26 @@ function isSettingsSection(value: unknown): value is SettingsSection {
 export const Route = createFileRoute("/_app/settings")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { section: SettingsSection } => ({
+  ): { authError?: string; section: SettingsSection } => ({
+    authError:
+      typeof search.authError === "string" ? search.authError : undefined,
     section: isSettingsSection(search.section) ? search.section : "account",
   }),
+  loader: () => fetchLoginMethods(),
   component: SettingsRoute,
 })
 
 function SettingsRoute() {
   const { user } = Route.useRouteContext()
-  const { section } = Route.useSearch()
+  const { authError, section } = Route.useSearch()
+  const loginMethods = Route.useLoaderData()
   const navigate = Route.useNavigate()
 
   return (
     <SettingsPage
       user={user}
+      loginMethods={loginMethods}
+      providerLinkError={authError === "provider-link"}
       section={section}
       onSectionChange={(next) => navigate({ search: { section: next } })}
     />

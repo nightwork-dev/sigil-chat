@@ -11,9 +11,15 @@ import {
   UserIcon,
 } from "lucide-react"
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
 import type { CurrentSessionUser } from "@/lib/auth/route-guard"
+import type { LoginMethods } from "@/lib/auth/login-methods"
 import { AccountSection } from "./account-section"
 import { AgentSection } from "./agent-section"
 import { AppearanceSection } from "./appearance-section"
@@ -24,7 +30,11 @@ import { usePublishWorkspaceAttention } from "@/components/agent/workspace-atten
 
 export type SettingsSection = "account" | "security" | "appearance" | "agent"
 
-const SETTINGS_TABS: { value: SettingsSection; label: string; icon: typeof UserIcon }[] = [
+const SETTINGS_TABS: {
+  value: SettingsSection
+  label: string
+  icon: typeof UserIcon
+}[] = [
   { value: "account", label: "Account", icon: UserIcon },
   { value: "security", label: "Security", icon: KeyRoundIcon },
   { value: "appearance", label: "Appearance", icon: PaletteIcon },
@@ -35,10 +45,14 @@ export function SettingsPage({
   user,
   section,
   onSectionChange,
+  loginMethods,
+  providerLinkError,
 }: {
   user: CurrentSessionUser
   section: SettingsSection
   onSectionChange: (section: SettingsSection) => void
+  loginMethods: LoginMethods
+  providerLinkError: boolean
 }) {
   // Attention coverage: the selected settings section flows into
   // agent context, so "change my theme" / "explain this setting" have a target.
@@ -50,7 +64,8 @@ export function SettingsPage({
     selection: {
       kind: "settings-section",
       id: section,
-      label: SETTINGS_TABS.find((tab) => tab.value === section)?.label ?? section,
+      label:
+        SETTINGS_TABS.find((tab) => tab.value === section)?.label ?? section,
     },
     history: telemetry.history,
   }
@@ -93,7 +108,12 @@ export function SettingsPage({
             <AccountSection user={user} />
           </TabsContent>
           <TabsContent value="security">
-            <SecuritySection isOwner={user.role === "owner"} userId={user.id} />
+            <SecuritySection
+              isOwner={user.role === "owner"}
+              loginMethods={loginMethods}
+              providerLinkError={providerLinkError}
+              userId={user.id}
+            />
           </TabsContent>
           <TabsContent value="appearance">
             <AppearanceSection userId={user.id} />

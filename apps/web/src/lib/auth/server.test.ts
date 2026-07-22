@@ -26,6 +26,19 @@ describe("createSigilAuthOptions", () => {
     const options = createSigilAuthOptions({ client, environment, kysely })
 
     expect(options.rateLimit?.enabled).toBe(true)
+    expect(options.rateLimit?.customRules).toMatchObject({
+      "/request-password-reset": { max: 3, window: 60 },
+      "/reset-password": { max: 5, window: 60 },
+      "/send-verification-email": { max: 3, window: 60 },
+    })
+    expect(options.emailAndPassword).toMatchObject({
+      resetPasswordTokenExpiresIn: 30 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: expect.any(Function),
+    })
+    expect(options.emailVerification).toMatchObject({
+      sendVerificationEmail: expect.any(Function),
+    })
     expect(options.account?.accountLinking?.requireLocalEmailVerified).toBe(
       false,
     )
