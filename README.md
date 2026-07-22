@@ -13,11 +13,11 @@ An agentic chat template with deliberately narrow ownership:
 
 Three services, each with a narrow, non-overlapping job:
 
-| Service | App | Owns | Portless URL |
-| --- | --- | --- | --- |
-| Chat client | `apps/web` | Renders the TanStack Start chat UI; server functions for app-local data | `http://sigil-chat.localhost:1355` |
-| Eve | `apps/agent` | Durable sessions, streaming, interruption, model calls via local Codex | `http://sigil-chat-agent.localhost:1355` |
-| Gonk MCP | `apps/gonk` | Application tool registry, dispatched over authenticated Streamable HTTP MCP | `http://sigil-chat-gonk.localhost:1355/mcp` |
+| Service     | App          | Owns                                                                         | Portless URL                                |
+| ----------- | ------------ | ---------------------------------------------------------------------------- | ------------------------------------------- |
+| Chat client | `apps/web`   | Renders the TanStack Start chat UI; server functions for app-local data      | `http://sigil-chat.localhost:1355`          |
+| Eve         | `apps/agent` | Durable sessions, streaming, interruption, model calls via local Codex       | `http://sigil-chat-agent.localhost:1355`    |
+| Gonk MCP    | `apps/gonk`  | Application tool registry, dispatched over authenticated Streamable HTTP MCP | `http://sigil-chat-gonk.localhost:1355/mcp` |
 
 Those are the primary-checkout URLs. In a linked worktree, Portless prefixes
 all three with the same branch-derived namespace—for example,
@@ -28,6 +28,17 @@ is set, so multiple full stacks can run without colliding.
 
 Eve discovers Gonk's tools through `apps/agent/agent/connections/gonk.ts`; new
 tools go in `apps/gonk/src/registry.ts`, not into Eve directly (see below).
+
+## What's new
+
+The current development slice adds membership-gated project/workspace
+registries, immediate agent-driven blackboard reconciliation, privacy-focused
+memory verification, durable human/agent request intake, model-aware readiness
+diagnostics, and a user-scoped external MCP/API-key gateway foundation.
+
+See [`What changed in July 2026`](docs/guides/whats-new-2026-07.md) for the
+ELI5 explanation, implementation map, security boundaries, and the UI/deployed
+proof that remains open.
 
 ## Run locally
 
@@ -152,8 +163,12 @@ always-current source of truth for every component that exists.
 
 ## Extending
 
-Five task-oriented guides in [`docs/guides/`](docs/guides/) cover the things
+Task-oriented guides in [`docs/guides/`](docs/guides/) cover the things
 this README only points at:
+
+- [`whats-new-2026-07.md`](docs/guides/whats-new-2026-07.md) — a plain-language
+  summary of the current project/workspace, memory, request-intake,
+  observability, and external MCP work, including what is not finished.
 
 - [`adding-a-tool.md`](docs/guides/adding-a-tool.md) — the end-to-end worked
   path for a new application tool, using the real `sigil-chat-status` tool as
@@ -202,6 +217,13 @@ web-issued principal and rejects continuation or stream access when the
 persisted session owner differs from the verified subject. The current Eve
 catalog projection is read-only and removes host filesystem paths.
 
+The public `/api/mcp` gateway does not expose or accept `GONK_MCP_KEY` as a
+user credential. It verifies a user-owned API key, its expiry/revocation and
+rate limits, the live principal and resource membership, explicit tool grants,
+and the MCP session binding before proxying to Gonk. Key lifecycle mutations
+require a one-time password-verified step-up receipt. External key-management
+UI and deployed remote-client proof remain release gates.
+
 Persisted Eve snapshots currently include the event projection and a resumable
 continuation token. They are acceptable only under this local trust model. The
 required retention, redaction, secret-storage, and owner-scoped resume contract
@@ -221,6 +243,7 @@ vendored scaffold CLI.
 
 1. Install or build the current Sigil Design CLI, then generate through the
    published overlay (or a local checkout while developing both repositories):
+
    ```bash
    sigil create my-project \
      --profile chat \

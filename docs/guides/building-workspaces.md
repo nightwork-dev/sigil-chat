@@ -110,6 +110,18 @@ choose, register a new handler object in the `handlers` array in
 right query key, and nothing else — the dispatcher, the event, and the
 mount point are already shared infrastructure.
 
+Current app-owned examples include:
+
+- `containers.changed` invalidates the project/workspace navigation root;
+- `blackboard.changed` invalidates the precise session, workspace, or project
+  blackboard key;
+- `work-items.changed` invalidates both the roadmap and request-intake query
+  roots.
+
+These outcomes are refresh instructions, not authorization receipts. The tool
+must authorize the real resource before mutation; the browser then reconciles
+only after the mutation succeeds.
+
 (The `agentDomainOutcomeFromCommand` function in the same file also
 translates two legacy `clientCommand` shapes, `review.annotation.add` and
 `review.passage.update`, into the same outcome shape for backward

@@ -138,6 +138,12 @@ A missing or mismatched key means Eve can't reach the Gonk tool registry at
 all — it is not a silent unauthenticated fallback. If a new tool isn't
 showing up, check this before suspecting the registry code.
 
+Do not issue `GONK_MCP_KEY` to a human, CLI, or third-party MCP client. The
+public client boundary is the web app's `/api/mcp` gateway, which accepts
+user-owned API keys with explicit resource/tool grants and reauthorizes before
+proxying. The internal bearer proves service identity only; it does not carry
+end-user authority.
+
 ## Client-side approval: the "ask" consent prompt
 
 The tool-tier (`approval: "read" | "write"` on the tool definition) and the
@@ -148,7 +154,7 @@ request by `apps/agent/agent/channels/eve.ts`:
 
 ```ts
 const toolApproval =
-  request.headers.get("x-sigil-tool-approval") === "always" ? "always" : "ask"
+  request.headers.get("x-sigil-tool-approval") === "always" ? "always" : "ask";
 ```
 
 That header is set from the browser side by
@@ -168,7 +174,7 @@ section for the full statement.
    both processes and `pnpm dev` running, the Gonk MCP endpoint is
    `http://sigil-chat-gonk.localhost:1355/mcp`. An MCP `tools/list` call over
    Streamable HTTP against that URL, with `Authorization: Bearer
-   $GONK_MCP_KEY`, should include the new tool name.
+$GONK_MCP_KEY`, should include the new tool name.
 2. **Drive it in chat.** Open `http://sigil-chat.localhost:1355/chat` and ask
    for something that should trigger the tool. With approval mode `"ask"`
    (default), you should see the consent prompt named in the chat UI before
