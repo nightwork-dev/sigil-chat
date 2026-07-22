@@ -24,16 +24,8 @@ import {
   useTransitionStory,
   useUpsertStory,
 } from "@/lib/work-items"
-import {
-  isOwnerGate,
-  Story,
-  STORY_STATUS,
-  STORY_STATUS_ORDER,
-} from "@/components/roadmap/story"
-import {
-  type AttentionContext,
-  type AttentionSelection,
-} from "@zigil/agent-react/attention"
+import { isOwnerGate, Story, STORY_STATUS, STORY_STATUS_ORDER } from "@/components/roadmap/story"
+import { type AttentionContext, type AttentionSelection } from "@zigil/agent-react/attention"
 import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import type {
@@ -45,17 +37,9 @@ import type {
 } from "@workspace/work-items-store/types"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import {
-  KanbanBoard,
-  type KanbanColumn,
-} from "@workspace/ui/components/blocks/kanban-board"
+import { KanbanBoard, type KanbanColumn } from "@workspace/ui/components/blocks/kanban-board"
 import type { SortableItemRenderProps } from "@workspace/ui/components/dnd/sortable"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@workspace/ui/components/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@workspace/ui/components/empty"
 import { Input } from "@workspace/ui/components/input"
 import {
   Select,
@@ -75,6 +59,11 @@ import {
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile"
 import { cn } from "@workspace/ui/lib/utils"
 import type { CurrentSessionUser } from "@/lib/auth/route-guard"
+import {
+  relationshipForStory,
+  storyRelationships,
+  type StoryRelationship,
+} from "./roadmap-relationships"
 
 type AsidePane = "queue" | "detail"
 
@@ -119,12 +108,9 @@ export function RoadmapWorkspace({
   const stories = addressedOnly ? addressedStoriesQuery : allStoriesQuery
   const reviews = useReviews()
   const isMobile = useIsMobile()
-  const [selectedId, setSelectedId] = useState<string | null>(
-    initialSelectedId ?? null,
-  )
-  const [pane, setPane] = useState<AsidePane>(
-    initialSelectedId ? "detail" : "queue",
-  )
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [pane, setPane] = useState<AsidePane>(initialSelectedId ? "detail" : "queue")
   const [sheetOpen, setSheetOpen] = useState(Boolean(initialSelectedId))
 
   const boardStories = stories.data ?? []
@@ -136,6 +122,10 @@ export function RoadmapWorkspace({
   const pendingCount = ownerReviews.filter((review) => !review.completed).length
   const selectedStory = allStories.find((story) => story.id === selectedId) ?? null
   const storiesById = new Map(allStories.map((story) => [story.id, story]))
+  const relationships = storyRelationships(allStories, hoveredId ?? selectedId)
+  const selectedDependents = selectedStory
+    ? allStories.filter((story) => story.deps.includes(selectedStory.id))
+    : []
 
   // KanbanBoard is controlled: it calls onMove, we reconcile by transitioning
   // the story's status (the store is the source of truth). The board reads the
@@ -150,10 +140,7 @@ export function RoadmapWorkspace({
     title: STORY_STATUS[status].label,
   }))
   const boardColumnItems: Record<string, string[]> = Object.fromEntries(
-    STORY_STATUS_ORDER.map((status) => [
-      status,
-      (grouped[status] ?? []).map((story) => story.id),
-    ]),
+    STORY_STATUS_ORDER.map((status) => [status, (grouped[status] ?? []).map((story) => story.id)]),
   )
   function handleBoardMove(id: string, _from: string, to: string, _newIndex: number) {
     transition
@@ -203,6 +190,7 @@ export function RoadmapWorkspace({
       ownerReviews={ownerReviews}
       storiesById={storiesById}
       selectedStory={selectedStory}
+      selectedDependents={selectedDependents}
       onOpenStory={openDetail}
     />
   )
@@ -261,12 +249,17 @@ export function RoadmapWorkspace({
                   key={story.id}
                   story={story}
                   selected={story.id === selectedId}
+                  relationship={relationshipForStory(relationships, story.id)}
+                  relationshipsActive={relationships.activeId !== null}
                   onSelect={openDetail}
+                  onHover={setHoveredId}
                   drag={drag}
                 />
               )}
               renderColumnHeader={(column) => (
-                <span className="text-xs font-medium">{STORY_STATUS[column.id as StoryStatus].label}</span>
+                <span className="text-xs font-medium">
+                  {STORY_STATUS[column.id as StoryStatus].label}
+                </span>
               )}
               className="w-full"
               columnClassName="h-full w-[85vw] max-w-sm snap-start md:w-72 md:max-w-none"
@@ -303,6 +296,7 @@ function AsidePaneBody({
   ownerReviews,
   storiesById,
   selectedStory,
+  selectedDependents,
   onOpenStory,
 }: {
   pane: AsidePane
@@ -311,6 +305,7 @@ function AsidePaneBody({
   ownerReviews: ReviewItem[]
   storiesById: Map<string, StoryData>
   selectedStory: StoryData | null
+  selectedDependents: StoryData[]
   onOpenStory: (id: string) => void
 }) {
   return (
@@ -347,6 +342,9 @@ function AsidePaneBody({
           <StoryDetail
             key={selectedStory.id}
             story={selectedStory}
+            dependents={selectedDependents}
+            storiesById={storiesById}
+            onOpenStory={onOpenStory}
             pendingReview={ownerReviews.some(
               (review) => review.storyId === selectedStory.id && !review.completed,
             )}
@@ -364,12 +362,18 @@ function AsidePaneBody({
 function RoadmapCard({
   story,
   selected,
+  relationship,
+  relationshipsActive,
   onSelect,
+  onHover,
   drag,
 }: {
   story: StoryData
   selected: boolean
+  relationship: StoryRelationship
+  relationshipsActive: boolean
   onSelect: (id: string) => void
+  onHover: (id: string | null) => void
   drag: SortableItemRenderProps
 }) {
   return (
@@ -377,11 +381,16 @@ function RoadmapCard({
       <div
         ref={drag.setNodeRef}
         style={drag.style}
+        onMouseEnter={() => onHover(story.id)}
+        onMouseLeave={() => onHover(null)}
         className={cn(
           "flex w-full flex-col gap-2 rounded-md border bg-card p-3 text-left transition-colors",
           selected
             ? "border-primary ring-1 ring-primary/30"
-            : "border-border hover:border-border/80 hover:bg-muted/40",
+            : relationship === "prerequisite" || relationship === "dependent"
+              ? "border-primary/60 bg-primary/5"
+              : "border-border hover:border-border/80 hover:bg-muted/40",
+          relationshipsActive && relationship === "unrelated" && "opacity-45",
         )}
       >
         <div className="flex items-start gap-1.5">
@@ -413,6 +422,11 @@ function RoadmapCard({
         <div className="pl-5">
           <Story.Meta />
         </div>
+        {relationship === "prerequisite" || relationship === "dependent" ? (
+          <span className="pl-5 text-[0.625rem] font-medium text-primary">
+            {relationship === "prerequisite" ? "Prerequisite" : "Dependent"}
+          </span>
+        ) : null}
       </div>
     </Story.Root>
   )
@@ -436,8 +450,8 @@ function ReviewQueue({
           <EmptyHeader>
             <EmptyTitle>Queue is clear</EmptyTitle>
             <EmptyDescription>
-              Reviews assigned to you appear here. Open a story that needs your
-              review and send it to your queue, or let the agent assign one.
+              Reviews assigned to you appear here. Open a story that needs your review and send it
+              to your queue, or let the agent assign one.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -450,12 +464,7 @@ function ReviewQueue({
         const story = storiesById.get(review.storyId)
         if (!story) return null
         return (
-          <ReviewQueueRow
-            key={review.id}
-            review={review}
-            story={story}
-            onOpenStory={onOpenStory}
-          />
+          <ReviewQueueRow key={review.id} review={review} story={story} onOpenStory={onOpenStory} />
         )
       })}
     </div>
@@ -493,11 +502,7 @@ function ReviewQueueRow({
   const act = (decision: ReviewDecision) =>
     decide
       .mutateAsync({ reviewId: review.id, decision })
-      .then(() =>
-        toast.success(
-          decision === "approved" ? "Review approved" : "Changes requested",
-        ),
-      )
+      .then(() => toast.success(decision === "approved" ? "Review approved" : "Changes requested"))
       .catch((error: unknown) =>
         toast.error(error instanceof Error ? error.message : "Could not record decision"),
       )
@@ -511,11 +516,7 @@ function ReviewQueueRow({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onOpenStory(story.id)}
-          className="min-w-0 text-left"
-        >
+        <button type="button" onClick={() => onOpenStory(story.id)} className="min-w-0 text-left">
           <Story.Title className="text-sm underline-offset-4 hover:underline" />
         </button>
         <Story.Status className="shrink-0" />
@@ -550,7 +551,19 @@ function ReviewQueueRow({
   )
 }
 
-function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview: boolean }) {
+function StoryDetail({
+  story,
+  dependents,
+  storiesById,
+  onOpenStory,
+  pendingReview,
+}: {
+  story: StoryData
+  dependents: StoryData[]
+  storiesById: Map<string, StoryData>
+  onOpenStory: (id: string) => void
+  pendingReview: boolean
+}) {
   const upsert = useUpsertStory()
   const transition = useTransitionStory()
   const assign = useAssignReview()
@@ -562,7 +575,9 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
 
   const save = () =>
     upsert
-      .mutateAsync({ story: { ...story, title: title.trim(), intent: intent.trim() } })
+      .mutateAsync({
+        story: { ...story, title: title.trim(), intent: intent.trim() },
+      })
       .then(() => toast.success("Story saved"))
       .catch((error: unknown) =>
         toast.error(error instanceof Error ? error.message : "Could not save story"),
@@ -594,7 +609,11 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
         <label className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
           Title
         </label>
-        <Input value={title} onChange={(event) => setTitle(event.target.value)} aria-label="Story title" />
+        <Input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          aria-label="Story title"
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -655,9 +674,38 @@ function StoryDetail({ story, pendingReview }: { story: StoryData; pendingReview
           </span>
           <div className="flex flex-wrap gap-1.5">
             {story.deps.map((dep) => (
-              <Badge key={dep} variant="outline" className="font-mono">
+              <Button
+                key={dep}
+                size="xs"
+                variant="outline"
+                className="font-mono"
+                onClick={() => onOpenStory(dep)}
+                title={storiesById.get(dep)?.title}
+              >
                 {dep}
-              </Badge>
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {dependents.length > 0 ? (
+        <div className="space-y-2 border-t border-border pt-4">
+          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            Required by
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {dependents.map((dependent) => (
+              <Button
+                key={dependent.id}
+                size="xs"
+                variant="outline"
+                className="font-mono"
+                onClick={() => onOpenStory(dependent.id)}
+                title={dependent.title}
+              >
+                {dependent.id}
+              </Button>
             ))}
           </div>
         </div>
@@ -707,9 +755,7 @@ function StoryComments({ story }: { story: StoryData }) {
   const [kind, setKind] = useState<StoryComment["kind"]>("suggestion")
   const [addressee, setAddressee] = useState("general")
 
-  const thread = [...(comments.data ?? [])].sort((a, b) =>
-    a.createdAt.localeCompare(b.createdAt),
-  )
+  const thread = [...(comments.data ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const canSend = body.trim().length > 0 && !addComment.isPending
 
   const send = () =>
