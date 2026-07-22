@@ -17,7 +17,7 @@ describe("readAuthEnvironment", () => {
   it("fails closed when production database configuration is missing", () => {
     expect(() =>
       readAuthEnvironment({
-        BETTER_AUTH_URL: "https://chat.example.test",
+        SIGIL_PUBLIC_URL: "https://chat.example.test",
         NODE_ENV: "production",
         SIGIL_INSTALLATION_ID: "production-installation",
       }),
@@ -27,7 +27,7 @@ describe("readAuthEnvironment", () => {
   it("fails closed when the production auth secret is missing", () => {
     expect(() =>
       readAuthEnvironment({
-        BETTER_AUTH_URL: "https://chat.example.test",
+        SIGIL_PUBLIC_URL: "https://chat.example.test",
         NODE_ENV: "production",
         SIGIL_DATABASE_URL: "file:production.db",
         SIGIL_INSTALLATION_ID: "production-installation",
@@ -44,13 +44,13 @@ describe("readAuthEnvironment", () => {
         SIGIL_DATABASE_URL: "file:production.db",
         SIGIL_INSTALLATION_ID: "production-installation",
       }),
-    ).toThrow("BETTER_AUTH_URL is required in production")
+    ).toThrow("SIGIL_PUBLIC_URL is required in production")
 
     expect(() =>
       readAuthEnvironment({
         BETTER_AUTH_SECRET:
           "a-production-secret-with-at-least-thirty-two-characters",
-        BETTER_AUTH_URL: "https://chat.example.test",
+        SIGIL_PUBLIC_URL: "https://chat.example.test",
         NODE_ENV: "production",
         SIGIL_AUTH_TRUSTED_ORIGINS: "https://*.example.test",
         SIGIL_DATABASE_URL: "file:production.db",
@@ -64,7 +64,7 @@ describe("readAuthEnvironment", () => {
       readAuthEnvironment({
         BETTER_AUTH_SECRET:
           "a-production-secret-with-at-least-thirty-two-characters",
-        BETTER_AUTH_URL: "https://chat.example.test",
+        SIGIL_PUBLIC_URL: "https://chat.example.test",
         NODE_ENV: "production",
         SIGIL_DATABASE_URL: "file:production.db",
       }),
@@ -83,6 +83,31 @@ describe("readAuthEnvironment", () => {
     expect(first.installationId).toBe("sigil-chat-local")
     expect(readFileSync(secretPath, "utf8").trim()).toBe(first.secret)
     expect(statSync(secretPath).mode & 0o777).toBe(0o600)
+  })
+
+  it("derives the worktree auth origin from Portless", () => {
+    const directory = mkdtempSync(join(tmpdir(), "sigil-auth-env-"))
+    temporaryDirectories.push(directory)
+
+    const environment = readAuthEnvironment(
+      {
+        PORTLESS_URL: "http://feature-dx.sigil-chat.localhost:1355",
+      },
+      { localSecretPath: join(directory, "auth-secret") },
+    )
+
+    expect(environment.baseUrl).toBe(
+      "http://feature-dx.sigil-chat.localhost:1355",
+    )
+    expect(environment.trustedOrigins).toContain(environment.baseUrl)
+  })
+
+  it("takes registration policy from the checked-in fixture, not the shell", () => {
+    const environment = readAuthEnvironment({
+      SIGIL_AUTH_REGISTRATION: "open",
+    })
+
+    expect(environment.registrationOpen).toBe(false)
   })
 
   it("requires complete authentication email configuration", () => {

@@ -23,12 +23,9 @@ import {
 } from "./artifact-scope.js"
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 
-// Local dev: load the repo-root .env (the single source of truth this process
-// shares with the Eve host — apps/agent/.env is a symlink to the same file, and
-// `eve dev` loads it natively). This is what makes the GONK_MCP_KEY the two
-// processes MUST agree on survive a restart without being exported in the
-// launching shell. A value already present in the parent environment wins,
-// matching Eve's dev env-file precedence — so an explicit export still overrides.
+// Direct app-local development may still load root .env overrides. The normal
+// root `pnpm dev` launcher supplies one generated service key to web, Eve, and
+// Gonk before any process starts, so it does not depend on an app-local symlink.
 if (process.env.GONK_MCP_KEY === undefined) {
   const rootEnv = resolve(import.meta.dirname, "../../../.env")
   if (existsSync(rootEnv)) process.loadEnvFile(rootEnv)

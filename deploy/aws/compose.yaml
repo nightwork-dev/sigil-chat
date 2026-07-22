@@ -75,11 +75,10 @@ services:
     tmpfs: [/tmp:size=64m, /home/sigil/.cache:size=64m]
     environment:
       NODE_ENV: production
-      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
-      BETTER_AUTH_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_DATA_DIR: /var/lib/sigil-web
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
-      SIGIL_AUTH_REGISTRATION: closed
     secrets: [better_auth_secret]
     volumes: [web_data:/var/lib/sigil-web]
     networks: [backend]
@@ -94,12 +93,11 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3000"
-      BETTER_AUTH_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_DATA_DIR: /var/lib/sigil-web
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
       SIGIL_AUTH_TRUSTED_ORIGINS: https://${PUBLIC_HOST:?set PUBLIC_HOST}
-      SIGIL_AUTH_REGISTRATION: closed
-      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
       EVE_ORIGIN: http://eve:3001
       GONK_MCP_URL: http://gonk:8808/mcp
@@ -161,8 +159,8 @@ services:
       HOST: 0.0.0.0
       PORT: "3001"
       SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
-      SIGIL_EVE_AUTH_ISSUER: https://${PUBLIC_HOST:?set PUBLIC_HOST}
-      SIGIL_EVE_AUTH_JWKS_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}/api/auth/jwks
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_EVE_AUTH_JWKS_URL: http://web:3000/api/auth/jwks
       SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
       GONK_MCP_URL: http://gonk:8808/mcp
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
@@ -196,7 +194,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 4
-    # edge too: eve needs egress for JWKS-over-HTTPS and model providers
+    # edge too: Eve needs egress for model providers
     networks: [edge, backend]
 
   gonk:
@@ -211,9 +209,7 @@ services:
       PORT: "8808"
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
       GONK_ALLOWED_HOSTS: gonk:8808
-      SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
-      SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
-      SIGIL_ARTIFACT_DIR: /var/lib/sigil-gonk/artifacts
+      SIGIL_DATA_DIR: /var/lib/sigil-gonk
       SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
       SIGIL_ROADMAP_DIR: /var/lib/sigil-roadmap
       SIGIL_CONTAINER_REGISTRY_ROOT: /var/lib/sigil-containers

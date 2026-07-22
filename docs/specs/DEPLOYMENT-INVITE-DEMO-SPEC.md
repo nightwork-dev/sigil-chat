@@ -106,7 +106,7 @@ same network, volume, TLS, secret-delivery, health, and teardown properties.
 On an empty installation, `/setup` performs one serialized transaction that
 creates exactly one owner. Its successful commit permanently closes bootstrap.
 Concurrent attempts must yield one owner and one rejection. Production never
-sets `SIGIL_AUTH_REGISTRATION=open`.
+changes the application fixture's `auth.registration` policy from `closed`.
 
 ### Issue
 

@@ -12,18 +12,21 @@ The whole file, in full:
 ```ts
 import { defineAgent } from "eve"
 import { experimental_chatgpt } from "eve/models/openai"
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
+
+const { value: sigilConfig } = await loadSigilConfigFixture()
 
 export default defineAgent({
-  model: experimental_chatgpt(process.env.CODEX_MODEL),
+  model: experimental_chatgpt(sigilConfig.agent.model),
   modelContextWindowTokens: 200_000,
 })
 ```
 
 `experimental_chatgpt()` reads the local `codex login` session and calls the
 Codex backend directly — Sigil Chat does not go through Vercel AI Gateway or
-an API key. `process.env.CODEX_MODEL`, if set, overrides Eve's default
-subscription-backed model with a bare OpenAI model slug; leave it unset to
-use the default. `modelContextWindowTokens: 200_000` bounds how much context
+an API key. The checked-in Mirk fixture at
+`fixtures/application/sigil-chat.yaml` supplies a validated bare OpenAI model
+slug. `modelContextWindowTokens: 200_000` bounds how much context
 Eve's own context management will try to fit — this is separate from the
 client-side attention/context-tray budget described in
 `building-workspaces.md`.

@@ -34,6 +34,21 @@ test("fresh deployment orders containers on Eve liveness, not model auth", () =>
   assert.doesNotMatch(eveService, /sigil-chat-agent[^\n]*healthcheck/)
 })
 
+test("Eve keeps public JWT identity separate from internal JWKS routing", () => {
+  const eveService = compose.slice(
+    compose.indexOf("\n  eve:"),
+    compose.indexOf("\n  gonk:"),
+  )
+  assert.match(
+    eveService,
+    /SIGIL_PUBLIC_URL: https:\/\/\$\{PUBLIC_HOST:\?set PUBLIC_HOST\}/,
+  )
+  assert.match(
+    eveService,
+    /SIGIL_EVE_AUTH_JWKS_URL: http:\/\/web:3000\/api\/auth\/jwks/,
+  )
+})
+
 test("runbook proves model readiness only after device login", () => {
   const login = runbook.indexOf("codex login --device-auth")
   const readiness = runbook.indexOf(
@@ -145,7 +160,7 @@ test("production services share writable blackboard storage", () => {
     assert.match(service, /SIGIL_BLACKBOARD_DIR: \/var\/lib\/sigil-blackboard/)
     assert.match(service, /blackboard_data:\/var\/lib\/sigil-blackboard/)
   }
-  assert.match(compose, /SIGIL_ARTIFACT_DIR: \/var\/lib\/sigil-gonk\/artifacts/)
+  assert.match(compose, /SIGIL_DATA_DIR: \/var\/lib\/sigil-gonk/)
 })
 
 test("web and Gonk share writable durable roadmap storage", () => {

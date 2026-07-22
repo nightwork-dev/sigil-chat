@@ -51,15 +51,17 @@ describe("application branding", () => {
   it("supports a complete explicit rebrand", () => {
     const branding = resolveBranding(
       {
-        SIGIL_APP_NAME: "Lantern",
-        SIGIL_APP_TITLE: "Lantern — campaign room",
-        SIGIL_APP_DESCRIPTION: "A collaborative campaign workspace.",
-        SIGIL_APP_ORIGIN: "https://lantern.example/ignored/path",
-        SIGIL_BRAND_COLOR: "#12ABef",
-        SIGIL_INSTANCE_LABEL: "preview",
-        SIGIL_SHARE_IMAGE_URL: "/share/lantern.png",
+        SIGIL_PUBLIC_URL: "https://lantern.example/ignored/path",
       },
       { development: false },
+      {
+        accent: "#12ABef",
+        description: "A collaborative campaign workspace.",
+        instanceLabel: "preview",
+        name: "Lantern",
+        shareImageUrl: "/share/lantern.png",
+        title: "Lantern — campaign room",
+      },
     )
 
     expect(branding).toMatchObject({
@@ -73,25 +75,26 @@ describe("application branding", () => {
     expect(decodeURIComponent(branding.faviconHref)).toContain("#12abef")
   })
 
-  it("allows automatic worktree branding to be explicitly disabled", () => {
+  it("allows checked-in config to disable automatic worktree branding", () => {
     expect(
       resolveBranding(
-        { SIGIL_INSTANCE_LABEL: "" },
+        {},
         { development: true, worktreeName: "sigil-chat-feature" },
+        { instanceLabel: false },
       ).instanceLabel,
     ).toBeUndefined()
   })
 
   it("rejects malformed public branding values", () => {
     expect(() =>
-      resolveBranding({ SIGIL_BRAND_COLOR: "gold" }, { development: false }),
-    ).toThrow("SIGIL_BRAND_COLOR")
+      resolveBranding({}, { development: false }, { accent: "gold" }),
+    ).toThrow("accent")
     expect(() =>
       resolveBranding(
-        { SIGIL_APP_ORIGIN: "file:///tmp/app" },
+        { SIGIL_PUBLIC_URL: "file:///tmp/app" },
         { development: false },
       ),
-    ).toThrow("SIGIL_APP_ORIGIN")
+    ).toThrow("SIGIL_PUBLIC_URL")
   })
 
   it("builds canonical URLs without duplicating separators", () => {

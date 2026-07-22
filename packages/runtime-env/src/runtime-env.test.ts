@@ -12,20 +12,19 @@ import {
   RuntimeEnvironmentError,
 } from "./topology.js";
 import {
-  DEFAULT_CODEX_MODEL,
   parsePort,
-  readAgentEnvironment,
   readEmbeddingEnvironment,
   readGonkClientEnvironment,
+  readDataEnvironment,
   readIdentityEnvironment,
   readOptionalSecretFromFile,
   readGonkServerEnvironment,
   readStorageEnvironment,
 } from "./server.js";
 
-describe("runtime topology", () => {
-  const temporaryDirectories: string[] = [];
+const temporaryDirectories: string[] = [];
 
+describe("runtime topology", () => {
   afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) {
       rmSync(directory, { recursive: true, force: true });
@@ -104,11 +103,6 @@ describe("runtime topology", () => {
       "INVALID_PATH_BASE",
       "PAGES_BASE",
     );
-    expectRuntimeError(
-      () => readAgentEnvironment({ CODEX_MODEL: "bad model" }),
-      "INVALID_MODEL",
-      "CODEX_MODEL",
-    );
   });
 
   it("normalizes static path bases and optional public API URLs", () => {
@@ -135,13 +129,6 @@ describe("runtime topology", () => {
     expect(readRuntimeTopology(env)).not.toHaveProperty("apiKey");
     expect(readPublicWebEnvironment(env)).not.toHaveProperty("apiKey");
     expect(readGonkClientEnvironment(env)).toMatchObject({ apiKey: "token" });
-  });
-
-  it("uses the established model default and accepts an override", () => {
-    expect(readAgentEnvironment({})).toEqual({ model: DEFAULT_CODEX_MODEL });
-    expect(readAgentEnvironment({ CODEX_MODEL: "gpt-5.5" })).toEqual({
-      model: "gpt-5.5",
-    });
   });
 
   it("prefers inline secret value over _FILE", () => {
@@ -172,30 +159,57 @@ describe("runtime topology", () => {
     ).toBe("file-backed-secret");
   });
 
-  it("projects optional storage paths without inventing defaults", () => {
-    expect(readStorageEnvironment({})).toEqual({
-      graphPath: undefined,
-      reviewPath: undefined,
-    });
+  it("derives disposable stores from one data root", () => {
     expect(
-      readStorageEnvironment({
-        SIGIL_CHAT_GRAPH_PATH: " ./data/graph.json ",
-        SIGIL_CHAT_REVIEW_PATH: " data/review.json ",
-      }),
+      readDataEnvironment(
+        { SIGIL_DATA_DIR: " /srv/sigil " },
+        "/workspace/apps/web",
+      ),
     ).toEqual({
-      graphPath: "./data/graph.json",
-      reviewPath: "data/review.json",
+      artifactDir: "/srv/sigil/artifacts",
+      blackboardDir: "/srv/sigil/blackboard",
+      containerRegistryRoot: "/srv/sigil/containers",
+      graphPath: "/srv/sigil/graph",
+      identityDir: "/srv/sigil/identity",
+      memoryDir: "/srv/sigil/identity/memory",
+      personaDir: "/srv/sigil/identity/persona",
+      reviewPath: "/srv/sigil/review",
+      rootDir: "/srv/sigil",
+    });
+  });
+
+  it("keeps specialist storage overrides available for isolated deployments", () => {
+    expect(
+      readStorageEnvironment(
+        {
+          SIGIL_DATA_DIR: "/srv/sigil",
+          SIGIL_CHAT_GRAPH_PATH: " ./data/graph.json ",
+          SIGIL_CHAT_REVIEW_PATH: " data/review.json ",
+        },
+        "/workspace/apps/gonk",
+      ),
+    ).toEqual({
+      graphPath: "/workspace/apps/gonk/data/graph.json",
+      reviewPath: "/workspace/apps/gonk/data/review.json",
     });
   });
 
   it("resolves one shared identity store for sibling app packages", () => {
-    expect(readIdentityEnvironment({}, "/workspace/apps/web")).toEqual({
-      personaDir: "/workspace/.data/persona",
-      memoryDir: "/workspace/.data/memory",
+    const project = temporaryDirectory();
+    writeFileSync(
+      join(project, "package.json"),
+      JSON.stringify({ name: "sigil-chat" }),
+    );
+    const web = join(project, "apps", "web");
+
+    expect(readIdentityEnvironment({}, web)).toEqual({
+      personaDir: join(project, ".data", "identity", "persona"),
+      memoryDir: join(project, ".data", "identity", "memory"),
     });
     expect(
       readIdentityEnvironment(
         {
+          SIGIL_DATA_DIR: "/srv/sigil",
           SIGIL_PERSONA_DIR: "/var/lib/example/personas",
           SIGIL_MEMORY_DIR: "./private-memory",
         },
@@ -205,6 +219,14 @@ describe("runtime topology", () => {
       personaDir: "/var/lib/example/personas",
       memoryDir: "/workspace/apps/agent/private-memory",
     });
+  });
+
+  it("refuses to guess a data root outside a Sigil Chat project", () => {
+    const directory = temporaryDirectory();
+
+    expect(() => readDataEnvironment({}, directory)).toThrow(
+      /Could not find the Sigil Chat project root/,
+    );
   });
 
   it("enables the embedding provider when its configuration is complete", () => {
@@ -270,4 +292,10 @@ function expectRuntimeError(
       detail: expect.any(String),
     });
   }
+}
+
+function temporaryDirectory(): string {
+  const directory = mkdtempSync(join(tmpdir(), "runtime-env-test-"));
+  temporaryDirectories.push(directory);
+  return directory;
 }

@@ -1,16 +1,13 @@
 import { createHash } from "node:crypto"
-import { resolve } from "node:path"
 
-import {
-  ObjectAlreadyExistsError,
-  type ObjectStore,
-} from "@mirk/artifact"
+import { ObjectAlreadyExistsError, type ObjectStore } from "@mirk/artifact"
 import { FileObjectStore } from "@mirk/artifact/fs"
 import type { AuthenticatedPrincipal } from "@gonk/auth"
 import type {
   ScopeAuthorizationAction,
   ScopeAuthorizationPolicy,
 } from "@workspace/agent-contracts/scope-authorization"
+import { readDataEnvironment } from "@workspace/runtime-env/server"
 
 import {
   formatScopeHeader,
@@ -27,7 +24,8 @@ import {
 // Interim home: staged from Verdaccio until @mirk/artifact publishes to public
 // npm; the store swaps to a Surreal-backed ObjectStore later behind the same
 // port with no change here.
-const root = process.env.SIGIL_ARTIFACT_DIR ?? resolve(".data/artifacts")
+const root =
+  process.env.SIGIL_ARTIFACT_DIR ?? readDataEnvironment(process.env).artifactDir
 const store = new FileObjectStore({ root })
 
 export function getArtifactStore(): FileObjectStore {
@@ -258,12 +256,10 @@ export class SessionArtifactStore {
     try {
       const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes))
       if (!Array.isArray(parsed)) return []
-      return parsed
-        .filter(isStoredArtifactMetadata)
-        .map((value) => ({
-          ...value,
-          scope: normalizeScope(value.scope) as ResourceScope,
-        }))
+      return parsed.filter(isStoredArtifactMetadata).map((value) => ({
+        ...value,
+        scope: normalizeScope(value.scope) as ResourceScope,
+      }))
     } catch {
       return []
     }
@@ -371,7 +367,8 @@ export function getSessionArtifactStore(): SessionArtifactStore {
 
 function requireScope(input: ScopeInput): ResourceScope {
   const scope = normalizeScope(input)
-  if (!scope) throw new Error("Artifact operations require a valid resource scope.")
+  if (!scope)
+    throw new Error("Artifact operations require a valid resource scope.")
   return scope
 }
 
@@ -386,9 +383,10 @@ function manifestKey(scope: ResourceScope): string {
   return `${directory}/${digest}/artifacts`
 }
 
-function isStoredArtifactMetadata(
-  value: unknown,
-): value is Omit<SessionArtifactMetadata, "scope"> & {
+function isStoredArtifactMetadata(value: unknown): value is Omit<
+  SessionArtifactMetadata,
+  "scope"
+> & {
   scope: ScopeInput
 } {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -423,7 +421,9 @@ function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
   )
 }
 
-async function collectBytes(stream: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
+async function collectBytes(
+  stream: AsyncIterable<Uint8Array>,
+): Promise<Uint8Array> {
   const chunks: Uint8Array[] = []
   let size = 0
   for await (const chunk of stream) {
@@ -440,7 +440,9 @@ async function collectBytes(stream: AsyncIterable<Uint8Array>): Promise<Uint8Arr
   return bytes
 }
 
-function extensionFromFilename(filename: string | undefined): string | undefined {
+function extensionFromFilename(
+  filename: string | undefined,
+): string | undefined {
   if (!filename) return undefined
   const match = /\.([a-zA-Z0-9]+)$/.exec(filename)
   return match?.[1]?.toLowerCase()

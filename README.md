@@ -42,49 +42,47 @@ proof that remains open.
 
 ## Run locally
 
-Requires Node 24 and [Portless](https://www.npmjs.com/package/portless)
-(`npm i -g portless`), which turns each service's dev script into a stable
-`.localhost` URL — no per-service port juggling. All other dependencies,
-including the `@gonk/*` and `@zigil/*` packages, resolve from the
-configured npm registries.
+Requires Node 24, [Portless](https://www.npmjs.com/package/portless)
+(`npm i -g portless`), and a one-time `codex login`. Everything else resolves
+from the repository and public npm.
 
 ```bash
-pnpm install
 pnpm dev
 ```
 
-Turbo starts the three worktree-aware Portless services listed above. The web
-tab title and procedural favicon use the same namespace so parallel stacks are
-visually distinct. To run the services on
-plain, unproxied ports instead — no Portless daemon, no `.localhost` routing —
-set `PORTLESS=0`:
+The launcher synchronizes the frozen install, generates worktree-local service
+credentials, applies idempotent auth migrations, seeds a development owner,
+and starts the three branch-namespaced services. It then proves the authenticated
+web → Eve → Gonk path, prints one readiness summary, and opens a private
+single-use URL that creates a normal owner session and lands on `/chat`.
+“Ready” therefore means the account store, Eve bearer flow, local Codex model
+session, Gonk connection, and Gonk store all responded—not merely that three
+ports are listening.
 
-```bash
-PORTLESS=0 pnpm dev
-```
+To reset only the current worktree's disposable app state, stop its dev stack
+and run `pnpm dev:reset`. The command moves `.data` and Eve state into a
+recoverable backup under Git's shared metadata and leaves the worktree empty.
+Restore it with the exact `pnpm dev:restore <backup>` command printed by reset.
+The next `pnpm dev` invocation rebuilds the database, credentials, and owner so
+the normal startup path is the first-run path. Reset does not touch `.env`, the
+external roadmap repository, or another worktree.
 
-Run `codex login` before starting the app. Eve's `experimental_chatgpt()` model
+Eve's `experimental_chatgpt()` model
 reads that local login and calls the Codex backend directly; Sigil Chat does not
-use Vercel AI Gateway. The template defaults to `gpt-5.6-terra`; set
-`CODEX_MODEL` to a bare OpenAI model slug to override it. Gonk requires `GONK_MCP_KEY`; set the
-same bearer on the Eve and Gonk services. The mounted adapter has no
-unauthenticated mode, including for local development.
+use Vercel AI Gateway. The template's model is the checked-in `agent.model` in
+`fixtures/application/sigil-chat.yaml`. Gonk still requires
+an authenticated service bearer, but local development generates and supplies
+it automatically. The mounted adapter has no unauthenticated mode.
 
-The web process owns human authentication. Before first use, apply its committed
-Better Auth schema:
-
-```bash
-pnpm auth:migrate
-```
-
-Local development defaults to `file:.data/sigil-chat.db` and maintains an
-owner-only `.data/auth-secret`. Production must provide `SIGIL_DATABASE_URL`
-and a `BETTER_AUTH_SECRET` of at least 32 characters plus a stable
-`SIGIL_INSTALLATION_ID`; server startup fails closed while the latest committed
-migration is absent. Owner-issued member invitations are single-use and expire
-within 24 hours; production also requires a stable
-`SIGIL_INVITE_TOKEN_PEPPER_FILE`. Registration closes after the first owner
-unless the server is started with `SIGIL_AUTH_REGISTRATION=open`.
+The web process owns human authentication. Local development keeps the database
+and owner-only auth secret under the worktree's single `SIGIL_DATA_DIR`.
+Production must provide `SIGIL_PUBLIC_URL`, a `BETTER_AUTH_SECRET` of at least
+32 characters, and a stable `SIGIL_INSTALLATION_ID`; `SIGIL_DATABASE_URL` is
+only needed for a database outside `SIGIL_DATA_DIR`. Server startup fails closed
+while the latest committed migration is absent. Owner-issued member invitations
+are single-use and expire within 24 hours; production also requires a stable
+`SIGIL_INVITE_TOKEN_PEPPER_FILE`. Registration policy is the checked-in
+fixture's `auth.registration` value and defaults to `closed`.
 
 Google, Okta, GitHub, and Discord can be enabled independently with the
 provider-specific `SIGIL_AUTH_*` variables in [`.env.example`](.env.example).
@@ -100,11 +98,18 @@ also enables magic-link sign-in, email verification, and password recovery.
 The Security settings page lists connected sign-in methods and lets a user link
 or unlink configured providers while preserving at least one usable account.
 
+`fixtures/application/sigil-chat.yaml` is the checked-in Mirk fixture for
+product branding and behavior. `SIGIL_PUBLIC_URL` is the single deployment
+origin used by Better Auth, trusted-origin defaults, Eve's JWT issuer, and
+public metadata. Eve normally derives JWKS discovery from it; deployments may
+route retrieval internally with `SIGIL_EVE_AUTH_JWKS_URL` without changing the
+issuer.
+
 The browser obtains a five-minute, Eve-audience JWT from the authenticated web
 session. Eve verifies it against the web app's JWKS and binds every created Eve
-session to the verified subject before returning its session id. Until the
-login/setup surface lands, local development can explicitly set
-`SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH=1`; production rejects that bypass. See
+session to the verified subject before returning its session id. Ordinary local
+development uses that real flow; the unauthenticated development bypass is
+reserved for deliberate host-level tests and is rejected in production. See
 [`.env.example`](.env.example) for the complete auth environment surface.
 
 Image instruction-editing uses the local image gateway's OpenAI-compatible
@@ -192,6 +197,9 @@ this README only points at:
   `apps/agent` anatomy: model config, system instructions, the Eve channel,
   adding a second MCP connection, subagents, and resetting local `.eve`
   state.
+- [`configuration.md`](docs/guides/configuration.md) — the small normal
+  production surface, optional integrations, and why deployment-only storage
+  overrides are not part of fresh-worktree setup.
 - [`building-workspaces.md`](docs/guides/building-workspaces.md) — the
   route/content split, and the two loops that keep a workspace and the agent
   in sync: a tool result becoming a React Query cache update via
@@ -265,12 +273,12 @@ vendored scaffold CLI.
    cd my-project
    ```
 
-2. Review `.env.example`. The generated app has typed defaults for the three
-   local Portless services; use `EVE_ORIGIN`, `GONK_MCP_URL`, and `PORT` for a
-   plain-port or deployed topology.
+2. Review `.env.example` only when deployment overrides are needed. Ordinary
+   local development derives its Portless topology and credentials automatically.
 
-3. Set `GONK_MCP_KEY` (same value for the Eve and Gonk processes), run
-   `codex login`, then install and run:
+3. Run `codex login`, then start the app. The local launcher synchronizes the
+   install and prepares the service bearer, database, and development owner
+   automatically:
    ```bash
    pnpm dev
    ```

@@ -8,6 +8,7 @@ import { spawn } from "node:child_process"
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const appDirectory = resolve(scriptDirectory, "..")
+const projectDirectory = resolve(appDirectory, "../..")
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "sigil-eve-cold-boot-"))
 const output = []
 let child
@@ -28,6 +29,11 @@ try {
   cpSync(join(appDirectory, "scripts"), join(fixtureDirectory, "scripts"), {
     recursive: true,
   })
+  cpSync(
+    join(projectDirectory, "fixtures"),
+    join(fixtureDirectory, "fixtures"),
+    { recursive: true },
+  )
   symlinkSync(join(appDirectory, "node_modules"), join(fixtureDirectory, "node_modules"))
 
   const port = await reservePort()

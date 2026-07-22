@@ -5,7 +5,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@mirk/store-markdown": "0.1.0"
+    "@mirk/store-markdown": "0.1.0",
+    "@workspace/runtime-env": "workspace:*"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

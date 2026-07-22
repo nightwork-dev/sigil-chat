@@ -1,3 +1,5 @@
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
+
 export interface ImageEditRequest {
   readonly sourceBytes: Uint8Array
   readonly sourceMediaType: string
@@ -40,10 +42,9 @@ const IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
  * bytes derived from the supplied source or fails with a loud backend error.
  */
 export const editImageThroughGateway: ImageEditProvider = async (request) => {
+  const { value: sigilConfig } = await loadSigilConfigFixture()
   const baseUrl = (
-    request.env.SIGIL_IMAGE_EDIT_GATEWAY_URL ??
-    request.env.GONK_GATEWAY_URL ??
-    "http://localhost:4000"
+    request.env.SIGIL_IMAGE_EDIT_GATEWAY_URL ?? "http://localhost:4000"
   ).replace(/\/+$/, "")
   const gatewayUrl = requireHttpUrl(baseUrl)
   const allowedOrigins = new Set([gatewayUrl.origin])
@@ -53,10 +54,7 @@ export const editImageThroughGateway: ImageEditProvider = async (request) => {
     const value = configured.trim()
     if (value) allowedOrigins.add(requireHttpUrl(value).origin)
   }
-  const apiKey =
-    request.env.SIGIL_IMAGE_EDIT_GATEWAY_KEY ??
-    request.env.GONK_GATEWAY_API_KEY ??
-    request.env.GATEWAY_API_KEY
+  const apiKey = request.env.SIGIL_IMAGE_EDIT_GATEWAY_KEY
 
   const headers = new Headers({
     Accept: "application/json",
@@ -78,11 +76,8 @@ export const editImageThroughGateway: ImageEditProvider = async (request) => {
             label: "source image",
           },
         ],
-        preset:
-          request.env.SIGIL_IMAGE_EDIT_PRESET ??
-          request.env.GONK_GATEWAY_IMAGE_EDIT_PRESET ??
-          "flux2klein4b",
-        quality: request.env.SIGIL_IMAGE_EDIT_QUALITY ?? "fast",
+        preset: sigilConfig.imageEdit.preset,
+        quality: sigilConfig.imageEdit.quality,
         size: `${request.width}x${request.height}`,
       }),
       signal: request.signal,
@@ -159,7 +154,8 @@ export const editImageThroughGateway: ImageEditProvider = async (request) => {
     ?.split(";", 1)[0]
     ?.trim()
     .toLowerCase()
-  if (!mediaType || !IMAGE_MEDIA_TYPES.has(mediaType)) throw unsupportedImageType()
+  if (!mediaType || !IMAGE_MEDIA_TYPES.has(mediaType))
+    throw unsupportedImageType()
   const bytes = await readResponseBytes(
     imageResponse,
     MAX_DOWNLOAD_BYTES,
@@ -319,7 +315,11 @@ async function readResponseBytes(
   return bytes
 }
 
-function assertWithinLimit(size: number, maxBytes: number, label: string): void {
+function assertWithinLimit(
+  size: number,
+  maxBytes: number,
+  label: string,
+): void {
   if (size > maxBytes) throw sizeLimitError(label, maxBytes)
 }
 

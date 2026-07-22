@@ -6,7 +6,6 @@ export type RuntimeEnvironment = Readonly<Record<string, string | undefined>>;
 export type RuntimeEnvironmentErrorCode =
   | "INVALID_HTTP_URL"
   | "INVALID_EMBEDDING_DIM"
-  | "INVALID_MODEL"
   | "INVALID_PATH_BASE"
   | "INVALID_PORT"
   | "INVALID_SECRET"

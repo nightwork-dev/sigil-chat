@@ -10,12 +10,63 @@ afterEach(() => {
 })
 
 describe("editImageThroughGateway download boundary", () => {
-  it("refuses redirects for the authenticated edit request", async () => {
+  it("uses only the canonical gateway settings", async () => {
     globalThis.fetch = vi.fn(async () =>
-      new Response(null, {
-        headers: { location: "http://169.254.169.254/latest/meta-data" },
-        status: 307,
+      jsonResponse({
+        data: [{ b64_json: Buffer.from(pngBytes()).toString("base64") }],
       }),
+    ) as typeof fetch
+
+    await editImageThroughGateway(
+      request({
+        SIGIL_IMAGE_EDIT_GATEWAY_KEY: "canonical-key",
+        SIGIL_IMAGE_EDIT_GATEWAY_URL: "https://gateway.example",
+      }),
+    )
+
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0] ?? []
+    expect(url).toEqual(new URL("https://gateway.example/v1/images/edits"))
+    expect(new Headers(init?.headers).get("authorization")).toBe(
+      "Bearer canonical-key",
+    )
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      preset: "flux2klein4b",
+      quality: "fast",
+    })
+  })
+
+  it("does not honor removed gateway aliases", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonResponse({
+        data: [{ b64_json: Buffer.from(pngBytes()).toString("base64") }],
+      }),
+    ) as typeof fetch
+
+    await editImageThroughGateway(
+      request({
+        GATEWAY_API_KEY: "legacy-key",
+        GONK_GATEWAY_API_KEY: "legacy-key",
+        GONK_GATEWAY_IMAGE_EDIT_PRESET: "legacy-preset",
+        GONK_GATEWAY_URL: "https://legacy.example",
+      }),
+    )
+
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0] ?? []
+    expect(url).toEqual(new URL("http://localhost:4000/v1/images/edits"))
+    expect(new Headers(init?.headers).has("authorization")).toBe(false)
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      preset: "flux2klein4b",
+      quality: "fast",
+    })
+  })
+
+  it("refuses redirects for the authenticated edit request", async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(null, {
+          headers: { location: "http://169.254.169.254/latest/meta-data" },
+          status: 307,
+        }),
     ) as typeof fetch
 
     await expect(editImageThroughGateway(request())).rejects.toThrow(
@@ -30,7 +81,9 @@ describe("editImageThroughGateway download boundary", () => {
 
   it("rejects a cross-origin backend URL by default", async () => {
     globalThis.fetch = vi.fn(async () =>
-      jsonResponse({ data: [{ url: "http://169.254.169.254/latest/meta-data" }] }),
+      jsonResponse({
+        data: [{ url: "http://169.254.169.254/latest/meta-data" }],
+      }),
     ) as typeof fetch
 
     await expect(editImageThroughGateway(request())).rejects.toThrow(
@@ -154,8 +207,8 @@ describe("editImageThroughGateway download boundary", () => {
   })
 
   it("does not return backend URLs or response bodies in client errors", async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response("internal host secret detail", { status: 500 }),
+    globalThis.fetch = vi.fn(
+      async () => new Response("internal host secret detail", { status: 500 }),
     ) as typeof fetch
 
     const error = await editImageThroughGateway(request()).catch(

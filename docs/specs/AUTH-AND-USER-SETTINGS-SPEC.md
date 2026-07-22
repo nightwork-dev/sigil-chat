@@ -133,9 +133,10 @@ path. Concurrent first-user submissions must be serialized by the database so
 two owners cannot be created.
 
 After bootstrap, public registration is closed by default. It may be enabled
-explicitly for a demo or controlled deployment with
-`SIGIL_AUTH_REGISTRATION=open`; new accounts receive role `member`. There is no
-UI switch whose untrusted browser value can open registration.
+explicitly for a demo or controlled deployment by setting
+`auth.registration: open` in the reviewed application fixture; new accounts
+receive role `member`. Environment variables and untrusted browser values
+cannot open registration.
 
 Invites and administrator-created users are a later feature. Production
 deployments that need self-service password recovery must configure verified

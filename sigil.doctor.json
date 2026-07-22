@@ -5,6 +5,7 @@
     { "path": "apps/gonk/package.json" },
     { "path": "packages/agent-contracts/package.json" },
     { "path": "packages/runtime-env/package.json" },
+    { "path": "fixtures/application/sigil-chat.yaml" },
     { "path": "apps/web/src/routes/_app/chat.tsx" }
   ],
   "packageJson": [
@@ -27,15 +28,12 @@
     {
       "path": ".env.example",
       "variables": [
+        { "name": "SIGIL_PUBLIC_URL", "url": "http", "public": true },
+        { "name": "SIGIL_DATA_DIR" },
         { "name": "EVE_ORIGIN", "url": "http", "public": true },
         { "name": "GONK_MCP_URL", "url": "http", "public": true },
-        { "name": "GONK_MCP_KEY" },
-        { "name": "PORT" },
-        { "name": "CODEX_MODEL" },
-        { "name": "VITE_API_BASE_URL", "url": "http", "public": true },
-        { "name": "PAGES_BASE", "url": "path", "public": true },
-        { "name": "SIGIL_CHAT_GRAPH_PATH" },
-        { "name": "SIGIL_CHAT_REVIEW_PATH" }
+        { "name": "SIGIL_EVE_AUTH_JWKS_URL", "url": "http" },
+        { "name": "GONK_MCP_KEY" }
       ]
     }
   ],
@@ -52,7 +50,7 @@
       "url": "http://sigil-chat-gonk.localhost:1355/live",
       "expectedStatuses": [200],
       "timeoutMs": 2000,
-      "remediation": "Set GONK_MCP_KEY and start Gonk with pnpm --filter sigil-chat-gonk dev."
+      "remediation": "Start the complete development stack with pnpm dev."
     }
   ]
 }

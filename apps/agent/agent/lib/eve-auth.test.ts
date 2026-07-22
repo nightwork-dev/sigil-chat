@@ -134,12 +134,37 @@ describe("Sigil Eve JWT authentication", () => {
   it("refuses to enable the local bypass in production", () => {
     expect(() =>
       readSigilEveAuthEnvironment({
-        BETTER_AUTH_URL: "https://chat.example.test",
+        SIGIL_PUBLIC_URL: "https://chat.example.test",
         NODE_ENV: "production",
         SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "1",
         SIGIL_INSTALLATION_ID: "installation-1",
       }),
     ).toThrow("cannot be enabled in production")
+  })
+
+  it("derives the worktree web issuer from Eve's Portless URL", () => {
+    expect(
+      readSigilEveAuthEnvironment({
+        PORTLESS_URL: "http://feature-dx.sigil-chat-agent.localhost:1355",
+      }),
+    ).toMatchObject({
+      issuer: "http://feature-dx.sigil-chat.localhost:1355",
+      jwksUrl: "http://feature-dx.sigil-chat.localhost:1355/api/auth/jwks",
+    })
+  })
+
+  it("keeps public token identity separate from internal JWKS routing", () => {
+    expect(
+      readSigilEveAuthEnvironment({
+        NODE_ENV: "production",
+        SIGIL_EVE_AUTH_JWKS_URL: "http://web:3000/api/auth/jwks",
+        SIGIL_INSTALLATION_ID: "installation-1",
+        SIGIL_PUBLIC_URL: "https://chat.example.test",
+      }),
+    ).toMatchObject({
+      issuer: "https://chat.example.test",
+      jwksUrl: "http://web:3000/api/auth/jwks",
+    })
   })
 })
 

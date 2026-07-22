@@ -19,6 +19,7 @@ import {
   type EveMessageResult,
 } from "eve/channels/eve"
 import type { AgentSessionExecutionBinding } from "@workspace/agent-contracts/session-binding"
+import { portlessSiblingUrl } from "@workspace/runtime-env/topology"
 
 import type { EveSessionOwnerStore } from "./eve-session-owners"
 
@@ -56,13 +57,12 @@ export function readSigilEveAuthEnvironment(
 ): SigilEveAuthEnvironment {
   const isProduction = source.NODE_ENV === "production"
   const issuer =
-    source.SIGIL_EVE_AUTH_ISSUER ??
-    source.BETTER_AUTH_URL ??
-    (isProduction ? undefined : LOCAL_ISSUER)
+    source.SIGIL_PUBLIC_URL ??
+    (isProduction
+      ? undefined
+      : (portlessSiblingUrl(source.PORTLESS_URL, "sigil-chat") ?? LOCAL_ISSUER))
   if (!issuer) {
-    throw new Error(
-      "SIGIL_EVE_AUTH_ISSUER or BETTER_AUTH_URL is required in production.",
-    )
+    throw new Error("SIGIL_PUBLIC_URL is required in production.")
   }
 
   const installationId =
@@ -83,11 +83,11 @@ export function readSigilEveAuthEnvironment(
   }
 
   const issuerUrl = parseHttpUrl(issuer, "Eve auth issuer", isProduction)
+  const configuredJwksUrl = source.SIGIL_EVE_AUTH_JWKS_URL?.trim()
   const jwksUrl = parseHttpUrl(
-    source.SIGIL_EVE_AUTH_JWKS_URL ??
-      new URL("/api/auth/jwks", issuerUrl).toString(),
+    configuredJwksUrl ?? new URL("/api/auth/jwks", issuerUrl).toString(),
     "Eve auth JWKS URL",
-    isProduction,
+    isProduction && configuredJwksUrl === undefined,
   )
 
   return {

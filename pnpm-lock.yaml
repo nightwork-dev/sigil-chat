@@ -359,6 +359,9 @@ importers:
       '@mirk/store-markdown':
         specifier: 0.1.0
         version: 0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@workspace/runtime-env':
+        specifier: workspace:*
+        version: link:../runtime-env
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
@@ -535,6 +538,13 @@ importers:
         version: 3.2.7(@types/debug@4.1.13)(@types/node@25.9.5)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/runtime-env:
+    dependencies:
+      '@mirk/fixtures':
+        specifier: 0.1.0
+        version: 0.1.0
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
@@ -1675,6 +1685,9 @@ packages:
 
   '@mirk/artifact@0.1.0':
     resolution: {integrity: sha512-ByV1jC/R720A8Cm6F6y9Dada82s3+bfpTCpPeoqq3OqIz/GD23ubSYJ/4GDPJyXNt2ifON3rEaM+CNlb8BrJEQ==}
+
+  '@mirk/fixtures@0.1.0':
+    resolution: {integrity: sha512-quBU0lyRXcEr8A1YVd85OHDFRYq3ksq638L7jZtWAzut1C3n4UPIS/vuveUsrwhfbSfr7XHM6dOYlLWIEgw67A==}
 
   '@mirk/store-markdown@0.1.0':
     resolution: {integrity: sha512-gF3/NpKcLfi+9UW6UXi+8sivss415NdLcZq+P1PChJ2kYVZvS8him8AbZesQx4K1zcFD/4H6pHuSB/oq3FFXrw==}
@@ -7521,6 +7534,8 @@ snapshots:
     transitivePeerDependencies:
       - better-sqlite3
       - sqlite-vec
+
+  '@mirk/fixtures@0.1.0': {}
 
   '@mirk/store-markdown@0.1.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     dependencies:

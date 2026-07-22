@@ -126,7 +126,8 @@ that's the sign the tool belongs in the registry instead.
 `apps/gonk/src/server.ts` calls `process.exit(1)` at startup if
 `GONK_MCP_KEY` is unset — it will not run unauthenticated, because Portless
 exposes the endpoint machine-wide and loopback binding alone isn't isolation.
-The same bearer token must be set on **both** processes:
+`pnpm dev` generates the local bearer when needed and supplies the same value
+to **both** processes:
 
 - `apps/gonk` reads it in `server.ts` to authenticate incoming MCP requests
   (see `apps/gonk/src/auth.ts` for the authorization policy that runs after
@@ -170,12 +171,11 @@ section for the full statement.
 
 ## Verifying a new tool
 
-1. **Confirm the registry sees it.** With `GONK_MCP_KEY` set identically on
-   both processes and `pnpm dev` running, the Gonk MCP endpoint is
-   `http://sigil-chat-gonk.localhost:1355/mcp`. An MCP `tools/list` call over
-   Streamable HTTP against that URL, with `Authorization: Bearer
-$GONK_MCP_KEY`, should include the new tool name.
-2. **Drive it in chat.** Open `http://sigil-chat.localhost:1355/chat` and ask
+1. **Confirm the registry sees it.** With `pnpm dev` running, use `portless get
+sigil-chat-gonk` for this worktree's origin and the private bearer at
+   `.data/dev/gonk-mcp-key`. An authenticated MCP `tools/list` call against its
+   `/mcp` route should include the new tool name.
+2. **Drive it in chat.** Use the private sign-in URL printed by `pnpm dev` and ask
    for something that should trigger the tool. With approval mode `"ask"`
    (default), you should see the consent prompt named in the chat UI before
    the call executes; approve it and confirm the handler's `data` shows up in

@@ -41,7 +41,7 @@ file does not repeat it.
 │   │   └── vite.config.ts  → Vite + tanstackStart + Nitro + Tailwind
 │   ├── agent/               → Eve host (sigil-chat-agent)
 │   │   └── agent/
-│   │       ├── agent.ts               → defineAgent — experimental_chatgpt(CODEX_MODEL)
+│   │       ├── agent.ts               → defineAgent — model from the application fixture
 │   │       ├── channels/eve.ts        → Eve channel wiring
 │   │       ├── connections/gonk.ts    → MCP client connection to apps/gonk
 │   │       ├── instructions.md        → Agent system instructions
@@ -155,13 +155,24 @@ Requires Node 24. All dependencies — including the `@gonk/*` and
 `@zigil/agent-*` packages — resolve from the public npm registry.
 
 ```bash
-pnpm install
-pnpm auth:migrate   # first run (and after any auth schema change)
 pnpm dev
 ```
 
-`pnpm dev` runs `turbo dev`, which starts three Portless services in
-parallel:
+`pnpm dev` prepares the current worktree and then runs the three Portless
+services through Turbo. It synchronizes the frozen install, generates
+worktree-local credentials, applies idempotent auth migrations, seeds the
+development owner, proves the authenticated web → Eve → Gonk path, and opens a
+private single-use URL that creates a normal owner session on `/chat`.
+
+`pnpm dev:reset` resets only the current worktree's documented disposable app
+state (`.data` at the root and under each app, plus `apps/agent/.eve`). It first
+moves that state into a recoverable backup under the Git common directory and
+leaves the worktree empty. The next `pnpm dev` runs the real first-start path.
+Reset prints the exact `pnpm dev:restore <backup>` command that restores the
+quarantined instance without overwriting current state.
+It never touches `.env`, the external roadmap repository, root
+`.agents`/`traces` tooling state, or another worktree. Stop `pnpm dev` before
+resetting.
 
 | Service                | Portless name      | URL                                         |
 | ---------------------- | ------------------ | ------------------------------------------- |
@@ -173,44 +184,34 @@ These are the primary-checkout names. The dev scripts use `portless run`, so a
 linked worktree receives one shared branch-derived prefix across all three
 services (for example `feature-auth.sigil-chat.localhost`). Runtime topology,
 the browser title, and the generated favicon follow that prefix automatically;
-explicit `EVE_ORIGIN`, `GONK_MCP_URL`, and branding variables still win.
+explicit `EVE_ORIGIN` and `GONK_MCP_URL` still win. Product behavior and
+branding live in `fixtures/application/sigil-chat.yaml` as a typed Mirk fixture.
 
 Prerequisites and required env:
 
 - [Portless](https://www.npmjs.com/package/portless) (`npm i -g portless`) —
-  provides the shared daemon behind the `.localhost` URLs above. `PORTLESS=0`
-  bypasses it and runs the three services on plain, unproxied ports.
-- `pnpm auth:migrate` — **required before first `pnpm dev`.** Better Auth
-  stores accounts/sessions in a local libsql DB (`apps/web/.data/sigil-chat.db`,
-  gitignored); the tables must be created first. Skipping it makes every route
-  (including `/login`) return a 500 that the dev server surfaces as a cryptic
-  `socket hang up` — the real error (`run pnpm auth:migrate`) is masked at the
-  server-fn RPC layer. Re-run after any change under `apps/web/src/lib/auth`
-  that adds a migration.
+  provides the shared daemon behind the `.localhost` URLs above.
 - Run `codex login` before starting the app — Eve's `experimental_chatgpt()`
   model reads that local login and calls the Codex backend directly.
-- `CODEX_MODEL` — optional, overrides Eve's default subscription-backed model
-  with a bare OpenAI model slug.
-- `GONK_MCP_KEY` — **required**. `apps/gonk/src/server.ts` calls
+- `agent.model` in `fixtures/application/sigil-chat.yaml` selects Eve's
+  subscription-backed model with a bare OpenAI model slug.
+- `SIGIL_PUBLIC_URL` — the one production origin for the web app, Better Auth,
+  Eve's JWT issuer, and public metadata. Local development derives it from
+  Portless. `SIGIL_EVE_AUTH_JWKS_URL` optionally routes Eve's key retrieval over
+  an internal service address without changing token identity.
+- `SIGIL_DATA_DIR` — optional root for ordinary application stores. `pnpm dev`
+  sets it to the worktree's `.data`; deployments can retain per-store overrides
+  where separate volume boundaries are intentional.
+- `GONK_MCP_KEY` — required by the service boundary and generated automatically
+  for local development. `apps/gonk/src/server.ts` calls
   `process.exit(1)` at startup if it is unset (Portless exposes the endpoint
-  machine-wide; loopback binding alone is not isolation). Set the _same_
-  bearer token on both the Eve (`apps/agent`) and Gonk (`apps/gonk`)
-  processes — Eve's `connections/gonk.ts` reads it too. This has already
-  tripped people up: a missing/mismatched key means Eve can't reach the
-  Gonk tool registry, not a silent unauthenticated fallback.
+  machine-wide; loopback binding alone is not isolation).
 
-  **Where it lives:** a gitignored **root `.env`** is the single source of
-  truth. All three dev processes read that one file: `apps/agent/.env` is a
-  symlink to it (`eve dev` loads it natively); `apps/gonk/src/server.ts` and
-  `apps/web/vite.config.ts` each load it via `process.loadEnvFile` before
-  reading their environment (the web app needs it because the attachment-upload
-  server function proxies to Gonk's authenticated `/upload` route). Because
-  every process reads one file, the "same token on all three" invariant holds
-  by construction and survives a restart without exporting anything in your
-  shell. An explicit `export GONK_MCP_KEY=…`
-  still wins (parent-process env takes precedence over the file), matching
-  Eve's dev env-file behavior. Copy `.env.example` to `.env` and set the key on
-  a fresh checkout.
+  **Where it lives:** `pnpm dev` writes the bearer under the current worktree's
+  gitignored `.data/dev`, then supplies its value to all three services. An
+  explicitly exported `GONK_MCP_KEY` still wins. `.env.example` documents
+  optional overrides; fresh worktrees do not need to copy it or materialize an
+  app-local symlink.
 
 - `GONK_MCP_URL` — optional, overrides the MCP endpoint Eve connects to
   (defaults to the Portless Gonk URL above).

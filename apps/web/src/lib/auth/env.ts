@@ -1,5 +1,10 @@
 import { randomBytes } from "node:crypto"
-import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
+import {
+  readDataEnvironment,
+  readOptionalSecretFromFile,
+} from "@workspace/runtime-env/server"
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
+import { portlessSiblingUrl } from "@workspace/runtime-env/topology"
 import {
   chmodSync,
   existsSync,
@@ -7,9 +12,11 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import type { AuthEmailConfig } from "./auth-email.server"
+
+const { value: sigilConfig } = await loadSigilConfigFixture()
 
 export interface SocialProviderCredentials {
   clientId: string
@@ -39,9 +46,6 @@ export interface AuthEnvironment {
   socialProviders: SocialProviderEnvironment
   trustedOrigins: string[]
 }
-
-const LOCAL_DATABASE_URL = "file:.data/sigil-chat.db"
-const LOCAL_SECRET_PATH = ".data/auth-secret"
 
 function readProviderCredentials(
   source: NodeJS.ProcessEnv,
@@ -87,7 +91,7 @@ function readOktaCredentials(
   }
 }
 
-function getOrCreateLocalSecret(path = LOCAL_SECRET_PATH): string {
+function getOrCreateLocalSecret(path: string): string {
   const absolutePath = resolve(path)
   mkdirSync(dirname(absolutePath), { recursive: true })
 
@@ -138,14 +142,25 @@ export function readAuthEnvironment(
   options: { localSecretPath?: string } = {},
 ): AuthEnvironment {
   const isProduction = source.NODE_ENV === "production"
+  const data = readDataEnvironment(source)
   const baseUrl =
-    source.BETTER_AUTH_URL ??
-    (isProduction ? undefined : "http://sigil-chat.localhost:1355")
+    source.SIGIL_PUBLIC_URL ??
+    (isProduction
+      ? undefined
+      : (portlessSiblingUrl(source.PORTLESS_URL, "sigil-chat") ??
+        "http://sigil-chat.localhost:1355"))
   const databaseUrl =
-    source.SIGIL_DATABASE_URL ?? (isProduction ? undefined : LOCAL_DATABASE_URL)
+    source.SIGIL_DATABASE_URL ??
+    (isProduction && !source.SIGIL_DATA_DIR
+      ? undefined
+      : `file:${join(data.rootDir, "sigil-chat.db")}`)
   const secret =
     readOptionalSecretFromFile(source, "BETTER_AUTH_SECRET") ??
-    (isProduction ? undefined : getOrCreateLocalSecret(options.localSecretPath))
+    (isProduction
+      ? undefined
+      : getOrCreateLocalSecret(
+          options.localSecretPath ?? join(data.rootDir, "auth-secret"),
+        ))
   const installationId =
     source.SIGIL_INSTALLATION_ID ??
     (isProduction ? undefined : "sigil-chat-local")
@@ -159,7 +174,7 @@ export function readAuthEnvironment(
   }
 
   if (!baseUrl) {
-    throw new Error("BETTER_AUTH_URL is required in production")
+    throw new Error("SIGIL_PUBLIC_URL is required in production")
   }
   if (!databaseUrl) {
     throw new Error("SIGIL_DATABASE_URL is required in production")
@@ -183,7 +198,7 @@ export function readAuthEnvironment(
     ...(authEmailApiKey && authEmailFrom
       ? { authEmail: { apiKey: authEmailApiKey, from: authEmailFrom } }
       : {}),
-    registrationOpen: source.SIGIL_AUTH_REGISTRATION === "open",
+    registrationOpen: sigilConfig.auth.registration === "open",
     secret,
     socialProviders: {
       discord: readProviderCredentials(source, "DISCORD"),

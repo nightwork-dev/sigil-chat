@@ -11,6 +11,7 @@ import {
 } from "better-auth/plugins"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import type { Kysely } from "kysely"
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
 
 import { createAuthDatabase, type AuthDatabase } from "./db"
 import { readAuthEnvironment, type AuthEnvironment } from "./env"
@@ -28,6 +29,8 @@ import {
   type SigilRole,
 } from "./policy"
 import { authUserAdditionalFields } from "./schema"
+
+const { value: sigilConfig } = await loadSigilConfigFixture()
 
 export interface SigilAuthUser {
   displayUsername?: string | null
@@ -115,7 +118,7 @@ export function createSigilAuthOptions(
         sendPasswordResetEmail(
           environment.authEmail,
           { email: user.email, url },
-          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+          { siteName: sigilConfig.branding.name },
         ),
     },
     emailVerification: {
@@ -123,7 +126,7 @@ export function createSigilAuthOptions(
         sendVerificationEmail(
           environment.authEmail,
           { email: user.email, url },
-          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+          { siteName: sigilConfig.branding.name },
         ),
     },
     rateLimit: {
@@ -180,7 +183,7 @@ export function createSigilAuthOptions(
           sendMagicLinkEmail(
             environment.authEmail,
             { email, url },
-            { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+            { siteName: sigilConfig.branding.name },
           ),
         storeToken: "hashed",
       }),
@@ -220,7 +223,7 @@ export function createSigilAuthOptions(
               ],
             }),
           ]
-         : []),
+        : []),
       tanstackStartCookies(),
     ],
   }
