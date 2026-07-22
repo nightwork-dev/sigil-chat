@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest"
 
 import type { Story } from "@workspace/work-items-store/types"
 
-import { relationshipForStory, storyRelationships } from "./roadmap-relationships"
+import {
+  relationshipForStory,
+  storyRelationships,
+  unresolvedPrerequisitesForStory,
+} from "./roadmap-relationships"
 
-function story(id: string, deps: string[] = []): Story {
-  return { id, deps } as Story
+function story(id: string, deps: string[] = [], status: Story["status"] = "ready"): Story {
+  return { id, deps, status } as Story
 }
 
 describe("roadmap relationships", () => {
@@ -26,5 +30,22 @@ describe("roadmap relationships", () => {
 
     expect(relationships.activeId).toBeNull()
     expect(relationshipForStory(relationships, "A")).toBe("unrelated")
+  })
+
+  it("treats prerequisites before verify, and missing prerequisites, as unresolved", () => {
+    const stories = [
+      story("idea", [], "idea"),
+      story("active", [], "in-progress"),
+      story("verify", [], "verify"),
+      story("shipped", [], "shipped"),
+    ]
+    const storiesById = new Map(stories.map((item) => [item.id, item]))
+
+    expect(
+      unresolvedPrerequisitesForStory(
+        storiesById,
+        story("consumer", ["idea", "active", "verify", "shipped", "missing"]),
+      ),
+    ).toEqual(["idea", "active", "missing"])
   })
 })

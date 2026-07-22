@@ -39,3 +39,13 @@ export function relationshipForStory(
   if (relationships.dependents.has(storyId)) return "dependent"
   return "unrelated"
 }
+
+export function unresolvedPrerequisitesForStory(
+  storiesById: Map<string, Story>,
+  story: Story,
+): string[] {
+  return story.deps.filter((dependencyId) => {
+    const dependency = storiesById.get(dependencyId)
+    return !dependency || (dependency.status !== "verify" && dependency.status !== "shipped")
+  })
+}

@@ -10,6 +10,7 @@ import {
   MessageSquareIcon,
   PencilLineIcon,
   SendHorizonalIcon,
+  TriangleAlertIcon,
   XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -63,6 +64,7 @@ import {
   relationshipForStory,
   storyRelationships,
   type StoryRelationship,
+  unresolvedPrerequisitesForStory,
 } from "./roadmap-relationships"
 
 type AsidePane = "queue" | "detail"
@@ -251,6 +253,7 @@ export function RoadmapWorkspace({
                   selected={story.id === selectedId}
                   relationship={relationshipForStory(relationships, story.id)}
                   relationshipsActive={relationships.activeId !== null}
+                  unresolvedPrerequisites={unresolvedPrerequisitesForStory(storiesById, story)}
                   onSelect={openDetail}
                   onHover={setHoveredId}
                   drag={drag}
@@ -364,6 +367,7 @@ function RoadmapCard({
   selected,
   relationship,
   relationshipsActive,
+  unresolvedPrerequisites,
   onSelect,
   onHover,
   drag,
@@ -372,6 +376,7 @@ function RoadmapCard({
   selected: boolean
   relationship: StoryRelationship
   relationshipsActive: boolean
+  unresolvedPrerequisites: string[]
   onSelect: (id: string) => void
   onHover: (id: string | null) => void
   drag: SortableItemRenderProps
@@ -387,9 +392,12 @@ function RoadmapCard({
           "flex w-full flex-col gap-2 rounded-md border bg-card p-3 text-left transition-colors",
           selected
             ? "border-primary ring-1 ring-primary/30"
-            : relationship === "prerequisite" || relationship === "dependent"
-              ? "border-primary/60 bg-primary/5"
-              : "border-border hover:border-border/80 hover:bg-muted/40",
+            : relationship === "prerequisite"
+              ? "border-warning/70 bg-warning/10"
+              : relationship === "dependent"
+                ? "border-info/70 bg-info/10"
+                : "border-border hover:border-border/80 hover:bg-muted/40",
+          !selected && unresolvedPrerequisites.length > 0 && "border-destructive/70",
           relationshipsActive && relationship === "unrelated" && "opacity-45",
         )}
       >
@@ -415,6 +423,18 @@ function RoadmapCard({
           >
             <Story.Title className="text-sm" />
           </button>
+          {unresolvedPrerequisites.length > 0 ? (
+            <span
+              className="mt-0.5 shrink-0 text-destructive"
+              title={`Blocked by unresolved prerequisites: ${unresolvedPrerequisites.join(", ")}`}
+            >
+              <TriangleAlertIcon className="size-3.5" aria-hidden="true" />
+              <span className="sr-only">
+                Blocked by {unresolvedPrerequisites.length} unresolved prerequisite
+                {unresolvedPrerequisites.length === 1 ? "" : "s"}
+              </span>
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 pl-5">
           <Story.RoutingBadge />
@@ -423,7 +443,12 @@ function RoadmapCard({
           <Story.Meta />
         </div>
         {relationship === "prerequisite" || relationship === "dependent" ? (
-          <span className="pl-5 text-[0.625rem] font-medium text-primary">
+          <span
+            className={cn(
+              "pl-5 text-[0.625rem] font-medium",
+              relationship === "prerequisite" ? "text-warning" : "text-info",
+            )}
+          >
             {relationship === "prerequisite" ? "Prerequisite" : "Dependent"}
           </span>
         ) : null}
