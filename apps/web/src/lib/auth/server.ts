@@ -1,4 +1,5 @@
 import type { Client } from "@libsql/client"
+import { apiKey } from "@better-auth/api-key"
 import { betterAuth } from "better-auth"
 import type { BetterAuthOptions } from "better-auth"
 import { jwt, magicLink, username } from "better-auth/plugins"
@@ -130,6 +131,28 @@ export function createSigilAuthOptions(
             { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
           ),
         storeToken: "hashed",
+      }),
+      apiKey({
+        defaultPrefix: "sigil_live_",
+        defaultKeyLength: 48,
+        enableMetadata: true,
+        enableSessionForAPIKeys: false,
+        keyExpiration: {
+          defaultExpiresIn: 90 * 24 * 60 * 60,
+          maxExpiresIn: 365,
+          minExpiresIn: 1,
+        },
+        maximumNameLength: 80,
+        rateLimit: {
+          enabled: true,
+          maxRequests: 120,
+          timeWindow: 60 * 1000,
+        },
+        requireName: true,
+        startingCharactersConfig: {
+          charactersLength: 16,
+          shouldStore: true,
+        },
       }),
       tanstackStartCookies(),
     ],

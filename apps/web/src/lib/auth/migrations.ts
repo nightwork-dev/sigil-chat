@@ -1,6 +1,6 @@
 import type { Client } from "@libsql/client"
 
-export const LATEST_AUTH_MIGRATION = "0003_auth_invites.sql"
+export const LATEST_AUTH_MIGRATION = "0004_external_mcp_api_keys.sql"
 
 export async function assertAuthMigrationsApplied(client: Client) {
   try {
