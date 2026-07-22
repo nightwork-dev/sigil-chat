@@ -11,6 +11,22 @@ import { dirname, resolve } from "node:path"
 
 import type { MagicLinkEmailConfig } from "./magic-link-email.server"
 
+export interface SocialProviderCredentials {
+  clientId: string
+  clientSecret: string
+}
+
+export interface OktaProviderCredentials extends SocialProviderCredentials {
+  issuer: string
+}
+
+export interface SocialProviderEnvironment {
+  discord?: SocialProviderCredentials
+  github?: SocialProviderCredentials
+  google?: SocialProviderCredentials
+  okta?: OktaProviderCredentials
+}
+
 export interface AuthEnvironment {
   baseUrl: string
   databaseAuthToken?: string
@@ -20,11 +36,56 @@ export interface AuthEnvironment {
   magicLinkEmail?: MagicLinkEmailConfig
   registrationOpen: boolean
   secret: string
+  socialProviders: SocialProviderEnvironment
   trustedOrigins: string[]
 }
 
 const LOCAL_DATABASE_URL = "file:.data/sigil-chat.db"
 const LOCAL_SECRET_PATH = ".data/auth-secret"
+
+function readProviderCredentials(
+  source: NodeJS.ProcessEnv,
+  provider: "DISCORD" | "GITHUB" | "GOOGLE",
+): SocialProviderCredentials | undefined {
+  const clientId = source[`SIGIL_AUTH_${provider}_CLIENT_ID`]?.trim()
+  const clientSecret = source[`SIGIL_AUTH_${provider}_CLIENT_SECRET`]?.trim()
+
+  if (Boolean(clientId) !== Boolean(clientSecret)) {
+    throw new Error(
+      `SIGIL_AUTH_${provider}_CLIENT_ID and SIGIL_AUTH_${provider}_CLIENT_SECRET must be configured together`,
+    )
+  }
+
+  return clientId && clientSecret ? { clientId, clientSecret } : undefined
+}
+
+function readOktaCredentials(
+  source: NodeJS.ProcessEnv,
+): OktaProviderCredentials | undefined {
+  const clientId = source.SIGIL_AUTH_OKTA_CLIENT_ID?.trim()
+  const clientSecret = source.SIGIL_AUTH_OKTA_CLIENT_SECRET?.trim()
+  const issuer = source.SIGIL_AUTH_OKTA_ISSUER?.trim()
+  const configuredValues = [clientId, clientSecret, issuer].filter(Boolean)
+
+  if (configuredValues.length > 0 && configuredValues.length < 3) {
+    throw new Error(
+      "SIGIL_AUTH_OKTA_CLIENT_ID, SIGIL_AUTH_OKTA_CLIENT_SECRET, and SIGIL_AUTH_OKTA_ISSUER must be configured together",
+    )
+  }
+
+  if (!clientId || !clientSecret || !issuer) return undefined
+
+  const parsedIssuer = new URL(issuer)
+  if (parsedIssuer.search || parsedIssuer.hash) {
+    throw new Error("SIGIL_AUTH_OKTA_ISSUER cannot contain a query or hash")
+  }
+
+  return {
+    clientId,
+    clientSecret,
+    issuer: parsedIssuer.href.replace(/\/$/, ""),
+  }
+}
 
 function getOrCreateLocalSecret(path = LOCAL_SECRET_PATH): string {
   const absolutePath = resolve(path)
@@ -124,6 +185,12 @@ export function readAuthEnvironment(
       : {}),
     registrationOpen: source.SIGIL_AUTH_REGISTRATION === "open",
     secret,
+    socialProviders: {
+      discord: readProviderCredentials(source, "DISCORD"),
+      github: readProviderCredentials(source, "GITHUB"),
+      google: readProviderCredentials(source, "GOOGLE"),
+      okta: readOktaCredentials(source),
+    },
     trustedOrigins: parseTrustedOrigins(
       source.SIGIL_AUTH_TRUSTED_ORIGINS,
       baseUrl,

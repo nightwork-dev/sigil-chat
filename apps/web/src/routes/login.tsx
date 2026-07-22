@@ -2,9 +2,9 @@
 // Tree:
 //   apps/web/src/routes/__root.tsx  — HTML shell, ThemeProvider, QueryClientProvider (no visible chrome)
 //   apps/web/src/routes/login.tsx   — THIS FILE, standalone (no SidebarShell, no AgentSessionProvider)
-// Content: quiet password or magic-link sign-in. Public route — renders
-// without a session, without creating an Eve client, and without fetching
-// channel data.
+// Content: quiet, environment-configured sign-in methods. Public route —
+// renders without a session, without creating an Eve client, and without
+// fetching channel data.
 
 import { useRef, useState, type FormEvent } from "react"
 import { createFileRoute, useRouter } from "@tanstack/react-router"
@@ -26,31 +26,46 @@ import {
   loginErrorFeedback,
   type LoginFeedback,
 } from "@/lib/auth/login-feedback"
-import { fetchMagicLinkAvailability } from "@/lib/auth/magic-link"
+import { fetchLoginMethods } from "@/lib/auth/login-methods"
+import {
+  getSocialAuthProvider,
+  type SocialAuthProviderId,
+} from "@/lib/auth/providers"
 import { sanitizeReturnTo } from "@/lib/auth/return-to"
 import { SITE } from "@/lib/site"
 
 interface LoginSearch {
+  error?: string
   returnTo?: string
 }
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
+    error: typeof search.error === "string" ? search.error : undefined,
     returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
   }),
-  loader: () => fetchMagicLinkAvailability(),
+  loader: () => fetchLoginMethods(),
   component: LoginPage,
 })
 
+function loginErrorCallback(returnTo: string | undefined) {
+  const search = new URLSearchParams()
+  if (returnTo) search.set("returnTo", sanitizeReturnTo(returnTo))
+  const query = search.toString()
+  return query ? `/login?${query}` : "/login"
+}
+
 function LoginPage() {
   const router = useRouter()
-  const { returnTo } = Route.useSearch()
-  const magicLinkAvailable = Route.useLoaderData()
+  const { error, returnTo } = Route.useSearch()
+  const { magicLinkAvailable, socialProviderIds } = Route.useLoaderData()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [feedback, setFeedback] = useState<LoginFeedback | null>(null)
+  const [feedback, setFeedback] = useState<LoginFeedback | null>(() =>
+    error ? loginErrorFeedback(undefined, "provider") : null,
+  )
   const [pendingAction, setPendingAction] = useState<
-    "magic-link" | "password" | null
+    "magic-link" | "password" | SocialAuthProviderId | null
   >(null)
   const emailInput = useRef<HTMLInputElement>(null)
 
@@ -99,15 +114,48 @@ function LoginPage() {
     }
   }
 
+  async function handleProvider(providerId: SocialAuthProviderId) {
+    const provider = getSocialAuthProvider(providerId)
+    setFeedback(null)
+    setPendingAction(providerId)
+
+    try {
+      const callbackURL = sanitizeReturnTo(returnTo)
+      const errorCallbackURL = loginErrorCallback(returnTo)
+      const result =
+        provider.protocol === "oauth2"
+          ? await authClient.signIn.oauth2({
+              callbackURL,
+              errorCallbackURL,
+              providerId,
+            })
+          : await authClient.signIn.social({
+              callbackURL,
+              errorCallbackURL,
+              provider: providerId,
+            })
+
+      if (result.error) {
+        setFeedback(loginErrorFeedback(result.error.status, "provider"))
+      }
+    } catch {
+      setFeedback(loginErrorFeedback(undefined, "provider"))
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  const hasSocialProviders = socialProviderIds.length > 0
+
   return (
     <div className="grid min-h-svh place-items-center p-6">
-      <Card className="flex h-[32rem] w-full max-w-sm flex-col">
+      <Card
+        className={`flex w-full max-w-sm flex-col ${hasSocialProviders ? "h-[40rem]" : "h-[32rem]"}`}
+      >
         <CardHeader>
           <CardTitle>Sign in to {SITE.name}</CardTitle>
           <CardDescription>
-            {magicLinkAvailable
-              ? "Password or email link."
-              : "Enter your email and password."}
+            Use any available method for your existing account.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
@@ -163,24 +211,47 @@ function LoginPage() {
             >
               {pendingAction === "password" ? "Signing in…" : "Sign in"}
             </Button>
-            {magicLinkAvailable ? (
+            {magicLinkAvailable || hasSocialProviders ? (
               <>
                 <div className="flex items-center gap-3" aria-hidden="true">
                   <span className="h-px flex-1 bg-border" />
                   <span className="text-xs text-muted-foreground">or</span>
                   <span className="h-px flex-1 bg-border" />
                 </div>
-                <Button
-                  className="h-11 min-h-11"
-                  disabled={pendingAction !== null}
-                  onClick={handleMagicLink}
-                  type="button"
-                  variant="outline"
-                >
-                  {pendingAction === "magic-link"
-                    ? "Sending link…"
-                    : "Email me a sign-in link"}
-                </Button>
+                {magicLinkAvailable ? (
+                  <Button
+                    className="h-11 min-h-11"
+                    disabled={pendingAction !== null}
+                    onClick={handleMagicLink}
+                    type="button"
+                    variant="outline"
+                  >
+                    {pendingAction === "magic-link"
+                      ? "Sending link…"
+                      : "Email me a sign-in link"}
+                  </Button>
+                ) : null}
+                {hasSocialProviders ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {socialProviderIds.map((providerId) => {
+                      const provider = getSocialAuthProvider(providerId)
+                      return (
+                        <Button
+                          className="h-11 min-h-11"
+                          disabled={pendingAction !== null}
+                          key={provider.id}
+                          onClick={() => handleProvider(provider.id)}
+                          type="button"
+                          variant="outline"
+                        >
+                          {pendingAction === provider.id
+                            ? "Opening…"
+                            : provider.label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </>
             ) : null}
           </form>

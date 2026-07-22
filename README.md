@@ -86,6 +86,15 @@ within 24 hours; production also requires a stable
 `SIGIL_INVITE_TOKEN_PEPPER_FILE`. Registration closes after the first owner
 unless the server is started with `SIGIL_AUTH_REGISTRATION=open`.
 
+Google, Okta, GitHub, and Discord can be enabled independently with the
+provider-specific `SIGIL_AUTH_*` variables in [`.env.example`](.env.example).
+The login page renders only providers whose complete credential set is present;
+partial configuration fails at startup. These methods sign in existing users
+and do not bypass the installation's registration or invitation policy. With
+closed registration, a provider-verified matching email may link to an
+owner/invite-created account; open registration additionally requires that the
+local email was already verified.
+
 The browser obtains a five-minute, Eve-audience JWT from the authenticated web
 session. Eve verifies it against the web app's JWKS and binds every created Eve
 session to the verified subject before returning its session id. Until the

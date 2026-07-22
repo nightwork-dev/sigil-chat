@@ -34,6 +34,7 @@ async function createTestAuth(registrationOpen = false) {
     isProduction: false,
     registrationOpen,
     secret: "test-secret-with-at-least-thirty-two-characters",
+    socialProviders: {},
     trustedOrigins: ["http://sigil-chat.localhost:1355"],
   }
   return createSigilAuth({ client, environment, kysely })

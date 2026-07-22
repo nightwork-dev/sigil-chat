@@ -2,7 +2,13 @@ import type { Client } from "@libsql/client"
 import { apiKey } from "@better-auth/api-key"
 import { betterAuth } from "better-auth"
 import type { BetterAuthOptions } from "better-auth"
-import { jwt, magicLink, username } from "better-auth/plugins"
+import {
+  genericOAuth,
+  jwt,
+  magicLink,
+  okta,
+  username,
+} from "better-auth/plugins"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import type { Kysely } from "kysely"
 
@@ -60,8 +66,22 @@ export function createSigilAuthOptions(
     createRegistrationPolicy(client, {
       registrationOpen: environment.registrationOpen,
     })
+  const {
+    discord,
+    github,
+    google,
+    okta: oktaCredentials,
+  } = environment.socialProviders
 
   return {
+    account: {
+      accountLinking: {
+        // Closed registration means local identities are owner/invite-created,
+        // so a provider-verified matching email may safely establish the link.
+        // Open registration keeps Better Auth's local-verification safeguard.
+        requireLocalEmailVerified: environment.registrationOpen,
+      },
+    },
     advanced: {
       useSecureCookies: environment.isProduction,
     },
@@ -91,12 +111,21 @@ export function createSigilAuthOptions(
       customRules: {
         // Sign-in is email + password; brute-force cap on that path.
         "/sign-in/email": { max: 5, window: 60 },
+        "/sign-in/oauth2": { max: 10, window: 60 },
+        "/sign-in/social": { max: 10, window: 60 },
         "/sign-up/email": { max: 3, window: 60 },
       },
       max: 100,
       window: 60,
     },
     secret: environment.secret,
+    socialProviders: {
+      ...(discord
+        ? { discord: { ...discord, disableSignUp: true } }
+        : undefined),
+      ...(github ? { github: { ...github, disableSignUp: true } } : undefined),
+      ...(google ? { google: { ...google, disableSignUp: true } } : undefined),
+    },
     trustedOrigins: environment.trustedOrigins,
     user: {
       additionalFields: authUserAdditionalFields,
@@ -154,6 +183,21 @@ export function createSigilAuthOptions(
           shouldStore: true,
         },
       }),
+      ...(oktaCredentials
+        ? [
+            genericOAuth({
+              config: [
+                {
+                  ...okta({
+                    ...oktaCredentials,
+                    disableSignUp: true,
+                  }),
+                  requireIssuerValidation: true,
+                },
+              ],
+            }),
+          ]
+         : []),
       tanstackStartCookies(),
     ],
   }

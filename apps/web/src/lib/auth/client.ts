@@ -1,5 +1,6 @@
 import { createAuthClient } from "better-auth/react"
 import {
+  genericOAuthClient,
   inferAdditionalFields,
   jwtClient,
   magicLinkClient,
@@ -13,6 +14,7 @@ export const authClient = createAuthClient({
     usernameClient(),
     jwtClient(),
     magicLinkClient(),
+    genericOAuthClient(),
     inferAdditionalFields({ user: authUserAdditionalFields }),
   ],
 })

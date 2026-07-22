@@ -13,6 +13,7 @@ const environment: AuthEnvironment = {
   isProduction: false,
   registrationOpen: false,
   secret: "test-secret-with-at-least-thirty-two-characters",
+  socialProviders: {},
   trustedOrigins: ["http://sigil-chat.localhost:1355"],
 }
 
@@ -25,6 +26,9 @@ describe("createSigilAuthOptions", () => {
     const options = createSigilAuthOptions({ client, environment, kysely })
 
     expect(options.rateLimit?.enabled).toBe(true)
+    expect(options.account?.accountLinking?.requireLocalEmailVerified).toBe(
+      false,
+    )
     expect(options.disabledPaths).toContain("/is-username-available")
     expect(options.plugins?.at(-1)?.id).toBe("tanstack-start-cookies")
 
@@ -44,6 +48,70 @@ describe("createSigilAuthOptions", () => {
         expirationTime: "5m",
         issuer: environment.baseUrl,
       },
+    })
+
+    client.close()
+    void kysely.destroy()
+  })
+
+  it("requires local email verification when registration is open", () => {
+    const client = createClient({ url: ":memory:" })
+    const kysely = new Kysely<Record<string, unknown>>({
+      dialect: new LibsqlDialect({ url: ":memory:" }),
+    })
+    const options = createSigilAuthOptions({
+      client,
+      environment: { ...environment, registrationOpen: true },
+      kysely,
+    })
+
+    expect(options.account?.accountLinking?.requireLocalEmailVerified).toBe(
+      true,
+    )
+
+    client.close()
+    void kysely.destroy()
+  })
+
+  it("configures only available providers without allowing OAuth registration", () => {
+    const client = createClient({ url: ":memory:" })
+    const kysely = new Kysely<Record<string, unknown>>({
+      dialect: new LibsqlDialect({ url: ":memory:" }),
+    })
+    const options = createSigilAuthOptions({
+      client,
+      environment: {
+        ...environment,
+        socialProviders: {
+          discord: { clientId: "discord-id", clientSecret: "discord-secret" },
+          google: { clientId: "google-id", clientSecret: "google-secret" },
+          okta: {
+            clientId: "okta-id",
+            clientSecret: "okta-secret",
+            issuer: "https://example.okta.com/oauth2/default",
+          },
+        },
+      },
+      kysely,
+    })
+
+    expect(options.socialProviders).toMatchObject({
+      discord: { disableSignUp: true },
+      google: { disableSignUp: true },
+    })
+    expect(options.socialProviders).not.toHaveProperty("github")
+
+    const genericOAuthPlugin = options.plugins?.find(
+      (plugin) => plugin.id === "generic-oauth",
+    )
+    expect(genericOAuthPlugin?.options).toMatchObject({
+      config: [
+        {
+          disableSignUp: true,
+          providerId: "okta",
+          requireIssuerValidation: true,
+        },
+      ],
     })
 
     client.close()
