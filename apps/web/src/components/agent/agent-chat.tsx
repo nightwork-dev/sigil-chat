@@ -42,11 +42,6 @@ import {
   AlertTitle,
 } from "@workspace/ui/components/alert"
 import { Button } from "@workspace/ui/components/button"
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar"
 import { Card } from "@workspace/ui/components/card"
 import {
   Empty,
@@ -73,6 +68,7 @@ import { StatusDot } from "@workspace/ui/components/status-dot"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AuthorizationCard } from "@/components/agent/authorization-card"
+import { AgentPortrait } from "@/components/agents/agent-portrait"
 import { ContextTray } from "@/components/agent/context-tray"
 import { ToolCall } from "@workspace/ui/components/tool-call"
 import { GenerateImageRenderer } from "@/components/agent/image-tool-renderer"
@@ -91,11 +87,7 @@ import {
 } from "@workspace/ui/components/tool-renderer-registry"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
-import {
-  agentPortraitUrl,
-  useAgentRoster,
-  type AgentPersonaSummary,
-} from "@/lib/agent-profile"
+import { useAgentRoster, type AgentPersonaSummary } from "@/lib/agent-profile"
 import { useAgentThreads, useCreateAgentThread } from "@/lib/agent-threads"
 import { deriveThreadProjectId } from "@/lib/agent-thread-containers"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
@@ -540,8 +532,6 @@ function PersonaPickerItem({
   onSelect: () => void
   persona: AgentPersonaSummary
 }) {
-  const portraitUrl = agentPortraitUrl(persona.id, persona.hasPortrait)
-
   return (
     <button
       className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
@@ -549,10 +539,12 @@ function PersonaPickerItem({
       onClick={onSelect}
       type="button"
     >
-      <Avatar className="size-9 shrink-0">
-        {portraitUrl ? <AvatarImage alt="" src={portraitUrl} /> : null}
-        <AvatarFallback>{persona.name.slice(0, 1)}</AvatarFallback>
-      </Avatar>
+      <AgentPortrait
+        personaId={persona.id}
+        name={persona.name}
+        hasPortrait={persona.hasPortrait}
+        className="size-9"
+      />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="font-medium">{persona.name}</span>
         <span className="line-clamp-1 text-muted-foreground">

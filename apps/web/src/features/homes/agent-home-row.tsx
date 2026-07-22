@@ -1,15 +1,10 @@
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar"
-import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@workspace/ui/components/hover-card"
 
-import { agentPortraitUrl } from "@/lib/agent-profile"
+import { AgentPortrait } from "@/components/agents/agent-portrait"
 
 import { HomeRow } from "./home-row"
 import type { AgentRow } from "./types"
@@ -23,13 +18,13 @@ export function AgentHomeRow({
   readonly compact?: boolean
   readonly first?: boolean
 }) {
-  const portraitUrl = agentPortraitUrl(agent.personaId, agent.hasPortrait)
-  const initial = agent.name.slice(0, 1).toUpperCase()
   const avatar = (
-    <Avatar size="sm" aria-hidden>
-      {portraitUrl ? <AvatarImage src={portraitUrl} alt="" /> : null}
-      <AvatarFallback>{initial}</AvatarFallback>
-    </Avatar>
+    <AgentPortrait
+      personaId={agent.personaId}
+      name={agent.name}
+      hasPortrait={agent.hasPortrait}
+      size="sm"
+    />
   )
 
   return (
@@ -47,10 +42,12 @@ export function AgentHomeRow({
       />
       <HoverCardContent align="start" side="right" className="w-72 p-3">
         <div className="flex items-start gap-3">
-          <Avatar size="lg" aria-hidden>
-            {portraitUrl ? <AvatarImage src={portraitUrl} alt="" /> : null}
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
+          <AgentPortrait
+            personaId={agent.personaId}
+            name={agent.name}
+            hasPortrait={agent.hasPortrait}
+            size="lg"
+          />
           <div className="min-w-0 space-y-1">
             <p className="font-medium text-popover-foreground">{agent.name}</p>
             {agent.headline ? (

@@ -93,6 +93,8 @@ export interface ResourceRow {
   readonly kind: "artifact" | "evidence" | "knowledge" | "saved-view"
   /** Present when the record participates here via a mount. */
   readonly mountedFromName?: string
+  /** Authenticated native resource URL. Opens outside the SPA router. */
+  readonly nativeHref?: string
 }
 
 export interface ActivityItem {
@@ -112,6 +114,8 @@ export interface WorkSummaryItem {
   /** Set when the item's canonical home is another visible scope. */
   readonly homeScopeName?: string
   readonly updatedAt: string
+  /** Deep link to the editable durable work record. */
+  readonly href?: string
 }
 
 /** Agent attention, cross-view labelled. Projection only (spec §3). */

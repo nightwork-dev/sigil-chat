@@ -149,6 +149,7 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
             first={index === 0}
             compact={compact}
             title={resource.name}
+            nativeHref={resource.nativeHref}
             description={
               resource.mountedFromName
                 ? `Shared from ${resource.mountedFromName}`
@@ -178,6 +179,7 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
             first={index === 0}
             compact={compact}
             title={item.title}
+            href={item.href}
             description={
               item.homeScopeName ? `Home: ${item.homeScopeName}` : undefined
             }

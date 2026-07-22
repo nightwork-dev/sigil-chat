@@ -4,7 +4,7 @@
 // artifacts come from the existing authenticated Gonk artifact manifest. Agent
 // Activity and attention project the durable retained session event stream.
 
-import type { ArtifactRecord } from "@/lib/artifacts"
+import { artifactUrl, type ArtifactRecord } from "@/lib/artifacts"
 import type { HomeSignals } from "@/lib/home-signals"
 import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 import type { Story } from "@workspace/work-items-store/types"
@@ -46,7 +46,10 @@ export function artifactScopeForHome(
 
 export function artifactRowsFromRecords(
   artifacts: readonly ArtifactRecord[],
-  options: { readonly mountedFromName?: string } = {},
+  options: {
+    readonly mountedFromName?: string
+    readonly scope?: string
+  } = {},
 ): ResourceRow[] {
   return [...artifacts]
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
@@ -54,6 +57,9 @@ export function artifactRowsFromRecords(
       id: artifact.id,
       name: artifact.filename,
       kind: "artifact" as const,
+      ...(options.scope
+        ? { nativeHref: artifactUrl(artifact.id, options.scope) }
+        : {}),
       ...(options.mountedFromName
         ? { mountedFromName: options.mountedFromName }
         : {}),
@@ -82,6 +88,7 @@ export function liveWorkSource({
       ...(story.kind ? { kind: story.kind } : {}),
       ...(homeScopeName ? { homeScopeName } : {}),
       updatedAt: story.updatedAt,
+      href: `/roadmap?story=${encodeURIComponent(story.id)}`,
     }
   }
   return {
