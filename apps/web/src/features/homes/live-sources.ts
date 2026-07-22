@@ -1,25 +1,14 @@
 // Route-side data sources for the homes.
 //
-// Honesty rule: a live page never shows fixture records as if they were real.
 // Scoped work comes from SC.5's permission-filtered server queries. Live
 // artifacts come from the existing authenticated Gonk artifact manifest. Agent
 // Activity and attention project the durable retained session event stream.
-// The explicit `?fixtures=1` review flag is the only path that enables the
-// Northstar data needed to exercise the rich state matrix.
 
 import type { ArtifactRecord } from "@/lib/artifacts"
 import type { HomeSignals } from "@/lib/home-signals"
 import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 import type { Story } from "@workspace/work-items-store/types"
 
-import {
-  fixtureAgents,
-  fixtureActivity,
-  fixtureArtifactRows,
-  fixtureAttention,
-  fixtureResources,
-  fixtureWorkSource,
-} from "./fixtures"
 import type {
   ActivityItem,
   AgentRow,
@@ -104,7 +93,6 @@ export function liveWorkSource({
 }
 
 export function routeSources(
-  fixtures: boolean,
   agents: readonly AgentRow[],
   work: ScopedWorkSource,
   live: {
@@ -115,23 +103,13 @@ export function routeSources(
   } = {},
 ): HomeRouteSources {
   const signals = homeRowsFromSignals(live.signals, agents, live.viaProjectId)
-  if (!fixtures) {
-    return {
-      work,
-      agents,
-      resources: live.resources ?? [],
-      artifacts: live.artifacts ?? [],
-      activity: signals.activity,
-      attention: signals.attention,
-    }
-  }
   return {
-    work: fixtureWorkSource,
-    agents: agents.length > 0 ? agents : fixtureAgents,
-    resources: fixtureResources,
-    artifacts: fixtureArtifactRows,
-    activity: fixtureActivity,
-    attention: fixtureAttention,
+    work,
+    agents,
+    resources: live.resources ?? [],
+    artifacts: live.artifacts ?? [],
+    activity: signals.activity,
+    attention: signals.attention,
   }
 }
 

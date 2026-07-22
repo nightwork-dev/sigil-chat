@@ -14,7 +14,6 @@ import { useArtifacts } from "@/lib/artifacts"
 import { useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { resolveViaLabel } from "@/features/homes/home-view-model"
-import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
 import {
   artifactRowsFromRecords,
   artifactScopeForHome,
@@ -26,61 +25,43 @@ import type { HomeState, SessionHomeView } from "@/features/homes/types"
 import { useSessionCommitments } from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/sessions/$threadId")({
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { via?: string; fixtures?: boolean } => ({
+  validateSearch: (search: Record<string, unknown>): { via?: string } => ({
     ...(typeof search.via === "string" ? { via: search.via } : {}),
-    ...(search.fixtures === "1" ||
-    search.fixtures === "true" ||
-    search.fixtures === true
-      ? { fixtures: true }
-      : {}),
   }),
   component: SessionHomeRoute,
 })
 
 function SessionHomeRoute() {
   const { threadId } = Route.useParams()
-  const { via, fixtures } = Route.useSearch()
-  const thread = useAgentThread(threadId, !fixtures)
+  const { via } = Route.useSearch()
+  const thread = useAgentThread(threadId)
   const nav = useProjectWorkspaceNav()
   const compact = useMediaQuery("(max-width: 640px)")
-  const commitments = useSessionCommitments(threadId, !fixtures)
-  const artifactScope =
-    !fixtures && thread.data ? artifactScopeForHome("session", threadId) : null
+  const commitments = useSessionCommitments(threadId)
+  const artifactScope = thread.data
+    ? artifactScopeForHome("session", threadId)
+    : null
   const artifacts = useArtifacts(artifactScope)
-  const signals = useHomeSignals(
-    "session",
-    threadId,
-    !fixtures && Boolean(thread.data),
-  )
+  const signals = useHomeSignals("session", threadId, Boolean(thread.data))
 
   const state: HomeState<SessionHomeView> = useMemo(() => {
-    const homeThread = fixtures
-      ? fixtureThreads.find((candidate) => candidate.id === threadId)
-      : thread.data
-    const homeNav = fixtures ? fixtureNav : nav.data
+    const homeThread = thread.data
+    const homeNav = nav.data
     // A resolved-but-absent record is "not found"; the thread server fn is
     // permission-filtered, so absence reveals nothing either way.
-    if (
-      (!fixtures && thread.isError) ||
-      (homeThread && !fixtures && !nav.isLoading && !homeNav)
-    ) {
+    if (thread.isError || (homeThread && !nav.isLoading && !homeNav)) {
       return { kind: "not-found" }
     }
     if (
       !homeThread ||
       !homeNav ||
-      (!fixtures && !commitments.data && !commitments.isError) ||
-      (!fixtures &&
-        Boolean(artifactScope) &&
-        !artifacts.data &&
-        !artifacts.isError) ||
-      (!fixtures && !signals.data && !signals.isError)
+      (!commitments.data && !commitments.isError) ||
+      (Boolean(artifactScope) && !artifacts.data && !artifacts.isError) ||
+      (!signals.data && !signals.isError)
     ) {
       return { kind: "loading" }
     }
-    if (!fixtures && commitments.isError) return { kind: "not-found" }
+    if (commitments.isError) return { kind: "not-found" }
     const workspace = homeThread.workspaceId
       ? homeNav.workspaces.find((w) => w.id === homeThread.workspaceId)
       : undefined
@@ -90,7 +71,6 @@ function SessionHomeRoute() {
       ? resolveViaLabel(homeNav, homeThread.workspaceId, via)
       : undefined
     const sources = routeSources(
-      Boolean(fixtures),
       [],
       liveWorkSource({
         sessionId: homeThread.id,
@@ -121,7 +101,6 @@ function SessionHomeRoute() {
   }, [
     thread.data,
     thread.isError,
-    threadId,
     nav.data,
     nav.isLoading,
     commitments.data,
@@ -132,7 +111,6 @@ function SessionHomeRoute() {
     signals.isError,
     artifactScope,
     via,
-    fixtures,
   ])
 
   return <SessionHome state={state} compact={compact} />

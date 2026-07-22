@@ -24,7 +24,6 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 
 import { useActiveContainer } from "@/lib/active-container"
-import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
 import { useAgentThread } from "@/lib/agent-threads"
 import {
   useProjectWorkspaceNav,
@@ -103,20 +102,13 @@ export function ContainerBreadcrumb() {
   const location = useRouterState({ select: (s) => s.location })
   const homeRoute = parseHomeRoute(location.pathname)
   const searchParams = new URLSearchParams(location.href.split("?", 2)[1] ?? "")
-  const fixtureValue = searchParams.get("fixtures")
-  const fixtureMode = fixtureValue === "1" || fixtureValue === "true"
   const liveSession = useAgentThread(
     homeRoute?.kind === "session" ? homeRoute.threadId : undefined,
-    homeRoute?.kind === "session" && !fixtureMode,
+    homeRoute?.kind === "session",
   )
-  const nav = fixtureMode ? fixtureNav : liveNav.data
+  const nav = liveNav.data
   const sessionWorkspaceId =
-    homeRoute?.kind === "session"
-      ? fixtureMode
-        ? fixtureThreads.find((thread) => thread.id === homeRoute.threadId)
-            ?.workspaceId
-        : liveSession.data?.workspaceId
-      : undefined
+    homeRoute?.kind === "session" ? liveSession.data?.workspaceId : undefined
   const viaProjectId = searchParams.get("via") ?? undefined
   const homeSelection =
     homeRoute && nav
@@ -156,12 +148,10 @@ export function ContainerBreadcrumb() {
   const workspaceHomeHref =
     workspaceId && projectId
       ? activeWorkspace?.projectId === projectId
-        ? `/workspaces/${workspaceId}${fixtureMode ? "?fixtures=1" : ""}`
-        : `/workspaces/${workspaceId}?via=${encodeURIComponent(projectId)}${fixtureMode ? "&fixtures=1" : ""}`
+        ? `/workspaces/${workspaceId}`
+        : `/workspaces/${workspaceId}?via=${encodeURIComponent(projectId)}`
       : undefined
-  const projectHomeHref = projectId
-    ? `/projects/${projectId}${fixtureMode ? "?fixtures=1" : ""}`
-    : undefined
+  const projectHomeHref = projectId ? `/projects/${projectId}` : undefined
 
   const selectProject = (nextProjectId: string) => {
     container.selectProject(nextProjectId)
@@ -169,7 +159,7 @@ export function ContainerBreadcrumb() {
       void navigate({
         to: "/projects/$projectId",
         params: { projectId: nextProjectId },
-        search: fixtureMode ? { fixtures: true } : {},
+        search: {},
       })
     }
   }
@@ -189,7 +179,6 @@ export function ContainerBreadcrumb() {
       params: { workspaceId: nextWorkspaceId },
       search: {
         ...(nextVia ? { via: nextVia } : {}),
-        ...(fixtureMode ? { fixtures: true } : {}),
       },
     })
   }

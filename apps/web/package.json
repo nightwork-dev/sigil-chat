@@ -7,6 +7,7 @@
   "scripts": {
     "auth:generate": "tsx scripts/auth-generate.ts",
     "auth:migrate": "tsx scripts/auth-migrate.ts",
+    "seed:scope-composition": "tsx scripts/seed-scope-composition-dev.ts",
     "agent-threads:claim-legacy": "tsx scripts/claim-agent-thread-memberships.ts",
     "gaze:setup": "node scripts/setup-gaze-assets.mjs",
     "predev": "pnpm gaze:setup",
