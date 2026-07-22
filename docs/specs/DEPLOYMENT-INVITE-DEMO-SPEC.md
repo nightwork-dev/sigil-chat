@@ -16,9 +16,9 @@ single-use, expiring, revocable invites.
 
 This document does **not** authorize a deployment. Public launch remains blocked
 until all ten gates below pass in one disposable environment. In particular,
-S10.5 membership-complete records, verified human-principal propagation through
-Eve into every user-dependent Gonk invocation, and the retention/continuation-
-secret proofs are hard prerequisites.
+S10.5 membership-complete records, deployed two-user proof of the implemented
+Eve-to-Gonk human-principal delegation, and the retention/continuation-secret
+proofs are hard prerequisites.
 
 The fixture is deliberately non-launchable today. It describes the required
 production image and configuration contract without pretending the current dev
@@ -27,14 +27,14 @@ publicly resolvable hostnames, provider account, or deployment command.
 
 ## Current blockers
 
-| Blocker                                 | Current evidence                                                                                                                           | Required closure                                                                                                          |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Blocker                                 | Current evidence                                                                                                                                                                                                                                               | Required closure                                                                                                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Invite admission                        | The base owner-issued, single-use, expiring, revocable token lifecycle is implemented. Current invites deliberately carry no channel ids because the product does not yet have an explicit channel-membership repository; a non-empty legacy row fails closed. | Keep global member admission atomic. Before issuing any channel-scoped invite, land the S10.5 membership store and make its writes part of the same acceptance transaction. |
-| Membership-complete persistence (S10.5) | The architecture contract requires ownership and membership for channels, snapshots, forks, preferences, and resume-secret references.     | Two-user exact-id denial proof across every record and operation.                                                         |
-| Human principal at Gonk                 | Eve's current MCP connection sends the static `GONK_MCP_KEY` and resource scope, not a verified human principal.                           | Trusted host context at every invocation; absent context denies before tool side effects.                                 |
-| Retention and resume secrets            | Event redaction is implemented, but persisted session state may still contain a raw continuation token and atomic secret rotation is open. | Server-only secret adapter, atomic revision/secret rotation, deletion and production-adapter proof.                       |
-| Production containers                   | The repo has dev commands, no production image contract, and Gonk currently binds `127.0.0.1`.                                             | Non-root images, explicit private-network bind support, secret-file loading, readiness endpoints, and startup assertions. |
-| Model credential                        | No remote credential profile has been selected or proven.                                                                                  | Dedicated device-login restart/refresh proof, or isolated supported API/Gateway credential proof.                         |
+| Membership-complete persistence (S10.5) | The architecture contract requires ownership and membership for channels, snapshots, forks, preferences, and resume-secret references.                                                                                                                         | Two-user exact-id denial proof across every record and operation.                                                                                                           |
+| Human-principal deployment proof        | Eve now signs a short-lived delegation for every Gonk tool call and Gonk verifies the subject, application thread, persona, Eve session, turn, durable binding, and live scope. Local denial and replay tests pass.                                            | Two-user proof through the deployed public origin, including revocation during a warm MCP session and denial before tool/store side effects.                                |
+| Retention and resume secrets            | Event redaction is implemented, but persisted session state may still contain a raw continuation token and atomic secret rotation is open.                                                                                                                     | Server-only secret adapter, atomic revision/secret rotation, deletion and production-adapter proof.                                                                         |
+| Production containers                   | The repo has dev commands, no production image contract, and Gonk currently binds `127.0.0.1`.                                                                                                                                                                 | Non-root images, explicit private-network bind support, secret-file loading, readiness endpoints, and startup assertions.                                                   |
+| Model credential                        | No remote credential profile has been selected or proven.                                                                                                                                                                                                      | Dedicated device-login restart/refresh proof, or isolated supported API/Gateway credential proof.                                                                           |
 
 An anonymous `401`, a green Compose parse, or a working single-user local app
 does not close any of these blockers.
@@ -240,10 +240,13 @@ side effects.
 ### 4. End-to-end principal propagation
 
 Web mints a short-lived Eve-audience token from the Better Auth session. Eve
-verifies it and binds the caller. Every user-dependent Gonk invocation receives
-that verified principal through trusted host context. `GONK_MCP_KEY` authenticates
-only the service hop and cannot authorize a human. Browser headers, tool inputs,
-approval preference, and resource-scope fields are never identity.
+verifies it and binds the caller. Immediately before every user-dependent Gonk
+invocation, Eve signs a short-lived turn delegation containing that verified
+subject and the trusted application thread, persona, Eve session, turn, and
+active scope. Gonk rechecks the durable binding and live authorization.
+`GONK_MCP_KEY` signs internal service claims and cannot authorize a human by
+itself. Browser headers, tool inputs, approval preference, and resource-scope
+fields are never identity.
 
 > **Proof command/check:** invoke the same read and mutation as two users through
 > the public origin, correlate web/Eve/Gonk receipts, and require the correct

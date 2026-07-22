@@ -7,7 +7,7 @@ a visible UI or deployment proof.
 ## The five-minute version
 
 Imagine Sigil Chat as a shared office where people and agents work together.
-This release improves five parts of that office:
+This release improves six parts of that office:
 
 1. **Projects and workspaces have real locks.** An agent cannot merely name a
    project and gain access. Membership is checked, registry changes use
@@ -28,6 +28,10 @@ This release improves five parts of that office:
    authenticated `/api/mcp` gateway backed by user-owned API keys and explicit
    resource/tool grants. Creating, replacing, or revoking a key requires a
    one-time password-verified step-up receipt.
+6. **Eve and Gonk now form one turn pipeline.** Eve runs the conversation and
+   live checklist; Gonk owns tools and durable product work. Every tool call
+   receives a fresh turn delegation, and an explicit commitment link connects
+   a session to an existing work item without creating a second task database.
 
 The `/status` surface and Eve healthcheck also report useful, secret-free
 readiness details instead of only saying red or green.
@@ -45,6 +49,9 @@ readiness details instead of only saying red or green.
   duplicate history instead of becoming an untraceable chat promise.
 - A CLI or another MCP client can eventually use a narrowly scoped user key
   without receiving the deployment-wide internal `GONK_MCP_KEY`.
+- The agent can keep a live Eve todo list while explicitly linking real product
+  work to the session; finishing the checklist does not silently mark work as
+  shipped.
 - Operators can distinguish model-login problems from Eve runtime failures and
   see sanitized diagnostics for the web, Eve, and Gonk services.
 
@@ -57,6 +64,8 @@ readiness details instead of only saying red or green.
 | Memory verification               | `apps/agent/agent/lib/memory.test.ts`                                                                  | Recall is audience-scoped and delivered with the turn; semantic/vector retrieval remains separate work. |
 | Request intake                    | `packages/work-items-store`, `apps/gonk/src/registry/request.ts`, `apps/web/src/lib/request-intake.ts` | Search, inspect, and evidence writes are scope-filtered; unknown and denied records fail opaquely.      |
 | External MCP gateway              | `apps/web/src/routes/api/mcp.ts`, `apps/web/src/lib/external-mcp.server.ts`                            | Public keys are user credentials with explicit grants; `GONK_MCP_KEY` stays internal.                   |
+| Eve/Gonk turn delegation          | `apps/web/src/lib/agent-turn-bootstrap.ts`, `apps/agent/agent/lib/gonk-turn-delegation.ts`             | Eve signs each tool call; Gonk rechecks the durable binding and live scope before side effects.         |
+| Session commitments               | Eve `todo`, `apps/gonk/src/registry/session-commitment.ts`, session home                               | Todos are transient; durable work changes only through explicit work-item tools.                        |
 | Readiness diagnostics             | `apps/web/src/lib/system-status.server.ts`, `apps/agent/scripts/healthcheck.mjs`                       | Diagnostics are sanitized and model-aware; HTTP availability alone is not readiness.                    |
 
 ## What is not finished
@@ -74,12 +83,16 @@ readiness details instead of only saying red or green.
   gates. Passing package tests is not the same as proving the visible product.
 - Per-agent tool surfacing is deferred because that work may belong in the
   released `@zigil/agent-*` packages rather than this app.
+- Slack and iMessage remain disabled until an external sender is explicitly
+  linked to a Sigil user and admitted through the same Eve execution-binding
+  and Gonk authorization path as the web channel.
 
 ## Security model in one paragraph
 
 There are three different credentials. A normal web session identifies a
 human using the browser. A user-owned external MCP API key identifies that same
 human to `/api/mcp`, but only with the key's explicit resource and tool grants.
-The deployment-wide `GONK_MCP_KEY` authenticates traffic between Sigil's own
-services. These credentials are not interchangeable, and every real operation
+The deployment-wide `GONK_MCP_KEY` is the internal signing secret for Sigil's
+own service claims; Eve uses it to mint a short-lived delegation for each Gonk
+tool call. These credentials are not interchangeable, and every real operation
 must re-check its current resource authorization before side effects.

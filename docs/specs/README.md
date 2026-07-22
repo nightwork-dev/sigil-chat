@@ -14,7 +14,9 @@ Currently authoritative for this product's design/implementation.
   external-identity linking before Slack or iMessage can reach user-owned
   resources. The implemented convergence removes `@zigil/agent-eve`, uses one
   web turn bootstrap, and makes Eve mint the short-lived bearer that Gonk
-  validates against durable session binding and live authorization.
+  validates against durable session binding and live authorization. Eve's
+  native `todo` remains session-local while explicit commitment links connect
+  existing durable work items to the trusted application thread.
 
 - [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md) —
   canonical ownership remains singular while typed, ordered scope links enable
@@ -42,8 +44,8 @@ Currently authoritative for this product's design/implementation.
   `packages/canvas`) composes panels of content. Draft product spec.
 
 - [`AGENT-OUTPUT-PROJECTION-SPEC.md`](AGENT-OUTPUT-PROJECTION-SPEC.md) —
-  companion to `AGENT-CONTEXT-AWARENESS-SPEC.md` (the *output* half to that
-  spec's *input* half): how agent actions surface on the canvas, not just the
+  companion to `AGENT-CONTEXT-AWARENESS-SPEC.md` (the _output_ half to that
+  spec's _input_ half): how agent actions surface on the canvas, not just the
   transcript. A part-projection registry renders tool-calls as anchored
   overlays or ambient panels instead of transcript lines; agent annotation
   tools (`sigil-annotate`/`pin`/`highlight`) anchor to attention items. Draft
@@ -52,7 +54,7 @@ Currently authoritative for this product's design/implementation.
 - [`PRODUCT-CHROME-REWORK-SPEC.md`](PRODUCT-CHROME-REWORK-SPEC.md) —
   make Projects/Workspaces the visible organizing center of the app shell
   (two-level chrome: container context + feature surface); elevate the Cmd+K
-  omnibar to fluid project/workspace/session switching *and* as a direct agent
+  omnibar to fluid project/workspace/session switching _and_ as a direct agent
   input (message mode); and define a family of agent chat-panel variants
   (dock / sidecar / inline / omnibar / strip) so the one conversation can be
   presented where a surface needs it. Also closes the consistency gaps

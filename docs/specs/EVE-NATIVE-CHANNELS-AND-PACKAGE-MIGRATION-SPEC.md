@@ -1,7 +1,8 @@
 # Eve-native channels and package migration
 
 > Date: 2026-07-22
-> Status: Accepted; Eve-native migration and Eve/Gonk turn delegation implemented.
+> Status: Accepted; Eve-native migration, Eve/Gonk turn delegation, and
+> session-commitment convergence implemented.
 > Owners: Eve for channel/session transport; Gonk for capability and identity
 > policy; Sigil Chat for product composition and external-identity membership.
 > Related: `AUTH-AND-USER-SETTINGS-SPEC.md`,
@@ -87,17 +88,17 @@ called production-ready.
 
 ## Dependency disposition
 
-| Package                      | Decision                   | Replacement or retained responsibility                                                                                                                           |
-| ---------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@zigil/agent-eve`           | Deprecate and remove first | Direct `eve/react` and `eve/client`; temporary app-owned compatibility code only for Sigil-specific attachments and explicit turn outcomes.                      |
-| `@zigil/agent-surface`       | Candidate after upstream split | Native Eve message/session types; app-owned domain outcomes move to `@workspace/agent-contracts`. Its current published consumers still require it.           |
-| `@zigil/agent-react`         | Shrink upstream            | Keep attention, privacy, drafts, telemetry, and thread controls; retire its generic session subpath and `agent-surface` dependency.                              |
-| `@zigil/agent-react-query`   | Keep                       | It owns product-domain cache reconciliation, which Eve does not provide.                                                                                         |
-| `@zigil/agent-gonk`          | Keep                       | It is the supported headless Gonk registry/MCP adapter.                                                                                                          |
-| `@gonk/eve-host`             | Keep and centralize        | It owns Eve/Gonk envelopes, delegation, membership guards, and host projection.                                                                                  |
-| `@workspace/agent-contracts` | Narrow                     | Keep client commands, UI highlights, and app authorization; move overlapping Eve binding/delegation contracts to their Gonk owner when compatible exports exist. |
-| `@vercel/connect`            | Do not add by default      | Eve 0.27's API supports direct secret-backed credentials for self-hosting; Connect is Eve's documented Slack happy path and remains an optional deployment choice. |
-| iMessage bridge SDK          | None initially             | Implement the Eve channel against the selected local bridge API; extract only after a second consumer and a stable bridge contract exist.                        |
+| Package                      | Decision                       | Replacement or retained responsibility                                                                                                                             |
+| ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@zigil/agent-eve`           | Deprecate and remove first     | Direct `eve/react` and `eve/client`; temporary app-owned compatibility code only for Sigil-specific attachments and explicit turn outcomes.                        |
+| `@zigil/agent-surface`       | Candidate after upstream split | Native Eve message/session types; app-owned domain outcomes move to `@workspace/agent-contracts`. Its current published consumers still require it.                |
+| `@zigil/agent-react`         | Shrink upstream                | Keep attention, privacy, drafts, telemetry, and thread controls; retire its generic session subpath and `agent-surface` dependency.                                |
+| `@zigil/agent-react-query`   | Keep                           | It owns product-domain cache reconciliation, which Eve does not provide.                                                                                           |
+| `@zigil/agent-gonk`          | Keep                           | It is the supported headless Gonk registry/MCP adapter.                                                                                                            |
+| `@gonk/eve-host`             | Keep and centralize            | It owns Eve/Gonk envelopes, delegation, membership guards, and host projection.                                                                                    |
+| `@workspace/agent-contracts` | Narrow                         | Keep client commands, UI highlights, and app authorization; move overlapping Eve binding/delegation contracts to their Gonk owner when compatible exports exist.   |
+| `@vercel/connect`            | Do not add by default          | Eve 0.27's API supports direct secret-backed credentials for self-hosting; Connect is Eve's documented Slack happy path and remains an optional deployment choice. |
+| iMessage bridge SDK          | None initially                 | Implement the Eve channel against the selected local bridge API; extract only after a second consumer and a stable bridge contract exist.                          |
 
 Deprecation means: stop adding consumers, ship a final migration notice from
 the package-owning repository, migrate clean-room fixtures, then publish npm's
@@ -250,6 +251,9 @@ framework tool with no authored replacement, the isolated session-todo store is
 absent, and the authenticated Gonk session-commitment tests prove authorized,
 idempotent, session-isolated link/list/unlink behavior plus denial after home
 access is revoked.
+
+For the implementation-oriented, plain-language version of this contract, see
+[`../guides/eve-gonk-tasking.md`](../guides/eve-gonk-tasking.md).
 
 ## Stop conditions
 

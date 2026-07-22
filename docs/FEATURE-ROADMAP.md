@@ -20,11 +20,11 @@
   browser-side** by the app-owned Eve client adapter (the AI SDK SSRF-guards
   local URL downloads upstream of the model, so a URL reference can't reach
   the model — bytes must ride in the turn). Working; two follow-ups below.
-  - *Follow-up: durable reload.* Inlining bloats the turn and eve does not
+  - _Follow-up: durable reload._ Inlining bloats the turn and eve does not
     persist large inline content, so attachment thumbnails don't survive a
     refresh. A durable design can't use a URL reference (SSRF guard) — needs a
     separate display-vs-model split.
-  - *Follow-up: binary office formats.* xlsx/docx need real
+  - _Follow-up: binary office formats._ xlsx/docx need real
     parsing/conversion before a model can read them; today they attach but
     aren't decoded.
 - **Ingress Cores** — the drop/paste/pick/upload/clipboard machinery extracted
@@ -60,7 +60,7 @@ container. Spec: [`specs/PRODUCT-CHROME-REWORK-SPEC.md`](specs/PRODUCT-CHROME-RE
   Gonk tools; `AnnotationOverlay` on Review passages + Studio nodes;
   `AmbientPanel` working-commentary surface in Studio. Spec:
   [`specs/AGENT-OUTPUT-PROJECTION-SPEC.md`](specs/AGENT-OUTPUT-PROJECTION-SPEC.md). Done.
-- *Open:* member-management / invitation UI (gated on registry-mutation
+- _Open:_ member-management / invitation UI (gated on registry-mutation
   authz, spec §5); the Q1 sponsorship + relationship-memory model for agent
   profiles (follow-up spec); the sigil-design variant registry + showcase.
 
@@ -84,6 +84,10 @@ the current forms).
   Gonk tool execution; Gonk checks it against the durable session binding and
   live scope authorization. Slack is the next useful channel validator after
   external identity linking, not a second tool/auth pipeline. Done.
+- **Task convergence** — Eve's native `todo` is the live session checklist; the
+  duplicate app-owned todo store and tool are gone. Explicit Gonk commitment
+  tools link existing durable work items to the trusted application thread
+  without changing their lifecycle or creating another task system. Done.
 
 ## Requested — agent memory & workspace
 

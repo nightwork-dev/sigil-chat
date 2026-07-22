@@ -66,8 +66,10 @@ PORTLESS=0 pnpm dev
 Run `codex login` before starting the app. Eve's `experimental_chatgpt()` model
 reads that local login and calls the Codex backend directly; Sigil Chat does not
 use Vercel AI Gateway. The template defaults to `gpt-5.6-terra`; set
-`CODEX_MODEL` to a bare OpenAI model slug to override it. Gonk requires `GONK_MCP_KEY`; set the
-same bearer on the Eve and Gonk services. The mounted adapter has no
+`CODEX_MODEL` to a bare OpenAI model slug to override it. Gonk requires
+`GONK_MCP_KEY`; set the same internal signing secret on the web, Eve, and Gonk
+services. The web app uses it for the turn bootstrap, and Eve uses it to mint a
+fresh, short-lived delegation for each Gonk tool call. The connection has no
 unauthenticated mode, including for local development.
 
 The web process owns human authentication. Before first use, apply its committed
@@ -169,6 +171,9 @@ this README only points at:
 - [`whats-new-2026-07.md`](docs/guides/whats-new-2026-07.md) — a plain-language
   summary of the current project/workspace, memory, request-intake,
   observability, and external MCP work, including what is not finished.
+- [`eve-gonk-tasking.md`](docs/guides/eve-gonk-tasking.md) — the streamlined
+  Eve/Gonk turn pipeline in plain English: authority, live todos versus durable
+  work, removed adapters, and the shared channel boundary for Slack/iMessage.
 
 - [`adding-a-tool.md`](docs/guides/adding-a-tool.md) — the end-to-end worked
   path for a new application tool, using the real `sigil-chat-status` tool as
