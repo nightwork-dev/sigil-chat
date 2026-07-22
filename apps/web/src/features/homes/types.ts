@@ -91,6 +91,7 @@ export interface ResourceRow {
   readonly id: string
   readonly name: string
   readonly kind: "artifact" | "evidence" | "knowledge" | "saved-view"
+  readonly mediaType?: string
   /** Present when the record participates here via a mount. */
   readonly mountedFromName?: string
   /** Authenticated native resource URL. Opens outside the SPA router. */

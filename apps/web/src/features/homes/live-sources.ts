@@ -57,6 +57,7 @@ export function artifactRowsFromRecords(
       id: artifact.id,
       name: artifact.filename,
       kind: "artifact" as const,
+      mediaType: artifact.mediaType,
       ...(options.scope
         ? { nativeHref: artifactUrl(artifact.id, options.scope) }
         : {}),

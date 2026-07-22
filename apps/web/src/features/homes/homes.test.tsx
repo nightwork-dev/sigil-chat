@@ -230,6 +230,7 @@ describe("project home", () => {
       resources: [
         {
           ...projectView.resources[0],
+          mediaType: "text/markdown",
           nativeHref: "/api/media/artifact?key=brief&scope=project%3Acommerce",
         },
       ],
@@ -255,6 +256,40 @@ describe("project home", () => {
     )
     expect(resource?.getAttribute("target")).toBe("_blank")
     expect(work?.getAttribute("href")).toBe("/roadmap?story=CP.14")
+  })
+
+  it("renders image resources as thumbnails that open an in-app preview", async () => {
+    const imageHref =
+      "/api/media/artifact?key=hero.png&scope=project%3Acommerce"
+    const imageView: ProjectHomeView = {
+      ...projectView,
+      resources: [
+        {
+          id: "hero",
+          name: "Holiday hero.png",
+          kind: "artifact",
+          mediaType: "image/png",
+          nativeHref: imageHref,
+        },
+      ],
+    }
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: imageView }} />,
+    )
+
+    const trigger = el.querySelector<HTMLButtonElement>(
+      "button[aria-label='Preview Holiday hero.png']",
+    )
+    expect(trigger).toBeTruthy()
+    expect(trigger?.querySelector("img")?.getAttribute("src")).toBe(imageHref)
+    expect(
+      el.querySelector("section[aria-label='Resources'] a"),
+    ).toBeNull()
+
+    act(() => trigger?.click())
+    const preview = document.querySelector("[data-slot='lightbox-content']")
+    expect(preview).toBeTruthy()
+    expect(preview?.querySelector("img")?.getAttribute("src")).toBe(imageHref)
   })
 
   it("labels a mounted workspace with its canonical owner, quietly", async () => {

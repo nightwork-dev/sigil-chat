@@ -5,6 +5,7 @@
 
 import { HomeSection } from "./home-section"
 import { AgentHomeRow } from "./agent-home-row"
+import { HomeResources } from "./home-resources"
 import {
   ArchivedBanner,
   EmptySection,
@@ -143,25 +144,11 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         }
         compact={compact}
       >
-        {view.resources.map((resource, index) => (
-          <HomeRow
-            key={resource.id}
-            first={index === 0}
-            compact={compact}
-            title={resource.name}
-            nativeHref={resource.nativeHref}
-            description={
-              resource.mountedFromName
-                ? `Shared from ${resource.mountedFromName}`
-                : undefined
-            }
-            trailing={
-              <span className="rounded-full border border-border px-1.5 py-px text-[10px] text-muted-foreground">
-                {resource.kind}
-              </span>
-            }
-          />
-        ))}
+        <HomeResources
+          resources={view.resources}
+          compact={compact}
+          showKind
+        />
       </HomeSection>
 
       <HomeSection
