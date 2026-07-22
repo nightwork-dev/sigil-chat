@@ -12,7 +12,10 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarkdownWorkItemsRepository } from "./markdown-repository.js";
-import { MirkWorkItemsRepository } from "./mirk-repository.js";
+import {
+  MirkWorkItemsRepository,
+  restoreStoryMarkdownNarrative,
+} from "./mirk-repository.js";
 
 const temporaryDirectories: string[] = [];
 const NOW = "2026-07-18T20:00:00.000Z";
@@ -41,6 +44,57 @@ afterEach(async () => {
 });
 
 describe("MirkWorkItemsRepository", () => {
+  it("preserves checked criteria and narrative comments across structured rewrites", () => {
+    const previous = [
+      "---",
+      "id: S1",
+      "---",
+      "",
+      "Intent",
+      "",
+      "## Acceptance criteria",
+      "",
+      "- [x] Already delivered",
+      "- [ ] Still open",
+      "",
+      "## Comments",
+      "",
+      "- Historical implementation note.",
+      "",
+      "```yaml",
+      "- id: old-comment",
+      "```",
+      "",
+    ].join("\n");
+    const rewritten = [
+      "---",
+      "id: S1",
+      "---",
+      "",
+      "Intent",
+      "",
+      "## Acceptance criteria",
+      "",
+      "- [ ] Already delivered",
+      "- [ ] Still open",
+      "",
+      "## Comments",
+      "",
+      "```yaml",
+      "- id: old-comment",
+      "- id: new-comment",
+      "```",
+      "",
+    ].join("\n");
+
+    const restored = restoreStoryMarkdownNarrative(previous, rewritten);
+
+    expect(restored).toContain("- [x] Already delivered");
+    expect(restored).toContain("- [ ] Still open");
+    expect(restored).toContain("- Historical implementation note.");
+    expect(restored).toContain("- id: new-comment");
+  });
+
   it("seeds, reads, mutates, and commits through the WorkItemsRepository seam", async () => {
     const directory = await makeDirectory();
     const repository = new MirkWorkItemsRepository({

@@ -604,8 +604,12 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
           ...recordForStory(story),
           comments: commentsByStory.get(story.id) ?? [],
         } as StoryRecord);
-        if (original !== undefined)
+        if (original !== undefined) {
+          const rewritten = await readFile(path, "utf8");
+          const restored = restoreStoryMarkdownNarrative(original, rewritten);
+          if (restored !== rewritten) await writeFile(path, restored, "utf8");
           await restoreFrontmatterOrder(path, original);
+        }
       }
     });
 
@@ -776,6 +780,51 @@ function stringifyComments(value: unknown): string {
   if (comments.length === 0) return "_No comments yet._";
   const fence = String.fromCharCode(96).repeat(3);
   return `${fence}yaml\n${stringifyYaml(comments).trimEnd()}\n${fence}`;
+}
+
+export function restoreStoryMarkdownNarrative(
+  previous: string,
+  rewritten: string,
+): string {
+  const checkedCriteria = new Set(
+    previous
+      .split("\n")
+      .map((line) => /^- \[[xX]\] (.*)$/.exec(line.trim())?.[1]?.trim())
+      .filter((criterion): criterion is string => Boolean(criterion)),
+  );
+  let restored = rewritten
+    .split("\n")
+    .map((line) => {
+      const match = /^(- \[)[ ](\] )(.*)$/.exec(line);
+      if (!match || !checkedCriteria.has(match[3].trim())) return line;
+      return `${match[1]}x${match[2]}${match[3]}`;
+    })
+    .join("\n");
+
+  const comments = extractMarkdownSection(previous, "Comments");
+  const narrative = comments
+    ?.replace(/```(?:yaml)?\n[\s\S]*?```/g, "")
+    .replace(/^_No comments yet\._$/m, "")
+    .trim();
+  if (!narrative) return restored;
+
+  restored = restored.replace(
+    "\n## Comments\n\n",
+    `\n## Comments\n\n${narrative}\n\n`,
+  );
+  return restored;
+}
+
+function extractMarkdownSection(
+  markdown: string,
+  heading: string,
+): string | undefined {
+  const marker = `\n## ${heading}\n`;
+  const start = markdown.indexOf(marker);
+  if (start === -1) return undefined;
+  const bodyStart = start + marker.length;
+  const nextSection = markdown.indexOf("\n## ", bodyStart);
+  return markdown.slice(bodyStart, nextSection === -1 ? undefined : nextSection);
 }
 
 function serializeReviews(reviews: ReviewItem[]): string {
