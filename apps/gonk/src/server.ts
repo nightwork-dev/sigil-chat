@@ -40,11 +40,11 @@ const host = process.env.HOST ?? "127.0.0.1"
 // them a bigger ceiling than the MCP JSON body limit above.
 const maxUploadBodyBytes = 10 * 1024 * 1024
 
-if (!apiKey) {
+if (!apiKey || Buffer.byteLength(apiKey) < 32) {
   console.error(
     [
-      "Gonk MCP refuses to start without authentication.",
-      "Set GONK_MCP_KEY to a bearer token.",
+      "Gonk MCP refuses to start without a strong internal signing secret.",
+      "Set GONK_MCP_KEY to at least 32 bytes.",
       "Why: the Portless proxy exposes this endpoint machine-wide; loopback binding is not sufficient isolation.",
     ].join("\n"),
   )

@@ -92,7 +92,7 @@ Currently authoritative for this product's design/implementation.
   accepted, product projection implemented, deployment gates still open.
   Referenced directly from the README trust-model section.
 - [`GONK-MCP-AUTH-INTEGRATION-SPEC.md`](GONK-MCP-AUTH-INTEGRATION-SPEC.md) —
-  the proposal that shaped the current `GONK_MCP_KEY` bearer-auth
+  the proposal that shaped the initial `GONK_MCP_KEY` bearer-auth
   integration in `apps/gonk`. Gonk Core's review response (request-changes,
   since acted on) is retained locally alongside the rest of the extraction
   program's correspondence.

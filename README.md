@@ -9,7 +9,7 @@ An agentic chat template with deliberately narrow ownership:
 
 ## Architecture
 
-<p align="center"><img src="docs/diagrams/architecture.svg" alt="Sigil Chat runtime topology: the browser renders chat, studio, and review workspaces plus an agent HUD, served over SSR and server functions by apps/web. apps/web hands sessions to apps/agent, the Eve host that owns durable sessions, streaming, and interruption through a local Codex login. apps/agent calls apps/gonk, the authenticated Gonk MCP server, over Streamable HTTP with a GONK_MCP_KEY bearer token. apps/web persists to a file-backed .data store; apps/agent persists Eve snapshots under .eve. Three trust boundaries: the tool-approval header is a client display preference, not a security control; GONK_MCP_KEY authenticates only the MCP transport; and threads plus the active-session preference are deployment-global in local dev, with no per-user ownership." width="1060"></p>
+<p align="center"><img src="docs/diagrams/architecture.svg" alt="Sigil Chat runtime topology: the browser renders chat, studio, and review workspaces plus an agent HUD, served over SSR and server functions by apps/web. apps/web hands sessions to apps/agent, the Eve host that owns durable sessions, streaming, and interruption through a local Codex login. apps/agent calls apps/gonk, the authenticated Gonk MCP server, over Streamable HTTP with a fresh turn-bound delegation signed by the shared GONK_MCP_KEY. apps/web persists to a file-backed .data store; apps/agent persists Eve snapshots under .eve. Three trust boundaries: the tool-approval header is a client display preference, not a security control; GONK_MCP_KEY is an internal signing secret rather than end-user authority; and threads plus the active-session preference are deployment-global in local dev, with no per-user ownership." width="1060"></p>
 
 Three services, each with a narrow, non-overlapping job:
 
@@ -211,11 +211,15 @@ workspace updates use revision-checked, cross-process writes; member-management
 UI remains outside this release.
 
 Session and capability-catalog access is application authorization, not tool
-approval state. `GONK_MCP_KEY` protects the Gonk MCP transport; it does not
-authorize Sigil Chat routes or thread records. Eve separately verifies the
-web-issued principal and rejects continuation or stream access when the
-persisted session owner differs from the verified subject. The current Eve
-catalog projection is read-only and removes host filesystem paths.
+approval state. `GONK_MCP_KEY` is the shared internal secret used to sign Eve
+turn delegations and protect server-to-server Gonk hops; it is not an end-user
+credential and does not authorize Sigil Chat routes or thread records. Eve
+separately verifies the web-issued principal and rejects continuation or
+stream access when the persisted session owner differs from the verified
+subject. For each Gonk tool execution, Eve signs the verified user, application
+thread, persona, Eve session, turn, and active resource scope; Gonk checks that
+claim against the durable session binding and live authorization. The current
+Eve catalog projection is read-only and removes host filesystem paths.
 
 The public `/api/mcp` gateway does not expose or accept `GONK_MCP_KEY` as a
 user credential. It verifies a user-owned API key, its expiry/revocation and
@@ -255,7 +259,8 @@ vendored scaffold CLI.
    local Portless services; use `EVE_ORIGIN`, `GONK_MCP_URL`, and `PORT` for a
    plain-port or deployed topology.
 
-3. Set `GONK_MCP_KEY` (same value for the Eve and Gonk processes), run
+3. Set `GONK_MCP_KEY` to a random value of at least 32 bytes (the same value
+   for the Eve and Gonk processes), run
    `codex login`, then install and run:
    ```bash
    pnpm dev

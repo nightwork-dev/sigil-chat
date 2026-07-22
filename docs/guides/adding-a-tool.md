@@ -124,15 +124,19 @@ that's the sign the tool belongs in the registry instead.
 ## The `GONK_MCP_KEY` requirement
 
 `apps/gonk/src/server.ts` calls `process.exit(1)` at startup if
-`GONK_MCP_KEY` is unset — it will not run unauthenticated, because Portless
-exposes the endpoint machine-wide and loopback binding alone isn't isolation.
-The same bearer token must be set on **both** processes:
+`GONK_MCP_KEY` is unset or shorter than 32 bytes. It will not run with a weak
+internal signing secret, because Portless exposes the endpoint machine-wide
+and loopback binding alone isn't isolation. The same secret must be set on
+**both** processes:
 
-- `apps/gonk` reads it in `server.ts` to authenticate incoming MCP requests
-  (see `apps/gonk/src/auth.ts` for the authorization policy that runs after
-  the bearer check — currently a single trusted service principal).
-- `apps/agent`'s `connections/gonk.ts` reads the same `GONK_MCP_KEY` via
-  `token` and sends it as the connection's bearer.
+- `apps/agent` uses it to sign a fresh, short-lived bearer for each Eve tool
+  execution. The delegation binds the verified user, application thread,
+  persona, Eve session, turn, and active resource scope.
+- `apps/gonk` verifies that delegation against the durable Eve session binding
+  and live scope authorization before invoking a tool.
+- The web app's external MCP gateway keeps the same secret server-side for its
+  separate service hop. It sends the internal service bearer plus a
+  server-issued user/scope proof; it never impersonates an Eve turn.
 
 A missing or mismatched key means Eve can't reach the Gonk tool registry at
 all — it is not a silent unauthenticated fallback. If a new tool isn't
@@ -141,8 +145,9 @@ showing up, check this before suspecting the registry code.
 Do not issue `GONK_MCP_KEY` to a human, CLI, or third-party MCP client. The
 public client boundary is the web app's `/api/mcp` gateway, which accepts
 user-owned API keys with explicit resource/tool grants and reauthorizes before
-proxying. The internal bearer proves service identity only; it does not carry
-end-user authority.
+proxying. Possession of the shared secret is internal service authority; user
+and resource authority must still arrive through either the Eve turn
+delegation or the external gateway's signed scope proof.
 
 ## Client-side approval: the "ask" consent prompt
 
@@ -174,7 +179,9 @@ section for the full statement.
    both processes and `pnpm dev` running, the Gonk MCP endpoint is
    `http://sigil-chat-gonk.localhost:1355/mcp`. An MCP `tools/list` call over
    Streamable HTTP against that URL, with `Authorization: Bearer
-$GONK_MCP_KEY`, should include the new tool name.
+$GONK_MCP_KEY`, should include the new tool name. This direct internal probe is
+for registry discovery only; normal Eve tool execution uses a freshly signed
+turn bearer instead.
 2. **Drive it in chat.** Open `http://sigil-chat.localhost:1355/chat` and ask
    for something that should trigger the tool. With approval mode `"ask"`
    (default), you should see the consent prompt named in the chat UI before

@@ -194,22 +194,24 @@ Prerequisites and required env:
 - `CODEX_MODEL` — optional, overrides Eve's default subscription-backed model
   with a bare OpenAI model slug.
 - `GONK_MCP_KEY` — **required**. `apps/gonk/src/server.ts` calls
-  `process.exit(1)` at startup if it is unset (Portless exposes the endpoint
-  machine-wide; loopback binding alone is not isolation). Set the _same_
-  bearer token on both the Eve (`apps/agent`) and Gonk (`apps/gonk`)
-  processes — Eve's `connections/gonk.ts` reads it too. This has already
-  tripped people up: a missing/mismatched key means Eve can't reach the
-  Gonk tool registry, not a silent unauthenticated fallback.
+  `process.exit(1)` at startup if it is unset or shorter than 32 bytes
+  (Portless exposes the endpoint machine-wide; loopback binding alone is not
+  isolation). Set the _same_ internal signing secret on both the Eve
+  (`apps/agent`) and Gonk (`apps/gonk`) processes. Eve uses it to mint a fresh,
+  turn-bound delegation for each tool execution; Gonk verifies that delegation
+  against the durable session binding and live authorization. A missing,
+  mismatched, or weak key means Eve can't reach the Gonk tool registry, not a
+  silent unauthenticated fallback.
 
   **Where it lives:** a gitignored **root `.env`** is the single source of
   truth. All three dev processes read that one file: `apps/agent/.env` is a
   symlink to it (`eve dev` loads it natively); `apps/gonk/src/server.ts` and
   `apps/web/vite.config.ts` each load it via `process.loadEnvFile` before
-  reading their environment (the web app needs it because the attachment-upload
-  server function proxies to Gonk's authenticated `/upload` route). Because
-  every process reads one file, the "same token on all three" invariant holds
-  by construction and survives a restart without exporting anything in your
-  shell. An explicit `export GONK_MCP_KEY=…`
+  reading their environment (the web app needs it because its external MCP and
+  attachment-upload server functions make authenticated internal Gonk hops).
+  Because every process reads one file, the "same secret on all three"
+  invariant holds by construction and survives a restart without exporting
+  anything in your shell. An explicit `export GONK_MCP_KEY=…`
   still wins (parent-process env takes precedence over the file), matching
   Eve's dev env-file behavior. Copy `.env.example` to `.env` and set the key on
   a fresh checkout.
@@ -255,11 +257,12 @@ Verified against the actual code, not inherited by assumption:
 ## Trust model
 
 See `README.md` "Trust model" — the tool-approval header is a client
-preference, not a security control; `GONK_MCP_KEY` authenticates the MCP
-transport but does not authorize Sigil Chat routes, Eve inspection, thread
-records, or continuation tokens; thread/session state is currently
-deployment-global with no per-user ownership. Do not weaken or restate this
-section elsewhere without updating the source of truth in `README.md`.
+preference, not a security control; `GONK_MCP_KEY` is an internal signing
+secret, not an end-user credential, and does not authorize Sigil Chat routes,
+Eve inspection, thread records, or continuation tokens; thread/session state
+is currently deployment-global with no per-user ownership. Do not weaken or
+restate this section elsewhere without updating the source of truth in
+`README.md`.
 
 ## Docs and specs
 

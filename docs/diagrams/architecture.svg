@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1060" height="380" viewBox="0 0 1060 380"
      font-family="Avenir Next, Helvetica Neue, Arial, sans-serif" role="img"
-     aria-label="Sigil Chat runtime topology: the browser renders chat, studio, and review workspaces plus an agent HUD, served over SSR and server functions by apps/web. apps/web hands sessions to apps/agent, the Eve host that owns durable sessions, streaming, and interruption through a local Codex login. apps/agent calls apps/gonk, the authenticated Gonk MCP server, over Streamable HTTP with a GONK_MCP_KEY bearer token. apps/web persists to a file-backed .data store; apps/agent persists Eve snapshots under .eve. Three trust boundaries: the tool-approval header is a client display preference, not a security control; GONK_MCP_KEY authenticates only the MCP transport; and threads plus the active-session preference are deployment-global in local dev, with no per-user ownership.">
+     aria-label="Sigil Chat runtime topology: the browser renders chat, studio, and review workspaces plus an agent HUD, served over SSR and server functions by apps/web. apps/web hands sessions to apps/agent, the Eve host that owns durable sessions, streaming, and interruption through a local Codex login. apps/agent calls apps/gonk, the authenticated Gonk MCP server, over Streamable HTTP with a fresh turn-bound delegation signed by GONK_MCP_KEY. apps/web persists to a file-backed .data store; apps/agent persists Eve snapshots under .eve. Three trust boundaries: the tool-approval header is a client display preference, not a security control; GONK_MCP_KEY is an internal signing secret rather than end-user authority; and threads plus the active-session preference are deployment-global in local dev, with no per-user ownership.">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0a0e1a"/><stop offset="1" stop-color="#0c1322"/>
@@ -69,8 +69,8 @@
   <line x1="750" y1="130" x2="760" y2="130" stroke="#2bd4ff" stroke-width="2" marker-end="url(#arc)"/>
   <g>
     <rect x="760" y="98" width="100" height="64" rx="12" fill="#102a3a" stroke="#2bd4ff" stroke-width="1.5"/>
-    <text x="810" y="124" text-anchor="middle" font-size="11.5" font-weight="700" fill="#9ce8ff">MCP ·</text>
-    <text x="810" y="142" text-anchor="middle" font-size="11.5" font-weight="700" fill="#9ce8ff">bearer-auth</text>
+    <text x="810" y="124" text-anchor="middle" font-size="11.5" font-weight="700" fill="#9ce8ff">turn-bound</text>
+    <text x="810" y="142" text-anchor="middle" font-size="11.5" font-weight="700" fill="#9ce8ff">delegation</text>
   </g>
   <line x1="860" y1="130" x2="870" y2="130" stroke="#2bd4ff" stroke-width="2" marker-end="url(#arc)"/>
 
@@ -90,6 +90,6 @@
   <!-- trust boundaries -->
   <text x="30" y="286" font-size="11" font-weight="600" letter-spacing="1.5" fill="#6f84a8">TRUST BOUNDARIES</text>
   <text x="30" y="308" font-size="12" fill="#8aa0c4">tool-approval header — client display preference, not a security control</text>
-  <text x="30" y="330" font-size="12" fill="#8aa0c4">GONK_MCP_KEY authenticates the MCP transport only — not routes, Eve inspection, or thread records</text>
+  <text x="30" y="330" font-size="12" fill="#8aa0c4">GONK_MCP_KEY signs internal delegation — it is not an end-user credential or route authority</text>
   <text x="30" y="352" font-size="12" fill="#8aa0c4">threads and the active-session preference are deployment-global in local dev — no per-user ownership yet</text>
 </svg>
