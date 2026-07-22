@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "eve build",
-    "dev": "portless sigil-chat-agent eve dev --no-ui --host 127.0.0.1",
+    "dev": "portless run --name sigil-chat-agent eve dev --no-ui --host 127.0.0.1",
     "healthcheck": "node scripts/healthcheck.mjs",
     "start": "eve start --host 127.0.0.1",
     "test": "vitest run && pnpm test:cold-boot",

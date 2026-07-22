@@ -32,7 +32,7 @@ import {
   useModeShortcut,
   NO_FLASH_SCRIPT,
 } from "@/lib/theme"
-import { SITE } from "@/lib/site"
+import { canonicalSiteUrl, SITE } from "@/lib/site"
 import { AgentDomainOutcomeReconciler } from "@/lib/agent-domain-outcomes"
 
 import appCss from "@workspace/ui/globals.css?url"
@@ -43,76 +43,86 @@ interface RouterContext {
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  head: () => ({
-    meta: [
-      {
-        charSet: "utf-8",
-      },
-      {
-        name: "viewport",
-        // App-shell behavior on mobile: lock zoom (maximum-scale/user-scalable)
-        // so it feels like an app, and viewport-fit=cover so env(safe-area-inset-*)
-        // resolves for the top chrome to clear the iOS status bar.
-        content:
-          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
-      },
-      {
-        title: SITE.title,
-      },
-      {
-        name: "description",
-        content: SITE.description,
-      },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      {
-        rel: "stylesheet",
-        href: themesCss,
-      },
-      {
-        rel: "icon",
-        href: "/favicon.ico",
-        sizes: "any",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "32x32",
-        href: "/favicon-32.png",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "16x16",
-        href: "/favicon-16.png",
-      },
-      {
-        rel: "apple-touch-icon",
-        href: "/apple-touch-icon.png",
-      },
-      {
-        rel: "manifest",
-        href: "/manifest.json",
-      },
-      {
-        rel: "preconnect",
-        href: "https://fonts.googleapis.com",
-      },
-      {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
-        crossOrigin: "anonymous",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap",
-      },
-    ],
-  }),
+  head: ({ matches }) => {
+    const pathname = matches.at(-1)?.pathname ?? "/"
+    const canonicalUrl = canonicalSiteUrl(pathname)
+    return {
+      meta: [
+        {
+          charSet: "utf-8",
+        },
+        {
+          name: "viewport",
+          // App-shell behavior on mobile: lock zoom (maximum-scale/user-scalable)
+          // so it feels like an app, and viewport-fit=cover so env(safe-area-inset-*)
+          // resolves for the top chrome to clear the iOS status bar.
+          content:
+            "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+        },
+        {
+          title: SITE.title,
+        },
+        {
+          name: "description",
+          content: SITE.description,
+        },
+        {
+          name: "theme-color",
+          content: SITE.accent,
+        },
+        { property: "og:type", content: "website" },
+        { property: "og:site_name", content: SITE.name },
+        { property: "og:title", content: SITE.title },
+        { property: "og:description", content: SITE.description },
+        { property: "og:url", content: canonicalUrl },
+        { property: "og:image", content: SITE.shareImageUrl },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: SITE.title },
+        { name: "twitter:description", content: SITE.description },
+        { name: "twitter:image", content: SITE.shareImageUrl },
+      ],
+      links: [
+        {
+          rel: "stylesheet",
+          href: appCss,
+        },
+        {
+          rel: "stylesheet",
+          href: themesCss,
+        },
+        {
+          rel: "icon",
+          type: "image/svg+xml",
+          href: SITE.faviconHref,
+        },
+        {
+          rel: "apple-touch-icon",
+          href: "/apple-touch-icon.png",
+        },
+        {
+          rel: "manifest",
+          href: SITE.manifestHref,
+        },
+        {
+          rel: "canonical",
+          href: canonicalUrl,
+        },
+        {
+          rel: "preconnect",
+          href: "https://fonts.googleapis.com",
+        },
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap",
+        },
+      ],
+    }
+  },
   component: RootComponent,
   notFoundComponent: NotFound,
   errorComponent: ErrorBoundary,
