@@ -3,15 +3,17 @@
 //   apps/web/src/routes/__root.tsx        — HTML shell, ThemeProvider, QueryClientProvider, shared agent session (no visible chrome)
 //   apps/web/src/routes/_app.tsx          — default collapsible sidebar, breadcrumb bar, and theme picker
 //   apps/web/src/routes/_app/roadmap.tsx  — THIS FILE
-// Content: RoadmapWorkspace — story status board with an editor panel and the installation owner's review queue, reconciled through the work-items domain-outcome loop
+// Content: RoadmapHub — peer Board and Specs views over the durable roadmap store, with story review/editing and specification lifecycle/linkage
 
 import { createFileRoute, redirect } from "@tanstack/react-router"
 
-import { RoadmapWorkspace } from "@/features/roadmap/roadmap-workspace"
+import { RoadmapHub, type RoadmapView } from "@/features/roadmap/roadmap-hub"
 
 export const Route = createFileRoute("/_app/roadmap")({
-  validateSearch: (search: Record<string, unknown>): { story?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { view: RoadmapView; story?: string; spec?: string } => ({
+    view: search.view === "specs" ? "specs" : "board",
     ...(typeof search.story === "string" ? { story: search.story } : {}),
+    ...(typeof search.spec === "string" ? { spec: search.spec } : {}),
   }),
   beforeLoad: () => {
     if (
@@ -26,12 +28,14 @@ export const Route = createFileRoute("/_app/roadmap")({
 
 function RoadmapRoute() {
   const { user } = Route.useRouteContext()
-  const { story } = Route.useSearch()
+  const { view, story, spec } = Route.useSearch()
   return (
-    <RoadmapWorkspace
-      key={story ?? "roadmap"}
+    <RoadmapHub
+      key={`${view}:${story ?? ""}:${spec ?? ""}`}
       viewer={user}
-      initialSelectedId={story}
+      view={view}
+      initialStoryId={story}
+      initialSpecId={spec}
     />
   )
 }

@@ -10,11 +10,13 @@
     "yaml": "^2.9.0"
   },
   "scripts": {
+    "migrate:scoped-work": "tsx scripts/migrate-scoped-work.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.6"
   },
@@ -25,6 +27,7 @@
     "./specs": "./src/specs.ts",
     "./repository": "./src/repository.ts",
     "./markdown-repository": "./src/markdown-repository.ts",
-    "./mirk-repository": "./src/mirk-repository.ts"
+    "./mirk-repository": "./src/mirk-repository.ts",
+    "./migrations": "./src/migrations.ts"
   }
 }

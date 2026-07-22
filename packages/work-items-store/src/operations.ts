@@ -652,51 +652,47 @@ export function isWorkItemsDocument(
 }
 
 export function isStory(value: unknown): value is Story {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    value.id.length > 0 &&
-    isWorkKind(value.kind) &&
-    isNonEmptyString(value.homeScopeId) &&
-    isScopeBindings(value.scopeBindings) &&
-    isOptionalString(value.parentWorkItemId) &&
-    isWorkProvenance(value.provenance) &&
-    isPositiveInteger(value.revision) &&
-    isOptionalString(value.worktree) &&
-    typeof value.epicId === "string" &&
-    value.epicId.length > 0 &&
-    typeof value.epicTitle === "string" &&
-    value.epicTitle.length > 0 &&
-    typeof value.title === "string" &&
-    value.title.length > 0 &&
-    typeof value.intent === "string" &&
-    value.intent.length > 0 &&
-    (value.request === undefined || isWorkRequestDetails(value.request)) &&
-    // Acceptance criteria may be empty: idea/spec-stage stories (e.g. a "## Shape
-    // sketch") legitimately have none yet — ACs are added at the spec/ready
-    // stage. Requiring them here made the whole board fail to load on the first
-    // idea story (D4.6).
-    Array.isArray(value.acceptanceCriteria) &&
-    value.acceptanceCriteria.every(
-      (criterion) => typeof criterion === "string" && criterion.length > 0,
-    ) &&
-    isStoryStatus(value.status) &&
-    isRouting(value.routing) &&
-    isReviewGate(value.reviewGate) &&
-    Array.isArray(value.deps) &&
-    value.deps.every((dependency) => typeof dependency === "string") &&
-    isOptionalString(value.assignee) &&
-    isOptionalString(value.assigneePrincipalId) &&
-    isOptionalReviewDecision(value.reviewDecision) &&
-    typeof value.authoredBy === "string" &&
-    value.authoredBy.length > 0 &&
-    typeof value.createdAt === "string" &&
-    value.createdAt.length > 0 &&
-    typeof value.updatedAt === "string" &&
-    value.updatedAt.length > 0 &&
-    isOptionalString(value.decidedBy) &&
-    isOptionalString(value.decidedAt)
-  );
+  return storyValidationIssues(value).length === 0;
+}
+
+export function storyValidationIssues(value: unknown): string[] {
+  if (!isRecord(value)) return ["record"];
+  const issues: string[] = [];
+  if (!isNonEmptyString(value.id)) issues.push("id");
+  if (!isWorkKind(value.kind)) issues.push("kind");
+  if (!isNonEmptyString(value.homeScopeId)) issues.push("homeScopeId");
+  if (!isScopeBindings(value.scopeBindings)) issues.push("scopeBindings");
+  if (!isOptionalString(value.parentWorkItemId)) issues.push("parentWorkItemId");
+  if (!isWorkProvenance(value.provenance)) issues.push("provenance");
+  if (!isPositiveInteger(value.revision)) issues.push("revision");
+  if (!isOptionalString(value.worktree)) issues.push("worktree");
+  if (!isNonEmptyString(value.epicId)) issues.push("epicId");
+  if (!isNonEmptyString(value.epicTitle)) issues.push("epicTitle");
+  if (!isNonEmptyString(value.title)) issues.push("title");
+  if (!isNonEmptyString(value.intent)) issues.push("intent");
+  if (value.request !== undefined && !isWorkRequestDetails(value.request))
+    issues.push("request");
+  // Acceptance criteria may be empty: idea/spec-stage stories legitimately
+  // have none yet, but the parsed field must still be an array.
+  if (
+    !Array.isArray(value.acceptanceCriteria) ||
+    !value.acceptanceCriteria.every(isNonEmptyString)
+  )
+    issues.push("acceptanceCriteria");
+  if (!isStoryStatus(value.status)) issues.push("status");
+  if (!isRouting(value.routing)) issues.push("routing");
+  if (!isReviewGate(value.reviewGate)) issues.push("reviewGate");
+  if (!Array.isArray(value.deps) || !value.deps.every((item) => typeof item === "string"))
+    issues.push("deps");
+  if (!isOptionalString(value.assignee)) issues.push("assignee");
+  if (!isOptionalString(value.assigneePrincipalId)) issues.push("assigneePrincipalId");
+  if (!isOptionalReviewDecision(value.reviewDecision)) issues.push("reviewDecision");
+  if (!isNonEmptyString(value.authoredBy)) issues.push("authoredBy");
+  if (!isNonEmptyString(value.createdAt)) issues.push("createdAt");
+  if (!isNonEmptyString(value.updatedAt)) issues.push("updatedAt");
+  if (!isOptionalString(value.decidedBy)) issues.push("decidedBy");
+  if (!isOptionalString(value.decidedAt)) issues.push("decidedAt");
+  return issues;
 }
 
 export function isStoryComment(value: unknown): value is StoryComment {

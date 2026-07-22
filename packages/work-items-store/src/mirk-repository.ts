@@ -21,6 +21,7 @@ import {
   proposeFeatureRequest,
   recordSponsorshipDecision,
   isStory,
+  storyValidationIssues,
   sortStories,
   transitionStory,
   upsertBoardView,
@@ -419,7 +420,33 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       const document = createWorkItemsDocument();
       await this.persistDocument(document);
       this.commit("roadmap: seed initial stories");
+    } else {
+      await this.repairIndexProjection();
     }
+  }
+
+  /**
+   * `index.md` is a derived projection. Roadmap records may be added by another
+   * worktree or harness without going through this process, so repair a stale
+   * projection on open instead of presenting an incomplete roadmap index.
+   */
+  private async repairIndexProjection(): Promise<void> {
+    const document = await this.readDocument();
+    const path = join(this.directory, INDEX_FILE);
+    const expectedRows = sortStories(document.stories).map(renderIndexLine);
+    const currentRows = existsSync(path)
+      ? (await readFile(path, "utf8"))
+          .split("\n")
+          .filter((line) => line.startsWith("- "))
+      : [];
+    if (
+      currentRows.length === expectedRows.length &&
+      currentRows.every((row, index) => row === expectedRows[index])
+    )
+      return;
+
+    await writeFile(path, serializeIndex(document, this.now()), "utf8");
+    this.commitIndexRepair();
   }
 
   private async readDocument(): Promise<WorkItemsDocument> {
@@ -468,7 +495,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         // board. Skip it with a loud warning; the rest of the
         // roadmap still loads.
         console.warn(
-          `[work-items] Skipping ${name}: not a valid story markdown file.`,
+          `[work-items] Skipping ${name}: invalid ${storyValidationIssues(candidate).join(", ")}.`,
         );
         continue;
       }
@@ -635,6 +662,17 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     if (!this.runGit(dir, ["add", "-A"])) return;
     // `commit` exits non-zero when there is nothing staged; that is fine.
     this.runGit(dir, [...GIT_IDENTITY, "commit", "-m", message], true);
+  }
+
+  private commitIndexRepair(): void {
+    if (!this.gitAvailable || !this.resolvedDir) return;
+    const dir = this.resolvedDir;
+    if (!this.runGit(dir, ["add", "--", INDEX_FILE])) return;
+    this.runGit(
+      dir,
+      [...GIT_IDENTITY, "commit", "-m", "roadmap: repair index projection"],
+      true,
+    );
   }
 
   private runGit(dir: string, args: string[], allowFailure = false): boolean {
