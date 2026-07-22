@@ -11,7 +11,7 @@ import {
   AGENT_CLIENT_COMMAND_EVENT,
   type AgentClientCommand,
 } from "@/lib/agent-client-command"
-import { REVIEW_DOCUMENT_ID, reviewDocumentKeys } from "./review-document"
+import { reviewDocumentKeys } from "./review-document"
 import { skillKeys } from "./skills"
 import { workItemKeys } from "./work-items"
 import { evidenceKeys } from "./evidence"
@@ -35,7 +35,9 @@ const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
           typeof outcome.resource.id !== "string" ||
           outcome.resource.id.length === 0
         ) {
-          return { issues: [{ message: "Expected a review document outcome" }] }
+          return {
+            issues: [{ message: "Expected a review document outcome" }],
+          }
         }
         return { value: outcome }
       },
@@ -217,49 +219,7 @@ export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
 export function agentDomainOutcomeFromCommand(
   command: AgentClientCommand,
 ): AgentDomainOutcome | null {
-  if (command.type === "agent.domain.outcome") return command.payload
-
-  if (
-    command.type === "review.annotation.add" ||
-    command.type === "review.passage.update"
-  ) {
-    const payload =
-      command.payload && typeof command.payload === "object"
-        ? (command.payload as {
-            revision?: unknown
-            annotations?: Array<{ id?: unknown }>
-          })
-        : undefined
-    const annotationIds =
-      command.type === "review.annotation.add"
-        ? (payload?.annotations ?? []).flatMap(({ id }) =>
-            typeof id === "string" ? [id] : [],
-          )
-        : []
-    const stableLegacyIdentity =
-      command.type === "review.annotation.add"
-        ? annotationIds.join(",")
-        : typeof payload?.revision === "number"
-          ? String(payload.revision)
-          : ""
-    return {
-      id: `legacy:${command.type}:${stableLegacyIdentity || "unknown"}`,
-      kind: "review.document.changed",
-      resource: {
-        kind: "review-document",
-        id: REVIEW_DOCUMENT_ID,
-        revision:
-          typeof payload?.revision === "number" ? payload.revision : undefined,
-      },
-      operation:
-        command.type === "review.annotation.add"
-          ? "annotations.add"
-          : "passages.update",
-      changedIds: annotationIds.length > 0 ? annotationIds : undefined,
-      deduplicate: stableLegacyIdentity.length > 0,
-    }
-  }
-  return null
+  return command.type === "agent.domain.outcome" ? command.payload : null
 }
 
 export function AgentDomainOutcomeReconciler() {

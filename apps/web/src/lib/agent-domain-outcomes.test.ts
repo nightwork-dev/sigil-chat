@@ -193,10 +193,10 @@ describe("agent domain outcome reconciliation", () => {
     expect(invalidate).toHaveBeenCalledTimes(2)
   })
 
-  it("does not suppress compatibility hints without a stable identity", async () => {
+  it("does not suppress outcomes without a stable identity", async () => {
     const queryClient = new QueryClient()
     const outcome = {
-      id: "legacy:review.annotation.add:unknown",
+      id: "review.document.changed:unknown",
       kind: "review.document.changed" as const,
       resource: {
         kind: "review-document" as const,
@@ -211,29 +211,5 @@ describe("agent domain outcome reconciliation", () => {
     await dispatcher.dispatch(outcome)
     await dispatcher.dispatch(outcome)
     expect(invalidate).toHaveBeenCalledTimes(2)
-  })
-
-  it("keys legacy annotation hints by returned annotation ids", () => {
-    expect(
-      agentDomainOutcomeFromCommand({
-        type: "review.annotation.add",
-        payload: {
-          annotations: [{ id: "annotation-8" }, { id: "annotation-9" }],
-        },
-      }),
-    ).toMatchObject({
-      id: "legacy:review.annotation.add:annotation-8,annotation-9",
-      changedIds: ["annotation-8", "annotation-9"],
-      deduplicate: true,
-    })
-    expect(
-      agentDomainOutcomeFromCommand({
-        type: "review.annotation.add",
-        payload: { annotations: [] },
-      }),
-    ).toMatchObject({
-      id: "legacy:review.annotation.add:unknown",
-      deduplicate: false,
-    })
   })
 })

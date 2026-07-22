@@ -33,6 +33,7 @@ import {
   ViewRailStatusStart,
   ViewRailTop,
 } from "@/lib/view-rails"
+import "@/components/agent/agent-tool-renderer-bootstrap"
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {

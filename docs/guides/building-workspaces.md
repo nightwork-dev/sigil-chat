@@ -122,11 +122,10 @@ These outcomes are refresh instructions, not authorization receipts. The tool
 must authorize the real resource before mutation; the browser then reconciles
 only after the mutation succeeds.
 
-(The `agentDomainOutcomeFromCommand` function in the same file also
-translates two legacy `clientCommand` shapes, `review.annotation.add` and
-`review.passage.update`, into the same outcome shape for backward
-compatibility — new tools should emit `agent.domain.outcome` directly rather
-than adding a third legacy shape.)
+The command boundary accepts only `agent.domain.outcome` for durable
+reconciliation. The pre-outcome `review.annotation.add` and
+`review.passage.update` compatibility shapes have been retired; new tools must
+emit `agent.domain.outcome` rather than extending the browser mutation bus.
 
 ## The attention/context tray: workspace state reaching the agent
 

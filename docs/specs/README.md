@@ -12,11 +12,12 @@ Currently authoritative for this product's design/implementation.
   adopt Eve's native client and channel surfaces, retire redundant Sigil Agent
   wrappers in stages, retain the Gonk ownership boundary, and require explicit
   external-identity linking before Slack or iMessage can reach user-owned
-  resources. The implemented convergence removes `@zigil/agent-eve`, uses one
-  web turn bootstrap, and makes Eve mint the short-lived bearer that Gonk
-  validates against durable session binding and live authorization. Eve's
-  native `todo` remains session-local while explicit commitment links connect
-  existing durable work items to the trusted application thread.
+  resources. The implemented convergence retains `@zigil/agent-eve` as the
+  single neutral runtime adapter, removes the copied app adapter, uses one web
+  turn bootstrap, and makes Eve mint the short-lived bearer that Gonk validates
+  against durable session binding and live authorization. Eve's native `todo`
+  remains session-local while explicit commitment links connect existing
+  durable work items to the trusted application thread.
 
 - [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md) —
   canonical ownership remains singular while typed, ordered scope links enable

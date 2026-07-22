@@ -51,7 +51,7 @@ const harness = vi.hoisted(() => ({
 let repository: AgentThreadRepository;
 const TEST_USER_ID = "session-test-user";
 
-vi.mock("@/lib/eve-runtime-session", () => ({
+vi.mock("@zigil/agent-eve", () => ({
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
     harness.eveCallbacks = callbacks;
     return {

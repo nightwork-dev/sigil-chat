@@ -90,9 +90,9 @@ commitments.
 
 The convergence deliberately removes parallel paths:
 
-- `@zigil/agent-eve` is no longer an application dependency; the web app uses
-  `eve/react` and `eve/client` through one temporary app-owned compatibility
-  seam.
+- The copied app-owned Eve adapter is gone. `@zigil/agent-eve` is the one
+  Eve-to-neutral adapter, while frontend components consume the neutral Sigil
+  Agent session contract.
 - Two independent web proof-minting calls became one turn bootstrap.
 - The app-owned session todo store and authored todo tool were deleted in favor
   of Eve's framework tool.
@@ -101,12 +101,9 @@ The convergence deliberately removes parallel paths:
 - Application tools remain registered once in Gonk and discovered by Eve over
   MCP; there is no hand-copied Eve tool list.
 
-The remaining compatibility seam is
-`apps/web/src/lib/eve-runtime-session.ts`. It preserves Sigil-specific
-attachment and terminal-outcome behavior while published UI packages still use
-the neutral agent surface. It stays app-owned and should be deleted after the
-upstream `@zigil/agent-react` split makes direct Eve types possible; it should
-not become another package.
+The runtime seam lives in the released `@zigil/agent-eve` package. Sigil Chat's
+session composition owns authentication, persistence, scope, and product
+policy; it does not copy Eve message translation into the application.
 
 ## Migrating an existing instance
 
@@ -117,9 +114,10 @@ Treat this as a coordinated runtime upgrade, not a rolling protocol change:
 2. Keep Node 24, update from the repository lockfile, and run
    `pnpm install --frozen-lockfile`. The web and agent apps must both resolve
    Eve `0.27.0`, including the tracked `patches/eve@0.27.0.patch`.
-3. Remove `@zigil/agent-eve` from any instance-owned manifest or import. Use the
-   app-owned `eve-runtime-session.ts` seam while retained UI packages still
-   require the neutral session contract; do not publish another wrapper.
+3. Install `@zigil/agent-eve@0.1.6` with the repository lockfile. Remove any
+   copied `eve-runtime-session.ts` implementation and import
+   `useEveRuntimeSession` from the package at the application session
+   composition root.
 4. Put one `GONK_MCP_KEY` of at least 32 bytes in the root `.env`, available to
    all three services. The web app needs it for turn bootstrap, Eve for
    per-tool delegation, and Gonk for verification. If the old value is weak,

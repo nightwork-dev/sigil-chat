@@ -10,11 +10,13 @@
 
 ## Outcome
 
-Sigil Chat uses Eve's native channel and client surfaces directly instead of
-maintaining published wrappers around Eve. Slack becomes an Eve-authored
-channel. iMessage, which Eve does not provide, remains an app-owned channel
-adapter over a separately operated bridge until a second real consumer earns a
-package.
+Sigil Chat uses Eve as its runtime and channel substrate without making the
+frontend UI depend on Eve's message model. `@zigil/agent-eve` is the single
+host adapter from Eve into the neutral Sigil Agent session contract; the app
+owns product policy around that contract, not a second runtime translation.
+Slack becomes an Eve-authored channel. iMessage, which Eve does not provide,
+remains an app-owned channel adapter over a separately operated bridge until a
+second real consumer earns a package.
 
 The migration must preserve Sigil Chat's stricter contracts:
 
@@ -30,7 +32,7 @@ The migration must preserve Sigil Chat's stricter contracts:
 
 ### Eve is the runtime and channel substrate
 
-Use Eve directly for:
+Use Eve beneath the neutral adapter for:
 
 - the React session client, stream projection, interruption, and resumable
   cursors;
@@ -39,8 +41,9 @@ Use Eve directly for:
 - Slack ingress, thread context, files, replies, HITL, and authorization
   presentation through `eve/channels/slack`.
 
-Sigil Chat does not create another generic channel framework or another neutral
-agent runtime merely to wrap Eve.
+Sigil Chat does not create another generic channel framework. The existing
+neutral Sigil Agent contract remains the UI boundary because it keeps reusable
+frontend components independent from the selected host runtime.
 
 ### Gonk remains the capability and durable-identity owner
 
@@ -88,55 +91,36 @@ called production-ready.
 
 ## Dependency disposition
 
-| Package                      | Decision                       | Replacement or retained responsibility                                                                                                                             |
-| ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@zigil/agent-eve`           | Deprecate and remove first     | Direct `eve/react` and `eve/client`; temporary app-owned compatibility code only for Sigil-specific attachments and explicit turn outcomes.                        |
-| `@zigil/agent-surface`       | Candidate after upstream split | Native Eve message/session types; app-owned domain outcomes move to `@workspace/agent-contracts`. Its current published consumers still require it.                |
-| `@zigil/agent-react`         | Shrink upstream                | Keep attention, privacy, drafts, telemetry, and thread controls; retire its generic session subpath and `agent-surface` dependency.                                |
-| `@zigil/agent-react-query`   | Keep                           | It owns product-domain cache reconciliation, which Eve does not provide.                                                                                           |
-| `@zigil/agent-gonk`          | Keep                           | It is the supported headless Gonk registry/MCP adapter.                                                                                                            |
-| `@gonk/eve-host`             | Keep and centralize            | It owns Eve/Gonk envelopes, delegation, membership guards, and host projection.                                                                                    |
-| `@workspace/agent-contracts` | Narrow                         | Keep client commands, UI highlights, and app authorization; move overlapping Eve binding/delegation contracts to their Gonk owner when compatible exports exist.   |
-| `@vercel/connect`            | Do not add by default          | Eve 0.27's API supports direct secret-backed credentials for self-hosting; Connect is Eve's documented Slack happy path and remains an optional deployment choice. |
-| iMessage bridge SDK          | None initially                 | Implement the Eve channel against the selected local bridge API; extract only after a second consumer and a stable bridge contract exist.                          |
-
-Deprecation means: stop adding consumers, ship a final migration notice from
-the package-owning repository, migrate clean-room fixtures, then publish npm's
-deprecation marker after supported consumers have moved. It does not mean
-unpublishing historical versions.
+| Package                      | Decision              | Replacement or retained responsibility                                                                                                                             |
+| ---------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@zigil/agent-eve`           | Keep and upgrade      | The one Eve-to-neutral runtime adapter. Version `0.1.6` aligns it with Eve `0.27.0` while preserving attachment inlining and explicit turn outcomes.               |
+| `@zigil/agent-surface`       | Keep                  | Runtime-neutral messages, session actions, tool input, and outcomes consumed by the frontend. It prevents Eve from becoming a component-level dependency.          |
+| `@zigil/agent-react`         | Keep                  | Neutral session context plus attention, privacy, drafts, telemetry, and thread controls.                                                                           |
+| `@zigil/agent-react-query`   | Keep                  | It owns product-domain cache reconciliation, which Eve does not provide.                                                                                           |
+| `@zigil/agent-gonk`          | Keep                  | It is the supported headless Gonk registry/MCP adapter.                                                                                                            |
+| `@gonk/eve-host`             | Keep and centralize   | It owns Eve/Gonk envelopes, delegation, membership guards, and host projection.                                                                                    |
+| `@workspace/agent-contracts` | Narrow                | Keep client commands, UI highlights, and app authorization; move overlapping Eve binding/delegation contracts to their Gonk owner when compatible exports exist.   |
+| `@vercel/connect`            | Do not add by default | Eve 0.27's API supports direct secret-backed credentials for self-hosting; Connect is Eve's documented Slack happy path and remains an optional deployment choice. |
+| iMessage bridge SDK          | None initially        | Implement the Eve channel against the selected local bridge API; extract only after a second consumer and a stable bridge contract exist.                          |
 
 ## Migration phases
 
-### Phase 1 — converge on current Eve and remove `agent-eve`
+### Phase 1 — converge on current Eve and remove the app-owned adapter
 
 1. Rebase the connector branch on `dev` without disturbing unrelated work.
 2. Upgrade the web and agent apps to the same current Eve version.
 3. Port the request-scoped MCP-client patch to that Eve version.
-4. Replace `useEveRuntimeSession` from `@zigil/agent-eve` with direct
-   `useEveAgent` composition in an app-owned compatibility module.
-5. Preserve attachment inlining and explicit succeeded/failed/cancelled turn
-   results with regression coverage.
-6. Remove `@zigil/agent-eve` from the manifest and lockfile.
+4. Upgrade `@zigil/agent-eve` to a release built and tested against Eve
+   `0.27.0`.
+5. Delete the copied `apps/web/src/lib/eve-runtime-session.ts` implementation
+   and consume the package adapter from the app session composition root.
+6. Preserve attachment inlining and explicit succeeded/failed/cancelled turn
+   results through the package conformance suite and app session regressions.
 
-This compatibility module is intentionally bounded. It may translate native
-Eve data only while `packages/ui` and `@zigil/agent-react/session` still require
-the old contract; phase 2 deletes it rather than publishing it.
-
-### Phase 2 — remove the neutral runtime surface
-
-1. Change agent UI and product consumers to Eve message/tool/authorization
-   types.
-2. Move `AgentDomainOutcome` into `@workspace/agent-contracts` and keep React
-   Query reconciliation unchanged.
-3. Replace `@zigil/agent-react/session` with the native Eve session context or
-   a product-local context typed directly to Eve.
-4. Consume an `@zigil/agent-react` release whose non-session modules no longer
-   depend on `@zigil/agent-surface`.
-5. Remove `@zigil/agent-surface` from every manifest and prove it is absent from
-   the dependency graph.
-
-Phase 2 is blocked on the upstream `agent-react` package split. A local package
-manager override or copied fork is not an acceptable substitute.
+The frontend continues to consume `AgentRuntimeSession`; only the composition
+root knows that Eve supplies it. Replacing that boundary with direct Eve types
+would couple every chat component to a host choice without removing a runtime
+translation.
 
 ### Phase 2a — make Eve and Gonk one turn pipeline
 
@@ -222,7 +206,8 @@ execution-binding and Gonk authorization pipeline.
 - `apps/web` and `apps/agent` resolve the same Eve version.
 - the tracked Eve patch applies to that version and scoped Gonk tests remain
   green;
-- `pnpm why @zigil/agent-eve --recursive` returns no consumer;
+- `pnpm why @zigil/agent-eve --recursive` resolves one application consumer and
+  Eve `0.27.0`;
 - persisted Eve events and cursors still restore through the active thread;
 - attachments, tool-input responses, cancellation, failed turns, and successful
   turns retain their prior behavior;
@@ -234,17 +219,17 @@ execution-binding and Gonk authorization pipeline.
 - both application manifests and the lockfile resolve Eve `0.27.0`;
 - the scoped MCP-client patch applies to `eve@0.27.0`, and the installed Eve
   registry selects that client for MCP connections;
-- `@zigil/agent-eve` is absent from the application dependency graph;
-- the compatibility adapter has regression coverage for terminal outcomes,
+- `@zigil/agent-eve@0.1.6` is the only Eve-to-neutral adapter in the web
+  dependency graph;
+- the package adapter has regression coverage for terminal outcomes,
   message/tool projection, and browser-side attachment inlining;
 - all web, agent, and Gonk test suites pass; the repository lint, typecheck,
   and build tasks complete successfully.
 
-Phase 2's `agent-surface` removal and phases 3–4 remain deliberately
-unimplemented. The package removal requires the upstream `@zigil/agent-react`
-split. Slack and iMessage remain disabled until the external-identity link and
-channel-membership service exist; Slack is the preferred real-world validator
-once those gates are present, not a prerequisite for this convergence.
+Phases 3–4 remain deliberately unimplemented. Slack and iMessage remain
+disabled until the external-identity link and channel-membership service exist;
+Slack is the preferred real-world validator once those gates are present, not a
+prerequisite for this convergence.
 
 Phase 2b is implemented when Eve inspection reports `todo` as an active
 framework tool with no authored replacement, the isolated session-todo store is
@@ -258,7 +243,7 @@ For the implementation-oriented, plain-language version of this contract, see
 ## Stop conditions
 
 Do not enable an external channel when identity linking or membership is
-missing. Do not remove `@zigil/agent-surface` while retained published packages
-still require it. Do not upgrade Eve while dropping the request-scoped MCP
-header invariant. Do not claim Slack or iMessage product readiness from a
-compiled channel definition alone.
+missing. Do not leak Eve types past the runtime composition boundary. Do not
+upgrade Eve while dropping the request-scoped MCP header invariant. Do not
+claim Slack or iMessage product readiness from a compiled channel definition
+alone.

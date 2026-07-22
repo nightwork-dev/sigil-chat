@@ -15,19 +15,19 @@ a workspace link, file dependency, tarball, or private registry at that proof
 point.
 
 | Surface                      | Exact application version                                                                                             | Status on 2026-07-20 | Consumer evidence                                                                                                                                            |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Eve host process             | `eve@0.25.2`                                                                                                          | Public         | Clean-room fixture install, typecheck, MCP smoke, and independent Eve boot.                                                                                  |
-| Web compatibility dependency | `eve@0.24.4`                                                                                                          | Public         | Present through the current web adapter graph; it is not the deployed host version. This split remains a compatibility finding.                              |
-| Gonk Core                    | `@gonk/auth`, `context`, `retrieval`, `scope`, `skills`, `store`, `tool-registry`, and `tool-registry-mcp` at `0.3.1` | Public         | The fixture exercises `auth`, `context`, `scope`, `tool-registry`, and `tool-registry-mcp`. Retrieval, skills, and store remain unexercised by this fixture. |
-| Gonk Eve host                | `@gonk/eve-host@0.5.1-mem2.6`                                                                                         | **Not public** | Full external application installation was blocked pending publication.                                                                                      |
-| Gonk memory                  | `@gonk/memory@0.5.1-mem2.5`                                                                                           | **Not public** | Full external application installation was blocked pending publication.                                                                                      |
-| Gonk persona                 | `@gonk/persona@0.5.1-mem2.5`                                                                                          | **Not public** | Full external application installation was blocked pending publication.                                                                                      |
-| Gonk MCP adapter             | `@zigil/agent-gonk@0.1.0`                                                                                             | Public         | Fixture mounts and calls authenticated Streamable HTTP MCP.                                                                                                  |
-| Eve adapter                  | `@zigil/agent-eve@0.1.5`                                                                                              | **Not public** | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
-| Agent surface                | `@zigil/agent-surface@0.1.1`                                                                                          | **Not public** | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
-| React adapter                | `@zigil/agent-react@0.1.1`                                                                                            | **Not public** | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
-| React Query adapter          | `@zigil/agent-react-query@0.1.1`                                                                                      | **Not public** | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
-| Chat application source      | Not an npm package                                                                                                    | Not applicable | Consumer-owned source; npm-distributed Chat application source is unsupported.                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Eve host process             | `eve@0.25.2`                                                                                                          | Public               | Clean-room fixture install, typecheck, MCP smoke, and independent Eve boot.                                                                                  |
+| Web compatibility dependency | `eve@0.24.4`                                                                                                          | Public               | Present through the current web adapter graph; it is not the deployed host version. This split remains a compatibility finding.                              |
+| Gonk Core                    | `@gonk/auth`, `context`, `retrieval`, `scope`, `skills`, `store`, `tool-registry`, and `tool-registry-mcp` at `0.3.1` | Public               | The fixture exercises `auth`, `context`, `scope`, `tool-registry`, and `tool-registry-mcp`. Retrieval, skills, and store remain unexercised by this fixture. |
+| Gonk Eve host                | `@gonk/eve-host@0.5.1-mem2.6`                                                                                         | **Not public**       | Full external application installation was blocked pending publication.                                                                                      |
+| Gonk memory                  | `@gonk/memory@0.5.1-mem2.5`                                                                                           | **Not public**       | Full external application installation was blocked pending publication.                                                                                      |
+| Gonk persona                 | `@gonk/persona@0.5.1-mem2.5`                                                                                          | **Not public**       | Full external application installation was blocked pending publication.                                                                                      |
+| Gonk MCP adapter             | `@zigil/agent-gonk@0.1.0`                                                                                             | Public               | Fixture mounts and calls authenticated Streamable HTTP MCP.                                                                                                  |
+| Eve adapter                  | `@zigil/agent-eve@0.1.5`                                                                                              | **Not public**       | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
+| Agent surface                | `@zigil/agent-surface@0.1.1`                                                                                          | **Not public**       | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
+| React adapter                | `@zigil/agent-react@0.1.1`                                                                                            | **Not public**       | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
+| React Query adapter          | `@zigil/agent-react-query@0.1.1`                                                                                      | **Not public**       | The application used it; the public registry exposed only `0.1.0` at the proof point.                                                                        |
+| Chat application source      | Not an npm package                                                                                                    | Not applicable       | Consumer-owned source; npm-distributed Chat application source is unsupported.                                                                               |
 
 The executable fixture therefore proves the strongest honest subset of that
 train: Eve `0.25.2`, the Gonk Core `0.3.1` MCP/context boundary, and
@@ -37,12 +37,14 @@ npm at that proof point.
 
 ## Current application delta — 2026-07-22
 
-The application now resolves Eve `0.27.0` in both the web and host apps and no
-longer consumes `@zigil/agent-eve`. The retained Gonk host packages are `0.6.0`,
-and the retained React adapter is `@zigil/agent-react@0.1.4`; those exact
-versions resolve from the public registry. This does not retroactively upgrade
-the fixture evidence. In particular, Sigil Chat still carries an application
-patch that creates a fresh MCP client with request-scoped headers per tool
+The application now resolves Eve `0.27.0` in both the web and host apps and
+uses the public `@zigil/agent-eve@0.1.6` release as its single Eve-to-neutral
+adapter. A frozen install from `https://registry.npmjs.org` verified that
+artifact on 2026-07-22 without a workspace link, file dependency, or private
+registry. The retained Gonk host packages are `0.6.0`, and the retained React
+adapter is `@zigil/agent-react@0.1.4`. This does not retroactively upgrade the
+fixture evidence. In particular, Sigil Chat still carries an application patch
+that creates a fresh MCP client with request-scoped headers per tool
 invocation, so an unpatched standalone Eve install is not equivalent evidence
 for Sigil Chat's delegation boundary.
 
@@ -65,10 +67,10 @@ Not supported: importing Sigil Chat's `apps/*`, `packages/*`, generated route tr
    `workspace:`, `link:`, `file:`, local paths, credentials, private fixture
    state, or undeclared runtime dependency.
 3. Verify every exact version with `npm view <name>@<version> version
-   --registry=https://registry.npmjs.org`.
+--registry=https://registry.npmjs.org`.
 4. Copy this fixture to a new temporary directory outside the monorepo and run
    `pnpm install --ignore-workspace --frozen-lockfile
-   --registry=https://registry.npmjs.org`, `pnpm verify:contract`,
+--registry=https://registry.npmjs.org`, `pnpm verify:contract`,
    `pnpm typecheck`, and `pnpm smoke`.
 5. Record the proof date and keep the compatibility manifest explicitly
    historical rather than presenting it as a live application dependency map.

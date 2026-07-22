@@ -21,6 +21,7 @@ import type { EveMessageData } from "eve/react"
 
 import { AgentRuntimeSessionProvider } from "@zigil/agent-react/session"
 import { AgentThreadControlsProvider } from "@zigil/agent-react/thread-controls"
+import { useEveRuntimeSession } from "@zigil/agent-eve"
 import type {
   AgentRuntimeSession,
   AgentSendInput,
@@ -61,7 +62,6 @@ import {
 import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projector"
 import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
 import { getAgentTurnBootstrap } from "@/lib/agent-turn-bootstrap"
-import { useEveRuntimeSession } from "@/lib/eve-runtime-session"
 
 export function AppAgentSessions({
   children,

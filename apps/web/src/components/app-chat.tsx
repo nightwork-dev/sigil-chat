@@ -1,4 +1,5 @@
-import { AgentChat, AgentChatHeader } from "@/components/agent/agent-chat"
+import { AgentChat } from "@/components/agent/agent-chat"
+import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { useRegisterAgentPresentation } from "@/lib/agent-surface-registry"
 import {
   setToolApprovalMode,

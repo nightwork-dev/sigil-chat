@@ -17,7 +17,7 @@
 - **Attachments** — upload (drag-drop / paste / paste-URL / pick, multiple),
   optimistic queue, preview chips, delivery to the model. Images → vision;
   text documents (md/csv/txt/json/code) → readable text. **Delivery is inlined
-  browser-side** by the app-owned Eve client adapter (the AI SDK SSRF-guards
+  browser-side** by `@zigil/agent-eve` (the AI SDK SSRF-guards
   local URL downloads upstream of the model, so a URL reference can't reach
   the model — bytes must ride in the turn). Working; two follow-ups below.
   - _Follow-up: durable reload._ Inlining bloats the turn and eve does not
