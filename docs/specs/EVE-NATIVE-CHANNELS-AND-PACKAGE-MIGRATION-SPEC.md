@@ -56,6 +56,13 @@ Gonk verifies that bearer against the durable binding and its live
 authorization policy. The browser proof is not forwarded to Gonk, and the
 long-lived service key cannot be used as a scoped human principal.
 
+The authenticated external MCP gateway is the explicit non-Eve exception. It
+has no Eve session to bind, so the web server authenticates its API credential
+and sends the service bearer plus a freshly signed user/scope proof. Gonk
+accepts that pair only after live authorization; the service bearer by itself
+still has no scoped human authority. Slack and other Eve channels do not use
+this exception.
+
 The current Eve package patch is a release invariant. It resolves Gonk MCP
 headers for each tool invocation instead of reusing the headers from the first
 connection. Eve `0.27.0` does not contain that behavior, so its patch must be
@@ -139,7 +146,9 @@ manager override or copied fork is not an acceptable substitute.
 3. Use Eve's execute-time MCP authorization resolver to mint a fresh
    `@gonk/eve-host` turn delegation.
 4. Make Gonk accept the shared key only for unscoped service operations and
-   require the signed Eve bearer for scoped human tool access.
+   for the separately authenticated external gateway when accompanied by its
+   server-signed user/scope proof; require the signed Eve bearer for scoped
+   Eve-hosted tool access.
 5. Re-read both the immutable execution binding and live scope authorization on
    every MCP request, including warm-session tool calls.
 6. Remove browser-proof forwarding, Eve-side proof rebinding, duplicate web

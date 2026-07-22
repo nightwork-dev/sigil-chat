@@ -2,9 +2,11 @@ import { GONK_AUTH_INFO_PRINCIPAL } from "@gonk/tool-registry-mcp"
 import { checkBearer } from "@gonk/tool-registry-mcp/http"
 import type { ToolRegistry } from "@gonk/tool-registry"
 import { createAgentWebMcpHandler } from "@zigil/agent-gonk"
+import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
 
 import {
+  authenticateExternalScopeDelegation,
   authenticateEveTurnDelegation,
   authorizeSigilMcpRequest,
   createContainerScopeAuthorizationPolicy,
@@ -110,12 +112,17 @@ export function createSigilMcpHandler({
         request.headers.get(SIGIL_SCOPE_HEADER) ?? undefined,
         request.headers.get(SIGIL_SESSION_SCOPE_HEADER) ?? undefined,
       )
-      // The long-lived key authenticates unscoped service operations. It must
-      // never be accepted as a human/scoped tool caller. Eve uses a fresh,
-      // turn-bound signed bearer for that path.
-      if (serviceRequest && resourceScope) return null
+      // The long-lived key alone authenticates only unscoped service work. A
+      // scoped direct-API call also needs the web gateway's user/scope proof;
+      // an Eve-hosted call instead carries its own fresh turn-bound bearer.
       const delegated = serviceRequest
-        ? undefined
+        ? authenticateExternalScopeDelegation({
+            policy: authorization,
+            proof:
+              request.headers.get(AGENT_SCOPE_PROOF_HEADER) ?? undefined,
+            scope: resourceScope,
+            secret: apiKey,
+          })
         : await authenticateEveTurnDelegation({
             bindings: resolvedExecutionBindings,
             policy: authorization,
@@ -123,8 +130,9 @@ export function createSigilMcpHandler({
             secret: apiKey,
             token,
           })
+      if (resourceScope && !delegated) return null
       if (!serviceRequest && !delegated) return null
-      const agentReach = delegated
+      const agentReach = delegated?.actorSessionId
         ? await resolveDelegatedAgentReach({
             actorSessionId: delegated.actorSessionId,
             bindings: resolvedExecutionBindings,
@@ -143,24 +151,30 @@ export function createSigilMcpHandler({
                 identity: {
                   issuer: "sigil-chat",
                   subject: delegated.principalId,
-                  method: "custom:eve-turn-delegation",
+                  method: delegated.actorSessionId
+                    ? "custom:eve-turn-delegation"
+                    : "custom:external-scope-delegation",
                 },
-                delegation: {
-                  actorKind: "agent" as const,
-                  actor: {
-                    issuer: "sigil-chat",
-                    subject: "sigil-chat-agent",
-                    method: "service-token" as const,
-                  },
-                  actorId: "agent:sigil-chat-agent",
-                  actorSessionId: delegated.actorSessionId,
-                  metadata: {
-                    channelId: delegated.channelId,
-                    correlationId: delegated.correlationId,
-                    delegationId: delegated.delegationId,
-                    personaId: delegated.personaId,
-                  },
-                },
+                ...(delegated.actorSessionId
+                  ? {
+                      delegation: {
+                        actorKind: "agent" as const,
+                        actor: {
+                          issuer: "sigil-chat",
+                          subject: "sigil-chat-agent",
+                          method: "service-token" as const,
+                        },
+                        actorId: "agent:sigil-chat-agent",
+                        actorSessionId: delegated.actorSessionId,
+                        metadata: {
+                          channelId: delegated.channelId,
+                          correlationId: delegated.correlationId,
+                          delegationId: delegated.delegationId,
+                          personaId: delegated.personaId,
+                        },
+                      },
+                    }
+                  : {}),
                 roles: ["member"],
                 scopes: [formatScopeHeader(delegated.scope)!],
               }

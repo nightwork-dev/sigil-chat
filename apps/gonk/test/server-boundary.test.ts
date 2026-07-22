@@ -6,6 +6,7 @@ import {
   SIGIL_GONK_DELEGATION_AUDIENCE,
   SIGIL_GONK_DELEGATION_ISSUER,
 } from "@workspace/agent-contracts/gonk-turn-delegation"
+import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository"
 
 import { ProjectRegistry } from "../../agent/agent/lib/project-registry.js"
@@ -86,6 +87,58 @@ describe("production MCP handler boundary", () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get("content-type")).toContain("application/json")
+  })
+
+  it("keeps the authenticated external gateway path without trusting the service bearer alone", async () => {
+    const records = containers()
+    records.projects.upsert({
+      id: "project-external",
+      name: "External API project",
+      description: "Owns the external gateway scope.",
+      members: [{ principalId: "user-external", role: "member" }],
+      settings: {},
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-external",
+    })
+    records.workspaces.upsert({
+      id: "workspace-external",
+      projectId: "project-external",
+      homeScopeId: "project-external",
+      name: "External API workspace",
+      description: "Scoped external MCP access.",
+      status: "active",
+      createdAt: "2026-07-21T12:00:00.000Z",
+      createdBy: "user-external",
+    })
+    const proof = issueScopeDelegation(
+      {
+        expiresAt: Math.floor(Date.now() / 1_000) + 60,
+        scope: "workspace:workspace-external",
+        subject: "user-external",
+      },
+      token,
+    )
+    const handler = createSigilMcpHandler({
+      apiKey: token,
+      containers: records,
+      port: 8808,
+    })
+    handlers.push(handler)
+
+    const delegated = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "workspace:workspace-external",
+        "x-sigil-scope-proof": proof,
+      }),
+    )
+    expect(delegated.status).toBe(200)
+
+    const bareServiceKey = await handler.handle(
+      initializeRequest("127.0.0.1:8808", {
+        "x-sigil-scope": "workspace:workspace-external",
+      }),
+    )
+    expect(bareServiceKey.status).toBe(401)
   })
 
   it("rejects a valid bearer presented through an unapproved host", async () => {

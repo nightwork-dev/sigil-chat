@@ -10,6 +10,7 @@ import {
   SIGIL_GONK_DELEGATION_ISSUER,
   SIGIL_GONK_DELEGATION_TTL_MS,
 } from "@workspace/agent-contracts/gonk-turn-delegation"
+import { readScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 
 import {
   formatScopeHeader,
@@ -50,6 +51,44 @@ export const authorizeSigilMcpRequest: AgentMcpAuthorizationPolicy = () => {
     outcome: "allow",
     reason: "Authenticated Sigil MCP principals may access application tools",
   }
+}
+
+/**
+ * Authenticate the web-owned external MCP gateway. This path deliberately has
+ * no Eve session: the gateway authenticates its own API credential, then signs
+ * the already-authorized user and resource scope for the Gonk hop. The shared
+ * bearer alone is insufficient, and live authorization is still re-read here.
+ */
+export function authenticateExternalScopeDelegation(input: {
+  now?: number
+  policy: ScopeAuthorizationPolicy
+  proof: string | undefined
+  scope: ResourceScope | undefined
+  secret: string
+}): {
+  actorSessionId?: undefined
+  principalId: string
+  scope: ResourceScope
+} | undefined {
+  if (!input.scope || !input.proof) return undefined
+  const delegation = readScopeDelegation(
+    input.proof,
+    input.now ?? Math.floor(Date.now() / 1_000),
+    input.secret,
+  )
+  const scope = formatScopeHeader(input.scope)
+  if (
+    !delegation ||
+    !scope ||
+    delegation.actorSessionId !== undefined ||
+    delegation.scope !== scope ||
+    !input.policy.authorize({
+      action: "tool",
+      principalId: delegation.subject,
+      resourceScope: scope,
+    })
+  ) return undefined
+  return { principalId: delegation.subject, scope: input.scope }
 }
 
 /**

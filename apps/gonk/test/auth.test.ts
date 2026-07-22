@@ -3,9 +3,11 @@ import {
   SIGIL_GONK_DELEGATION_AUDIENCE,
   SIGIL_GONK_DELEGATION_ISSUER,
 } from "@workspace/agent-contracts/gonk-turn-delegation"
+import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 import { describe, expect, it } from "vitest"
 
 import {
+  authenticateExternalScopeDelegation,
   authenticateEveTurnDelegation,
   createContainerScopeAuthorizationPolicy,
   resolveDelegatedAgentReach,
@@ -13,6 +15,37 @@ import {
 import { personalScopeId } from "../../agent/agent/lib/personal-scope.js"
 
 const SECRET = "test-turn-delegation-secret-32bytes"
+
+describe("Gonk external gateway delegation", () => {
+  it("requires the server proof and rechecks live tool authorization", () => {
+    let authorized = true
+    const proof = issueScopeDelegation(
+      {
+        expiresAt: 200,
+        scope: "workspace:holiday-launch",
+        subject: "user-grantee",
+      },
+      SECRET,
+    )
+    const input = {
+      now: 100,
+      policy: { authorize: () => authorized },
+      proof,
+      scope: { tier: "workspace" as const, id: "holiday-launch" },
+      secret: SECRET,
+    }
+
+    expect(authenticateExternalScopeDelegation(input)).toEqual({
+      principalId: "user-grantee",
+      scope: { tier: "workspace", id: "holiday-launch" },
+    })
+    authorized = false
+    expect(authenticateExternalScopeDelegation(input)).toBeUndefined()
+    expect(
+      authenticateExternalScopeDelegation({ ...input, proof: undefined }),
+    ).toBeUndefined()
+  })
+})
 
 describe("Gonk Eve turn-delegation authentication", () => {
   it("projects Eve's signed end-user principal only while live policy allows it", async () => {
