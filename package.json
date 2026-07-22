@@ -6,6 +6,7 @@
   "scripts": {
     "auth:generate": "pnpm --filter web auth:generate",
     "auth:migrate": "pnpm --filter web auth:migrate",
+    "seed:scope-composition": "pnpm --filter web seed:scope-composition",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",

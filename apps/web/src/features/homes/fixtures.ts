@@ -1,14 +1,10 @@
 // Typed fixtures for the homes presentation layer — the spec §2 "Northstar"
-// model rendered as view-model data. TWO purposes:
+// model rendered as view-model data for component and projector tests.
 //
 // 1. Component tests and stories exercise every state (normal, shared-via,
 //    empty, denied, archived, attention) against stable data.
-// 2. `fixtureWorkSource` implements the ScopedWorkSource seam so homes render
-//    scoped-work summaries today; SC.5 replaces it with the durable board
-//    query adapter WITHOUT touching components.
-//
-// Fixtures are presentation data. They carry no authority semantics and are
-// never read by server code.
+// Fixtures are never selected by runtime routes. Local review data is created
+// through `pnpm seed:scope-composition`, which writes through the real stores.
 
 import type {
   ActivityItem,

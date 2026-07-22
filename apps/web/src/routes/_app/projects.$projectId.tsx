@@ -1,4 +1,4 @@
-// Route: /projects/$projectId[?fixtures=1]
+// Route: /projects/$projectId
 // Tree:
 //   apps/web/src/routes/__root.tsx                     — HTML shell, theme/query providers, shared agent session (no visible chrome)
 //   apps/web/src/routes/_app.tsx                       — one-rail product shell, breadcrumb via-path, theme picker
@@ -15,7 +15,6 @@ import { useArtifacts } from "@/lib/artifacts"
 import { useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { buildProjectHome } from "@/features/homes/home-view-model"
-import { fixtureNav, fixtureThreads } from "@/features/homes/fixtures"
 import {
   artifactRowsFromRecords,
   artifactScopeForHome,
@@ -27,64 +26,53 @@ import type { HomeState, ProjectHomeView } from "@/features/homes/types"
 import { useScopeHomeAccess, useScopeWork } from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/projects/$projectId")({
-  validateSearch: (search: Record<string, unknown>): { fixtures?: boolean } =>
-    search.fixtures === "1" ||
-    search.fixtures === "true" ||
-    search.fixtures === true
-      ? { fixtures: true }
-      : {},
   component: ProjectHomeRoute,
 })
 
 function ProjectHomeRoute() {
   const { projectId } = Route.useParams()
-  const { fixtures } = Route.useSearch()
   const nav = useProjectWorkspaceNav()
   const threads = useAgentThreads()
   const roster = useAgentRoster()
   const compact = useMediaQuery("(max-width: 640px)")
-  const access = useScopeHomeAccess(projectId, !fixtures)
+  const access = useScopeHomeAccess(projectId)
   const scopedWork = useScopeWork(
     projectId,
     "self-and-rollups",
-    !fixtures && access.data === "readable",
+    access.data === "readable",
   )
   const artifactScope =
-    !fixtures && access.data === "readable"
+    access.data === "readable"
       ? artifactScopeForHome("project", projectId)
       : null
   const artifacts = useArtifacts(artifactScope)
   const signals = useHomeSignals(
     "project",
     projectId,
-    !fixtures && access.data === "readable",
+    access.data === "readable",
   )
 
   const state: HomeState<ProjectHomeView> = useMemo(() => {
-    const homeNav = fixtures ? fixtureNav : nav.data
-    const homeThreads = fixtures ? fixtureThreads : threads.data
-    if (!fixtures && access.data === "denied") {
+    const homeNav = nav.data
+    const homeThreads = threads.data
+    if (access.data === "denied") {
       return { kind: "denied", discoverable: true }
     }
-    if (!fixtures && (access.data === "not-found" || access.isError)) {
+    if (access.data === "not-found" || access.isError) {
       return { kind: "not-found" }
     }
     if (
       !homeNav ||
       !homeThreads ||
-      (!fixtures && !access.data) ||
-      (!fixtures && !scopedWork.data && !scopedWork.isError) ||
-      (!fixtures &&
-        Boolean(artifactScope) &&
-        !artifacts.data &&
-        !artifacts.isError) ||
-      (!fixtures && !signals.data && !signals.isError)
+      !access.data ||
+      (!scopedWork.data && !scopedWork.isError) ||
+      (Boolean(artifactScope) && !artifacts.data && !artifacts.isError) ||
+      (!signals.data && !signals.isError)
     ) {
       return { kind: "loading" }
     }
-    if (!fixtures && scopedWork.isError) return { kind: "not-found" }
+    if (scopedWork.isError) return { kind: "not-found" }
     const sources = routeSources(
-      Boolean(fixtures),
       (roster.data ?? []).map((persona) => ({
         personaId: persona.id,
         name: persona.name,
@@ -131,7 +119,6 @@ function ProjectHomeRoute() {
     access.data,
     access.isError,
     projectId,
-    fixtures,
   ])
 
   return <ProjectHome state={state} compact={compact} />

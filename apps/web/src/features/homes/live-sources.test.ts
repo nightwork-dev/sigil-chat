@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav";
 import type { Story } from "@workspace/work-items-store/types";
 
-import { fixtureWorkSource } from "./fixtures";
 import {
   artifactRowsFromRecords,
   artifactScopeForHome,
@@ -58,13 +57,13 @@ const story: Story = {
 };
 
 describe("home route sources", () => {
-  it("uses permission-filtered live work when fixtures are disabled", () => {
+  it("uses permission-filtered live work", () => {
     const live = liveWorkSource({
       scopeId: "project-1",
       scopeStories: [story],
       nav,
     });
-    const sources = routeSources(false, [], live);
+    const sources = routeSources([], live);
 
     expect(sources.work.summariesForScope("project-1")).toEqual([
       expect.objectContaining({
@@ -76,9 +75,9 @@ describe("home route sources", () => {
     expect(sources.attention).toEqual([]);
   });
 
-  it("uses permission-filtered live artifacts when fixtures are disabled", () => {
+  it("uses permission-filtered live artifacts", () => {
     const live = liveWorkSource({ nav });
-    const sources = routeSources(false, [], live, {
+    const sources = routeSources([], live, {
       resources: artifactRowsFromRecords([
         {
           id: "older",
@@ -106,7 +105,7 @@ describe("home route sources", () => {
 
   it("maps session artifacts separately from scope resources", () => {
     const live = liveWorkSource({ nav });
-    const sources = routeSources(false, [], live, {
+    const sources = routeSources([], live, {
       artifacts: artifactRowsFromRecords([
         {
           id: "matrix",
@@ -127,7 +126,6 @@ describe("home route sources", () => {
   it("projects durable activity and attention without inventing a source scope", () => {
     const live = liveWorkSource({ nav });
     const sources = routeSources(
-      false,
       [{ personaId: "eve", name: "Eve", hasPortrait: false }],
       live,
       {
@@ -195,15 +193,13 @@ describe("home route sources", () => {
     );
   });
 
-  it("enables fixture work only behind the explicit review flag", () => {
+  it("does not substitute presentation fixtures for live route data", () => {
     const live = liveWorkSource({ nav });
+    const resources = [
+      { id: "real", name: "real.md", kind: "artifact" },
+    ] as const;
 
-    expect(routeSources(false, [], live).work).toBe(live);
-    expect(routeSources(true, [], live).work).toBe(fixtureWorkSource);
-    expect(
-      routeSources(true, [], live, {
-        resources: [{ id: "real", name: "real.md", kind: "artifact" }],
-      }).resources,
-    ).not.toEqual([{ id: "real", name: "real.md", kind: "artifact" }]);
+    expect(routeSources([], live).work).toBe(live);
+    expect(routeSources([], live, { resources }).resources).toEqual(resources);
   });
 });
