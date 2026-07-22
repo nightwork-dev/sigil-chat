@@ -21,12 +21,12 @@ import type { EveMessageData } from "eve/react"
 
 import { AgentRuntimeSessionProvider } from "@zigil/agent-react/session"
 import { AgentThreadControlsProvider } from "@zigil/agent-react/thread-controls"
+import { useEveRuntimeSession } from "@zigil/agent-eve"
 import type {
   AgentRuntimeSession,
   AgentSendInput,
   AgentThreadControls,
 } from "@zigil/agent-surface/contracts"
-import { useEveRuntimeSession } from "@zigil/agent-eve"
 import {
   addContextAttachment,
   removeTurnContextAttachment,

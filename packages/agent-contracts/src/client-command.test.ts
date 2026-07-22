@@ -32,6 +32,21 @@ describe("agent client command contracts", () => {
     ).toBe(false)
   })
 
+  it("rejects retired pre-outcome review commands", () => {
+    expect(
+      isAgentClientCommand({
+        type: "review.annotation.add",
+        payload: { annotations: [{ id: "annotation-1" }] },
+      }),
+    ).toBe(false)
+    expect(
+      isAgentClientCommand({
+        type: "review.passage.update",
+        payload: { revision: 2 },
+      }),
+    ).toBe(false)
+  })
+
   it("accepts work-items domain outcomes from story tools", () => {
     expect(
       isAgentClientCommand({

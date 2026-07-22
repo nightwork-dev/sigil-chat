@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { agentChatHeaderClasses } from "./agent-chat"
+import { agentChatHeaderClasses } from "./agent-chat-header"
 
 describe("agentChatHeaderClasses", () => {
   it("surface: no flex-1 — the header takes its natural height", () => {
