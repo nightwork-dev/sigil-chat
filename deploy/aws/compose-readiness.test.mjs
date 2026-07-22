@@ -54,6 +54,21 @@ test("SSM downloads release manifests from an HTTPS S3 URL", () => {
   assert.doesNotMatch(releaseTerraform, /sourceInfo: '\{"path":"s3:\/\//)
 })
 
+test("each release ships and executes its versioned deployment contract", () => {
+  assert.match(productionWorkflow, /tar -C deploy\/aws -czf deploy\.tgz/)
+  assert.match(productionWorkflow, /aws s3 cp deploy\.tgz "\$deploy_uri"/)
+  assert.match(releaseTerraform, /name: downloadDeployBundle/)
+  assert.match(releaseTerraform, /releases\/\{\{ ReleaseSha \}\}\/deploy\.tgz/)
+  assert.match(
+    releaseTerraform,
+    /releases\/\{\{ ReleaseSha \}\}\/deploy\/update-images\.sh/,
+  )
+  assert.doesNotMatch(
+    releaseTerraform,
+    /'\/opt\/sigil-chat\/deploy\/update-images\.sh/,
+  )
+})
+
 test("release workflows allow the host updater fifteen minutes", () => {
   for (const workflow of [productionWorkflow, rollbackWorkflow]) {
     assert.doesNotMatch(workflow, /aws ssm wait command-executed/)
