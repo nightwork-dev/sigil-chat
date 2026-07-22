@@ -20,13 +20,14 @@ import {
   UserRoundIcon,
 } from "lucide-react"
 import type { NavModel } from "@workspace/ui/components/layouts/nav"
+import { SITE } from "./site"
 
 export function buildAppNav(options: {
   internalWorkspaces: boolean
   owner?: boolean
 }): NavModel {
   return {
-    brand: { label: "Sigil Chat", to: "/chat" },
+    brand: { label: SITE.name, to: "/chat" },
     items: [
       // The product center: conversation and the management session. Review,
       // Evidence, and Artifacts are demo workspaces — reachable from /demos,

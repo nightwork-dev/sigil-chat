@@ -4,6 +4,7 @@ import viteReact from "@vitejs/plugin-react"
 import viteTsConfigPaths from "vite-tsconfig-paths"
 import tailwindcss from "@tailwindcss/vite"
 import { readPublicWebEnvironment } from "@workspace/runtime-env/topology"
+import { brandingDefine } from "./vite.branding"
 
 const { pagesBase } = readPublicWebEnvironment(process.env)
 
@@ -16,8 +17,9 @@ const { pagesBase } = readPublicWebEnvironment(process.env)
 // Caveat: routes using `createServerFn` (e.g. src/routes/sidebar/index.tsx)
 // will NOT work in this export — there is no server to run them against.
 // SPA export is only valid for routes that don't rely on server functions.
-const config = defineConfig({
+const config = defineConfig(({ mode }) => ({
   base: pagesBase,
+  define: brandingDefine(mode),
   plugins: [
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
@@ -26,6 +28,6 @@ const config = defineConfig({
     tanstackStart({ spa: { enabled: true } }),
     viteReact(),
   ],
-})
+}))
 
 export default config

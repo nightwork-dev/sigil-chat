@@ -169,6 +169,12 @@ parallel:
 | Eve (`apps/agent`)     | `sigil-chat-agent` | `http://sigil-chat-agent.localhost:1355`    |
 | Gonk MCP (`apps/gonk`) | `sigil-chat-gonk`  | `http://sigil-chat-gonk.localhost:1355/mcp` |
 
+These are the primary-checkout names. The dev scripts use `portless run`, so a
+linked worktree receives one shared branch-derived prefix across all three
+services (for example `feature-auth.sigil-chat.localhost`). Runtime topology,
+the browser title, and the generated favicon follow that prefix automatically;
+explicit `EVE_ORIGIN`, `GONK_MCP_URL`, and branding variables still win.
+
 Prerequisites and required env:
 
 - [Portless](https://www.npmjs.com/package/portless) (`npm i -g portless`) —
@@ -256,8 +262,8 @@ section elsewhere without updating the source of truth in `README.md`.
 ## Docs and specs
 
 See [`docs/guides/`](../docs/guides/) for task-oriented usage/extension
-guides — adding a tool, customizing the agent, building a workspace, and
-trimming template boilerplate — and
+guides — adding a tool, customizing the agent, building a workspace,
+rebranding the app, and trimming template boilerplate — and
 [`docs/specs/README.md`](../docs/specs/README.md) for the index of active
 contracts versus historical/evidence records versus specs inherited from the
 `sigil-design` lineage that don't apply to this product.

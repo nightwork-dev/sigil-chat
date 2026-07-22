@@ -7,6 +7,7 @@ import viteTsConfigPaths from "vite-tsconfig-paths"
 import tailwindcss from "@tailwindcss/vite"
 import { nitro } from "nitro/vite"
 import { readRuntimeTopology } from "@workspace/runtime-env/topology"
+import { brandingDefine } from "./vite.branding"
 
 // Load the repo-root .env for all server-only configuration, including Gonk
 // transport auth and Better Auth. process.loadEnvFile preserves explicitly
@@ -18,7 +19,8 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv)
 // Validate the topology at startup (fail fast on a malformed EVE_ORIGIN);
 // the /eve/** proxy route reads it per-request from process.env.
 readRuntimeTopology(process.env)
-const config = defineConfig({
+const config = defineConfig(({ mode }) => ({
+  define: brandingDefine(mode),
   server: {
     // Allow Tailscale-served preview (tailscale serve → this dev server).
     // Vite rejects non-localhost Host headers by default; .ts.net is the
@@ -52,6 +54,6 @@ const config = defineConfig({
     tailwindcss(),
     viteReact(),
   ],
-})
+}))
 
 export default config

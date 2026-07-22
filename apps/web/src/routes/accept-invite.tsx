@@ -70,7 +70,7 @@ function AcceptInvitePage() {
     <div className="grid min-h-svh place-items-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Join {SITE.title}</CardTitle>
+          <CardTitle>Join {SITE.name}</CardTitle>
           <CardDescription>
             Create a member account with this one-time invitation.
           </CardDescription>

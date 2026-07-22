@@ -60,7 +60,7 @@ function LoginPage() {
     <div className="grid min-h-svh place-items-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Sign in to {SITE.title}</CardTitle>
+          <CardTitle>Sign in to {SITE.name}</CardTitle>
           <CardDescription>Enter your email and password.</CardDescription>
         </CardHeader>
         <CardContent>
