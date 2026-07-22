@@ -28,6 +28,15 @@ describe("createSigilAuthOptions", () => {
     expect(options.disabledPaths).toContain("/is-username-available")
     expect(options.plugins?.at(-1)?.id).toBe("tanstack-start-cookies")
 
+    const magicLinkPlugin = options.plugins?.find(
+      (plugin) => plugin.id === "magic-link",
+    )
+    expect(magicLinkPlugin?.options).toMatchObject({
+      disableSignUp: true,
+      expiresIn: 15 * 60,
+      storeToken: "hashed",
+    })
+
     const jwtPlugin = options.plugins?.find((plugin) => plugin.id === "jwt")
     expect(jwtPlugin?.options).toMatchObject({
       jwt: {

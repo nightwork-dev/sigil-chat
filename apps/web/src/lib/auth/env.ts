@@ -9,12 +9,15 @@ import {
 } from "node:fs"
 import { dirname, resolve } from "node:path"
 
+import type { MagicLinkEmailConfig } from "./magic-link-email.server"
+
 export interface AuthEnvironment {
   baseUrl: string
   databaseAuthToken?: string
   databaseUrl: string
   installationId: string
   isProduction: boolean
+  magicLinkEmail?: MagicLinkEmailConfig
   registrationOpen: boolean
   secret: string
   trustedOrigins: string[]
@@ -85,6 +88,14 @@ export function readAuthEnvironment(
   const installationId =
     source.SIGIL_INSTALLATION_ID ??
     (isProduction ? undefined : "sigil-chat-local")
+  const magicLinkApiKey = source.RESEND_API_KEY?.trim()
+  const magicLinkFrom = source.SIGIL_AUTH_EMAIL_FROM?.trim()
+
+  if (Boolean(magicLinkApiKey) !== Boolean(magicLinkFrom)) {
+    throw new Error(
+      "RESEND_API_KEY and SIGIL_AUTH_EMAIL_FROM must be configured together",
+    )
+  }
 
   if (!baseUrl) {
     throw new Error("BETTER_AUTH_URL is required in production")
@@ -108,6 +119,9 @@ export function readAuthEnvironment(
     databaseUrl,
     installationId,
     isProduction,
+    ...(magicLinkApiKey && magicLinkFrom
+      ? { magicLinkEmail: { apiKey: magicLinkApiKey, from: magicLinkFrom } }
+      : {}),
     registrationOpen: source.SIGIL_AUTH_REGISTRATION === "open",
     secret,
     trustedOrigins: parseTrustedOrigins(

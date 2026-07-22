@@ -84,4 +84,19 @@ describe("readAuthEnvironment", () => {
     expect(readFileSync(secretPath, "utf8").trim()).toBe(first.secret)
     expect(statSync(secretPath).mode & 0o777).toBe(0o600)
   })
+
+  it("requires complete magic-link email configuration", () => {
+    expect(() => readAuthEnvironment({ RESEND_API_KEY: "resend-key" })).toThrow(
+      "must be configured together",
+    )
+
+    const environment = readAuthEnvironment({
+      RESEND_API_KEY: "resend-key",
+      SIGIL_AUTH_EMAIL_FROM: "Sigil <signin@example.test>",
+    })
+    expect(environment.magicLinkEmail).toEqual({
+      apiKey: "resend-key",
+      from: "Sigil <signin@example.test>",
+    })
+  })
 })

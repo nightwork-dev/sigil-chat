@@ -1,12 +1,13 @@
 import type { Client } from "@libsql/client"
 import { betterAuth } from "better-auth"
 import type { BetterAuthOptions } from "better-auth"
-import { jwt, username } from "better-auth/plugins"
+import { jwt, magicLink, username } from "better-auth/plugins"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import type { Kysely } from "kysely"
 
 import { createAuthDatabase, type AuthDatabase } from "./db"
 import { readAuthEnvironment, type AuthEnvironment } from "./env"
+import { sendMagicLinkEmail } from "./magic-link-email.server"
 import { assertAuthMigrationsApplied } from "./migrations"
 import {
   createRegistrationPolicy,
@@ -119,6 +120,17 @@ export function createSigilAuthOptions(
           issuer: environment.baseUrl,
         },
       }),
+      magicLink({
+        disableSignUp: true,
+        expiresIn: 15 * 60,
+        sendMagicLink: ({ email, url }) =>
+          sendMagicLinkEmail(
+            environment.magicLinkEmail,
+            { email, url },
+            { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+          ),
+        storeToken: "hashed",
+      }),
       tanstackStartCookies(),
     ],
   }
@@ -132,7 +144,8 @@ export function createSigilAuth(
   ) as unknown as SigilAuthInstance
 }
 
-let defaultDatabase: Promise<{ database: AuthDatabase; environment: AuthEnvironment }> | undefined
+let defaultDatabase:
+  Promise<{ database: AuthDatabase; environment: AuthEnvironment }> | undefined
 
 // Shared, cached environment + connection so getAuth() and any other
 // installation-level query (e.g. the first-user check backing /setup) reuse
