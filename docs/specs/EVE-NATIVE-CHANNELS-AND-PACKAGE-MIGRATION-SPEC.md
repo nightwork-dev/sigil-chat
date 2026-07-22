@@ -143,7 +143,8 @@ manager override or copied fork is not an acceptable substitute.
 5. Re-read both the immutable execution binding and live scope authorization on
    every MCP request, including warm-session tool calls.
 6. Remove browser-proof forwarding, Eve-side proof rebinding, duplicate web
-   proof helpers, and the unused web dependency on `@gonk/eve-host`.
+   proof helpers. Retain the web dependency on `@gonk/eve-host` because the
+   agent-profile server still consumes its persona-memory host.
 
 This phase is implemented. It is the reusable channel boundary: a future Slack
 or iMessage ingress must authenticate and produce the same Eve execution

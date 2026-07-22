@@ -180,6 +180,9 @@ importers:
       '@gonk/comms':
         specifier: 0.5.0
         version: 0.5.0(sqlite-vec@0.1.9)
+      '@gonk/eve-host':
+        specifier: 0.6.0
+        version: 0.6.0(@gonk/scope@0.3.1)(eve@0.27.0(patch_hash=fhjqirxntkcq3lbbcphva7z5pm)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(zod@4.4.3)
       '@gonk/memory':
         specifier: 0.6.0
         version: 0.6.0
