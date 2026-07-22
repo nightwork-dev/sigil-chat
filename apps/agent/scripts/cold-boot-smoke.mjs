@@ -62,7 +62,25 @@ try {
     )
   }
 
-  console.log("Eve cold-boot smoke passed: fresh snapshot served /eve/v1/info 200")
+  const frameworkTodo = body.tools?.framework?.find(
+    (tool) => tool.name === "todo",
+  )
+  const authoredTodo = body.tools?.authored?.find(
+    (tool) => tool.name === "todo",
+  )
+  if (
+    frameworkTodo?.status !== "active" ||
+    frameworkTodo.origin !== "framework" ||
+    authoredTodo !== undefined
+  ) {
+    throw new Error(
+      `Cold-boot agent did not expose Eve's native todo tool: ${JSON.stringify(body.tools)}`,
+    )
+  }
+
+  console.log(
+    "Eve cold-boot smoke passed: fresh snapshot served /eve/v1/info 200 with the native todo tool",
+  )
 } catch (error) {
   if (output.length > 0) {
     console.error(output.join("").slice(-20_000))
