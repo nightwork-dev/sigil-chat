@@ -11,9 +11,11 @@ import {
   visibleSessionCommitments,
   type WorkItemsScopeAccess,
 } from "./work-items-access.server";
-import type { BoardView } from "@workspace/work-items-store/types";
+import type {
+  BoardView,
+  Story,
+} from "@workspace/work-items-store/types";
 import { queryBoardView } from "@workspace/work-items-store/operations";
-import type { Story } from "@workspace/work-items-store/types";
 
 function session(role: "member" | "owner"): SigilAuthSession {
   return {
