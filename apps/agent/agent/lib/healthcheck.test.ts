@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   checkAgentReadiness,
   hasCodexAccessToken,
+  readAgentReadiness,
 } from "../../scripts/healthcheck.mjs"
 
 describe("agent readiness", () => {
@@ -34,5 +35,45 @@ describe("agent readiness", () => {
         fetcher: async () => new Response(null, { status: 503 }),
       }),
     ).resolves.toBe(false)
+  })
+
+  it("reports actionable readiness diagnostics without token or path details", async () => {
+    await expect(
+      readAgentReadiness({
+        codexHome: "/private/codex-home",
+        read: async () => {
+          throw new Error("missing /private/codex-home/auth.json")
+        },
+        fetcher: async () => new Response(null, { status: 200 }),
+      }),
+    ).resolves.toEqual({
+      status: "unavailable",
+      checks: {
+        codexModelAuth: "error",
+        eveRuntime: "unknown",
+      },
+      diagnostic:
+        "Codex model auth is unavailable. Run codex login --device-auth inside the Eve container as the runtime user.",
+    })
+
+    const read = async () =>
+      JSON.stringify({ tokens: { access_token: "model-session-token" } })
+    const report = await readAgentReadiness({
+      codexHome: "virtual-codex-home",
+      read,
+      fetcher: async () => new Response(null, { status: 503 }),
+    })
+
+    expect(report).toEqual({
+      status: "unavailable",
+      checks: {
+        codexModelAuth: "ok",
+        eveRuntime: "error",
+      },
+      diagnostic:
+        "Eve runtime health returned HTTP 503. Check the Eve process logs.",
+    })
+    expect(JSON.stringify(report)).not.toContain("model-session-token")
+    expect(JSON.stringify(report)).not.toContain("/private")
   })
 })

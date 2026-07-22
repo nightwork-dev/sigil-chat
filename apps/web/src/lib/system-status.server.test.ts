@@ -100,5 +100,33 @@ describe("system status server boundary", () => {
     expect(
       result.services.find((service) => service.id === "eve")?.status,
     ).toBe("unhealthy")
+    expect(
+      result.services.find((service) => service.id === "eve")?.diagnostic,
+    ).toBe(
+      "Eve readiness returned HTTP 503. Run the model-aware Eve healthcheck inside the container.",
+    )
+  })
+
+  it("reports missing Gonk service secret before probing the tool service", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+    const result = await readSystemStatus(
+      dependencies({
+        fetcher,
+        readEnvironment: () => ({
+          eveOrigin: "https://agent.example.test",
+          gonkApiKey: undefined,
+          gonkMcpUrl: "https://tools.example.test/mcp",
+        }),
+      }),
+    )
+
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(
+      result.services.find((service) => service.id === "gonk"),
+    ).toMatchObject({
+      status: "unhealthy",
+      diagnostic:
+        "GONK_MCP_KEY is unavailable to the web server. Check the mounted service secret.",
+    })
   })
 })

@@ -77,6 +77,40 @@ test("release workflows allow the host updater fifteen minutes", () => {
   }
 })
 
+test("production image CI builds the four private ECR targets with OIDC", () => {
+  assert.match(productionWorkflow, /id-token: write/)
+  assert.match(productionWorkflow, /aws-actions\/configure-aws-credentials/)
+  assert.match(productionWorkflow, /Log in to private ECR/)
+  assert.match(
+    productionWorkflow,
+    /matrix:\s+target: \[migrate, web, eve, gonk\]/,
+  )
+  assert.match(
+    productionWorkflow,
+    /tags: \$\{\{ vars\.ECR_REGISTRY \}\}\/sigil-chat-\$\{\{ matrix\.target \}\}:\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/,
+  )
+  assert.match(productionWorkflow, /printf '%s=%s\/sigil-chat-%s@%s\\n'/)
+  assert.doesNotMatch(
+    productionWorkflow,
+    /ghcr\.io|GITHUB_TOKEN|packages: write/,
+  )
+})
+
+test("production CI gates image builds with local smoke contracts", () => {
+  const verifyJob = productionWorkflow.slice(
+    productionWorkflow.indexOf("\n  verify:"),
+    productionWorkflow.indexOf("\n  build:"),
+  )
+  assert.match(verifyJob, /pnpm typecheck/)
+  assert.match(
+    verifyJob,
+    /pnpm --filter '!sigil-chat-agent' -r --if-present test/,
+  )
+  assert.match(verifyJob, /pnpm --filter sigil-chat-agent exec vitest run/)
+  assert.match(verifyJob, /pnpm lint/)
+  assert.match(verifyJob, /node --test deploy\/aws\/\*\.test\.mjs/)
+})
+
 test("update command stops the public edge before replacing services", () => {
   const updateScript = readFileSync(
     resolve(directory, "update-images.sh"),
@@ -222,9 +256,15 @@ test("host secrets are readable only by root and the runtime group", () => {
   assert.match(provisionHost, /chown root:10000 "\$path"/)
   assert.match(provisionHost, /chmod 0440 "\$path"/)
   assert.doesNotMatch(provisionHost, /chmod 04(?:00|44) "\$path"/)
-  assert.match(deploymentReadme, /chown root:10000 \/srv\/sigil-chat\/secrets\/\*/)
+  assert.match(
+    deploymentReadme,
+    /chown root:10000 \/srv\/sigil-chat\/secrets\/\*/,
+  )
   assert.match(deploymentReadme, /chmod 0440 \/srv\/sigil-chat\/secrets\/\*/)
-  assert.doesNotMatch(deploymentReadme, /chmod 0400 \/srv\/sigil-chat\/secrets\/\*/)
+  assert.doesNotMatch(
+    deploymentReadme,
+    /chmod 0400 \/srv\/sigil-chat\/secrets\/\*/,
+  )
 })
 
 test("production image disables KVM tools during Eve compilation", () => {

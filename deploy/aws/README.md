@@ -88,6 +88,37 @@ docker compose --env-file deploy.env.local up -d edge
 curl --fail "https://$PUBLIC_HOST/healthz"
 ```
 
+## Operations smoke checks
+
+Before pushing to `prod`, run the local checks that match the production-image
+workflow:
+
+```bash
+pnpm typecheck
+pnpm --filter '!sigil-chat-agent' -r --if-present test
+pnpm --filter sigil-chat-agent exec vitest run
+pnpm lint
+node --test deploy/aws/*.test.mjs
+```
+
+On the host, use the private Compose health checks first. They prove web account
+storage, Gonk artifact storage, process liveness, and edge routing without
+printing any secret value:
+
+```bash
+docker compose --env-file deploy.env.local ps
+docker compose --env-file deploy.env.local exec web node -e "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+docker compose --env-file deploy.env.local exec gonk node -e "const fs=require('node:fs');const key=fs.readFileSync('/run/secrets/gonk_mcp_key','utf8').trim();fetch('http://127.0.0.1:8808/health',{headers:{authorization:'Bearer '+key}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+docker compose --env-file deploy.env.local exec eve pnpm --filter sigil-chat-agent healthcheck
+curl --fail --show-error --connect-timeout 15 "https://$PUBLIC_HOST/healthz"
+```
+
+The Eve healthcheck is intentionally model-aware and prints a small JSON report:
+`codexModelAuth` and `eveRuntime` are either `ok`, `error`, or `unknown`, with a
+sanitized diagnostic. If it reports missing model auth, complete
+`codex login --device-auth` inside the Eve container, then run the same
+healthcheck again before treating chat responses as recovered.
+
 For rollback, dispatch the `Roll back production images` workflow with the full
 40-character SHA of any previously deployed release. Its manifest remains in
 the versioned artifact bucket, and the same migration/readiness gates apply:
