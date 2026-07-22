@@ -1,22 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
-  readRuntimeTopology,
   parseHttpUrl,
   RuntimeEnvironmentError,
   type RuntimeEnvironment,
-  type SigilRuntimeTopology,
 } from "./topology.js";
 import { resolveSigilProjectRoot } from "./project-root.js";
-
-export interface GonkServerEnvironment extends SigilRuntimeTopology {
-  apiKey: string | undefined;
-  port: number;
-}
-
-export interface GonkClientEnvironment extends SigilRuntimeTopology {
-  apiKey: string | undefined;
-}
 
 export interface StorageRuntimeEnvironment {
   graphPath: string;
@@ -143,24 +132,6 @@ export function readIdentityEnvironment(
       data.memoryDir,
       cwd,
     ),
-  };
-}
-
-export function readGonkClientEnvironment(
-  env: RuntimeEnvironment,
-): GonkClientEnvironment {
-  return {
-    ...readRuntimeTopology(env),
-    apiKey: readOptionalSecretFromFile(env, "GONK_MCP_KEY"),
-  };
-}
-
-export function readGonkServerEnvironment(
-  env: RuntimeEnvironment,
-): GonkServerEnvironment {
-  return {
-    ...readGonkClientEnvironment(env),
-    port: parsePort(env.PORT, 8808, "PORT"),
   };
 }
 

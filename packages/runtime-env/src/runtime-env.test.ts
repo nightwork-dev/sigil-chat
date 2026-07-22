@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_EVE_ORIGIN,
-  DEFAULT_GONK_MCP_URL,
   joinRuntimeUrl,
   portlessSiblingUrl,
   readPublicWebEnvironment,
@@ -14,11 +13,9 @@ import {
 import {
   parsePort,
   readEmbeddingEnvironment,
-  readGonkClientEnvironment,
   readDataEnvironment,
   readIdentityEnvironment,
   readOptionalSecretFromFile,
-  readGonkServerEnvironment,
   readStorageEnvironment,
 } from "./server.js";
 
@@ -34,9 +31,7 @@ describe("runtime topology", () => {
   it("provides the Portless development defaults", () => {
     expect(readRuntimeTopology({})).toEqual({
       eveOrigin: DEFAULT_EVE_ORIGIN,
-      gonkMcpUrl: DEFAULT_GONK_MCP_URL,
     });
-    expect(readGonkServerEnvironment({})).toMatchObject({ port: 8808 });
   });
 
   it("keeps sibling services inside the current Portless worktree namespace", () => {
@@ -46,13 +41,12 @@ describe("runtime topology", () => {
       }),
     ).toEqual({
       eveOrigin: "http://feature-auth.sigil-chat-agent.localhost:1355",
-      gonkMcpUrl: "http://feature-auth.sigil-chat-gonk.localhost:1355/mcp",
     });
     expect(
       readRuntimeTopology({
         PORTLESS_URL: "http://feature-auth.sigil-chat-agent.localhost:1355",
-      }).gonkMcpUrl,
-    ).toBe("http://feature-auth.sigil-chat-gonk.localhost:1355/mcp");
+      }).eveOrigin,
+    ).toBe("http://feature-auth.sigil-chat-agent.localhost:1355");
     expect(portlessSiblingUrl("not a URL", "sigil-chat-agent")).toBeUndefined();
   });
 
@@ -61,26 +55,18 @@ describe("runtime topology", () => {
       readRuntimeTopology({
         PORTLESS_URL: "http://feature.sigil-chat.localhost:1355",
         EVE_ORIGIN: "https://eve.example.test",
-        GONK_MCP_URL: "https://gonk.example.test/mcp",
       }),
     ).toEqual({
       eveOrigin: "https://eve.example.test",
-      gonkMcpUrl: "https://gonk.example.test/mcp",
     });
-  });
-
-  it("supports a plain numeric server port override", () => {
-    expect(readGonkServerEnvironment({ PORT: "9900" }).port).toBe(9900);
   });
 
   it("normalizes URL trailing slashes and joins root-relative paths", () => {
     const topology = readRuntimeTopology({
       EVE_ORIGIN: " https://agent.example.test/// ",
-      GONK_MCP_URL: "https://gonk.example.test/mcp/",
     });
     expect(topology).toEqual({
       eveOrigin: "https://agent.example.test",
-      gonkMcpUrl: "https://gonk.example.test/mcp",
     });
     expect(joinRuntimeUrl(topology.eveOrigin, "/eve/v1/info")).toBe(
       "https://agent.example.test/eve/v1/info",
@@ -123,22 +109,24 @@ describe("runtime topology", () => {
 
   it("keeps secrets out of public topology projections", () => {
     const env = {
-      GONK_MCP_KEY: " token ",
+      SIGIL_AGENT_BINDING_SECRET: " token ",
       VITE_API_BASE_URL: "https://api.example.test",
     };
     expect(readRuntimeTopology(env)).not.toHaveProperty("apiKey");
     expect(readPublicWebEnvironment(env)).not.toHaveProperty("apiKey");
-    expect(readGonkClientEnvironment(env)).toMatchObject({ apiKey: "token" });
+    expect(readOptionalSecretFromFile(env, "SIGIL_AGENT_BINDING_SECRET")).toBe(
+      "token",
+    );
   });
 
   it("prefers inline secret value over _FILE", () => {
     expect(
       readOptionalSecretFromFile(
         {
-          GONK_MCP_KEY: "  inlined  ",
-          GONK_MCP_KEY_FILE: "ignored",
+          SIGIL_AGENT_BINDING_SECRET: "  inlined  ",
+          SIGIL_AGENT_BINDING_SECRET_FILE: "ignored",
         },
-        "GONK_MCP_KEY",
+        "SIGIL_AGENT_BINDING_SECRET",
       ),
     ).toBe("inlined");
   });
@@ -152,9 +140,9 @@ describe("runtime topology", () => {
     expect(
       readOptionalSecretFromFile(
         {
-          GONK_MCP_KEY_FILE: secretFile,
+          SIGIL_AGENT_BINDING_SECRET_FILE: secretFile,
         },
-        "GONK_MCP_KEY",
+        "SIGIL_AGENT_BINDING_SECRET",
       ),
     ).toBe("file-backed-secret");
   });

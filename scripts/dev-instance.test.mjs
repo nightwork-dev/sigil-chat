@@ -20,7 +20,7 @@ import {
   getOrCreateDevOwnerCredentials,
   prepareDevServiceEnvironment,
   quarantineDevState,
-  readDevServiceKey,
+  readDevBindingSecret,
   restoreDevState,
 } from "./dev-instance.mjs";
 
@@ -45,9 +45,9 @@ describe("development instance preparation", () => {
     assert.equal(statSync(path).mode & 0o777, 0o600);
   });
 
-  it("creates a stable worktree-local Gonk key with private permissions", () => {
+  it("creates a stable worktree-local agent binding secret with private permissions", () => {
     const directory = temporaryDirectory();
-    const path = join(directory, ".data", "dev", "gonk-mcp-key");
+    const path = join(directory, ".data", "dev", "agent-binding-secret");
 
     const first = ensureDevServiceKey(path, () => "generated-key-1234");
     const second = ensureDevServiceKey(path, () => "replacement-key");
@@ -57,32 +57,38 @@ describe("development instance preparation", () => {
     assert.equal(readFileSync(path, "utf8"), "generated-key-1234\n");
     assert.equal(statSync(path).mode & 0o777, 0o600);
     assert.equal(
-      readDevServiceKey({ GONK_MCP_KEY_FILE: path }),
+      readDevBindingSecret({ SIGIL_AGENT_BINDING_SECRET_FILE: path }),
       "generated-key-1234",
     );
 
-    const environment = { GONK_MCP_KEY_FILE: path };
+    const environment = { SIGIL_AGENT_BINDING_SECRET_FILE: path };
     prepareDevServiceEnvironment(directory, environment);
-    assert.equal(environment.GONK_MCP_KEY, "generated-key-1234");
+    assert.equal(
+      environment.SIGIL_AGENT_BINDING_SECRET,
+      "generated-key-1234",
+    );
     assert.equal(environment.SIGIL_DATA_DIR, join(directory, ".data"));
   });
 
-  it("rejects an invalid existing Gonk key instead of silently replacing it", () => {
+  it("rejects an invalid existing binding secret instead of replacing it", () => {
     const directory = temporaryDirectory();
-    const path = join(directory, ".data", "dev", "gonk-mcp-key");
+    const path = join(directory, ".data", "dev", "agent-binding-secret");
     mkdirSync(join(directory, ".data", "dev"), { recursive: true });
     writeFileSync(path, "short\n");
 
     assert.throws(
       () => ensureDevServiceKey(path, () => "generated-key-1234"),
-      /Invalid Sigil Chat development service key/,
+      /Invalid Sigil Chat development agent binding secret/,
     );
   });
 
   it("leaves current-worktree state absent until the next development start", () => {
     const repoRoot = temporaryDirectory();
     const destination = temporaryDirectory();
-    writeFileSync(join(repoRoot, ".env"), "GONK_MCP_KEY=keep-me\n");
+    writeFileSync(
+      join(repoRoot, ".env"),
+      "SIGIL_AGENT_BINDING_SECRET=keep-me\n",
+    );
 
     for (const relativePath of DEV_STATE_DIRECTORIES) {
       const directory = join(repoRoot, relativePath);
@@ -95,7 +101,7 @@ describe("development instance preparation", () => {
     assert.deepEqual(moved, DEV_STATE_DIRECTORIES);
     assert.equal(
       readFileSync(join(repoRoot, ".env"), "utf8"),
-      "GONK_MCP_KEY=keep-me\n",
+      "SIGIL_AGENT_BINDING_SECRET=keep-me\n",
     );
     for (const relativePath of DEV_STATE_DIRECTORIES) {
       assert.equal(existsSync(join(repoRoot, relativePath)), false);

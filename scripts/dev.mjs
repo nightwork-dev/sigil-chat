@@ -9,7 +9,6 @@ import {
   devProcessMarkerPath,
   getOrCreateDevOwnerCredentials,
   prepareDevServiceEnvironment,
-  readDevServiceKey,
 } from "./dev-instance.mjs";
 import { waitForDevelopmentReadiness } from "./dev-readiness.mjs";
 
@@ -29,7 +28,6 @@ process.env.SIGIL_DEV_LOGIN_TOKEN = randomBytes(24).toString("base64url");
 
 const topology = {
   eveOrigin: portlessUrl("sigil-chat-agent"),
-  gonkOrigin: portlessUrl("sigil-chat-gonk"),
   webOrigin: portlessUrl("sigil-chat"),
 };
 const webOrigin = topology.webOrigin;
@@ -61,7 +59,6 @@ try {
   await Promise.race([
     waitForDevelopmentReadiness({
       credentials,
-      gonkApiKey: readDevServiceKey(),
       topology,
     }),
     turbo.exit.then(({ code, signal }) => {
@@ -146,7 +143,6 @@ function printReadySummary(entryUrl, topology) {
       `  App: ${topology.webOrigin}`,
       `  Sign in: ${entryUrl}`,
       `  Eve: ${topology.eveOrigin}`,
-      `  Gonk: ${topology.gonkOrigin}`,
       `  Code: ${branch || "detached HEAD"}${basedOnDev ? " (based on dev)" : " (warning: dev is not an ancestor)"}`,
       "  State: app data is worktree-local; the roadmap repository is shared",
       "",

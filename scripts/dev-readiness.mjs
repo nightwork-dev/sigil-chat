@@ -11,7 +11,6 @@ export class DevelopmentReadinessError extends Error {
 export async function checkDevelopmentReadiness({
   credentials,
   fetcher = fetch,
-  gonkApiKey,
   topology,
 }) {
   await checkWebReadiness({ fetcher, topology });
@@ -22,7 +21,6 @@ export async function checkDevelopmentReadiness({
   });
   await checkAuthenticatedServices({
     fetcher,
-    gonkApiKey,
     session,
     topology,
   });
@@ -102,7 +100,6 @@ async function createDevelopmentAuthSession({
 
 async function checkAuthenticatedServices({
   fetcher,
-  gonkApiKey,
   session,
   topology,
 }) {
@@ -134,27 +131,12 @@ async function checkAuthenticatedServices({
     },
   );
   const info = await infoResponse.json();
-  if (!hasGonkConnection(info?.connections, topology.gonkOrigin)) {
+  if (!hasNativeGonkTools(info?.dynamic)) {
     throw new DevelopmentReadinessError(
-      "GONK_CONNECTION_MISSING",
-      "Eve is running but its Sigil Chat Gonk connection is unavailable.",
+      "GONK_TOOLS_MISSING",
+      "Eve is running but its native Sigil Chat tools are unavailable.",
     );
   }
-
-  await expectOk(
-    fetcher(
-      new URL("/health", topology.gonkOrigin),
-      requestOptions({
-        headers: { authorization: `Bearer ${gonkApiKey}` },
-      }),
-    ),
-    "GONK_UNHEALTHY",
-    "Gonk authentication or artifact storage is not ready.",
-    {
-      remediation: "Remove stale GONK_MCP_KEY overrides or run pnpm dev:reset.",
-      retryableStatus: isTransientHttpStatus,
-    },
-  );
 }
 
 export async function waitForDevelopmentReadiness(
@@ -252,14 +234,12 @@ function responseCookies(headers) {
   );
 }
 
-function hasGonkConnection(connections, gonkOrigin) {
-  if (!Array.isArray(connections)) return false;
-  return connections.some(
-    (connection) =>
-      connection?.connectionName === "gonk" &&
-      connection.protocol === "mcp" &&
-      typeof connection.url === "string" &&
-      new URL(connection.url).origin === new URL(gonkOrigin).origin,
+function hasNativeGonkTools(dynamicResolvers) {
+  if (!Array.isArray(dynamicResolvers)) return false;
+  return dynamicResolvers.some(
+    (resolver) =>
+      resolver?.id === "sigil-gonk-tools" &&
+      resolver.trigger === "step.started",
   );
 }
 

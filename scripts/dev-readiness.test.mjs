@@ -9,12 +9,11 @@ import {
 
 const topology = {
   eveOrigin: "http://dx.sigil-chat-agent.localhost:1355",
-  gonkOrigin: "http://dx.sigil-chat-gonk.localhost:1355",
   webOrigin: "http://dx.sigil-chat.localhost:1355",
 };
 
 describe("development readiness", () => {
-  it("proves the authenticated web to Eve to Gonk path", async () => {
+  it("proves the authenticated web to Eve path and native tool catalog", async () => {
     const calls = [];
     const result = await checkDevelopmentReadiness({
       credentials: {
@@ -40,30 +39,23 @@ describe("development readiness", () => {
         }
         if (url.endsWith("/eve/v1/info")) {
           return Response.json({
-            connections: [
+            dynamic: [
               {
-                connectionName: "gonk",
-                protocol: "mcp",
-                url: "http://dx.sigil-chat-gonk.localhost:1355/mcp",
+                id: "sigil-gonk-tools",
+                trigger: "step.started",
               },
             ],
           });
         }
-        if (url.endsWith("/health")) return Response.json({ status: "ok" });
         return new Response(null, { status: 404 });
       },
-      gonkApiKey: "gonk-service-key",
       topology,
     });
 
     assert.deepEqual(result, { status: "ready" });
-    assert.equal(calls.length, 6);
+    assert.equal(calls.length, 5);
     assert.equal(calls[2].headers.get("cookie"), "sigil.session=session-value");
     assert.equal(calls[3].headers.get("authorization"), "Bearer eve-token");
-    assert.equal(
-      calls[5].headers.get("authorization"),
-      "Bearer gonk-service-key",
-    );
   });
 
   it("classifies the boundary that is not ready", async () => {
@@ -74,7 +66,6 @@ describe("development readiness", () => {
           password: "owner-password-1234",
         },
         fetcher: async () => new Response(null, { status: 503 }),
-        gonkApiKey: "gonk-service-key",
         topology,
       }),
       (error) =>
@@ -97,7 +88,6 @@ describe("development readiness", () => {
             String(input).endsWith("/healthz")
               ? Response.json({ status: "ok" })
               : new Response(null, { status: 401 }),
-          gonkApiKey: "gonk-service-key",
           topology,
         },
         {
