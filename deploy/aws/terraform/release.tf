@@ -232,13 +232,23 @@ resource "aws_ssm_document" "deploy_release" {
           sourceType: S3
           sourceInfo: '{"path":"https://s3.${var.aws_region}.amazonaws.com/${aws_s3_bucket.artifacts.bucket}/releases/{{ ReleaseSha }}/sigil-images.env"}'
           destinationPath: '/opt/sigil-chat/releases/{{ ReleaseSha }}'
+      - action: aws:downloadContent
+        name: downloadDeployBundle
+        inputs:
+          sourceType: S3
+          sourceInfo: '{"path":"https://s3.${var.aws_region}.amazonaws.com/${aws_s3_bucket.artifacts.bucket}/releases/{{ ReleaseSha }}/deploy.tgz"}'
+          destinationPath: '/opt/sigil-chat/releases/{{ ReleaseSha }}'
       - action: aws:runShellScript
         name: deployRelease
         inputs:
           timeoutSeconds: '900'
           runCommand:
             - 'set -eu'
-            - '/opt/sigil-chat/deploy/update-images.sh "/opt/sigil-chat/releases/{{ ReleaseSha }}/sigil-images.env"'
+            - 'install -d -m 0700 "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy"'
+            - 'tar -xzf "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy.tgz" -C "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy"'
+            - 'chmod 0755 "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy/update-images.sh" "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy/verify-release.sh"'
+            - 'docker compose --env-file /opt/sigil-chat/deploy/deploy.env.local -f "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy/compose.yaml" config --quiet'
+            - 'DEPLOY_ENV=/opt/sigil-chat/deploy/deploy.env.local "/opt/sigil-chat/releases/{{ ReleaseSha }}/deploy/update-images.sh" "/opt/sigil-chat/releases/{{ ReleaseSha }}/sigil-images.env"'
   YAML
 
   tags = {
