@@ -68,6 +68,46 @@ describe("Gonk Eve turn-delegation authentication", () => {
         token,
       }),
     ).resolves.toBeUndefined()
+    await expect(
+      authenticateEveTurnDelegation({
+        bindings: bindingLookup("user-a", {
+          applicationThreadId: "other-thread",
+        }),
+        now: 100,
+        policy: { authorize: () => true },
+        scope: { tier: "project", id: "brand" },
+        secret: SECRET,
+        token,
+      }),
+    ).resolves.toBeUndefined()
+  })
+
+  it("rejects tampering and replay into an unbound Eve session", async () => {
+    const token = issueTurnDelegation({
+      activeResourceScope: "project:brand",
+      subject: "user-a",
+    })
+    const input = {
+      now: 100,
+      policy: { authorize: () => true },
+      scope: { tier: "project" as const, id: "brand" },
+      secret: SECRET,
+    }
+
+    await expect(
+      authenticateEveTurnDelegation({
+        ...input,
+        bindings: { getBinding: async () => undefined },
+        token,
+      }),
+    ).resolves.toBeUndefined()
+    await expect(
+      authenticateEveTurnDelegation({
+        ...input,
+        bindings: bindingLookup("user-a"),
+        token: `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`,
+      }),
+    ).resolves.toBeUndefined()
   })
 })
 
