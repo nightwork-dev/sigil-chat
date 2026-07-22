@@ -2,6 +2,7 @@ import { createClient, type Client } from "@libsql/client"
 import { readFileSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { hashPassword } from "better-auth/crypto"
 import { Kysely } from "kysely"
 import { LibsqlDialect } from "kysely-libsql"
 import { afterEach, describe, expect, it } from "vitest"
@@ -10,7 +11,9 @@ import type { AuthEnvironment } from "./auth/env"
 import { createSigilAuth, type SigilAuthSession } from "./auth/server"
 import {
   ExternalMcpCredentialService,
+  type ExternalMcpKeyCreateInput,
   handleExternalMcpRequest,
+  resetExternalMcpGatewayStateForTests,
 } from "./external-mcp.server"
 
 const clients: Client[] = []
@@ -18,6 +21,7 @@ const databases: Kysely<Record<string, unknown>>[] = []
 const temporaryDirectories: string[] = []
 
 afterEach(async () => {
+  resetExternalMcpGatewayStateForTests()
   for (const database of databases.splice(0)) await database.destroy()
   for (const client of clients.splice(0)) client.close()
   for (const directory of temporaryDirectories.splice(0)) {
@@ -28,7 +32,7 @@ afterEach(async () => {
 describe("ExternalMcpCredentialService", () => {
   it("creates one-time hashed keys and never turns API keys into sessions", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Codex desktop",
       resourceScope: "project:roadmap",
     })
@@ -62,42 +66,59 @@ describe("ExternalMcpCredentialService", () => {
     expect(sessionFromApiKey).toBeNull()
   })
 
-  it("requires a fresh Better Auth session to create, replace, or revoke keys", async () => {
+  it("requires an explicit password step-up receipt for key lifecycle actions", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
-      name: "Fresh",
+    const created = await fixture.createKey({
+      name: "Receipted",
       resourceScope: "project:roadmap",
     })
     await fixture.client.execute({
       sql: "UPDATE session SET updatedAt = ? WHERE id = ?",
-      args: ["2026-07-20T11:40:00.000Z", fixture.session.session.id],
+      args: ["2026-07-20T12:00:00.000Z", fixture.session.session.id],
     })
 
     await expect(
       fixture.service.create(fixture.session, {
-        name: "Stale create",
+        name: "No receipt",
         resourceScope: "project:roadmap",
       }),
-    ).rejects.toThrow("Fresh authentication")
+    ).rejects.toThrow("Step-up reauthentication")
     await expect(
       fixture.service.replace(fixture.session, created.summary.id),
-    ).rejects.toThrow("Fresh authentication")
+    ).rejects.toThrow("Step-up reauthentication")
     await expect(
       fixture.service.revoke(fixture.session, created.summary.id),
-    ).rejects.toThrow("Fresh authentication")
+    ).rejects.toThrow("Step-up reauthentication")
+    await expect(
+      fixture.service.issueStepUpReceipt(fixture.session, "wrong-password"),
+    ).rejects.toThrow("Step-up reauthentication")
+
+    const receipt = await fixture.stepUp()
+    await fixture.service.revoke(
+      fixture.session,
+      created.summary.id,
+      receipt,
+    )
+    await expect(
+      fixture.service.create(
+        fixture.session,
+        { name: "Reused receipt", resourceScope: "project:roadmap" },
+        receipt,
+      ),
+    ).rejects.toThrow("Step-up reauthentication")
   })
 
   it("caps active external MCP keys at 20 per user", async () => {
     const fixture = await createFixture()
     for (let index = 0; index < 20; index += 1) {
-      await fixture.service.create(fixture.session, {
+      await fixture.createKey({
         name: `Key ${index}`,
         resourceScope: "project:roadmap",
       })
     }
 
     await expect(
-      fixture.service.create(fixture.session, {
+      fixture.createKey({
         name: "One too many",
         resourceScope: "project:roadmap",
       }),
@@ -108,7 +129,7 @@ describe("ExternalMcpCredentialService", () => {
 describe("handleExternalMcpRequest", () => {
   it("filters discovery and forwards only the internal service bearer", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Observer",
       resourceScope: "project:roadmap",
     })
@@ -151,7 +172,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("denies ungranted write tools before Gonk sees the request", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Read only",
       resourceScope: "project:roadmap",
     })
@@ -177,7 +198,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("filters streamed SSE discovery responses too", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Observer stream",
       resourceScope: "project:roadmap",
     })
@@ -205,7 +226,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("allows explicit collaborator writes", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Collaborator",
       operation: "write",
       profile: "collaborator",
@@ -234,7 +255,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("denies requests when live resource membership has been removed", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Membership checked",
       resourceScope: "project:roadmap",
     })
@@ -262,7 +283,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("denies requested scopes outside the credential grant before proxying", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Cross resource",
       resourceScope: "project:roadmap",
     })
@@ -289,7 +310,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("rejects cookies and credential-like JSON-RPC metadata before proxying", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Smuggling",
       resourceScope: "project:roadmap",
     })
@@ -329,7 +350,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("denies missing principals before minting a delegation", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Principal deleted",
       resourceScope: "project:roadmap",
     })
@@ -366,7 +387,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("rejects a revoked key on the next request in an initialized session", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Short lived",
       resourceScope: "project:roadmap",
     })
@@ -387,7 +408,11 @@ describe("handleExternalMcpRequest", () => {
     )
     expect(init.headers.get("mcp-session-id")).toBe("session-a")
 
-    await fixture.service.revoke(fixture.session, created.summary.id)
+    await fixture.service.revoke(
+      fixture.session,
+      created.summary.id,
+      await fixture.stepUp(),
+    )
     const afterRevoke = await handleExternalMcpRequest(
       mcpRequest(
         created.key,
@@ -408,11 +433,11 @@ describe("handleExternalMcpRequest", () => {
 
   it("prevents an MCP session from changing credential identity", async () => {
     const fixture = await createFixture()
-    const first = await fixture.service.create(fixture.session, {
+    const first = await fixture.createKey({
       name: "First",
       resourceScope: "project:roadmap",
     })
-    const second = await fixture.service.create(fixture.session, {
+    const second = await fixture.createKey({
       name: "Second",
       resourceScope: "project:roadmap",
     })
@@ -452,7 +477,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("rejects browser origins outside the trusted allowlist", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Origin checked",
       resourceScope: "project:roadmap",
     })
@@ -475,7 +500,7 @@ describe("handleExternalMcpRequest", () => {
 
   it("returns 429 with Retry-After when the provider rate limit denies the key", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Limited",
       resourceScope: "project:roadmap",
     })
@@ -532,10 +557,11 @@ describe("handleExternalMcpRequest", () => {
 
   it("bounds active MCP session concurrency per credential", async () => {
     const fixture = await createFixture()
-    const created = await fixture.service.create(fixture.session, {
+    const created = await fixture.createKey({
       name: "Concurrency",
       resourceScope: "project:roadmap",
     })
+    const upstreamRequests: Request[] = []
     let response = new Response(null, { status: 204 })
     for (let index = 0; index < 5; index += 1) {
       response = await handleExternalMcpRequest(
@@ -547,7 +573,7 @@ describe("handleExternalMcpRequest", () => {
         }),
         {
           credentialService: fixture.service,
-          fetcher: fakeGonk([], { sessionId: `concurrency-${index}` }),
+          fetcher: fakeGonk(upstreamRequests, { sessionId: `concurrency-${index}` }),
           gonkServiceBearer: "internal-service-bearer",
           trustedOrigins: ["https://chat.example.test"],
         },
@@ -555,6 +581,73 @@ describe("handleExternalMcpRequest", () => {
     }
 
     expect(response.status).toBe(429)
+    expect(upstreamRequests).toHaveLength(4)
+  })
+
+  it("releases MCP session reservations when initialize returns no session", async () => {
+    const fixture = await createFixture()
+    const created = await fixture.createKey({
+      name: "No session release",
+      resourceScope: "project:roadmap",
+    })
+    const upstreamRequests: Request[] = []
+
+    for (let index = 0; index < 5; index += 1) {
+      const response = await handleExternalMcpRequest(
+        mcpRequest(created.key, {
+          jsonrpc: "2.0",
+          id: index,
+          method: "initialize",
+          params: {},
+        }),
+        {
+          credentialService: fixture.service,
+          fetcher: fakeGonk(upstreamRequests),
+          gonkServiceBearer: "internal-service-bearer",
+          trustedOrigins: ["https://chat.example.test"],
+        },
+      )
+      expect(response.status).toBe(200)
+    }
+
+    expect(upstreamRequests).toHaveLength(5)
+  })
+
+  it("releases MCP session reservations when upstream initialize fails", async () => {
+    const fixture = await createFixture()
+    const created = await fixture.createKey({
+      name: "Failure release",
+      resourceScope: "project:roadmap",
+    })
+    const upstreamRequests: Request[] = []
+    const failingFetcher = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const request =
+        input instanceof Request
+          ? input
+          : new Request(input, init)
+      upstreamRequests.push(request)
+      return Promise.reject(new Error("upstream down"))
+    }) as typeof fetch
+
+    for (let index = 0; index < 5; index += 1) {
+      const response = await handleExternalMcpRequest(
+        mcpRequest(created.key, {
+          jsonrpc: "2.0",
+          id: index,
+          method: "initialize",
+          params: {},
+        }),
+        {
+          credentialService: fixture.service,
+          fetcher: failingFetcher,
+          gonkServiceBearer: "internal-service-bearer",
+          trustedOrigins: ["https://chat.example.test"],
+        },
+      )
+      expect(response.status).toBe(500)
+    }
+
+    expect(upstreamRequests).toHaveLength(5)
   })
 })
 
@@ -607,6 +700,21 @@ async function createFixture() {
       "user-1",
     ],
   })
+  await client.execute({
+    sql: `
+      INSERT INTO account (
+        id, accountId, providerId, userId, password, createdAt, updatedAt
+      ) VALUES (?, ?, 'credential', ?, ?, ?, ?)
+    `,
+    args: [
+      "account-1",
+      "user-1",
+      "user-1",
+      await hashPassword("current-password"),
+      "2026-07-20T00:00:00.000Z",
+      "2026-07-20T00:00:00.000Z",
+    ],
+  })
 
   const environment: AuthEnvironment = {
     baseUrl: "https://chat.example.test",
@@ -638,7 +746,11 @@ async function createFixture() {
       username: "owner",
     },
   }
-  return { auth, client, resourceAccess, service, session }
+  const stepUp = async () =>
+    (await service.issueStepUpReceipt(session, "current-password")).receipt
+  const createKey = async (input: ExternalMcpKeyCreateInput) =>
+    service.create(session, input, await stepUp())
+  return { auth, client, createKey, resourceAccess, service, session, stepUp }
 }
 
 function mcpRequest(

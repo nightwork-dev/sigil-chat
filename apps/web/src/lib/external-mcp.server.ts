@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { Client } from "@libsql/client"
+import { verifyPassword } from "better-auth/crypto"
 import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import { readGonkClientEnvironment } from "@workspace/runtime-env/server"
@@ -20,7 +21,7 @@ const MAX_EXPIRY_DAYS = 365
 const KEY_RATE_LIMIT_WINDOW_MS = 60 * 1000
 const KEY_RATE_LIMIT_MAX = 120
 const MAX_BODY_BYTES = 1024 * 1024
-const FRESH_SESSION_WINDOW_MS = 5 * 60 * 1000
+const STEP_UP_RECEIPT_WINDOW_MS = 5 * 60 * 1000
 const MAX_ACTIVE_KEYS_PER_USER = 20
 const MAX_INVALID_AUTH_ATTEMPTS_PER_MINUTE = 30
 const MAX_ACTIVE_MCP_SESSIONS = 100
@@ -105,6 +106,10 @@ export interface CreatedExternalMcpKey {
   summary: ExternalMcpKeySummary
 }
 
+export interface ExternalMcpStepUpReceipt {
+  receipt: string
+}
+
 export class ExternalMcpAuthError extends Error {
   readonly status = 401
   readonly code = "invalid_token"
@@ -164,7 +169,23 @@ const mcpSessionBindings = new Map<
     securityContextKey: string
   }
 >()
+const mcpSessionReservations = new Map<string, { credentialId: string }>()
 const invalidAuthBuckets = new Map<string, { count: number; windowStart: number }>()
+const stepUpReceipts = new Map<
+  string,
+  {
+    expiresAt: number
+    sessionId: string
+    userId: string
+  }
+>()
+
+export function resetExternalMcpGatewayStateForTests() {
+  invalidAuthBuckets.clear()
+  mcpSessionBindings.clear()
+  mcpSessionReservations.clear()
+  stepUpReceipts.clear()
+}
 
 export class ExternalMcpCredentialService {
   constructor(
@@ -179,10 +200,33 @@ export class ExternalMcpCredentialService {
   async create(
     session: SigilAuthSession | null,
     input: ExternalMcpKeyCreateInput,
+    stepUpReceipt?: string,
   ): Promise<CreatedExternalMcpKey> {
     requireSession(session)
-    await this.requireFreshSession(session)
+    this.consumeStepUpReceipt(session, stepUpReceipt)
     const normalized = normalizeCreateInput(input)
+    return this.createAuthorizedKey(session, normalized)
+  }
+
+  async issueStepUpReceipt(
+    session: SigilAuthSession | null,
+    password: string,
+  ): Promise<ExternalMcpStepUpReceipt> {
+    requireSession(session)
+    await this.verifyPasswordReauthentication(session, password)
+    const receipt = randomUUID()
+    stepUpReceipts.set(receipt, {
+      expiresAt: this.now().getTime() + STEP_UP_RECEIPT_WINDOW_MS,
+      sessionId: session.session.id,
+      userId: session.user.id,
+    })
+    return { receipt }
+  }
+
+  private async createAuthorizedKey(
+    session: SigilAuthSession,
+    normalized: ReturnType<typeof normalizeCreateInput>,
+  ): Promise<CreatedExternalMcpKey> {
     this.requireResourceAccess({
       operation: normalized.operation,
       principalId: session.user.id,
@@ -261,28 +305,41 @@ export class ExternalMcpCredentialService {
   async replace(
     session: SigilAuthSession | null,
     credentialId: string,
+    stepUpReceipt?: string,
   ): Promise<CreatedExternalMcpKey> {
     requireSession(session)
-    await this.requireFreshSession(session)
+    this.consumeStepUpReceipt(session, stepUpReceipt)
     const existing = await this.loadOwnedGrant(credentialId, session.user.id)
-    const created = await this.create(session, {
-      name: `Replacement for ${credentialId}`,
-      operation: existing.operation,
-      profile: existing.profile,
-      resourceScope: existing.resourceScope,
-      toolAllowlist: existing.toolAllowlist,
-    })
-    await this.revoke(session, credentialId, "replaced")
+    const created = await this.createAuthorizedKey(
+      session,
+      normalizeCreateInput({
+        name: `Replacement for ${credentialId}`,
+        operation: existing.operation,
+        profile: existing.profile,
+        resourceScope: existing.resourceScope,
+        toolAllowlist: existing.toolAllowlist,
+      }),
+    )
+    await this.revokeAuthorizedKey(session, credentialId, "replaced")
     return created
   }
 
   async revoke(
     session: SigilAuthSession | null,
     credentialId: string,
+    stepUpReceipt?: string,
     reason = "revoked",
   ): Promise<void> {
     requireSession(session)
-    await this.requireFreshSession(session)
+    this.consumeStepUpReceipt(session, stepUpReceipt)
+    await this.revokeAuthorizedKey(session, credentialId, reason)
+  }
+
+  private async revokeAuthorizedKey(
+    session: SigilAuthSession,
+    credentialId: string,
+    reason: string,
+  ): Promise<void> {
     await this.loadOwnedGrant(credentialId, session.user.id)
     await this.plugin().updateApiKey({
       body: { enabled: false, keyId: credentialId, userId: session.user.id },
@@ -435,12 +492,39 @@ export class ExternalMcpCredentialService {
     return grantRow(row)
   }
 
-  private async requireFreshSession(session: SigilAuthSession): Promise<void> {
+  private consumeStepUpReceipt(
+    session: SigilAuthSession,
+    receipt: string | undefined,
+  ): void {
+    if (!receipt) {
+      throw new ExternalMcpForbiddenError("Step-up reauthentication is required.")
+    }
+    const stored = stepUpReceipts.get(receipt)
+    stepUpReceipts.delete(receipt)
+    if (
+      !stored ||
+      stored.userId !== session.user.id ||
+      stored.sessionId !== session.session.id ||
+      stored.expiresAt <= this.now().getTime()
+    ) {
+      throw new ExternalMcpForbiddenError("Step-up reauthentication is required.")
+    }
+  }
+
+  private async verifyPasswordReauthentication(
+    session: SigilAuthSession,
+    password: string,
+  ): Promise<void> {
     const result = await this.options.client.execute({
       sql: `
-        SELECT updatedAt, expiresAt
+        SELECT account.password, session.expiresAt
         FROM session
-        WHERE id = ? AND userId = ?
+        JOIN account
+          ON account.userId = session.userId
+        WHERE session.id = ?
+          AND session.userId = ?
+          AND account.providerId = 'credential'
+          AND account.password IS NOT NULL
         LIMIT 1
       `,
       args: [session.session.id, session.user.id],
@@ -449,14 +533,18 @@ export class ExternalMcpCredentialService {
     if (!row) throw new ExternalMcpAuthError()
     const now = this.now().getTime()
     const expiresAt = new Date(String(row.expiresAt)).getTime()
-    const updatedAt = new Date(String(row.updatedAt)).getTime()
     if (
       !Number.isFinite(expiresAt) ||
-      expiresAt <= now ||
-      !Number.isFinite(updatedAt) ||
-      now - updatedAt > FRESH_SESSION_WINDOW_MS
+      expiresAt <= now
     ) {
-      throw new ExternalMcpForbiddenError("Fresh authentication is required.")
+      throw new ExternalMcpAuthError()
+    }
+    const verified = await verifyPassword({
+      hash: String(row.password),
+      password,
+    })
+    if (!verified) {
+      throw new ExternalMcpForbiddenError("Step-up reauthentication is required.")
     }
   }
 
@@ -532,6 +620,7 @@ export async function handleExternalMcpRequest(
     options.credentialService ?? (await createDefaultExternalMcpCredentialService())
   let verified: VerifiedCredential | undefined
   let mcpMethod = method === "POST" ? "unknown" : method
+  let sessionReservationId: string | undefined
   let toolName: string | undefined
 
   try {
@@ -558,12 +647,14 @@ export async function handleExternalMcpRequest(
       sessionId: request.headers.get("mcp-session-id") ?? undefined,
     })
 
+    sessionReservationId = reserveMcpSessionCapacity(rpc, verified)
     const upstream = await proxyToGonk(request, body, verified, options)
     const response =
       rpc?.method === "tools/list"
         ? await filterToolList(upstream, verified)
         : upstream
-    bindSession(response, verified)
+    bindSession(response, verified, sessionReservationId)
+    sessionReservationId = undefined
     await auditDecision(service, {
       credentialId: verified.key.id,
       latencyMs: Date.now() - started,
@@ -579,6 +670,7 @@ export async function handleExternalMcpRequest(
     })
     return response
   } catch (error) {
+    if (sessionReservationId) releaseMcpSessionReservation(sessionReservationId)
     const status = statusFor(error)
     if (status === 401) recordInvalidAuthFailure(request)
     await auditDecision(service, {
@@ -746,27 +838,53 @@ function filterToolListSse(text: string, verified: VerifiedCredential): string {
     .join("\n")
 }
 
-function bindSession(response: Response, verified: VerifiedCredential) {
-  const sessionId = response.headers.get("mcp-session-id")
-  if (!sessionId) return
-  const existing = mcpSessionBindings.get(sessionId)
-  if (!existing) {
-    const activeForCredential = [...mcpSessionBindings.values()].filter(
-      (binding) => binding.credentialId === verified.key.id,
-    ).length
-    if (
-      mcpSessionBindings.size >= MAX_ACTIVE_MCP_SESSIONS ||
-      activeForCredential >= MAX_ACTIVE_MCP_SESSIONS_PER_CREDENTIAL
-    ) {
-      throw new ExternalMcpRateLimitError(60)
-    }
+function reserveMcpSessionCapacity(
+  rpc: JsonRpcRequest | undefined,
+  verified: VerifiedCredential,
+): string | undefined {
+  if (rpc?.method !== "initialize") return undefined
+  const activeForCredential = [...mcpSessionBindings.values()].filter(
+    (binding) => binding.credentialId === verified.key.id,
+  ).length
+  const reservedForCredential = [...mcpSessionReservations.values()].filter(
+    (reservation) => reservation.credentialId === verified.key.id,
+  ).length
+  if (
+    mcpSessionBindings.size + mcpSessionReservations.size >=
+      MAX_ACTIVE_MCP_SESSIONS ||
+    activeForCredential + reservedForCredential >=
+      MAX_ACTIVE_MCP_SESSIONS_PER_CREDENTIAL
+  ) {
+    throw new ExternalMcpRateLimitError(60)
   }
+  const reservationId = randomUUID()
+  mcpSessionReservations.set(reservationId, { credentialId: verified.key.id })
+  return reservationId
+}
+
+function releaseMcpSessionReservation(reservationId: string) {
+  mcpSessionReservations.delete(reservationId)
+}
+
+function bindSession(
+  response: Response,
+  verified: VerifiedCredential,
+  reservationId: string | undefined,
+) {
+  const sessionId = response.headers.get("mcp-session-id")
+  if (!response.ok || !sessionId) {
+    if (reservationId) releaseMcpSessionReservation(reservationId)
+    return
+  }
+  const existing = mcpSessionBindings.get(sessionId)
+  if (existing && reservationId) releaseMcpSessionReservation(reservationId)
   mcpSessionBindings.set(sessionId, {
     credentialId: verified.key.id,
     principalId: verified.grant.principalId,
     resourceScope: verified.grant.resourceScope,
     securityContextKey: securityContextKey(verified),
   })
+  if (!existing && reservationId) releaseMcpSessionReservation(reservationId)
 }
 
 async function auditDecision(
