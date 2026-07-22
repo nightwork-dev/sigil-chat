@@ -159,6 +159,38 @@ This phase is implemented. It is the reusable channel boundary: a future Slack
 or iMessage ingress must authenticate and produce the same Eve execution
 binding, after which the Gonk hop is identical to the web channel.
 
+### Phase 2b — converge live tasking with durable work
+
+Eve's framework `todo` tool is the live checklist for one execution session.
+Sigil's work-items store remains the only durable product task system. Do not
+persist a parallel todo database or create a second run repository merely to
+connect the two.
+
+The existing session-commitment contract is the bridge:
+
+1. A durable work item is explicitly linked to an application thread through a
+   `session:<threadId>` scope binding with relation `mounted-in`.
+2. The application thread id is derived from trusted Eve delegation metadata,
+   never tool input.
+3. Gonk exposes narrow list/link/unlink tools, re-authorizes each work item's
+   canonical home through the live container membership/grant policy (not the
+   permissive registry-admission policy), performs revision-checked writes, and
+   emits the existing `work-items.changed` client command so the product
+   reconciles immediately. The authenticated-visible stock roadmap home,
+   `installation:default`, is explicitly admitted for session links; that link
+   grants no work-item lifecycle authority. Unresolvable, ambiguous, or
+   malformed duplicate session bindings fail closed.
+4. An unbound Eve todo remains session-local and causes no durable work write.
+5. Todo completion never implies `verify`, `shipped`, sponsorship, priority,
+   assignment, or acceptance. Durable lifecycle changes remain explicit Gonk
+   work-item mutations.
+6. The session home renders linked commitments from the work-items repository;
+   it does not copy Eve checklist entries into product storage.
+
+This phase is channel-neutral. A future Slack or iMessage turn receives the same
+behavior only after its external identity is linked and admitted to the same Eve
+execution-binding and Gonk authorization pipeline.
+
 ### Phase 3 — Slack
 
 1. Add an Eve `slackChannel` using direct server-side credentials for the
@@ -212,6 +244,12 @@ unimplemented. The package removal requires the upstream `@zigil/agent-react`
 split. Slack and iMessage remain disabled until the external-identity link and
 channel-membership service exist; Slack is the preferred real-world validator
 once those gates are present, not a prerequisite for this convergence.
+
+Phase 2b is implemented when Eve inspection reports `todo` as an active
+framework tool with no authored replacement, the isolated session-todo store is
+absent, and the authenticated Gonk session-commitment tests prove authorized,
+idempotent, session-isolated link/list/unlink behavior plus denial after home
+access is revoked.
 
 ## Stop conditions
 
