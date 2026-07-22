@@ -99,6 +99,24 @@ test("production services share writable blackboard storage", () => {
   assert.match(compose, /SIGIL_ARTIFACT_DIR: \/var\/lib\/sigil-gonk\/artifacts/)
 })
 
+test("web and Gonk share writable durable roadmap storage", () => {
+  for (const serviceName of ["web", "gonk"]) {
+    const start = compose.indexOf(`\n  ${serviceName}:`)
+    const nextMatch = /\n  [a-z][a-z-]+:/g
+    nextMatch.lastIndex = start + serviceName.length + 4
+    const next = nextMatch.exec(compose)?.index ?? compose.length
+    const service = compose.slice(start, next)
+    assert.match(service, /SIGIL_ROADMAP_DIR: \/var\/lib\/sigil-roadmap/)
+    assert.match(service, /roadmap_data:\/var\/lib\/sigil-roadmap/)
+  }
+  const storageInit = compose.slice(
+    compose.indexOf("\n  storage-init:"),
+    compose.indexOf("\n  migrate:"),
+  )
+  assert.match(storageInit, /roadmap_data:\/var\/lib\/sigil-roadmap/)
+  assert.match(storageInit, /\/var\/lib\/sigil-roadmap/)
+})
+
 test("web and Gonk share the authoritative container registry store", () => {
   for (const serviceName of ["web", "gonk"]) {
     const start = compose.indexOf(`\n  ${serviceName}:`)
@@ -151,6 +169,7 @@ test("shared stores are initialized for one runtime filesystem identity", () => 
     "gonk_data",
     "gonk_scope",
     "blackboard_data",
+    "roadmap_data",
     "container_registry_data",
     "codex_auth",
     "eve_identity",
