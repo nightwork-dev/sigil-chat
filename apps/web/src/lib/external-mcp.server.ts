@@ -10,6 +10,7 @@ import {
   type SigilAuthInstance,
   type SigilAuthSession,
 } from "./auth/server"
+import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import { requireSession } from "./auth/session"
 
 const SIGIL_SCOPE_HEADER = "x-sigil-scope"
@@ -19,6 +20,11 @@ const MAX_EXPIRY_DAYS = 365
 const KEY_RATE_LIMIT_WINDOW_MS = 60 * 1000
 const KEY_RATE_LIMIT_MAX = 120
 const MAX_BODY_BYTES = 1024 * 1024
+const FRESH_SESSION_WINDOW_MS = 5 * 60 * 1000
+const MAX_ACTIVE_KEYS_PER_USER = 20
+const MAX_INVALID_AUTH_ATTEMPTS_PER_MINUTE = 30
+const MAX_ACTIVE_MCP_SESSIONS = 100
+const MAX_ACTIVE_MCP_SESSIONS_PER_CREDENTIAL = 4
 
 type ExternalMcpOperation = "read" | "write"
 type ExternalMcpProfile = "observer" | "collaborator"
@@ -63,6 +69,12 @@ interface VerifiedCredential {
   key: ApiKeyRow
   safeStart: string
 }
+
+type ResourceAuthorizer = (input: {
+  operation: ExternalMcpOperation
+  principalId: string
+  resourceScope: string
+}) => boolean
 
 export interface ExternalMcpKeyCreateInput {
   expiresInDays?: number
@@ -152,6 +164,7 @@ const mcpSessionBindings = new Map<
     securityContextKey: string
   }
 >()
+const invalidAuthBuckets = new Map<string, { count: number; windowStart: number }>()
 
 export class ExternalMcpCredentialService {
   constructor(
@@ -159,6 +172,7 @@ export class ExternalMcpCredentialService {
       auth?: SigilAuthInstance
       client: Client
       now?: () => Date
+      resourceAuthorizer?: ResourceAuthorizer
     },
   ) {}
 
@@ -167,7 +181,14 @@ export class ExternalMcpCredentialService {
     input: ExternalMcpKeyCreateInput,
   ): Promise<CreatedExternalMcpKey> {
     requireSession(session)
+    await this.requireFreshSession(session)
     const normalized = normalizeCreateInput(input)
+    this.requireResourceAccess({
+      operation: normalized.operation,
+      principalId: session.user.id,
+      resourceScope: normalized.resourceScope,
+    })
+    await this.requireActiveKeyCapacity(session.user.id)
     const auth = this.plugin()
     const created = await auth.createApiKey({
       body: {
@@ -242,6 +263,7 @@ export class ExternalMcpCredentialService {
     credentialId: string,
   ): Promise<CreatedExternalMcpKey> {
     requireSession(session)
+    await this.requireFreshSession(session)
     const existing = await this.loadOwnedGrant(credentialId, session.user.id)
     const created = await this.create(session, {
       name: `Replacement for ${credentialId}`,
@@ -260,6 +282,7 @@ export class ExternalMcpCredentialService {
     reason = "revoked",
   ): Promise<void> {
     requireSession(session)
+    await this.requireFreshSession(session)
     await this.loadOwnedGrant(credentialId, session.user.id)
     await this.plugin().updateApiKey({
       body: { enabled: false, keyId: credentialId, userId: session.user.id },
@@ -296,6 +319,12 @@ export class ExternalMcpCredentialService {
     }
     const grant = await this.loadOwnedGrant(result.key.id, result.key.referenceId)
     if (grant.revokedAt) throw new ExternalMcpAuthError()
+    await this.requireActivePrincipal(grant.principalId)
+    this.requireResourceAccess({
+      operation: grant.operation,
+      principalId: grant.principalId,
+      resourceScope: grant.resourceScope,
+    })
     return {
       grant,
       key: result.key,
@@ -406,6 +435,69 @@ export class ExternalMcpCredentialService {
     return grantRow(row)
   }
 
+  private async requireFreshSession(session: SigilAuthSession): Promise<void> {
+    const result = await this.options.client.execute({
+      sql: `
+        SELECT updatedAt, expiresAt
+        FROM session
+        WHERE id = ? AND userId = ?
+        LIMIT 1
+      `,
+      args: [session.session.id, session.user.id],
+    })
+    const row = result.rows[0]
+    if (!row) throw new ExternalMcpAuthError()
+    const now = this.now().getTime()
+    const expiresAt = new Date(String(row.expiresAt)).getTime()
+    const updatedAt = new Date(String(row.updatedAt)).getTime()
+    if (
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= now ||
+      !Number.isFinite(updatedAt) ||
+      now - updatedAt > FRESH_SESSION_WINDOW_MS
+    ) {
+      throw new ExternalMcpForbiddenError("Fresh authentication is required.")
+    }
+  }
+
+  private async requireActiveKeyCapacity(principalId: string): Promise<void> {
+    const result = await this.options.client.execute({
+      sql: `
+        SELECT COUNT(*) AS count
+        FROM apikey
+        JOIN external_mcp_grant
+          ON external_mcp_grant.credential_id = apikey.id
+        WHERE apikey.referenceId = ?
+          AND apikey.enabled = 1
+          AND external_mcp_grant.revoked_at IS NULL
+          AND (apikey.expiresAt IS NULL OR apikey.expiresAt > ?)
+      `,
+      args: [principalId, this.now().toISOString()],
+    })
+    if (Number(result.rows[0]?.count ?? 0) >= MAX_ACTIVE_KEYS_PER_USER) {
+      throw new ExternalMcpForbiddenError("External MCP active key limit reached.")
+    }
+  }
+
+  private async requireActivePrincipal(principalId: string): Promise<void> {
+    const result = await this.options.client.execute({
+      sql: "SELECT 1 FROM user WHERE id = ? LIMIT 1",
+      args: [principalId],
+    })
+    if (result.rows.length === 0) throw new ExternalMcpAuthError()
+  }
+
+  private requireResourceAccess(input: {
+    operation: ExternalMcpOperation
+    principalId: string
+    resourceScope: string
+  }): void {
+    const authorizer = this.options.resourceAuthorizer ?? defaultResourceAuthorizer
+    if (!authorizer(input)) {
+      throw new ExternalMcpForbiddenError("Resource scope is not authorized.")
+    }
+  }
+
   private now(): Date {
     return this.options.now?.() ?? new Date()
   }
@@ -444,19 +536,24 @@ export async function handleExternalMcpRequest(
 
   try {
     validateOrigin(request, options.trustedOrigins)
+    rejectCookies(request)
+    enforceInvalidAuthBudget(request)
     const rawKey = extractBearer(request)
     if (hasCredentialInUnsafePlace(request)) throw new ExternalMcpAuthError()
-    verified = await service.verifyRawKey(rawKey)
-
     const body =
       method === "POST" ? await readRequestBody(request, MAX_BODY_BYTES) : undefined
     const rpc = body ? readJsonRpc(body) : undefined
+    if (rpc?.hasCredentialLikeData) throw new ExternalMcpAuthError()
+    verified = await service.verifyRawKey(rawKey)
     if (rpc?.method) mcpMethod = rpc.method
     if (rpc?.method === "tools/call") toolName = rpc.toolName
 
     authorizeMcpRequest({
       method,
       rpc,
+      requestedScope:
+        request.headers.get(SIGIL_SCOPE_HEADER) ??
+        rpc?.requestedResourceScope,
       verified,
       sessionId: request.headers.get("mcp-session-id") ?? undefined,
     })
@@ -483,6 +580,7 @@ export async function handleExternalMcpRequest(
     return response
   } catch (error) {
     const status = statusFor(error)
+    if (status === 401) recordInvalidAuthFailure(request)
     await auditDecision(service, {
       credentialId: verified?.key.id,
       latencyMs: Date.now() - started,
@@ -553,9 +651,16 @@ function bodyToArrayBuffer(body: Uint8Array): ArrayBuffer {
 function authorizeMcpRequest(input: {
   method: string
   rpc: JsonRpcRequest | undefined
+  requestedScope: string | undefined
   sessionId: string | undefined
   verified: VerifiedCredential
 }) {
+  if (
+    input.requestedScope !== undefined &&
+    input.requestedScope !== input.verified.grant.resourceScope
+  ) {
+    throw new ExternalMcpForbiddenError("Requested scope is outside this credential grant.")
+  }
   const binding = input.sessionId ? mcpSessionBindings.get(input.sessionId) : undefined
   if (
     binding &&
@@ -644,6 +749,18 @@ function filterToolListSse(text: string, verified: VerifiedCredential): string {
 function bindSession(response: Response, verified: VerifiedCredential) {
   const sessionId = response.headers.get("mcp-session-id")
   if (!sessionId) return
+  const existing = mcpSessionBindings.get(sessionId)
+  if (!existing) {
+    const activeForCredential = [...mcpSessionBindings.values()].filter(
+      (binding) => binding.credentialId === verified.key.id,
+    ).length
+    if (
+      mcpSessionBindings.size >= MAX_ACTIVE_MCP_SESSIONS ||
+      activeForCredential >= MAX_ACTIVE_MCP_SESSIONS_PER_CREDENTIAL
+    ) {
+      throw new ExternalMcpRateLimitError(60)
+    }
+  }
   mcpSessionBindings.set(sessionId, {
     credentialId: verified.key.id,
     principalId: verified.grant.principalId,
@@ -750,7 +867,9 @@ function validateOrigin(
 }
 
 interface JsonRpcRequest {
+  hasCredentialLikeData: boolean
   method?: string
+  requestedResourceScope?: string
   toolName?: string
 }
 
@@ -759,8 +878,11 @@ function readJsonRpc(body: Uint8Array): JsonRpcRequest | undefined {
     const payload = JSON.parse(new TextDecoder().decode(body))
     if (!isRecord(payload)) return undefined
     const params = isRecord(payload.params) ? payload.params : undefined
+    const requestedResourceScope = findResourceScope(params)
     return {
+      hasCredentialLikeData: hasCredentialLikeData(payload),
       method: typeof payload.method === "string" ? payload.method : undefined,
+      requestedResourceScope,
       toolName:
         typeof params?.name === "string"
           ? params.name
@@ -769,6 +891,99 @@ function readJsonRpc(body: Uint8Array): JsonRpcRequest | undefined {
   } catch {
     return undefined
   }
+}
+
+function rejectCookies(request: Request) {
+  if (request.headers.has("cookie")) {
+    throw new ExternalMcpAuthError()
+  }
+}
+
+function enforceInvalidAuthBudget(request: Request) {
+  const key = invalidAuthBucketKey(request)
+  const bucket = invalidAuthBuckets.get(key)
+  if (
+    bucket &&
+    Date.now() - bucket.windowStart < 60_000 &&
+    bucket.count >= MAX_INVALID_AUTH_ATTEMPTS_PER_MINUTE
+  ) {
+    throw new ExternalMcpRateLimitError(60)
+  }
+}
+
+function recordInvalidAuthFailure(request: Request) {
+  const key = invalidAuthBucketKey(request)
+  const now = Date.now()
+  const bucket = invalidAuthBuckets.get(key)
+  if (!bucket || now - bucket.windowStart >= 60_000) {
+    invalidAuthBuckets.set(key, { count: 1, windowStart: now })
+    return
+  }
+  bucket.count += 1
+}
+
+function invalidAuthBucketKey(request: Request): string {
+  const deployment = new URL(request.url).origin
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    "unknown"
+  return `${deployment}:${ip}`
+}
+
+function hasCredentialLikeData(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasCredentialLikeData)
+  if (!isRecord(value)) return false
+  return Object.entries(value).some(([key, child]) => {
+    const normalized = key.toLowerCase()
+    if (
+      [
+        "authorization",
+        "cookie",
+        "api_key",
+        "apikey",
+        "access_token",
+        "bearer",
+        "credential",
+        "credentials",
+        "key",
+        "password",
+        "secret",
+        "token",
+      ].includes(normalized)
+    ) {
+      return true
+    }
+    if (
+      typeof child === "string" &&
+      (/^Bearer\s+\S+/i.test(child) || child.includes("sigil_live_"))
+    ) {
+      return true
+    }
+    return hasCredentialLikeData(child)
+  })
+}
+
+function findResourceScope(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findResourceScope(item)
+      if (found) return found
+    }
+    return undefined
+  }
+  if (!isRecord(value)) return undefined
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      ["resourceScope", "resource_scope", "scope"].includes(key) &&
+      typeof child === "string"
+    ) {
+      return child
+    }
+    const found = findResourceScope(child)
+    if (found) return found
+  }
+  return undefined
 }
 
 async function readRequestBody(request: Request, maxBytes: number) {
@@ -895,4 +1110,24 @@ function errorResponse(status: number, reason: string, error: unknown): Response
     headers.set("retry-after", String(error.retryAfterSeconds))
   }
   return new Response(JSON.stringify({ error: reason }), { headers, status })
+}
+
+function defaultResourceAuthorizer(input: {
+  operation: ExternalMcpOperation
+  principalId: string
+  resourceScope: string
+}): boolean {
+  try {
+    assertAuthorizedScope(
+      input.resourceScope,
+      input.principalId,
+      () => undefined,
+      undefined,
+      undefined,
+      input.operation === "write" ? "tool" : "read",
+    )
+    return true
+  } catch {
+    return false
+  }
 }
