@@ -4,6 +4,7 @@ import { useState } from "react"
 import {
   AtSignIcon,
   CheckIcon,
+  EyeIcon,
   GripVerticalIcon,
   InboxIcon,
   LayoutListIcon,
@@ -38,6 +39,7 @@ import type {
 } from "@workspace/work-items-store/types"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { ChatMarkdown } from "@workspace/chat/components/chat-markdown"
 import { KanbanBoard, type KanbanColumn } from "@workspace/ui/components/blocks/kanban-board"
 import type { SortableItemRenderProps } from "@workspace/ui/components/dnd/sortable"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@workspace/ui/components/empty"
@@ -586,6 +588,7 @@ function StoryDetail({
   const assign = useAssignReview()
   const [title, setTitle] = useState(story.title)
   const [intent, setIntent] = useState(story.intent)
+  const [editingIntent, setEditingIntent] = useState(false)
 
   const dirty = title.trim() !== story.title || intent.trim() !== story.intent
   const canSave = dirty && title.trim().length > 0 && !upsert.isPending
@@ -595,7 +598,10 @@ function StoryDetail({
       .mutateAsync({
         story: { ...story, title: title.trim(), intent: intent.trim() },
       })
-      .then(() => toast.success("Story saved"))
+      .then(() => {
+        setEditingIntent(false)
+        toast.success("Story saved")
+      })
       .catch((error: unknown) =>
         toast.error(error instanceof Error ? error.message : "Could not save story"),
       )
@@ -633,16 +639,31 @@ function StoryDetail({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <label className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Intent
-        </label>
-        <Textarea
-          value={intent}
-          onChange={(event) => setIntent(event.target.value)}
-          aria-label="Story intent"
-          className="min-h-24"
-        />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            Intent
+          </span>
+          <Button
+            onClick={() => setEditingIntent((current) => !current)}
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            {editingIntent ? <EyeIcon /> : <PencilLineIcon />}
+            {editingIntent ? "Preview" : "Edit"}
+          </Button>
+        </div>
+        {editingIntent ? (
+          <Textarea
+            value={intent}
+            onChange={(event) => setIntent(event.target.value)}
+            aria-label="Story intent"
+            className="min-h-48 font-mono text-sm leading-6"
+          />
+        ) : (
+          <ChatMarkdown content={intent} />
+        )}
       </div>
 
       <div className="flex items-center gap-2">
