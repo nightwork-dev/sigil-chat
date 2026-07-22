@@ -85,7 +85,9 @@ function ProjectHomeRoute() {
         nav: homeNav,
       }),
       {
-        resources: artifactRowsFromRecords(artifacts.data ?? []),
+        resources: artifactRowsFromRecords(artifacts.data ?? [], {
+          scope: artifactScope ?? undefined,
+        }),
         signals: signals.data,
         viaProjectId: projectId,
       },

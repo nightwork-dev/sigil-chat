@@ -112,6 +112,7 @@ export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
             first={index === 0}
             compact={compact}
             title={resource.name}
+            nativeHref={resource.nativeHref}
             description={
               resource.mountedFromName
                 ? `Shared from ${resource.mountedFromName}`
@@ -141,6 +142,7 @@ export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
             first={index === 0}
             compact={compact}
             title={item.title}
+            href={item.href}
             trailing={
               <span
                 data-testid="work-status"

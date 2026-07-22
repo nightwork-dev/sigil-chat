@@ -78,7 +78,9 @@ function SessionHomeRoute() {
         nav: homeNav,
       }),
       {
-        artifacts: artifactRowsFromRecords(artifacts.data ?? []),
+        artifacts: artifactRowsFromRecords(artifacts.data ?? [], {
+          scope: artifactScope ?? undefined,
+        }),
         signals: signals.data,
         viaProjectId: via,
       },

@@ -224,6 +224,39 @@ describe("project home", () => {
     expect(el.textContent).toContain("Shared from Checkout Reliability")
   })
 
+  it("links resources to their native content and work to its roadmap record", async () => {
+    const interactiveView: ProjectHomeView = {
+      ...projectView,
+      resources: [
+        {
+          ...projectView.resources[0],
+          nativeHref: "/api/media/artifact?key=brief&scope=project%3Acommerce",
+        },
+      ],
+      work: [
+        {
+          ...projectView.work[0],
+          href: "/roadmap?story=CP.14",
+        },
+      ],
+    }
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: interactiveView }} />,
+    )
+
+    const resource = el.querySelector<HTMLAnchorElement>(
+      "section[aria-label='Resources'] a",
+    )
+    const work = el.querySelector<HTMLAnchorElement>(
+      "section[aria-label='Work'] a",
+    )
+    expect(resource?.getAttribute("href")).toBe(
+      "/api/media/artifact?key=brief&scope=project%3Acommerce",
+    )
+    expect(resource?.getAttribute("target")).toBe("_blank")
+    expect(work?.getAttribute("href")).toBe("/roadmap?story=CP.14")
+  })
+
   it("labels a mounted workspace with its canonical owner, quietly", async () => {
     const el = await render(
       <ProjectHome state={{ kind: "ready", view: projectView }} />,

@@ -64,6 +64,7 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
             first={index === 0}
             compact={compact}
             title={artifact.name}
+            nativeHref={artifact.nativeHref}
             description={
               artifact.mountedFromName
                 ? `Shared from ${artifact.mountedFromName}`
@@ -88,6 +89,7 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
             first={index === 0}
             compact={compact}
             title={item.title}
+            href={item.href}
             description={
               item.homeScopeName ? `Home: ${item.homeScopeName}` : undefined
             }

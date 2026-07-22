@@ -58,6 +58,8 @@ export interface HomeRowProps {
   readonly leading?: ReactNode
   readonly description?: string
   readonly href?: string
+  /** Native document/resource navigation, bypassing the SPA router. */
+  readonly nativeHref?: string
   readonly trailing?: ReactNode
   /** Roving tabindex: the section's key handler manages movement; the first
    *  row starts tabbable. */
@@ -72,6 +74,7 @@ export function HomeRow({
   leading,
   description,
   href,
+  nativeHref,
   trailing,
   first,
   compact,
@@ -101,7 +104,7 @@ export function HomeRow({
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md border border-transparent text-left transition-colors",
     compact ? "min-h-11 px-2 py-1.5" : "px-3 py-2",
-    href
+    href || nativeHref
       ? "hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       : "cursor-default",
   )
@@ -119,6 +122,22 @@ export function HomeRow({
       >
         {body}
       </Link>
+    )
+  }
+  if (nativeHref) {
+    return (
+      <a
+        data-home-row
+        data-testid={testId}
+        role="listitem"
+        href={nativeHref}
+        target="_blank"
+        rel="noreferrer"
+        tabIndex={first ? 0 : -1}
+        className={className}
+      >
+        {body}
+      </a>
     )
   }
   return (

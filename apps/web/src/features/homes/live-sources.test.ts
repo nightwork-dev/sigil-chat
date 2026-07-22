@@ -69,6 +69,7 @@ describe("home route sources", () => {
       expect.objectContaining({
         id: "SC.7",
         homeScopeName: "Checkout Reliability",
+        href: "/roadmap?story=SC.7",
       }),
     ]);
     expect(sources.resources).toEqual([]);
@@ -93,12 +94,22 @@ describe("home route sources", () => {
           size: 12,
           createdAt: "2026-07-21T00:00:00.000Z",
         },
-      ]),
+      ], { scope: "project:project-1" }),
     });
 
     expect(sources.resources).toEqual([
-      { id: "newer", name: "latest-brief.png", kind: "artifact" },
-      { id: "older", name: "old-plan.md", kind: "artifact" },
+      {
+        id: "newer",
+        name: "latest-brief.png",
+        kind: "artifact",
+        nativeHref: "/api/media/artifact?key=newer&scope=project%3Aproject-1",
+      },
+      {
+        id: "older",
+        name: "old-plan.md",
+        kind: "artifact",
+        nativeHref: "/api/media/artifact?key=older&scope=project%3Aproject-1",
+      },
     ]);
     expect(sources.artifacts).toEqual([]);
   });
