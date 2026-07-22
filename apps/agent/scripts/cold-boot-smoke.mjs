@@ -101,6 +101,7 @@ async function reservePort() {
 async function waitForInfoRoute(processHandle, port) {
   const deadline = Date.now() + Number(process.env.COLD_BOOT_TIMEOUT_MS ?? 60_000)
   const url = `http://127.0.0.1:${port}/eve/v1/info`
+  let lastProbeFailure = "no response received"
 
   while (Date.now() < deadline) {
     if (processHandle.exitCode !== null) {
@@ -111,13 +112,18 @@ async function waitForInfoRoute(processHandle, port) {
     try {
       const response = await fetch(url)
       if (response.status === 200) return response
+      lastProbeFailure = `HTTP ${response.status}`
       // Eve 0.27 starts Nitro before its first compiler publication. During
       // that narrow window /eve/v1/info can return 500 (missing manifest)
       // rather than 503; cold boot is healthy if the compiler publishes and
       // the same route becomes ready before the deadline.
-    } catch {}
+    } catch (error) {
+      lastProbeFailure = error instanceof Error ? error.message : String(error)
+    }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
   }
 
-  throw new Error("Timed out waiting for Eve's cold-boot info route")
+  throw new Error(
+    `Timed out waiting for Eve's cold-boot info route (${lastProbeFailure})`,
+  )
 }
