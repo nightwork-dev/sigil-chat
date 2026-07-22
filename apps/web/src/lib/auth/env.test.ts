@@ -84,4 +84,59 @@ describe("readAuthEnvironment", () => {
     expect(readFileSync(secretPath, "utf8").trim()).toBe(first.secret)
     expect(statSync(secretPath).mode & 0o777).toBe(0o600)
   })
+
+  it("requires complete authentication email configuration", () => {
+    expect(() => readAuthEnvironment({ RESEND_API_KEY: "resend-key" })).toThrow(
+      "must be configured together",
+    )
+
+    const environment = readAuthEnvironment({
+      RESEND_API_KEY: "resend-key",
+      SIGIL_AUTH_EMAIL_FROM: "Sigil <signin@example.test>",
+    })
+    expect(environment.authEmail).toEqual({
+      apiKey: "resend-key",
+      from: "Sigil <signin@example.test>",
+    })
+  })
+
+  it("enables only completely configured social providers", () => {
+    expect(() =>
+      readAuthEnvironment({ SIGIL_AUTH_GOOGLE_CLIENT_ID: "google-client" }),
+    ).toThrow(
+      "SIGIL_AUTH_GOOGLE_CLIENT_ID and SIGIL_AUTH_GOOGLE_CLIENT_SECRET must be configured together",
+    )
+    expect(() =>
+      readAuthEnvironment({
+        SIGIL_AUTH_OKTA_CLIENT_ID: "okta-client",
+        SIGIL_AUTH_OKTA_CLIENT_SECRET: "okta-secret",
+      }),
+    ).toThrow("SIGIL_AUTH_OKTA_ISSUER must be configured together")
+
+    const environment = readAuthEnvironment({
+      SIGIL_AUTH_DISCORD_CLIENT_ID: "discord-client",
+      SIGIL_AUTH_DISCORD_CLIENT_SECRET: "discord-secret",
+      SIGIL_AUTH_GITHUB_CLIENT_ID: "github-client",
+      SIGIL_AUTH_GITHUB_CLIENT_SECRET: "github-secret",
+      SIGIL_AUTH_GOOGLE_CLIENT_ID: "google-client",
+      SIGIL_AUTH_GOOGLE_CLIENT_SECRET: "google-secret",
+      SIGIL_AUTH_OKTA_CLIENT_ID: "okta-client",
+      SIGIL_AUTH_OKTA_CLIENT_SECRET: "okta-secret",
+      SIGIL_AUTH_OKTA_ISSUER: "https://example.okta.com/oauth2/default/",
+    })
+
+    expect(environment.socialProviders).toEqual({
+      discord: {
+        clientId: "discord-client",
+        clientSecret: "discord-secret",
+      },
+      github: { clientId: "github-client", clientSecret: "github-secret" },
+      google: { clientId: "google-client", clientSecret: "google-secret" },
+      okta: {
+        clientId: "okta-client",
+        clientSecret: "okta-secret",
+        issuer: "https://example.okta.com/oauth2/default",
+      },
+    })
+  })
 })

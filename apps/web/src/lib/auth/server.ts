@@ -1,12 +1,24 @@
 import type { Client } from "@libsql/client"
+import { apiKey } from "@better-auth/api-key"
 import { betterAuth } from "better-auth"
 import type { BetterAuthOptions } from "better-auth"
-import { jwt, username } from "better-auth/plugins"
+import {
+  genericOAuth,
+  jwt,
+  magicLink,
+  okta,
+  username,
+} from "better-auth/plugins"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import type { Kysely } from "kysely"
 
 import { createAuthDatabase, type AuthDatabase } from "./db"
 import { readAuthEnvironment, type AuthEnvironment } from "./env"
+import {
+  sendMagicLinkEmail,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "./auth-email.server"
 import { assertAuthMigrationsApplied } from "./migrations"
 import {
   createRegistrationPolicy,
@@ -58,8 +70,22 @@ export function createSigilAuthOptions(
     createRegistrationPolicy(client, {
       registrationOpen: environment.registrationOpen,
     })
+  const {
+    discord,
+    github,
+    google,
+    okta: oktaCredentials,
+  } = environment.socialProviders
 
   return {
+    account: {
+      accountLinking: {
+        // Closed registration means local identities are owner/invite-created,
+        // so a provider-verified matching email may safely establish the link.
+        // Open registration keeps Better Auth's local-verification safeguard.
+        requireLocalEmailVerified: environment.registrationOpen,
+      },
+    },
     advanced: {
       useSecureCookies: environment.isProduction,
     },
@@ -83,18 +109,46 @@ export function createSigilAuthOptions(
       maxPasswordLength: 128,
       // Better Auth's own default floor; no symbol/composition rules.
       minPasswordLength: 8,
+      resetPasswordTokenExpiresIn: 30 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: ({ user, url }) =>
+        sendPasswordResetEmail(
+          environment.authEmail,
+          { email: user.email, url },
+          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+        ),
+    },
+    emailVerification: {
+      sendVerificationEmail: ({ user, url }) =>
+        sendVerificationEmail(
+          environment.authEmail,
+          { email: user.email, url },
+          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+        ),
     },
     rateLimit: {
       enabled: true,
       customRules: {
         // Sign-in is email + password; brute-force cap on that path.
         "/sign-in/email": { max: 5, window: 60 },
+        "/sign-in/oauth2": { max: 10, window: 60 },
+        "/sign-in/social": { max: 10, window: 60 },
         "/sign-up/email": { max: 3, window: 60 },
+        "/request-password-reset": { max: 3, window: 60 },
+        "/reset-password": { max: 5, window: 60 },
+        "/send-verification-email": { max: 3, window: 60 },
       },
       max: 100,
       window: 60,
     },
     secret: environment.secret,
+    socialProviders: {
+      ...(discord
+        ? { discord: { ...discord, disableSignUp: true } }
+        : undefined),
+      ...(github ? { github: { ...github, disableSignUp: true } } : undefined),
+      ...(google ? { google: { ...google, disableSignUp: true } } : undefined),
+    },
     trustedOrigins: environment.trustedOrigins,
     user: {
       additionalFields: authUserAdditionalFields,
@@ -119,6 +173,54 @@ export function createSigilAuthOptions(
           issuer: environment.baseUrl,
         },
       }),
+      magicLink({
+        disableSignUp: true,
+        expiresIn: 15 * 60,
+        sendMagicLink: ({ email, url }) =>
+          sendMagicLinkEmail(
+            environment.authEmail,
+            { email, url },
+            { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+          ),
+        storeToken: "hashed",
+      }),
+      apiKey({
+        defaultPrefix: "sigil_live_",
+        defaultKeyLength: 48,
+        enableMetadata: true,
+        enableSessionForAPIKeys: false,
+        keyExpiration: {
+          defaultExpiresIn: 90 * 24 * 60 * 60,
+          maxExpiresIn: 365,
+          minExpiresIn: 1,
+        },
+        maximumNameLength: 80,
+        rateLimit: {
+          enabled: true,
+          maxRequests: 120,
+          timeWindow: 60 * 1000,
+        },
+        requireName: true,
+        startingCharactersConfig: {
+          charactersLength: 16,
+          shouldStore: true,
+        },
+      }),
+      ...(oktaCredentials
+        ? [
+            genericOAuth({
+              config: [
+                {
+                  ...okta({
+                    ...oktaCredentials,
+                    disableSignUp: true,
+                  }),
+                  requireIssuerValidation: true,
+                },
+              ],
+            }),
+          ]
+         : []),
       tanstackStartCookies(),
     ],
   }
@@ -132,7 +234,8 @@ export function createSigilAuth(
   ) as unknown as SigilAuthInstance
 }
 
-let defaultDatabase: Promise<{ database: AuthDatabase; environment: AuthEnvironment }> | undefined
+let defaultDatabase:
+  Promise<{ database: AuthDatabase; environment: AuthEnvironment }> | undefined
 
 // Shared, cached environment + connection so getAuth() and any other
 // installation-level query (e.g. the first-user check backing /setup) reuse

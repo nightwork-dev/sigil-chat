@@ -169,6 +169,14 @@ describe("agent scope authorization", () => {
         registries,
       ),
     ).toThrow("NOT_AUTHORIZED")
+    expect(() =>
+      assertAuthorizedScope(
+        "workspace:workspace-1",
+        "user-outsider",
+        () => undefined,
+        registries,
+      ),
+    ).toThrow("NOT_AUTHORIZED")
   })
 
   it("can issue a workspace proof from an explicit resource grant without granting its home project", () => {

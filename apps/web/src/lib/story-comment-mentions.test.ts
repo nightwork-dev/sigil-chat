@@ -3,6 +3,7 @@ import type { Story, StoryComment } from "@workspace/work-items-store/types";
 
 import {
   parseSingleInlineSelector,
+  storyCommentRoutingReceipt,
   storiesAddressedToViewer,
 } from "./story-comment-mentions";
 
@@ -64,4 +65,23 @@ describe("story comment selectors", () => {
       }).map((story) => story.id),
     ).toEqual(["S3"]);
   });
+
+  it("describes actual delivery separately from durable board routing", () => {
+    expect(
+      storyCommentRoutingReceipt({
+        selector: "analysis",
+        delivery: "delivered",
+      }),
+    ).toContain("active session received")
+    expect(
+      storyCommentRoutingReceipt({
+        selector: "analysis",
+        delivery: "unresolved",
+      }),
+    ).toContain("not currently reachable")
+    expect(storyCommentRoutingReceipt({ addressee: "Analysis" })).toContain(
+      "Addressed to me",
+    )
+    expect(storyCommentRoutingReceipt({})).toBeUndefined()
+  })
 });

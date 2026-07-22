@@ -5,11 +5,13 @@ import {
 
 import { MirkWorkItemsRepository } from "./mirk-repository.js";
 import {
+  addRequestEvidence,
   addComment,
   assertRevision,
   assignReview,
   decideReview,
   filterBoardViews,
+  filterRequests,
   filterStories,
   normalizeWorkItemsDocument,
   parseWorkItemsDocument,
@@ -22,11 +24,15 @@ import {
 } from "./operations.js";
 import { createWorkItemsDocument } from "./sample.js";
 import type {
+  AddRequestEvidenceInput,
   BoardView,
   BoardViewFilter,
   FeatureRequestProposalContext,
   FeatureRequestProposalInput,
   FeatureRequestProposalResult,
+  RequestFilter,
+  RequestInspectResult,
+  RequestSearchResult,
   ReviewAssignment,
   ReviewDecision,
   Story,
@@ -83,6 +89,12 @@ export interface WorkItemsRepository {
   listSponsorshipDecisions(
     filter?: WorkSponsorshipDecisionFilter,
   ): Promise<WorkSponsorshipDecision[]>;
+  searchRequests(filter?: RequestFilter): Promise<RequestSearchResult>;
+  inspectRequest(id: string): Promise<RequestInspectResult>;
+  addRequestEvidence(
+    input: AddRequestEvidenceInput,
+    context: FeatureRequestProposalContext,
+  ): Promise<WorkItemsMutationResult>;
 }
 
 export class MemoryWorkItemsRepository implements WorkItemsRepository {
@@ -228,6 +240,37 @@ export class MemoryWorkItemsRepository implements WorkItemsRepository {
       filter,
     );
   }
+
+  async searchRequests(filter?: RequestFilter): Promise<RequestSearchResult> {
+    return {
+      revision: this.document.revision,
+      requests: filterRequests(this.document.stories, filter),
+    };
+  }
+
+  async inspectRequest(id: string): Promise<RequestInspectResult> {
+    const request = filterRequests(this.document.stories).find(
+      (candidate) => candidate.id === id,
+    );
+    if (!request) throw new Error(`Unknown request id: ${id}.`);
+    return {
+      revision: this.document.revision,
+      request,
+      sponsorshipDecisions: filterSponsorshipDecisions(
+        this.document.sponsorshipDecisions,
+        { workItemId: id },
+      ),
+    };
+  }
+
+  async addRequestEvidence(
+    input: AddRequestEvidenceInput,
+    context: FeatureRequestProposalContext,
+  ): Promise<WorkItemsMutationResult> {
+    const result = addRequestEvidence(this.document, input, context);
+    this.document = result.document;
+    return structuredClone(result);
+  }
 }
 
 export class FileWorkItemsRepository implements WorkItemsRepository {
@@ -365,6 +408,39 @@ export class FileWorkItemsRepository implements WorkItemsRepository {
   ): Promise<WorkSponsorshipDecision[]> {
     const document = await this.store.read();
     return filterSponsorshipDecisions(document.sponsorshipDecisions, filter);
+  }
+
+  async searchRequests(filter?: RequestFilter): Promise<RequestSearchResult> {
+    const document = await this.store.read();
+    return {
+      revision: document.revision,
+      requests: filterRequests(document.stories, filter),
+    };
+  }
+
+  async inspectRequest(id: string): Promise<RequestInspectResult> {
+    const document = await this.store.read();
+    const request = filterRequests(document.stories).find(
+      (candidate) => candidate.id === id,
+    );
+    if (!request) throw new Error(`Unknown request id: ${id}.`);
+    return {
+      revision: document.revision,
+      request,
+      sponsorshipDecisions: filterSponsorshipDecisions(
+        document.sponsorshipDecisions,
+        { workItemId: id },
+      ),
+    };
+  }
+
+  async addRequestEvidence(
+    input: AddRequestEvidenceInput,
+    context: FeatureRequestProposalContext,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate((document) =>
+      addRequestEvidence(document, input, context),
+    );
   }
 
   private async mutate(

@@ -24,7 +24,9 @@ export function StatusWorkspace() {
             size="sm"
             variant="outline"
           >
-            <RefreshCwIcon className={status.isFetching ? "animate-spin" : undefined} />
+            <RefreshCwIcon
+              className={status.isFetching ? "animate-spin" : undefined}
+            />
             Refresh
           </Button>
         </div>
@@ -55,23 +57,34 @@ export function StatusWorkspace() {
                       <p className="font-mono text-[10px] text-muted-foreground">
                         {service.latencyMs} ms
                       </p>
+                      {service.diagnostic ? (
+                        <p className="mt-1 max-w-xl text-xs text-muted-foreground">
+                          {service.diagnostic}
+                        </p>
+                      ) : null}
                     </div>
                     <StatusDot
                       label={service.status}
-                      status={service.status === "healthy" ? "success" : "destructive"}
+                      status={
+                        service.status === "healthy" ? "success" : "destructive"
+                      }
                     />
                   </div>
                 ))}
               </div>
             </section>
 
-            <section aria-labelledby="usage-heading" className="border-t border-border pt-4">
+            <section
+              aria-labelledby="usage-heading"
+              className="border-t border-border pt-4"
+            >
               <h2 className="text-sm font-medium" id="usage-heading">
                 Model usage
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Token accounting is not connected yet. Health data above is live;
-                this section will remain explicit rather than estimating usage.
+                Token accounting is not connected yet. Health data above is
+                live; this section will remain explicit rather than estimating
+                usage.
               </p>
             </section>
           </>

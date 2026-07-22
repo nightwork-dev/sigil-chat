@@ -268,6 +268,7 @@ async function createDatabase() {
     isProduction: false,
     registrationOpen: false,
     secret: "test-secret-with-at-least-thirty-two-characters",
+    socialProviders: {},
     trustedOrigins: ["http://sigil-chat.localhost:1355"],
   }
   return { client, environment, kysely, url }

@@ -6,6 +6,19 @@ export interface AgentReadinessOptions {
 }
 
 export function hasCodexAccessToken(raw: string): boolean
+export function readAgentReadiness(options?: AgentReadinessOptions): Promise<
+  | {
+      status: "ready"
+      checks: { codexModelAuth: "ok"; eveRuntime: "ok" }
+    }
+  | {
+      status: "unavailable"
+      checks:
+        | { codexModelAuth: "error"; eveRuntime: "unknown" }
+        | { codexModelAuth: "ok"; eveRuntime: "error" }
+      diagnostic: string
+    }
+>
 export function checkAgentReadiness(
   options?: AgentReadinessOptions,
 ): Promise<boolean>

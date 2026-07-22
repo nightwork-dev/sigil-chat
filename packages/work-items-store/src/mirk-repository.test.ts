@@ -12,7 +12,10 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarkdownWorkItemsRepository } from "./markdown-repository.js";
-import { MirkWorkItemsRepository } from "./mirk-repository.js";
+import {
+  MirkWorkItemsRepository,
+  restoreStoryMarkdownNarrative,
+} from "./mirk-repository.js";
 
 const temporaryDirectories: string[] = [];
 const NOW = "2026-07-18T20:00:00.000Z";
@@ -41,6 +44,57 @@ afterEach(async () => {
 });
 
 describe("MirkWorkItemsRepository", () => {
+  it("preserves checked criteria and narrative comments across structured rewrites", () => {
+    const previous = [
+      "---",
+      "id: S1",
+      "---",
+      "",
+      "Intent",
+      "",
+      "## Acceptance criteria",
+      "",
+      "- [x] Already delivered",
+      "- [ ] Still open",
+      "",
+      "## Comments",
+      "",
+      "- Historical implementation note.",
+      "",
+      "```yaml",
+      "- id: old-comment",
+      "```",
+      "",
+    ].join("\n");
+    const rewritten = [
+      "---",
+      "id: S1",
+      "---",
+      "",
+      "Intent",
+      "",
+      "## Acceptance criteria",
+      "",
+      "- [ ] Already delivered",
+      "- [ ] Still open",
+      "",
+      "## Comments",
+      "",
+      "```yaml",
+      "- id: old-comment",
+      "- id: new-comment",
+      "```",
+      "",
+    ].join("\n");
+
+    const restored = restoreStoryMarkdownNarrative(previous, rewritten);
+
+    expect(restored).toContain("- [x] Already delivered");
+    expect(restored).toContain("- [ ] Still open");
+    expect(restored).toContain("- Historical implementation note.");
+    expect(restored).toContain("- id: new-comment");
+  });
+
   it("seeds, reads, mutates, and commits through the WorkItemsRepository seam", async () => {
     const directory = await makeDirectory();
     const repository = new MirkWorkItemsRepository({
@@ -301,5 +355,36 @@ describe("MirkWorkItemsRepository", () => {
 
     expect(ids).toContain("IDEA9"); // idea story with no ACs is valid
     expect(ids).not.toContain("BROKEN9"); // corrupt file dropped, board survives
+  });
+
+  it("repairs an index that omits story files added outside this process", async () => {
+    const directory = await makeDirectory();
+    await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+
+    const source = await readFile(join(directory, "S0.3.md"), "utf8");
+    await writeFile(
+      join(directory, "S0.4.md"),
+      source
+        .replace("id: S0.3", "id: S0.4")
+        .replace("title: Verify the integration baseline", "title: Added elsewhere"),
+      "utf8",
+    );
+
+    const staleIndex = await readFile(join(directory, "index.md"), "utf8");
+    expect(staleIndex).not.toContain("S0.4 · Added elsewhere");
+
+    await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+
+    const repairedIndex = await readFile(join(directory, "index.md"), "utf8");
+    expect(repairedIndex).toContain("S0.3 · Verify the integration baseline");
+    expect(repairedIndex).toContain("S0.4 · Added elsewhere");
   });
 });

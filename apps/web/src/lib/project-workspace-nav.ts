@@ -58,6 +58,7 @@ const loadProjectWorkspaceNavFn = createServerFn({ method: "GET" }).handler(
 );
 
 export const projectWorkspaceNavKeys = {
+  root: () => ["project-workspace-nav"] as const,
   all: (principalId: string) => ["project-workspace-nav", principalId] as const,
 };
 

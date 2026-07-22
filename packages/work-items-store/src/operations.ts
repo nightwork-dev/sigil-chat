@@ -12,6 +12,13 @@ import type {
   FeatureRequestProposalContext,
   FeatureRequestProposalInput,
   FeatureRequestProposalResult,
+  AddRequestEvidenceInput,
+  RequestEvidenceEntry,
+  RequestFilter,
+  RequestKind,
+  RequestOriginMode,
+  RequestState,
+  RequesterKind,
   ReviewAssignment,
   ReviewDecision,
   ReviewGate,
@@ -28,6 +35,34 @@ import type {
 
 const MAX_HISTORY_ENTRIES = 100;
 const FEATURE_REQUEST_DUPLICATE_THRESHOLD = 0.82;
+const requestKinds: RequestKind[] = [
+  "feature",
+  "tool",
+  "skill",
+  "integration",
+  "data-access",
+  "defect",
+  "workflow",
+  "other",
+];
+const requestStates: RequestState[] = [
+  "proposed",
+  "awaiting-sponsor",
+  "triage",
+  "accepted",
+  "declined",
+  "duplicate",
+  "promoted",
+  "archived",
+];
+const requestOriginModes: RequestOriginMode[] = [
+  "human-direct",
+  "agent-proposal",
+  "principal-directed-agent",
+  "after-action",
+  "imported",
+];
+const requesterKinds: RequesterKind[] = ["human", "agent"];
 
 // ---------------------------------------------------------------------------
 // Pure document mutations. These operate on a WorkItemsDocument and return the
@@ -290,10 +325,18 @@ export function proposeFeatureRequest(
     id: nextFeatureRequestId(document),
     kind: "feature-request",
     homeScopeId,
-    scopeBindings: [],
+    scopeBindings: uniqueStrings(input.relatedScopeIds ?? [])
+      .filter((scopeId) => scopeId !== homeScopeId)
+      .map((scopeId) => ({ scopeId, relation: "rolls-up-to" as const })),
     provenance: {
-      origin: "agent",
+      origin: context.originMode === "human-direct" ? "principal" : "agent",
       actorPrincipalId: context.actorPrincipalId,
+      requesterId: context.requesterId ?? context.actorPrincipalId,
+      requesterKind:
+        context.requesterKind ??
+        (context.originMode === "human-direct" ? "human" : "agent"),
+      principalId: context.actorPrincipalId,
+      originMode: context.originMode ?? "agent-proposal",
       ...(context.agentSessionId
         ? { agentSessionId: context.agentSessionId }
         : {}),
@@ -312,6 +355,37 @@ export function proposeFeatureRequest(
     epicTitle: "Feature requests",
     title,
     intent: featureRequestIntent(input),
+    request: {
+      requestKind: input.requestKind ?? "feature",
+      requestState: input.proposedSponsorPrincipalId
+        ? "awaiting-sponsor"
+        : "proposed",
+      problem: input.problem.trim(),
+      desiredOutcome: input.desiredOutcome.trim(),
+      evidence: initialRequestEvidence(
+        input,
+        {
+          observedById: context.requesterId ?? context.actorPrincipalId,
+          observedByKind:
+            context.requesterKind ??
+            (context.originMode === "human-direct" ? "human" : "agent"),
+          scopeId: homeScopeId,
+          now: context.now,
+        },
+      ),
+      relatedScopeIds: uniqueStrings(input.relatedScopeIds ?? []),
+      promotedSpecIds: [],
+      promotedStoryIds: [],
+      ...(input.proposedApproach
+        ? { proposedApproach: input.proposedApproach.trim() }
+        : {}),
+      ...(input.impact ? { impact: input.impact.trim() } : {}),
+      ...(input.frequency ? { frequency: input.frequency.trim() } : {}),
+      ...(input.constraints ? { constraints: input.constraints.trim() } : {}),
+      ...(input.targetAudience
+        ? { targetAudience: input.targetAudience.trim() }
+        : {}),
+    },
     acceptanceCriteria: [],
     status: "idea",
     routing: "strategy",
@@ -331,6 +405,53 @@ export function proposeFeatureRequest(
     duplicateDecision,
     changedIds: result.changedIds,
   };
+}
+
+export function addRequestEvidence(
+  document: WorkItemsDocument,
+  input: AddRequestEvidenceInput,
+  context: FeatureRequestProposalContext,
+): WorkItemsMutationResult {
+  assertRevision(document, input.expectedRevision);
+  assertFeatureRequestProposalContext(context);
+  assertRequestEvidenceInput(input);
+  const story = findStory(document, input.requestId);
+  if (story.kind !== "feature-request")
+    throw new Error(`Work item is not a request: ${input.requestId}.`);
+  const timestamp = context.now;
+  const nextEvidence: RequestEvidenceEntry = {
+    id: nextRequestEvidenceId(story),
+    observedById: context.requesterId ?? context.actorPrincipalId,
+    observedByKind: context.requesterKind ?? "agent",
+    scopeId: context.currentScopeId,
+    constraint: input.evidence.constraint.trim(),
+    workaround: input.evidence.workaround.trim(),
+    cost: input.evidence.cost.trim(),
+    expectedImprovement: input.evidence.expectedImprovement.trim(),
+    ...(input.evidence.proof ? { proof: input.evidence.proof.trim() } : {}),
+    ...(input.evidence.taskRef
+      ? { taskRef: input.evidence.taskRef.trim() }
+      : {}),
+    ...(input.evidence.sourceRefs
+      ? { sourceRefs: input.evidence.sourceRefs.map((ref) => ref.trim()) }
+      : {}),
+    createdAt: timestamp,
+  };
+  const request = requestDetailsFor(story);
+  const stories = document.stories.map((item) =>
+    item.id === story.id
+      ? {
+          ...item,
+          request: {
+            ...request,
+            evidence: [...request.evidence, nextEvidence],
+          },
+          updatedAt: timestamp,
+          revision: item.revision + 1,
+        }
+      : item,
+  );
+  return commit(document, { stories }, [story.id, nextEvidence.id]);
 }
 
 export function decideFeatureRequestDuplicates(
@@ -443,6 +564,37 @@ export function filterStories(stories: Story[], filter?: StoryFilter): Story[] {
   );
 }
 
+export function filterRequests(
+  stories: readonly Story[],
+  filter?: RequestFilter,
+): Story[] {
+  const query = filter?.query ? normalizeSearchText(filter.query) : undefined;
+  return sortStories(
+    stories.filter((story) => {
+      if (story.kind !== "feature-request") return false;
+      const request = requestDetailsFor(story);
+      return (
+        (filter?.requestKind === undefined ||
+          request.requestKind === filter.requestKind) &&
+        (filter?.requestState === undefined ||
+          request.requestState === filter.requestState) &&
+        (filter?.homeScopeId === undefined ||
+          story.homeScopeId === filter.homeScopeId) &&
+        (filter?.sponsorPrincipalId === undefined ||
+          story.provenance.proposedSponsorPrincipalId ===
+            filter.sponsorPrincipalId) &&
+        (filter?.requesterId === undefined ||
+          (story.provenance.requesterId ?? story.provenance.actorPrincipalId) ===
+            filter.requesterId) &&
+        (query === undefined ||
+          normalizeSearchText(
+            `${story.title}\n${request.problem}\n${request.desiredOutcome}`,
+          ).includes(query))
+      );
+    }),
+  ).map((story) => structuredClone(withRequestDefaults(story)));
+}
+
 export function assertRevision(
   document: WorkItemsDocument,
   expectedRevision?: number,
@@ -500,50 +652,47 @@ export function isWorkItemsDocument(
 }
 
 export function isStory(value: unknown): value is Story {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    value.id.length > 0 &&
-    isWorkKind(value.kind) &&
-    isNonEmptyString(value.homeScopeId) &&
-    isScopeBindings(value.scopeBindings) &&
-    isOptionalString(value.parentWorkItemId) &&
-    isWorkProvenance(value.provenance) &&
-    isPositiveInteger(value.revision) &&
-    isOptionalString(value.worktree) &&
-    typeof value.epicId === "string" &&
-    value.epicId.length > 0 &&
-    typeof value.epicTitle === "string" &&
-    value.epicTitle.length > 0 &&
-    typeof value.title === "string" &&
-    value.title.length > 0 &&
-    typeof value.intent === "string" &&
-    value.intent.length > 0 &&
-    // Acceptance criteria may be empty: idea/spec-stage stories (e.g. a "## Shape
-    // sketch") legitimately have none yet — ACs are added at the spec/ready
-    // stage. Requiring them here made the whole board fail to load on the first
-    // idea story (D4.6).
-    Array.isArray(value.acceptanceCriteria) &&
-    value.acceptanceCriteria.every(
-      (criterion) => typeof criterion === "string" && criterion.length > 0,
-    ) &&
-    isStoryStatus(value.status) &&
-    isRouting(value.routing) &&
-    isReviewGate(value.reviewGate) &&
-    Array.isArray(value.deps) &&
-    value.deps.every((dependency) => typeof dependency === "string") &&
-    isOptionalString(value.assignee) &&
-    isOptionalString(value.assigneePrincipalId) &&
-    isOptionalReviewDecision(value.reviewDecision) &&
-    typeof value.authoredBy === "string" &&
-    value.authoredBy.length > 0 &&
-    typeof value.createdAt === "string" &&
-    value.createdAt.length > 0 &&
-    typeof value.updatedAt === "string" &&
-    value.updatedAt.length > 0 &&
-    isOptionalString(value.decidedBy) &&
-    isOptionalString(value.decidedAt)
-  );
+  return storyValidationIssues(value).length === 0;
+}
+
+export function storyValidationIssues(value: unknown): string[] {
+  if (!isRecord(value)) return ["record"];
+  const issues: string[] = [];
+  if (!isNonEmptyString(value.id)) issues.push("id");
+  if (!isWorkKind(value.kind)) issues.push("kind");
+  if (!isNonEmptyString(value.homeScopeId)) issues.push("homeScopeId");
+  if (!isScopeBindings(value.scopeBindings)) issues.push("scopeBindings");
+  if (!isOptionalString(value.parentWorkItemId)) issues.push("parentWorkItemId");
+  if (!isWorkProvenance(value.provenance)) issues.push("provenance");
+  if (!isPositiveInteger(value.revision)) issues.push("revision");
+  if (!isOptionalString(value.worktree)) issues.push("worktree");
+  if (!isNonEmptyString(value.epicId)) issues.push("epicId");
+  if (!isNonEmptyString(value.epicTitle)) issues.push("epicTitle");
+  if (!isNonEmptyString(value.title)) issues.push("title");
+  if (!isNonEmptyString(value.intent)) issues.push("intent");
+  if (value.request !== undefined && !isWorkRequestDetails(value.request))
+    issues.push("request");
+  // Acceptance criteria may be empty: idea/spec-stage stories legitimately
+  // have none yet, but the parsed field must still be an array.
+  if (
+    !Array.isArray(value.acceptanceCriteria) ||
+    !value.acceptanceCriteria.every(isNonEmptyString)
+  )
+    issues.push("acceptanceCriteria");
+  if (!isStoryStatus(value.status)) issues.push("status");
+  if (!isRouting(value.routing)) issues.push("routing");
+  if (!isReviewGate(value.reviewGate)) issues.push("reviewGate");
+  if (!Array.isArray(value.deps) || !value.deps.every((item) => typeof item === "string"))
+    issues.push("deps");
+  if (!isOptionalString(value.assignee)) issues.push("assignee");
+  if (!isOptionalString(value.assigneePrincipalId)) issues.push("assigneePrincipalId");
+  if (!isOptionalReviewDecision(value.reviewDecision)) issues.push("reviewDecision");
+  if (!isNonEmptyString(value.authoredBy)) issues.push("authoredBy");
+  if (!isNonEmptyString(value.createdAt)) issues.push("createdAt");
+  if (!isNonEmptyString(value.updatedAt)) issues.push("updatedAt");
+  if (!isOptionalString(value.decidedBy)) issues.push("decidedBy");
+  if (!isOptionalString(value.decidedAt)) issues.push("decidedAt");
+  return issues;
 }
 
 export function isStoryComment(value: unknown): value is StoryComment {
@@ -696,8 +845,57 @@ function isWorkProvenance(value: unknown): boolean {
     isRecord(value) &&
     (value.origin === "principal" || value.origin === "agent") &&
     isNonEmptyString(value.actorPrincipalId) &&
+    isOptionalString(value.requesterId) &&
+    (value.requesterKind === undefined ||
+      requesterKinds.includes(value.requesterKind as RequesterKind)) &&
+    isOptionalString(value.principalId) &&
+    (value.originMode === undefined ||
+      requestOriginModes.includes(value.originMode as RequestOriginMode)) &&
     isOptionalString(value.agentSessionId) &&
     isOptionalString(value.proposedSponsorPrincipalId) &&
+    (value.sourceRefs === undefined ||
+      (Array.isArray(value.sourceRefs) &&
+        value.sourceRefs.every(isNonEmptyString))) &&
+    isNonEmptyString(value.createdAt)
+  );
+}
+
+function isWorkRequestDetails(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    requestKinds.includes(value.requestKind as RequestKind) &&
+    requestStates.includes(value.requestState as RequestState) &&
+    isNonEmptyString(value.problem) &&
+    isNonEmptyString(value.desiredOutcome) &&
+    Array.isArray(value.evidence) &&
+    value.evidence.every(isRequestEvidenceEntry) &&
+    Array.isArray(value.relatedScopeIds) &&
+    value.relatedScopeIds.every(isNonEmptyString) &&
+    Array.isArray(value.promotedSpecIds) &&
+    value.promotedSpecIds.every(isNonEmptyString) &&
+    Array.isArray(value.promotedStoryIds) &&
+    value.promotedStoryIds.every(isNonEmptyString) &&
+    isOptionalString(value.proposedApproach) &&
+    isOptionalString(value.impact) &&
+    isOptionalString(value.frequency) &&
+    isOptionalString(value.constraints) &&
+    isOptionalString(value.targetAudience)
+  );
+}
+
+function isRequestEvidenceEntry(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.observedById) &&
+    requesterKinds.includes(value.observedByKind as RequesterKind) &&
+    isNonEmptyString(value.scopeId) &&
+    isNonEmptyString(value.constraint) &&
+    isNonEmptyString(value.workaround) &&
+    isNonEmptyString(value.cost) &&
+    isNonEmptyString(value.expectedImprovement) &&
+    isOptionalString(value.proof) &&
+    isOptionalString(value.taskRef) &&
     (value.sourceRefs === undefined ||
       (Array.isArray(value.sourceRefs) &&
         value.sourceRefs.every(isNonEmptyString))) &&
@@ -815,6 +1013,8 @@ function assertFeatureRequestProposalInput(
   input: FeatureRequestProposalInput,
 ): void {
   if (
+    (input.requestKind !== undefined &&
+      !requestKinds.includes(input.requestKind)) ||
     typeof input.problem !== "string" ||
     typeof input.title !== "string" ||
     input.title.trim().length === 0 ||
@@ -827,6 +1027,20 @@ function assertFeatureRequestProposalInput(
     (input.sourceRefs !== undefined &&
       (!Array.isArray(input.sourceRefs) ||
         !input.sourceRefs.every((entry) => entry.trim().length > 0))) ||
+    (input.structuredEvidence !== undefined &&
+      (!Array.isArray(input.structuredEvidence) ||
+        !input.structuredEvidence.every(isRequestEvidenceInputShape))) ||
+    (input.relatedScopeIds !== undefined &&
+      (!Array.isArray(input.relatedScopeIds) ||
+        !input.relatedScopeIds.every((entry) => entry.trim().length > 0))) ||
+    (input.proposedApproach !== undefined &&
+      input.proposedApproach.trim().length === 0) ||
+    (input.impact !== undefined && input.impact.trim().length === 0) ||
+    (input.frequency !== undefined && input.frequency.trim().length === 0) ||
+    (input.constraints !== undefined &&
+      input.constraints.trim().length === 0) ||
+    (input.targetAudience !== undefined &&
+      input.targetAudience.trim().length === 0) ||
     (input.intendedScopeId !== undefined &&
       input.intendedScopeId.trim().length === 0) ||
     (input.proposedSponsorPrincipalId !== undefined &&
@@ -843,11 +1057,41 @@ function assertFeatureRequestProposalContext(
     context.actorPrincipalId.trim().length === 0 ||
     context.currentScopeId.trim().length === 0 ||
     context.now.trim().length === 0 ||
+    (context.requesterId !== undefined &&
+      context.requesterId.trim().length === 0) ||
+    (context.requesterKind !== undefined &&
+      !requesterKinds.includes(context.requesterKind)) ||
+    (context.originMode !== undefined &&
+      !requestOriginModes.includes(context.originMode)) ||
     (context.agentSessionId !== undefined &&
       context.agentSessionId.trim().length === 0)
   ) {
     throw new Error("Invalid feature request proposal context.");
   }
+}
+
+function assertRequestEvidenceInput(input: AddRequestEvidenceInput): void {
+  if (
+    input.requestId.trim().length === 0 ||
+    !isRequestEvidenceInputShape(input.evidence)
+  ) {
+    throw new Error("Invalid request evidence.");
+  }
+}
+
+function isRequestEvidenceInputShape(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.constraint) &&
+    isNonEmptyString(value.workaround) &&
+    isNonEmptyString(value.cost) &&
+    isNonEmptyString(value.expectedImprovement) &&
+    isOptionalString(value.proof) &&
+    isOptionalString(value.taskRef) &&
+    (value.sourceRefs === undefined ||
+      (Array.isArray(value.sourceRefs) &&
+        value.sourceRefs.every(isNonEmptyString)))
+  );
 }
 
 function featureRequestIntent(input: FeatureRequestProposalInput): string {
@@ -863,6 +1107,120 @@ function featureRequestIntent(input: FeatureRequestProposalInput): string {
     lines.push("", "Evidence", ...evidence.map((entry) => `- ${entry}`));
   }
   return lines.join("\n");
+}
+
+function initialRequestEvidence(
+  input: FeatureRequestProposalInput,
+  context: {
+    observedById: string;
+    observedByKind: RequesterKind;
+    scopeId: string;
+    now: string;
+  },
+): RequestEvidenceEntry[] {
+  const structured = input.structuredEvidence ?? [];
+  if (structured.length > 0) {
+    return structured.map((entry, index) => ({
+      id: `evidence-${index + 1}`,
+      observedById: context.observedById,
+      observedByKind: context.observedByKind,
+      scopeId: context.scopeId,
+      constraint: entry.constraint.trim(),
+      workaround: entry.workaround.trim(),
+      cost: entry.cost.trim(),
+      expectedImprovement: entry.expectedImprovement.trim(),
+      ...(entry.proof ? { proof: entry.proof.trim() } : {}),
+      ...(entry.taskRef ? { taskRef: entry.taskRef.trim() } : {}),
+      ...(entry.sourceRefs
+        ? { sourceRefs: entry.sourceRefs.map((ref) => ref.trim()) }
+        : {}),
+      createdAt: context.now,
+    }));
+  }
+  const evidence = input.evidence?.map((entry) => entry.trim()) ?? [];
+  if (evidence.length === 0) return [];
+  return [
+    {
+      id: "evidence-1",
+      observedById: context.observedById,
+      observedByKind: context.observedByKind,
+      scopeId: context.scopeId,
+      constraint: evidence.join("\n"),
+      workaround: "Not recorded.",
+      cost: "Not recorded.",
+      expectedImprovement: input.desiredOutcome.trim(),
+      ...(input.sourceRefs ? { sourceRefs: input.sourceRefs } : {}),
+      createdAt: context.now,
+    },
+  ];
+}
+
+function requestDetailsFor(story: Story): NonNullable<Story["request"]> {
+  return {
+    requestKind: story.request?.requestKind ?? "feature",
+    requestState:
+      story.request?.requestState ??
+      (story.provenance.proposedSponsorPrincipalId
+        ? "awaiting-sponsor"
+        : "proposed"),
+    problem: story.request?.problem ?? problemFromIntent(story.intent),
+    desiredOutcome:
+      story.request?.desiredOutcome ?? desiredOutcomeFromIntent(story.intent),
+    evidence: story.request?.evidence ?? [],
+    relatedScopeIds:
+      story.request?.relatedScopeIds ??
+      story.scopeBindings.map((binding) => binding.scopeId),
+    promotedSpecIds: story.request?.promotedSpecIds ?? [],
+    promotedStoryIds: story.request?.promotedStoryIds ?? [],
+    ...(story.request?.proposedApproach
+      ? { proposedApproach: story.request.proposedApproach }
+      : {}),
+    ...(story.request?.impact ? { impact: story.request.impact } : {}),
+    ...(story.request?.frequency ? { frequency: story.request.frequency } : {}),
+    ...(story.request?.constraints
+      ? { constraints: story.request.constraints }
+      : {}),
+    ...(story.request?.targetAudience
+      ? { targetAudience: story.request.targetAudience }
+      : {}),
+  };
+}
+
+function withRequestDefaults(story: Story): Story {
+  return story.kind === "feature-request"
+    ? { ...story, request: requestDetailsFor(story) }
+    : story;
+}
+
+function problemFromIntent(intent: string): string {
+  const match = /Problem\n([\s\S]*?)(?:\n\nDesired outcome\n|$)/.exec(intent);
+  return (match?.[1] ?? intent).trim();
+}
+
+function desiredOutcomeFromIntent(intent: string): string {
+  const match = /Desired outcome\n([\s\S]*?)(?:\n\nEvidence\n|$)/.exec(intent);
+  return (match?.[1] ?? intent).trim();
+}
+
+function nextRequestEvidenceId(story: Story): string {
+  const next =
+    requestDetailsFor(story).evidence
+      .map(({ id }) => /^evidence-(\d+)$/.exec(id)?.[1])
+      .filter((value): value is string => value !== undefined)
+      .map((value) => Number.parseInt(value, 10))
+      .filter(Number.isInteger)
+      .reduce((max, value) => Math.max(max, value), 0) + 1;
+  return `evidence-${next}`;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()))].filter(
+    (value) => value.length > 0,
+  );
+}
+
+function normalizeSearchText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function nextFeatureRequestId(document: WorkItemsDocument): string {

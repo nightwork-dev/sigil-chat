@@ -361,28 +361,59 @@ const addCommentFn = createServerFn({ method: "POST" })
         ? { parentCommentId: data.parentCommentId }
         : {}),
     };
-    const result = await workItemsRepository.addComment(
+    let result = await workItemsRepository.addComment(
       comment,
       data.expectedRevision,
     );
 
-    const { parseSingleInlineSelector } = await import(
+    const { parseSingleInlineSelector, storyCommentRoutingReceipt } = await import(
       "@/lib/story-comment-mentions"
     );
     const selector = parseSingleInlineSelector(comment.body);
+    let receiptBody: string | undefined
     if (selector) {
       try {
         const { depositStoryCommentMention } = await import(
           "@/lib/story-comment-mentions.server"
         );
-        await depositStoryCommentMention({
+        const delivery = await depositStoryCommentMention({
           reference: { storyId: comment.storyId, commentId: comment.id },
           selector,
           viewer,
         });
+        receiptBody = storyCommentRoutingReceipt({
+          selector,
+          delivery: delivery.status,
+        })
       } catch {
         // The durable domain comment is authoritative. A missing/unavailable
         // harness inbox must not turn a successful write into a duplicate retry.
+        receiptBody = storyCommentRoutingReceipt({
+          selector,
+          delivery: "unresolved",
+        })
+      }
+    } else if (comment.addressee) {
+      receiptBody = storyCommentRoutingReceipt({ addressee: comment.addressee })
+    }
+
+    if (receiptBody) {
+      try {
+        result = await workItemsRepository.addComment(
+          {
+            id: crypto.randomUUID(),
+            storyId: comment.storyId,
+            kind: "reference",
+            author: "Sigil",
+            body: receiptBody,
+            createdAt: new Date().toISOString(),
+            parentCommentId: comment.id,
+          },
+          result.document.revision,
+        )
+      } catch {
+        // The principal's comment remains authoritative if the secondary
+        // acknowledgement write races another roadmap mutation.
       }
     }
     return result;

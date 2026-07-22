@@ -89,6 +89,27 @@ describe("agent client command contracts", () => {
     }
   })
 
+  it("accepts blackboard changed domain outcomes", () => {
+    for (const resource of [
+      { kind: "session-blackboard", id: "thread-1" },
+      { kind: "workspace-blackboard", id: "workspace-1" },
+      { kind: "project-blackboard", id: "project-1" },
+    ]) {
+      expect(
+        isAgentClientCommand({
+          type: "agent.domain.outcome",
+          payload: {
+            id: `blackboard:${resource.id}:r2`,
+            kind: "blackboard.changed",
+            resource,
+            operation: "blackboard.write",
+            changedIds: [resource.id],
+          },
+        }),
+      ).toBe(true)
+    }
+  })
+
   it("keeps Gonk tool input stricter than the client envelope", () => {
     expect(
       isAgentClientCommand({

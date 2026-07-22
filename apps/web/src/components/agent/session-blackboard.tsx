@@ -1,5 +1,12 @@
 import { useState, type FormEvent } from "react"
-import { BookOpenTextIcon, LoaderCircleIcon } from "lucide-react"
+import {
+  BookOpenTextIcon,
+  EyeIcon,
+  LoaderCircleIcon,
+  PencilLineIcon,
+} from "lucide-react"
+
+import { ChatMarkdown } from "@workspace/chat/components/chat-markdown"
 
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -179,6 +186,9 @@ function BlackboardEditor({
   writePending: boolean
   writeReset: () => void
 }) {
+  const [mode, setMode] = useState<"read" | "edit">(
+    document.content.trim() ? "read" : "edit",
+  )
   const [draft, setDraft] = useState(document.content)
   const [baseContent, setBaseContent] = useState(document.content)
   const [baseRevision, setBaseRevision] = useState(document.revision)
@@ -191,8 +201,10 @@ function BlackboardEditor({
 
   function save(expectedRevision: string) {
     onSave(draft, expectedRevision, (saved) => {
+      setDraft(saved.content)
       setBaseContent(saved.content)
       setBaseRevision(saved.revision)
+      setMode("read")
     })
   }
 
@@ -210,11 +222,55 @@ function BlackboardEditor({
     writeReset()
   }
 
+  function beginEditing() {
+    setDraft(document.content)
+    setBaseContent(document.content)
+    setBaseRevision(document.revision)
+    writeReset()
+    setMode("edit")
+  }
+
   return (
-    <form
-      className="flex h-full min-h-80 flex-col gap-3"
-      onSubmit={handleSubmit}
-    >
+    <div className="flex h-full min-h-80 flex-col gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+        <p className="min-w-0 truncate text-xs text-muted-foreground">
+          {document.updatedAt
+            ? `Last updated ${new Date(document.updatedAt).toLocaleString()}`
+            : "No notes yet"}
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            aria-pressed={mode === "read"}
+            disabled={!document.content.trim()}
+            onClick={() => setMode("read")}
+            size="xs"
+            type="button"
+            variant={mode === "read" ? "secondary" : "ghost"}
+          >
+            <EyeIcon />
+            Read
+          </Button>
+          <Button
+            aria-pressed={mode === "edit"}
+            onClick={beginEditing}
+            size="xs"
+            type="button"
+            variant={mode === "edit" ? "secondary" : "ghost"}
+          >
+            <PencilLineIcon />
+            Edit
+          </Button>
+        </div>
+      </div>
+      {mode === "read" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+          <ChatMarkdown content={document.content} />
+        </div>
+      ) : (
+        <form
+          className="flex min-h-0 flex-1 flex-col gap-3"
+          onSubmit={handleSubmit}
+        >
       <Textarea
         aria-label="Blackboard notes"
         className="min-h-64 flex-1 resize-none font-mono text-sm leading-6"
@@ -248,12 +304,7 @@ function BlackboardEditor({
           </div>
         </div>
       ) : null}
-      <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-xs text-muted-foreground">
-          {document.updatedAt
-            ? `Last updated ${new Date(document.updatedAt).toLocaleString()}`
-            : "No notes yet"}
-        </p>
+      <div className="flex items-center justify-end gap-3">
         <Button disabled={writePending || remoteChanged} size="sm" type="submit">
           {writePending ? "Saving…" : "Save notes"}
         </Button>
@@ -271,7 +322,9 @@ function BlackboardEditor({
           </Button>
         </div>
       ) : null}
-    </form>
+        </form>
+      )}
+    </div>
   )
 }
 

@@ -6,6 +6,7 @@ export interface ServiceStatus {
   label: string
   status: "healthy" | "unhealthy"
   latencyMs: number
+  diagnostic?: string
 }
 
 export interface SystemStatus {
@@ -34,13 +35,23 @@ export async function measureService(
       status: "healthy",
       latencyMs: Math.max(0, Math.round(now() - startedAt)),
     }
-  } catch {
+  } catch (error) {
     return {
       id,
       label,
       status: "unhealthy",
       latencyMs: Math.max(0, Math.round(now() - startedAt)),
+      diagnostic:
+        error instanceof ServiceDiagnosticError
+          ? error.diagnostic
+          : "Dependency probe failed. Check the service logs.",
     }
+  }
+}
+
+export class ServiceDiagnosticError extends Error {
+  constructor(readonly diagnostic: string) {
+    super(diagnostic)
   }
 }
 

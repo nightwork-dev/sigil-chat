@@ -529,6 +529,99 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-request-search",
+    description:
+      "Search durable human and agent product requests before proposing a new one. Use this to find exact or likely matches and add evidence instead of duplicating.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: ["filter", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-request-inspect",
+    description:
+      "Inspect one durable request, including its structured request fields, evidence, sponsorship receipts, and promotion links.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      destructive: false,
+      idempotent: true,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-request-propose",
+    description:
+      "Propose a durable low-authority request for a feature, tool, skill, integration, data/access, defect, or workflow need. Search first; this blocks duplicates and cannot set sponsorship decisions, priority, assignment, acceptance, promotion, or delivery status.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["title", "problem", "desiredOutcome"],
+      properties: [
+        "requestKind",
+        "title",
+        "problem",
+        "desiredOutcome",
+        "evidence",
+        "structuredEvidence",
+        "relatedScopeIds",
+        "proposedApproach",
+        "impact",
+        "frequency",
+        "constraints",
+        "targetAudience",
+        "sourceRefs",
+        "intendedScopeId",
+        "proposedSponsorPrincipalId",
+        "originMode",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
+    name: "sigil-request-add-evidence",
+    description:
+      "Append structured evidence from a concrete task encounter to an existing durable request. Use this for duplicate or repeated needs instead of creating another request.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["requestId", "evidence"],
+      properties: ["requestId", "evidence", "expectedRevision"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-spec-list",
     description:
       "List durable product specifications in the roadmap, optionally filtered by lifecycle status or linked story id.",
@@ -642,7 +735,7 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-project-list",
     description:
-      "List the durable projects and their membership records. Inspect a project before replacing it.",
+      "List durable project summaries for projects where the authenticated principal is a current member.",
     visibility: "always",
     approval: "read",
     schema: {
@@ -680,13 +773,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-project-upsert",
     description:
-      "Create or replace a durable project record, including its authoritative members and settings. Inspect first when updating.",
+      "Create a durable project for the authenticated principal, or update an existing project as one of its current owners. Updates require expectedRevision.",
     visibility: "always",
     approval: "write",
     schema: {
       type: "object",
       required: ["project"],
-      properties: ["project"],
+      properties: ["project", "expectedRevision"],
       additionalProperties: false,
     },
     mcpAnnotations: {
@@ -736,13 +829,13 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
   {
     name: "sigil-workspace-upsert",
     description:
-      "Create or replace a workspace inside an existing project. Inspect first when updating.",
+      "Create or update a workspace inside a project where the authenticated principal is a current member. Updates require expectedRevision and cannot move the canonical project.",
     visibility: "always",
     approval: "write",
     schema: {
       type: "object",
       required: ["workspace"],
-      properties: ["workspace"],
+      properties: ["workspace", "expectedRevision"],
       additionalProperties: false,
     },
     mcpAnnotations: {

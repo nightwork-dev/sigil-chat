@@ -1,4 +1,4 @@
-import { shape, type ToolRegistry } from "@gonk/tool-registry"
+import { shape, type ToolContext, type ToolRegistry } from "@gonk/tool-registry"
 
 import type {
   Project,
@@ -23,6 +23,7 @@ type ProjectInspectInput = {
 
 type ProjectUpsertInput = {
   project: Project
+  expectedRevision?: number
 }
 
 type WorkspaceListInput = {
@@ -35,10 +36,11 @@ type WorkspaceInspectInput = {
 
 type WorkspaceUpsertInput = {
   workspace: Workspace
+  expectedRevision?: number
 }
 
 export interface ContainerRegistries {
-  projects: Pick<ProjectRegistry, "get" | "list" | "upsert">
+  projects: Pick<ProjectRegistry, "get" | "hasMember" | "list" | "upsert">
   workspaces: Pick<WorkspaceRegistry, "get" | "list" | "upsert">
 }
 
@@ -49,13 +51,27 @@ export function registerContainerTools(
   registry.register({
     name: "sigil-project-list",
     description:
-      "List the durable projects and their membership records. Inspect a project before replacing it.",
+      "List durable project summaries for projects where the authenticated principal is a current member.",
     visibility: "always",
     approval: "read",
     input: shape<ProjectListInput>(isEmptyObject, "Expected an empty object."),
     inputJsonSchema: emptyObjectSchema(),
     hints: readHints,
-    handler: async () => ({ data: { projects: containers.projects.list() } }),
+    handler: async (_input, ctx) => {
+      const principalId = requireHumanPrincipal(ctx)
+      return {
+        data: {
+          projects: containers.projects
+            .list()
+            .filter((project) =>
+              project.members.some(
+                (member) => member.principalId === principalId,
+              ),
+            )
+            .map((project) => projectSummary(project, principalId)),
+        },
+      }
+    },
   })
 
   registry.register({
@@ -72,9 +88,12 @@ export function registerContainerTools(
       "id",
     ]),
     hints: readHints,
-    handler: async (input) => {
+    handler: async (input, ctx) => {
+      const principalId = requireHumanPrincipal(ctx)
       const project = containers.projects.get(input.id)
-      if (!project) throw new Error(`Unknown project id: ${input.id}.`)
+      if (!project || !hasProjectMember(project, principalId)) {
+        throw new Error("Project is not available.")
+      }
       return { data: { project } }
     },
   })
@@ -82,23 +101,42 @@ export function registerContainerTools(
   registry.register({
     name: "sigil-project-upsert",
     description:
-      "Create or replace a durable project record, including its authoritative members and settings. Inspect first when updating.",
+      "Create a durable project for the authenticated principal, or update an existing project as one of its current owners. Updates require expectedRevision.",
     visibility: "always",
     approval: "write",
     input: shape<ProjectUpsertInput>(
       isProjectUpsertInput,
-      "Expected a complete project record with unique owner or member principals.",
+      "Expected a complete project record with unique owner or member principals and an optional integer expectedRevision.",
     ),
-    inputJsonSchema: objectSchema({ project: projectSchema() }, ["project"]),
+    inputJsonSchema: objectSchema(
+      {
+        project: projectSchema(),
+        expectedRevision: { type: "integer", minimum: 1 },
+      },
+      ["project"],
+    ),
     hints: writeHints,
-    handler: async (input) => {
-      const project = containers.projects.upsert(input.project)
+    handler: async (input, ctx) => {
+      const principalId = requireHumanPrincipal(ctx)
+      const current = containers.projects.get(input.project.id)
+      const project = current
+        ? updateProject(
+            input.project,
+            current,
+            principalId,
+            input.expectedRevision,
+          )
+        : createProject(input.project, principalId, input.expectedRevision)
+      const persisted = containers.projects.upsert(
+        project,
+        revisionOptions(input.expectedRevision),
+      )
       return {
         data: {
-          project,
+          project: persisted,
           clientCommand: clientCommand(
             PROJECTS_RESOURCE_KIND,
-            project.id,
+            persisted.id,
             "project.upsert",
           ),
         },
@@ -120,9 +158,27 @@ export function registerContainerTools(
       projectId: { type: "string", minLength: 1 },
     }),
     hints: readHints,
-    handler: async (input) => ({
-      data: { workspaces: containers.workspaces.list(input.projectId) },
-    }),
+    handler: async (input, ctx) => {
+      const principalId = requireHumanPrincipal(ctx)
+      const projects = memberProjects(containers, principalId)
+      if (input.projectId !== undefined) {
+        if (!projects.has(input.projectId)) {
+          throw new Error("Workspace is not available.")
+        }
+        return {
+          data: { workspaces: containers.workspaces.list(input.projectId) },
+        }
+      }
+      return {
+        data: {
+          workspaces: containers.workspaces
+            .list()
+            .filter((workspace) =>
+              projects.has(workspace.homeScopeId ?? workspace.projectId),
+            ),
+        },
+      }
+    },
   })
 
   registry.register({
@@ -138,9 +194,18 @@ export function registerContainerTools(
       "id",
     ]),
     hints: readHints,
-    handler: async (input) => {
+    handler: async (input, ctx) => {
+      const principalId = requireHumanPrincipal(ctx)
       const workspace = containers.workspaces.get(input.id)
-      if (!workspace) throw new Error(`Unknown workspace id: ${input.id}.`)
+      if (
+        !workspace ||
+        !containers.projects.hasMember(
+          workspace.homeScopeId ?? workspace.projectId,
+          principalId,
+        )
+      ) {
+        throw new Error("Workspace is not available.")
+      }
       return { data: { workspace } }
     },
   })
@@ -148,31 +213,188 @@ export function registerContainerTools(
   registry.register({
     name: "sigil-workspace-upsert",
     description:
-      "Create or replace a workspace inside an existing project. Inspect first when updating.",
+      "Create or update a workspace inside a project where the authenticated principal is a current member. Updates require expectedRevision and cannot move the canonical project.",
     visibility: "always",
     approval: "write",
     input: shape<WorkspaceUpsertInput>(
       isWorkspaceUpsertInput,
-      "Expected a complete workspace record for an existing project.",
+      "Expected a complete workspace record for an existing project and an optional integer expectedRevision.",
     ),
-    inputJsonSchema: objectSchema({ workspace: workspaceSchema() }, [
-      "workspace",
-    ]),
+    inputJsonSchema: objectSchema(
+      {
+        workspace: workspaceSchema(),
+        expectedRevision: { type: "integer", minimum: 1 },
+      },
+      ["workspace"],
+    ),
     hints: writeHints,
-    handler: async (input) => {
-      const workspace = containers.workspaces.upsert(input.workspace)
+    handler: async (input, ctx) => {
+      const principalId = requireHumanPrincipal(ctx)
+      const current = containers.workspaces.get(input.workspace.id)
+      const workspace = current
+        ? updateWorkspace(
+            input.workspace,
+            current,
+            containers,
+            principalId,
+            input.expectedRevision,
+          )
+        : createWorkspace(input.workspace, containers, principalId)
+      const persisted = containers.workspaces.upsert(
+        workspace,
+        revisionOptions(input.expectedRevision),
+      )
       return {
         data: {
-          workspace,
+          workspace: persisted,
           clientCommand: clientCommand(
             WORKSPACES_RESOURCE_KIND,
-            workspace.id,
+            persisted.id,
             "workspace.upsert",
           ),
         },
       }
     },
   })
+}
+
+function requireHumanPrincipal(ctx: ToolContext): string {
+  const principal = ctx.auth?.principal
+  if (
+    principal?.kind !== "human" ||
+    !isNonEmptyString(principal.id) ||
+    !Array.isArray(principal.scopes) ||
+    principal.scopes.length === 0
+  ) {
+    throw new Error("Container registry is not available.")
+  }
+  return principal.id
+}
+
+function projectSummary(project: Project, principalId: string) {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    icon: project.icon,
+    createdAt: project.createdAt,
+    createdBy: project.createdBy,
+    revision: project.revision,
+    role:
+      project.members.find((member) => member.principalId === principalId)
+        ?.role ?? "member",
+  }
+}
+
+function memberProjects(
+  containers: ContainerRegistries,
+  principalId: string,
+): Set<string> {
+  return new Set(
+    containers.projects
+      .list()
+      .filter((project) => hasProjectMember(project, principalId))
+      .map((project) => project.id),
+  )
+}
+
+function createProject(
+  project: Project,
+  principalId: string,
+  expectedRevision: number | undefined,
+): Project {
+  if (expectedRevision !== undefined) {
+    throw new Error("Project is not available.")
+  }
+  const { revision: _revision, ...rest } = project
+  return {
+    ...rest,
+    createdBy: principalId,
+    members: [{ principalId, role: "owner" }],
+  }
+}
+
+function updateProject(
+  project: Project,
+  current: Project,
+  principalId: string,
+  expectedRevision: number | undefined,
+): Project {
+  if (!hasProjectOwner(current, principalId)) {
+    throw new Error("Project is not available.")
+  }
+  if (expectedRevision === undefined) {
+    throw new Error("Project revision is required.")
+  }
+  if (!project.members.some((member) => member.role === "owner")) {
+    throw new Error("Project must keep at least one owner.")
+  }
+  return {
+    ...project,
+    id: current.id,
+    createdAt: current.createdAt,
+    createdBy: current.createdBy,
+  }
+}
+
+function createWorkspace(
+  workspace: Workspace,
+  containers: ContainerRegistries,
+  principalId: string,
+): Workspace {
+  const homeScopeId = workspace.homeScopeId ?? workspace.projectId
+  if (!containers.projects.hasMember(homeScopeId, principalId)) {
+    throw new Error("Workspace is not available.")
+  }
+  const { revision: _revision, ...rest } = workspace
+  return {
+    ...rest,
+    projectId: homeScopeId,
+    homeScopeId,
+    createdBy: principalId,
+  }
+}
+
+function updateWorkspace(
+  workspace: Workspace,
+  current: Workspace,
+  containers: ContainerRegistries,
+  principalId: string,
+  expectedRevision: number | undefined,
+): Workspace {
+  const currentHome = current.homeScopeId ?? current.projectId
+  if (!containers.projects.hasMember(currentHome, principalId)) {
+    throw new Error("Workspace is not available.")
+  }
+  if (expectedRevision === undefined) {
+    throw new Error("Workspace revision is required.")
+  }
+  const nextHome = workspace.homeScopeId ?? workspace.projectId
+  if (currentHome !== nextHome || workspace.projectId !== nextHome) {
+    throw new Error("Workspace canonical project cannot change.")
+  }
+  return {
+    ...workspace,
+    id: current.id,
+    projectId: currentHome,
+    homeScopeId: currentHome,
+    createdAt: current.createdAt,
+    createdBy: current.createdBy,
+  }
+}
+
+function hasProjectMember(project: Project, principalId: string): boolean {
+  return project.members.some((member) => member.principalId === principalId)
+}
+
+function hasProjectOwner(project: Project, principalId: string): boolean {
+  return project.members.some(
+    (member) => member.principalId === principalId && member.role === "owner",
+  )
+}
+
+function revisionOptions(expectedRevision: number | undefined) {
+  return expectedRevision === undefined ? {} : { expectedRevision }
 }
 
 function clientCommand(resourceKind: string, id: string, operation: string) {
@@ -201,8 +423,9 @@ function isProjectInspectInput(value: unknown): value is ProjectInspectInput {
 function isProjectUpsertInput(value: unknown): value is ProjectUpsertInput {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["project"]) &&
-    isProject(value.project)
+    hasOnlyKeys(value, ["project", "expectedRevision"]) &&
+    isProject(value.project) &&
+    isOptionalRevisionInput(value.expectedRevision)
   )
 }
 
@@ -225,8 +448,9 @@ function isWorkspaceInspectInput(
 function isWorkspaceUpsertInput(value: unknown): value is WorkspaceUpsertInput {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["workspace"]) &&
-    isWorkspace(value.workspace)
+    hasOnlyKeys(value, ["workspace", "expectedRevision"]) &&
+    isWorkspace(value.workspace) &&
+    isOptionalRevisionInput(value.expectedRevision)
   )
 }
 
@@ -241,6 +465,8 @@ function isProject(value: unknown): value is Project {
       "settings",
       "createdAt",
       "createdBy",
+      "icon",
+      "revision",
     ]) &&
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.name) &&
@@ -250,7 +476,8 @@ function isProject(value: unknown): value is Project {
     hasUniquePrincipalIds(value.members) &&
     isJsonRecord(value.settings) &&
     isNonEmptyString(value.createdAt) &&
-    isNonEmptyString(value.createdBy)
+    isNonEmptyString(value.createdBy) &&
+    isOptionalRevisionInput(value.revision)
   )
 }
 
@@ -277,19 +504,24 @@ function isWorkspace(value: unknown): value is Workspace {
     hasOnlyKeys(value, [
       "id",
       "projectId",
+      "homeScopeId",
       "name",
       "description",
+      "icon",
       "status",
       "createdAt",
       "createdBy",
+      "revision",
     ]) &&
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.projectId) &&
+    (value.homeScopeId === undefined || isNonEmptyString(value.homeScopeId)) &&
     isNonEmptyString(value.name) &&
     typeof value.description === "string" &&
     (value.status === "active" || value.status === "archived") &&
     isNonEmptyString(value.createdAt) &&
-    isNonEmptyString(value.createdBy)
+    isNonEmptyString(value.createdBy) &&
+    isOptionalRevisionInput(value.revision)
   )
 }
 
@@ -314,6 +546,13 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0
 }
 
+function isOptionalRevisionInput(value: unknown): value is number | undefined {
+  return (
+    value === undefined ||
+    (typeof value === "number" && Number.isSafeInteger(value) && value > 0)
+  )
+}
+
 function projectSchema(): Record<string, unknown> {
   return objectSchema(
     {
@@ -334,6 +573,7 @@ function projectSchema(): Record<string, unknown> {
       settings: { type: "object", additionalProperties: true },
       createdAt: { type: "string", minLength: 1 },
       createdBy: { type: "string", minLength: 1 },
+      revision: { type: "integer", minimum: 1 },
     },
     [
       "id",
@@ -352,12 +592,14 @@ function workspaceSchema(): Record<string, unknown> {
     {
       id: { type: "string", minLength: 1 },
       projectId: { type: "string", minLength: 1 },
+      homeScopeId: { type: "string", minLength: 1 },
       name: { type: "string", minLength: 1 },
       description: { type: "string" },
       icon: { type: "string" },
       status: { type: "string", enum: ["active", "archived"] },
       createdAt: { type: "string", minLength: 1 },
       createdBy: { type: "string", minLength: 1 },
+      revision: { type: "integer", minimum: 1 },
     },
     [
       "id",

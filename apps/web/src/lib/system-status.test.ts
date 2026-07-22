@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { measureService } from "./system-status"
+import { ServiceDiagnosticError, measureService } from "./system-status"
 
 describe("system status measurement", () => {
   it("records successful dependency latency", async () => {
@@ -20,7 +20,7 @@ describe("system status measurement", () => {
     })
   })
 
-  it("fails closed without exposing dependency errors", async () => {
+  it("fails closed with a generic diagnostic when the error is not public", async () => {
     const times = [100, 110]
     const status = await measureService(
       "eve",
@@ -34,7 +34,32 @@ describe("system status measurement", () => {
       label: "Agent runtime",
       latencyMs: 10,
       status: "unhealthy",
+      diagnostic: "Dependency probe failed. Check the service logs.",
     })
     expect(JSON.stringify(status)).not.toContain("secret")
+  })
+
+  it("uses explicit public diagnostics without exposing raw error text", async () => {
+    const times = [100, 112]
+    const status = await measureService(
+      "gonk",
+      "Gonk",
+      () =>
+        Promise.reject(
+          new ServiceDiagnosticError(
+            "Gonk readiness returned HTTP 503. Check artifact-store logs.",
+          ),
+        ),
+      () => times.shift()!,
+    )
+
+    expect(status).toEqual({
+      id: "gonk",
+      label: "Gonk",
+      latencyMs: 12,
+      status: "unhealthy",
+      diagnostic:
+        "Gonk readiness returned HTTP 503. Check artifact-store logs.",
+    })
   })
 })

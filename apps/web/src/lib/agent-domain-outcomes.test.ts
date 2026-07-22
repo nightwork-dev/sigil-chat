@@ -5,6 +5,8 @@ import {
   agentDomainOutcomeFromCommand,
   createAgentDomainOutcomeDispatcher,
 } from "./agent-domain-outcomes"
+import { blackboardKeys } from "./blackboard"
+import { projectWorkspaceNavKeys } from "./project-workspace-nav"
 import { reviewDocumentKeys } from "./review-document"
 import { skillKeys } from "./skills"
 
@@ -45,6 +47,63 @@ describe("agent domain outcome reconciliation", () => {
     })
 
     expect(queryClient.getQueryState(skillKeys.all())?.isInvalidated).toBe(true)
+  })
+
+  it("invalidates every project/workspace nav query for container mutations", async () => {
+    const queryClient = new QueryClient()
+    const user1 = projectWorkspaceNavKeys.all("user-1")
+    const user2 = projectWorkspaceNavKeys.all("user-2")
+    queryClient.setQueryData(user1, { projects: [] })
+    queryClient.setQueryData(user2, { projects: [] })
+
+    await createAgentDomainOutcomeDispatcher(queryClient).dispatch({
+      id: "containers:project.upsert:project-1",
+      kind: "containers.changed",
+      resource: { kind: "project-registry", id: "project-1" },
+      operation: "project.upsert",
+      changedIds: ["project-1"],
+    })
+
+    expect(queryClient.getQueryState(user1)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(user2)?.isInvalidated).toBe(true)
+  })
+
+  it("invalidates the affected session blackboard for agent edits", async () => {
+    const queryClient = new QueryClient()
+    const affected = blackboardKeys.detail("thread-1")
+    const unaffected = blackboardKeys.detail("thread-2")
+    queryClient.setQueryData(affected, { revision: "r1" })
+    queryClient.setQueryData(unaffected, { revision: "r1" })
+
+    await createAgentDomainOutcomeDispatcher(queryClient).dispatch({
+      id: "blackboard:thread-1:r2",
+      kind: "blackboard.changed",
+      resource: { kind: "session-blackboard", id: "thread-1" },
+      operation: "blackboard.write",
+      changedIds: ["thread-1"],
+    })
+
+    expect(queryClient.getQueryState(affected)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(unaffected)?.isInvalidated).toBe(false)
+  })
+
+  it("invalidates the affected container blackboard for scoped edits", async () => {
+    const queryClient = new QueryClient()
+    const workspace = blackboardKeys.scoped({ tier: "workspace", id: "ws-1" })
+    const project = blackboardKeys.scoped({ tier: "project", id: "project-1" })
+    queryClient.setQueryData(workspace, { revision: "r1" })
+    queryClient.setQueryData(project, { revision: "r1" })
+
+    await createAgentDomainOutcomeDispatcher(queryClient).dispatch({
+      id: "blackboard:workspace:ws-1:r2",
+      kind: "blackboard.changed",
+      resource: { kind: "workspace-blackboard", id: "ws-1" },
+      operation: "blackboard.write",
+      changedIds: ["ws-1"],
+    })
+
+    expect(queryClient.getQueryState(workspace)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(project)?.isInvalidated).toBe(false)
   })
 
   it("does not route an unrelated or malformed outcome into review queries", async () => {

@@ -13,6 +13,7 @@ const environment: AuthEnvironment = {
   isProduction: false,
   registrationOpen: false,
   secret: "test-secret-with-at-least-thirty-two-characters",
+  socialProviders: {},
   trustedOrigins: ["http://sigil-chat.localhost:1355"],
 }
 
@@ -25,8 +26,33 @@ describe("createSigilAuthOptions", () => {
     const options = createSigilAuthOptions({ client, environment, kysely })
 
     expect(options.rateLimit?.enabled).toBe(true)
+    expect(options.rateLimit?.customRules).toMatchObject({
+      "/request-password-reset": { max: 3, window: 60 },
+      "/reset-password": { max: 5, window: 60 },
+      "/send-verification-email": { max: 3, window: 60 },
+    })
+    expect(options.emailAndPassword).toMatchObject({
+      resetPasswordTokenExpiresIn: 30 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: expect.any(Function),
+    })
+    expect(options.emailVerification).toMatchObject({
+      sendVerificationEmail: expect.any(Function),
+    })
+    expect(options.account?.accountLinking?.requireLocalEmailVerified).toBe(
+      false,
+    )
     expect(options.disabledPaths).toContain("/is-username-available")
     expect(options.plugins?.at(-1)?.id).toBe("tanstack-start-cookies")
+
+    const magicLinkPlugin = options.plugins?.find(
+      (plugin) => plugin.id === "magic-link",
+    )
+    expect(magicLinkPlugin?.options).toMatchObject({
+      disableSignUp: true,
+      expiresIn: 15 * 60,
+      storeToken: "hashed",
+    })
 
     const jwtPlugin = options.plugins?.find((plugin) => plugin.id === "jwt")
     expect(jwtPlugin?.options).toMatchObject({
@@ -35,6 +61,70 @@ describe("createSigilAuthOptions", () => {
         expirationTime: "5m",
         issuer: environment.baseUrl,
       },
+    })
+
+    client.close()
+    void kysely.destroy()
+  })
+
+  it("requires local email verification when registration is open", () => {
+    const client = createClient({ url: ":memory:" })
+    const kysely = new Kysely<Record<string, unknown>>({
+      dialect: new LibsqlDialect({ url: ":memory:" }),
+    })
+    const options = createSigilAuthOptions({
+      client,
+      environment: { ...environment, registrationOpen: true },
+      kysely,
+    })
+
+    expect(options.account?.accountLinking?.requireLocalEmailVerified).toBe(
+      true,
+    )
+
+    client.close()
+    void kysely.destroy()
+  })
+
+  it("configures only available providers without allowing OAuth registration", () => {
+    const client = createClient({ url: ":memory:" })
+    const kysely = new Kysely<Record<string, unknown>>({
+      dialect: new LibsqlDialect({ url: ":memory:" }),
+    })
+    const options = createSigilAuthOptions({
+      client,
+      environment: {
+        ...environment,
+        socialProviders: {
+          discord: { clientId: "discord-id", clientSecret: "discord-secret" },
+          google: { clientId: "google-id", clientSecret: "google-secret" },
+          okta: {
+            clientId: "okta-id",
+            clientSecret: "okta-secret",
+            issuer: "https://example.okta.com/oauth2/default",
+          },
+        },
+      },
+      kysely,
+    })
+
+    expect(options.socialProviders).toMatchObject({
+      discord: { disableSignUp: true },
+      google: { disableSignUp: true },
+    })
+    expect(options.socialProviders).not.toHaveProperty("github")
+
+    const genericOAuthPlugin = options.plugins?.find(
+      (plugin) => plugin.id === "generic-oauth",
+    )
+    expect(genericOAuthPlugin?.options).toMatchObject({
+      config: [
+        {
+          disableSignUp: true,
+          providerId: "okta",
+          requireIssuerValidation: true,
+        },
+      ],
     })
 
     client.close()

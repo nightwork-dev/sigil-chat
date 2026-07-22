@@ -15,6 +15,9 @@ import { REVIEW_DOCUMENT_ID, reviewDocumentKeys } from "./review-document"
 import { skillKeys } from "./skills"
 import { workItemKeys } from "./work-items"
 import { evidenceKeys } from "./evidence"
+import { blackboardKeys } from "./blackboard"
+import { projectWorkspaceNavKeys } from "./project-workspace-nav"
+import { requestKeys } from "./request-intake"
 
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "review.document.changed",
@@ -94,6 +97,7 @@ const workItemsChangedHandler: AgentOutcomeReconciliationHandler = {
   },
   reconcile: async (_outcome, context) => {
     await context.invalidate([workItemKeys.all()])
+    await context.invalidate([requestKeys.all()])
   },
 }
 
@@ -125,6 +129,75 @@ const evidenceChangedHandler: AgentOutcomeReconciliationHandler = {
   },
 }
 
+const containersChangedHandler: AgentOutcomeReconciliationHandler = {
+  kind: "containers.changed",
+  schema: {
+    "~standard": {
+      version: 1,
+      vendor: "sigil-chat",
+      validate(value) {
+        const outcome = value as AgentDomainOutcome
+        if (
+          !value ||
+          typeof value !== "object" ||
+          outcome.kind !== "containers.changed" ||
+          !(
+            outcome.resource?.kind === "project-registry" ||
+            outcome.resource?.kind === "workspace-registry"
+          ) ||
+          typeof outcome.resource.id !== "string" ||
+          outcome.resource.id.length === 0
+        ) {
+          return { issues: [{ message: "Expected a containers outcome" }] }
+        }
+        return { value: outcome }
+      },
+    },
+  },
+  reconcile: async (_outcome, context) => {
+    await context.invalidate([projectWorkspaceNavKeys.root()])
+  },
+}
+
+const blackboardChangedHandler: AgentOutcomeReconciliationHandler = {
+  kind: "blackboard.changed",
+  schema: {
+    "~standard": {
+      version: 1,
+      vendor: "sigil-chat",
+      validate(value) {
+        const outcome = value as AgentDomainOutcome
+        if (
+          !value ||
+          typeof value !== "object" ||
+          outcome.kind !== "blackboard.changed" ||
+          !(
+            outcome.resource?.kind === "session-blackboard" ||
+            outcome.resource?.kind === "workspace-blackboard" ||
+            outcome.resource?.kind === "project-blackboard"
+          ) ||
+          typeof outcome.resource.id !== "string" ||
+          outcome.resource.id.length === 0
+        ) {
+          return { issues: [{ message: "Expected a blackboard outcome" }] }
+        }
+        return { value: outcome }
+      },
+    },
+  },
+  reconcile: async (outcome, context) => {
+    if (outcome.resource.kind === "session-blackboard") {
+      await context.invalidate([blackboardKeys.detail(outcome.resource.id)])
+      return
+    }
+    const tier =
+      outcome.resource.kind === "workspace-blackboard" ? "workspace" : "project"
+    await context.invalidate([
+      blackboardKeys.scoped({ tier, id: outcome.resource.id }),
+    ])
+  },
+}
+
 export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
   return createReactQueryOutcomeDispatcher({
     queryClient,
@@ -133,6 +206,8 @@ export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
       skillsChangedHandler,
       workItemsChangedHandler,
       evidenceChangedHandler,
+      containersChangedHandler,
+      blackboardChangedHandler,
     ],
     duplicateKindPolicy: "reject",
     unhandledOutcomePolicy: "ignore",

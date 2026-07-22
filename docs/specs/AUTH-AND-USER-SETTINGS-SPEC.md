@@ -1,19 +1,21 @@
 # Authentication and user settings
 
 > Date: 2026-07-18
-> Status: ratified architecture contract; slice 1 and most of slice 3 are
-> implemented; slices 2 and 4 remain incomplete. Invitations are absent and
-> Gonk human-principal propagation remains open.
+> Status: ratified architecture contract; subsequent slices added invitations,
+> authentication email delivery, environment-configured OAuth sign-in, and
+> connected-method management. Gonk human-principal propagation remains open.
 > Owner: Sigil Chat application composition
 > Related: `AGENT-SESSION-RETENTION-ISSUE.md`, `AGENT-CONTEXT-AWARENESS-SPEC.md`, `GONK-MCP-AUTH-INTEGRATION-SPEC.md`
 
 ## Summary
 
-Sigil Chat will use Better Auth for human accounts and browser sessions, with
-username/password as the visible sign-in method. Authentication terminates in
-`apps/web`. The authenticated principal is then carried explicitly into Eve and
-Gonk; neither the browser's tool-approval preference nor possession of the
-internal `GONK_MCP_KEY` stands in for user identity.
+Sigil Chat uses Better Auth for human accounts and browser sessions, with
+username/password always available and magic-link, recovery, verification, or
+OAuth methods enabled by complete environment configuration. Authentication
+terminates in `apps/web`.
+The authenticated principal is then carried explicitly into Eve and Gonk;
+neither the browser's tool-approval preference nor possession of the internal
+`GONK_MCP_KEY` stands in for user identity.
 
 User settings are owned by Sigil Chat and keyed by the authenticated user.
 Workspace- and channel-specific settings add a second scope coordinate, but
@@ -32,13 +34,14 @@ The first release is deliberately small:
 - first-user setup and optional explicitly enabled registration;
 - username/password sign-in backed by Better Auth;
 - account, password, active-session, appearance, and agent-preference settings;
+- connected sign-in methods, password recovery, and email verification when
+  authentication email delivery is configured;
 - owner-scoped channels, explicit participants, and active-channel preference;
 - authenticated Web-to-Eve calls with a short-lived service token;
 - trusted principal propagation toward Gonk's invocation boundary.
 
-OAuth, organizations, invitations, billing, API keys, passkeys, two-factor
-authentication, and public password-recovery email are not part of the first
-release.
+Organizations, billing, API keys, passkeys, and two-factor authentication are
+not part of the first release.
 
 ## Why this boundary
 
@@ -58,10 +61,9 @@ Its implementation establishes several good patterns:
 
 Sigil Chat should adopt those seams, but not the reference application's breadth. It
 does not yet have a second consumer that earns a reusable auth package, and it
-does not need an admin plugin, OAuth providers, API keys, invitations,
-content profiles, or Turso-specific product assumptions. Auth stays app-local
-under `apps/web/src/lib/auth/` until a real second application consumes the same
-contract.
+does not need an admin plugin, API keys, content profiles, or Turso-specific
+product assumptions. Auth stays app-local under `apps/web/src/lib/auth/` until
+a real second application consumes the same contract.
 
 ## Terminology and scope axes
 
@@ -490,6 +492,13 @@ true:
 - A fresh database permits exactly one first-owner setup transaction.
 - Username/password sign-in works and username matching is normalized and
   case-insensitive.
+- The login page exposes only fully configured Google, Okta, GitHub, and Discord
+  providers; partial credentials fail closed and provider login cannot create a
+  new user.
+- Password-reset requests do not disclose whether an email exists, reset links
+  expire after 30 minutes, and completing a reset revokes existing sessions.
+- Security settings expose only configured or already-connected providers and
+  never permit disconnecting the final sign-in account.
 - No protected page, server function, or private query succeeds with a missing,
   expired, or forged session.
 - User A cannot list, fetch, mutate, fork, resume, or delete a channel they do
@@ -513,10 +522,8 @@ true:
 
 ## Deferred work
 
-- invitation lifecycle and administrator user management;
-- password reset and email verification delivery;
+- invitation administration beyond owner-issued, single-use links;
 - passkeys and two-factor authentication;
-- OAuth/social providers;
 - organizations, invitations, collaborative workspace roles, and policy beyond
   the explicit channel participant set;
 - user-owned API keys and external MCP/OAuth identity;

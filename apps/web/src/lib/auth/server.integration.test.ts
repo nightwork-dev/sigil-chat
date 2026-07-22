@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { Kysely } from "kysely"
 import { LibsqlDialect } from "kysely-libsql"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { AuthEnvironment } from "./env"
 import { createSigilAuth } from "./server"
@@ -13,7 +13,10 @@ const clients: Client[] = []
 const databases: Kysely<Record<string, unknown>>[] = []
 const temporaryDirectories: string[] = []
 
-async function createTestAuth(registrationOpen = false) {
+async function createTestAuth(
+  registrationOpen = false,
+  authEmail?: AuthEnvironment["authEmail"],
+) {
   const directory = mkdtempSync(join(tmpdir(), "sigil-auth-server-"))
   temporaryDirectories.push(directory)
   const url = `file:${join(directory, "auth.db")}`
@@ -28,12 +31,14 @@ async function createTestAuth(registrationOpen = false) {
   )
 
   const environment: AuthEnvironment = {
+    authEmail,
     baseUrl: "http://sigil-chat.localhost:1355",
     databaseUrl: url,
     installationId: "test-installation",
     isProduction: false,
     registrationOpen,
     secret: "test-secret-with-at-least-thirty-two-characters",
+    socialProviders: {},
     trustedOrigins: ["http://sigil-chat.localhost:1355"],
   }
   return createSigilAuth({ client, environment, kysely })
@@ -60,6 +65,7 @@ function signUpRequest(username: string, ipAddress = "192.0.2.1") {
 }
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
   for (const database of databases.splice(0)) await database.destroy()
   for (const client of clients.splice(0)) client.close()
   for (const directory of temporaryDirectories.splice(0)) {
@@ -134,5 +140,121 @@ describe("Better Auth registration boundary", () => {
     )
 
     expect(response.status).toBe(401)
+  })
+
+  it("resets a password through a single-use email token and revokes the existing session", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 202 }))
+    vi.stubGlobal("fetch", fetcher)
+    const auth = await createTestAuth(false, {
+      apiKey: "resend-key",
+      from: "Sigil <signin@example.test>",
+    })
+    const ownerResponse = await auth.handler(signUpRequest("first-owner"))
+    const sessionCookie = ownerResponse.headers
+      .getSetCookie()
+      .map((value) => value.split(";", 1)[0])
+      .join("; ")
+
+    const requestResponse = await auth.handler(
+      new Request(
+        "http://sigil-chat.localhost:1355/api/auth/request-password-reset",
+        {
+          body: JSON.stringify({
+            email: "first-owner@example.test",
+            redirectTo: "/reset-password",
+          }),
+          headers: {
+            "content-type": "application/json",
+            origin: "http://sigil-chat.localhost:1355",
+          },
+          method: "POST",
+        },
+      ),
+    )
+    expect(requestResponse.status).toBe(200)
+    expect(fetcher).toHaveBeenCalledOnce()
+
+    const unknownAccountResponse = await auth.handler(
+      new Request(
+        "http://sigil-chat.localhost:1355/api/auth/request-password-reset",
+        {
+          body: JSON.stringify({
+            email: "unknown@example.test",
+            redirectTo: "/reset-password",
+          }),
+          headers: {
+            "content-type": "application/json",
+            origin: "http://sigil-chat.localhost:1355",
+          },
+          method: "POST",
+        },
+      ),
+    )
+    expect(unknownAccountResponse.status).toBe(200)
+    expect(fetcher).toHaveBeenCalledOnce()
+
+    const emailRequest = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body),
+    ) as { text: string }
+    const resetUrl = emailRequest.text
+      .split("\n")
+      .find((line) => line.startsWith("http"))
+    expect(resetUrl).toBeDefined()
+    const token = new URL(resetUrl ?? "").pathname.split("/").at(-1)
+    expect(token).toBeTruthy()
+
+    const resetResponse = await auth.handler(
+      new Request("http://sigil-chat.localhost:1355/api/auth/reset-password", {
+        body: JSON.stringify({
+          newPassword: "a-new-safe-password",
+          token,
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin: "http://sigil-chat.localhost:1355",
+        },
+        method: "POST",
+      }),
+    )
+    expect(resetResponse.status).toBe(200)
+
+    const revokedSessionResponse = await auth.handler(
+      new Request("http://sigil-chat.localhost:1355/api/auth/get-session", {
+        headers: { cookie: sessionCookie },
+      }),
+    )
+    expect(await revokedSessionResponse.json()).toBeNull()
+
+    const oldPasswordResponse = await auth.handler(
+      new Request("http://sigil-chat.localhost:1355/api/auth/sign-in/email", {
+        body: JSON.stringify({
+          email: "first-owner@example.test",
+          password: "a-safe-password-value",
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin: "http://sigil-chat.localhost:1355",
+        },
+        method: "POST",
+      }),
+    )
+    expect(oldPasswordResponse.status).toBe(401)
+
+    const newPasswordResponse = await auth.handler(
+      new Request("http://sigil-chat.localhost:1355/api/auth/sign-in/email", {
+        body: JSON.stringify({
+          email: "first-owner@example.test",
+          password: "a-new-safe-password",
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin: "http://sigil-chat.localhost:1355",
+        },
+        method: "POST",
+      }),
+    )
+    expect(newPasswordResponse.status).toBe(200)
   })
 })

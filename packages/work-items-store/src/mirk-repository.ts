@@ -7,6 +7,7 @@ import { MarkdownStore } from "@mirk/store-markdown";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import {
+  addRequestEvidence,
   addComment,
   assertRevision,
   assignReview,
@@ -14,11 +15,13 @@ import {
   filterBoardViews,
   isBoardView,
   filterStories,
+  filterRequests,
   isReviewItem,
   isWorkSponsorshipDecision,
   proposeFeatureRequest,
   recordSponsorshipDecision,
   isStory,
+  storyValidationIssues,
   sortStories,
   transitionStory,
   upsertBoardView,
@@ -30,9 +33,13 @@ import { assertSafeStoryId, resolveRoadmapDir } from "./markdown-repository.js";
 import type {
   BoardView,
   BoardViewFilter,
+  AddRequestEvidenceInput,
   FeatureRequestProposalContext,
   FeatureRequestProposalInput,
   FeatureRequestProposalResult,
+  RequestFilter,
+  RequestInspectResult,
+  RequestSearchResult,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -269,6 +276,45 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async searchRequests(filter?: RequestFilter): Promise<RequestSearchResult> {
+    await this.ensureReady();
+    const document = await this.readDocument();
+    return {
+      revision: document.revision,
+      requests: filterRequests(document.stories, filter),
+    };
+  }
+
+  async inspectRequest(id: string): Promise<RequestInspectResult> {
+    await this.ensureReady();
+    const document = await this.readDocument();
+    const request = filterRequests(document.stories).find(
+      (candidate) => candidate.id === id,
+    );
+    if (!request) throw new Error(`Unknown request id: ${id}.`);
+    return {
+      revision: document.revision,
+      request,
+      sponsorshipDecisions: filterSponsorshipDecisions(
+        document.sponsorshipDecisions,
+        { workItemId: id },
+      ),
+    };
+  }
+
+  async addRequestEvidence(
+    input: AddRequestEvidenceInput,
+    context: FeatureRequestProposalContext,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) => ({
+        ...addRequestEvidence(document, input, context),
+        storyIds: [input.requestId],
+      }),
+      (result) => `request ${input.requestId}: evidence ${result.changedIds.at(-1) ?? "append"}`,
+    );
+  }
+
   private async mutate(
     operation: (document: WorkItemsDocument) => MutationResult,
     message: (result: MutationResult) => string,
@@ -337,6 +383,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
             "assignee",
             "assigneePrincipalId",
             "reviewDecision",
+            "request",
             "authoredBy",
             "createdAt",
             "updatedAt",
@@ -373,7 +420,33 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       const document = createWorkItemsDocument();
       await this.persistDocument(document);
       this.commit("roadmap: seed initial stories");
+    } else {
+      await this.repairIndexProjection();
     }
+  }
+
+  /**
+   * `index.md` is a derived projection. Roadmap records may be added by another
+   * worktree or harness without going through this process, so repair a stale
+   * projection on open instead of presenting an incomplete roadmap index.
+   */
+  private async repairIndexProjection(): Promise<void> {
+    const document = await this.readDocument();
+    const path = join(this.directory, INDEX_FILE);
+    const expectedRows = sortStories(document.stories).map(renderIndexLine);
+    const currentRows = existsSync(path)
+      ? (await readFile(path, "utf8"))
+          .split("\n")
+          .filter((line) => line.startsWith("- "))
+      : [];
+    if (
+      currentRows.length === expectedRows.length &&
+      currentRows.every((row, index) => row === expectedRows[index])
+    )
+      return;
+
+    await writeFile(path, serializeIndex(document, this.now()), "utf8");
+    this.commitIndexRepair();
   }
 
   private async readDocument(): Promise<WorkItemsDocument> {
@@ -422,7 +495,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
         // board. Skip it with a loud warning; the rest of the
         // roadmap still loads.
         console.warn(
-          `[work-items] Skipping ${name}: not a valid story markdown file.`,
+          `[work-items] Skipping ${name}: invalid ${storyValidationIssues(candidate).join(", ")}.`,
         );
         continue;
       }
@@ -531,8 +604,12 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
           ...recordForStory(story),
           comments: commentsByStory.get(story.id) ?? [],
         } as StoryRecord);
-        if (original !== undefined)
+        if (original !== undefined) {
+          const rewritten = await readFile(path, "utf8");
+          const restored = restoreStoryMarkdownNarrative(original, rewritten);
+          if (restored !== rewritten) await writeFile(path, restored, "utf8");
           await restoreFrontmatterOrder(path, original);
+        }
       }
     });
 
@@ -591,6 +668,17 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     this.runGit(dir, [...GIT_IDENTITY, "commit", "-m", message], true);
   }
 
+  private commitIndexRepair(): void {
+    if (!this.gitAvailable || !this.resolvedDir) return;
+    const dir = this.resolvedDir;
+    if (!this.runGit(dir, ["add", "--", INDEX_FILE])) return;
+    this.runGit(
+      dir,
+      [...GIT_IDENTITY, "commit", "-m", "roadmap: repair index projection"],
+      true,
+    );
+  }
+
   private runGit(dir: string, args: string[], allowFailure = false): boolean {
     try {
       execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
@@ -636,6 +724,7 @@ function recordForStory(story: Story): Record<string, unknown> {
   if (story.reviewDecision !== undefined)
     record.reviewDecision = story.reviewDecision;
   if (story.extraction !== undefined) record.extraction = story.extraction;
+  if (story.request !== undefined) record.request = story.request;
   record.authoredBy = story.authoredBy;
   record.createdAt = story.createdAt;
   record.updatedAt = story.updatedAt;
@@ -691,6 +780,51 @@ function stringifyComments(value: unknown): string {
   if (comments.length === 0) return "_No comments yet._";
   const fence = String.fromCharCode(96).repeat(3);
   return `${fence}yaml\n${stringifyYaml(comments).trimEnd()}\n${fence}`;
+}
+
+export function restoreStoryMarkdownNarrative(
+  previous: string,
+  rewritten: string,
+): string {
+  const checkedCriteria = new Set(
+    previous
+      .split("\n")
+      .map((line) => /^- \[[xX]\] (.*)$/.exec(line.trim())?.[1]?.trim())
+      .filter((criterion): criterion is string => Boolean(criterion)),
+  );
+  let restored = rewritten
+    .split("\n")
+    .map((line) => {
+      const match = /^(- \[)[ ](\] )(.*)$/.exec(line);
+      if (!match || !checkedCriteria.has(match[3].trim())) return line;
+      return `${match[1]}x${match[2]}${match[3]}`;
+    })
+    .join("\n");
+
+  const comments = extractMarkdownSection(previous, "Comments");
+  const narrative = comments
+    ?.replace(/```(?:yaml)?\n[\s\S]*?```/g, "")
+    .replace(/^_No comments yet\._$/m, "")
+    .trim();
+  if (!narrative) return restored;
+
+  restored = restored.replace(
+    "\n## Comments\n\n",
+    `\n## Comments\n\n${narrative}\n\n`,
+  );
+  return restored;
+}
+
+function extractMarkdownSection(
+  markdown: string,
+  heading: string,
+): string | undefined {
+  const marker = `\n## ${heading}\n`;
+  const start = markdown.indexOf(marker);
+  if (start === -1) return undefined;
+  const bodyStart = start + marker.length;
+  const nextSection = markdown.indexOf("\n## ", bodyStart);
+  return markdown.slice(bodyStart, nextSection === -1 ? undefined : nextSection);
 }
 
 function serializeReviews(reviews: ReviewItem[]): string {
