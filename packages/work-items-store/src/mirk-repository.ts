@@ -7,6 +7,7 @@ import { MarkdownStore } from "@mirk/store-markdown";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import {
+  addRequestEvidence,
   addComment,
   assertRevision,
   assignReview,
@@ -14,6 +15,7 @@ import {
   filterBoardViews,
   isBoardView,
   filterStories,
+  filterRequests,
   isReviewItem,
   isWorkSponsorshipDecision,
   proposeFeatureRequest,
@@ -30,9 +32,13 @@ import { assertSafeStoryId, resolveRoadmapDir } from "./markdown-repository.js";
 import type {
   BoardView,
   BoardViewFilter,
+  AddRequestEvidenceInput,
   FeatureRequestProposalContext,
   FeatureRequestProposalInput,
   FeatureRequestProposalResult,
+  RequestFilter,
+  RequestInspectResult,
+  RequestSearchResult,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -269,6 +275,45 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
     );
   }
 
+  async searchRequests(filter?: RequestFilter): Promise<RequestSearchResult> {
+    await this.ensureReady();
+    const document = await this.readDocument();
+    return {
+      revision: document.revision,
+      requests: filterRequests(document.stories, filter),
+    };
+  }
+
+  async inspectRequest(id: string): Promise<RequestInspectResult> {
+    await this.ensureReady();
+    const document = await this.readDocument();
+    const request = filterRequests(document.stories).find(
+      (candidate) => candidate.id === id,
+    );
+    if (!request) throw new Error(`Unknown request id: ${id}.`);
+    return {
+      revision: document.revision,
+      request,
+      sponsorshipDecisions: filterSponsorshipDecisions(
+        document.sponsorshipDecisions,
+        { workItemId: id },
+      ),
+    };
+  }
+
+  async addRequestEvidence(
+    input: AddRequestEvidenceInput,
+    context: FeatureRequestProposalContext,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) => ({
+        ...addRequestEvidence(document, input, context),
+        storyIds: [input.requestId],
+      }),
+      (result) => `request ${input.requestId}: evidence ${result.changedIds.at(-1) ?? "append"}`,
+    );
+  }
+
   private async mutate(
     operation: (document: WorkItemsDocument) => MutationResult,
     message: (result: MutationResult) => string,
@@ -337,6 +382,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
             "assignee",
             "assigneePrincipalId",
             "reviewDecision",
+            "request",
             "authoredBy",
             "createdAt",
             "updatedAt",
@@ -636,6 +682,7 @@ function recordForStory(story: Story): Record<string, unknown> {
   if (story.reviewDecision !== undefined)
     record.reviewDecision = story.reviewDecision;
   if (story.extraction !== undefined) record.extraction = story.extraction;
+  if (story.request !== undefined) record.request = story.request;
   record.authoredBy = story.authoredBy;
   record.createdAt = story.createdAt;
   record.updatedAt = story.updatedAt;

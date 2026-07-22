@@ -9,6 +9,31 @@ export type ReviewGate = "browser:owner" | "decision:owner" | "peer" | "none";
 /** The durable product-work categories defined by the scoped-work contract. */
 export type WorkKind =
   "feature-request" | "story" | "task" | "defect" | "decision";
+export type RequestKind =
+  | "feature"
+  | "tool"
+  | "skill"
+  | "integration"
+  | "data-access"
+  | "defect"
+  | "workflow"
+  | "other";
+export type RequestState =
+  | "proposed"
+  | "awaiting-sponsor"
+  | "triage"
+  | "accepted"
+  | "declined"
+  | "duplicate"
+  | "promoted"
+  | "archived";
+export type RequestOriginMode =
+  | "human-direct"
+  | "agent-proposal"
+  | "principal-directed-agent"
+  | "after-action"
+  | "imported";
+export type RequesterKind = "human" | "agent";
 
 /** A non-owning scope participation relation for one work item. */
 export interface ScopeBinding {
@@ -20,10 +45,45 @@ export interface ScopeBinding {
 export interface WorkProvenance {
   origin: "principal" | "agent";
   actorPrincipalId: string;
+  requesterId?: string;
+  requesterKind?: RequesterKind;
+  principalId?: string;
+  originMode?: RequestOriginMode;
   agentSessionId?: string;
   proposedSponsorPrincipalId?: string;
   sourceRefs?: string[];
   createdAt: string;
+}
+
+export interface RequestEvidenceEntry {
+  id: string;
+  observedById: string;
+  observedByKind: RequesterKind;
+  scopeId: string;
+  constraint: string;
+  workaround: string;
+  cost: string;
+  expectedImprovement: string;
+  proof?: string;
+  taskRef?: string;
+  sourceRefs?: string[];
+  createdAt: string;
+}
+
+export interface WorkRequestDetails {
+  requestKind: RequestKind;
+  requestState: RequestState;
+  problem: string;
+  desiredOutcome: string;
+  evidence: RequestEvidenceEntry[];
+  relatedScopeIds: string[];
+  promotedSpecIds: string[];
+  promotedStoryIds: string[];
+  proposedApproach?: string;
+  impact?: string;
+  frequency?: string;
+  constraints?: string;
+  targetAudience?: string;
 }
 
 /**
@@ -53,6 +113,7 @@ export interface Story {
   epicTitle: string;
   title: string;
   intent: string;
+  request?: WorkRequestDetails;
   acceptanceCriteria: string[];
   status: StoryStatus;
   routing: Routing;
@@ -113,10 +174,23 @@ export interface WorkSponsorshipDecisionFilter {
 }
 
 export interface FeatureRequestProposalInput {
+  requestKind?: RequestKind;
   title: string;
   problem: string;
   desiredOutcome: string;
   evidence?: string[];
+  structuredEvidence?: Array<
+    Omit<
+      RequestEvidenceEntry,
+      "id" | "requestId" | "observedById" | "observedByKind" | "scopeId" | "createdAt"
+    >
+  >;
+  relatedScopeIds?: string[];
+  proposedApproach?: string;
+  impact?: string;
+  frequency?: string;
+  constraints?: string;
+  targetAudience?: string;
   sourceRefs?: string[];
   intendedScopeId?: string;
   proposedSponsorPrincipalId?: string;
@@ -124,9 +198,41 @@ export interface FeatureRequestProposalInput {
 
 export interface FeatureRequestProposalContext {
   actorPrincipalId: string;
+  requesterId?: string;
+  requesterKind?: RequesterKind;
+  originMode?: RequestOriginMode;
   agentSessionId?: string;
   currentScopeId: string;
   now: string;
+}
+
+export interface RequestFilter {
+  requestKind?: RequestKind;
+  requestState?: RequestState;
+  homeScopeId?: string;
+  sponsorPrincipalId?: string;
+  requesterId?: string;
+  query?: string;
+}
+
+export interface RequestSearchResult {
+  revision: number;
+  requests: Story[];
+}
+
+export interface RequestInspectResult {
+  revision: number;
+  request: Story;
+  sponsorshipDecisions: WorkSponsorshipDecision[];
+}
+
+export interface AddRequestEvidenceInput {
+  requestId: string;
+  evidence: Omit<
+    RequestEvidenceEntry,
+    "id" | "observedById" | "observedByKind" | "scopeId" | "createdAt"
+  >;
+  expectedRevision?: number;
 }
 
 export interface FeatureRequestDuplicateCandidate {

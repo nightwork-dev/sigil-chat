@@ -6,12 +6,14 @@ import { dirname, join, resolve } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import {
+  addRequestEvidence,
   addComment,
   assertRevision,
   assignReview,
   decideReview,
   filterBoardViews,
   filterStories,
+  filterRequests,
   isBoardView,
   isReviewItem,
   isWorkSponsorshipDecision,
@@ -28,9 +30,13 @@ import type { WorkItemsRepository } from "./repository.js";
 import type {
   BoardView,
   BoardViewFilter,
+  AddRequestEvidenceInput,
   FeatureRequestProposalContext,
   FeatureRequestProposalInput,
   FeatureRequestProposalResult,
+  RequestFilter,
+  RequestInspectResult,
+  RequestSearchResult,
   ReviewAssignment,
   ReviewDecision,
   ReviewItem,
@@ -234,6 +240,42 @@ export class MarkdownWorkItemsRepository implements WorkItemsRepository {
     return filterSponsorshipDecisions(
       (await this.readDocument()).sponsorshipDecisions,
       filter,
+    );
+  }
+
+  async searchRequests(filter?: RequestFilter): Promise<RequestSearchResult> {
+    await this.ensureReady();
+    const document = await this.readDocument();
+    return {
+      revision: document.revision,
+      requests: filterRequests(document.stories, filter),
+    };
+  }
+
+  async inspectRequest(id: string): Promise<RequestInspectResult> {
+    await this.ensureReady();
+    const document = await this.readDocument();
+    const request = filterRequests(document.stories).find(
+      (candidate) => candidate.id === id,
+    );
+    if (!request) throw new Error(`Unknown request id: ${id}.`);
+    return {
+      revision: document.revision,
+      request,
+      sponsorshipDecisions: filterSponsorshipDecisions(
+        document.sponsorshipDecisions,
+        { workItemId: id },
+      ),
+    };
+  }
+
+  async addRequestEvidence(
+    input: AddRequestEvidenceInput,
+    context: FeatureRequestProposalContext,
+  ): Promise<WorkItemsMutationResult> {
+    return this.mutate(
+      (document) => addRequestEvidence(document, input, context),
+      (result) => `request ${input.requestId}: evidence ${result.changedIds.at(-1) ?? "append"}`,
     );
   }
 
@@ -542,6 +584,7 @@ function serializeStoryMarkdown(
     frontmatter.assigneePrincipalId = story.assigneePrincipalId;
   if (story.reviewDecision !== undefined)
     frontmatter.reviewDecision = story.reviewDecision;
+  if (story.request !== undefined) frontmatter.request = story.request;
   frontmatter.authoredBy = story.authoredBy;
   frontmatter.createdAt = story.createdAt;
   frontmatter.updatedAt = story.updatedAt;

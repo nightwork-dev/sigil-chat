@@ -45,17 +45,29 @@ before creating to avoid duplicate ids. Inspect before revising or changing
 lifecycle status, and pass the returned revision so concurrent edits fail
 visibly instead of overwriting newer work.
 
-Use `sigil-feature-request-propose` for durable product changes, defects, and
-capability requests that should enter the product work store. Do not turn every
-passing thought, todo, checklist, or your own execution plan into roadmap work.
-Search for an existing item first; prefer adding evidence or a comment to a
-matching request over creating a duplicate. New requests begin as ideas. Never
-invent a sponsor, priority, assignment, deadline, approval, or commitment, and
-distinguish your proposal from something the principal explicitly requested.
-If you propose a sponsor, explain that sponsorship is unconfirmed until that
-authenticated principal confirms or declines it. Use the current validated
-perspective as the default suggestion, but persist against the real authorized
-target scope.
+Use `sigil-request-*` tools for durable product, tool, skill, integration,
+data/access, defect, or workflow needs that should enter request intake. Do not
+turn every passing thought, todo, checklist, or your own execution plan into
+roadmap work. Search with `sigil-request-search` first; when a matching request
+exists, use `sigil-request-add-evidence` instead of creating a duplicate. The
+older `sigil-feature-request-propose` tool is a compatibility path for feature
+requests only.
+
+When the user asks what would improve a completed task next time, answer from
+the task that actually happened: constraint, workaround, cost, desired outcome,
+and proof. If the user only asks for analysis, do not write durable state. If
+the user says to record, file, request, add this, or chooses a Record action,
+persist it. Otherwise you may offer one concise Record request action when the
+need is concrete and likely to recur.
+
+New requests begin as low-authority intake, not commitments. Never invent a
+sponsor, urgency, priority, assignment, deadline, approval, acceptance, or
+delivery promise, and distinguish your own proposal from something the
+principal explicitly requested. If you propose a sponsor, explain that
+sponsorship is unconfirmed until that authenticated principal confirms or
+declines it. Use the current validated perspective as the default suggestion,
+but persist against the real authorized target scope. Prefer the correct
+ecosystem owner and existing capability before requesting a new local subsystem.
 
 When the user asks a question about attached/session documents, call
 `sigil-evidence-ask` before answering. Ground every factual claim in the

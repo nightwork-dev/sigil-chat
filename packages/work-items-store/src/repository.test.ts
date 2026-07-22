@@ -442,6 +442,113 @@ describe("MemoryWorkItemsRepository", () => {
     await expect(repository.get()).resolves.toMatchObject({ revision: 1 });
   });
 
+  it("searches generalized request records and appends structured evidence", async () => {
+    const repository = new MemoryWorkItemsRepository();
+    const created = await repository.proposeFeatureRequest(
+      {
+        requestKind: "tool",
+        title: "Record after-action request evidence",
+        problem: "Agents cannot preserve concrete task friction.",
+        desiredOutcome:
+          "A repeated task can add evidence to one canonical request.",
+        structuredEvidence: [
+          {
+            constraint: "The request shape was only feature-specific.",
+            workaround: "The agent encoded request details in prose.",
+            cost: "Triage could not filter by tool or workflow need.",
+            expectedImprovement: "Request views can group tool requests.",
+            proof: "A request search by kind returns this item.",
+          },
+        ],
+        relatedScopeIds: ["project-a"],
+        proposedApproach: "Generalize the intake schema.",
+      },
+      {
+        actorPrincipalId: "user-1",
+        requesterId: "agent:eve",
+        requesterKind: "agent",
+        originMode: "after-action",
+        agentSessionId: "thread-1",
+        currentScopeId: "workspace-a",
+        now: "2026-07-22T02:00:00.000Z",
+      },
+    );
+    if (created.outcome !== "created") throw new Error("Expected create.");
+
+    await expect(
+      repository.searchRequests({ requestKind: "tool" }),
+    ).resolves.toMatchObject({
+      revision: 1,
+      requests: [
+        {
+          id: "FR.1",
+          request: {
+            requestKind: "tool",
+            requestState: "proposed",
+            problem: "Agents cannot preserve concrete task friction.",
+            desiredOutcome:
+              "A repeated task can add evidence to one canonical request.",
+            relatedScopeIds: ["project-a"],
+            proposedApproach: "Generalize the intake schema.",
+            evidence: [
+              {
+                id: "evidence-1",
+                observedById: "agent:eve",
+                observedByKind: "agent",
+                constraint: "The request shape was only feature-specific.",
+              },
+            ],
+          },
+          provenance: {
+            requesterId: "agent:eve",
+            requesterKind: "agent",
+            originMode: "after-action",
+          },
+        },
+      ],
+    });
+
+    const evidence = await repository.addRequestEvidence(
+      {
+        requestId: "FR.1",
+        evidence: {
+          constraint: "A duplicate surfaced during implementation.",
+          workaround: "The agent manually searched the roadmap.",
+          cost: "Extra review time.",
+          expectedImprovement:
+            "The agent can append evidence to the existing request.",
+          taskRef: "S1.11",
+        },
+        expectedRevision: created.document.revision,
+      },
+      {
+        actorPrincipalId: "user-1",
+        requesterId: "agent:eve",
+        requesterKind: "agent",
+        originMode: "after-action",
+        currentScopeId: "workspace-a",
+        now: "2026-07-22T02:01:00.000Z",
+      },
+    );
+
+    expect(evidence.changedIds).toEqual(["FR.1", "evidence-2"]);
+    await expect(repository.inspectRequest("FR.1")).resolves.toMatchObject({
+      revision: 2,
+      request: {
+        request: {
+          evidence: [
+            { id: "evidence-1" },
+            {
+              id: "evidence-2",
+              taskRef: "S1.11",
+              cost: "Extra review time.",
+            },
+          ],
+        },
+      },
+    });
+  });
+
   it("records sponsorship decisions separately from agent proposals", async () => {
     const repository = new MemoryWorkItemsRepository();
     const created = await repository.proposeFeatureRequest(

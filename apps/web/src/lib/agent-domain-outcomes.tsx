@@ -17,6 +17,7 @@ import { workItemKeys } from "./work-items"
 import { evidenceKeys } from "./evidence"
 import { blackboardKeys } from "./blackboard"
 import { projectWorkspaceNavKeys } from "./project-workspace-nav"
+import { requestKeys } from "./request-intake"
 
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "review.document.changed",
@@ -96,6 +97,7 @@ const workItemsChangedHandler: AgentOutcomeReconciliationHandler = {
   },
   reconcile: async (_outcome, context) => {
     await context.invalidate([workItemKeys.all()])
+    await context.invalidate([requestKeys.all()])
   },
 }
 
