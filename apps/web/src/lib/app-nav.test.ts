@@ -8,8 +8,8 @@ describe("app navigation profiles", () => {
     const itemsTo = items.map((item) => item.to)
     const footerTo = (footer ?? []).map((item) => item.to)
 
-    // The product center: conversation + one management entry.
-    expect(itemsTo).toEqual(["/home", "/chat", "/agents"])
+    // The product center: conversation, durable work, and management.
+    expect(itemsTo).toEqual(["/home", "/chat", "/roadmap", "/agents"])
 
     // Demo workspaces are /demos cards, not primary nav.
     expect(itemsTo).not.toContain("/review")
@@ -19,12 +19,11 @@ describe("app navigation profiles", () => {
     expect(footerTo).not.toContain("/labs")
     expect(footerTo).not.toContain("/demos")
 
-    // Kanban is centered, not a demo — internal profile only, until the
-    // scoped-rollup spec lands.
-    expect(itemsTo).not.toContain("/roadmap")
+    // Kanban and specs are centered product surfaces in every profile.
+    expect(itemsTo).toContain("/roadmap")
   })
 
-  it("shows roadmap, authenticated demos, and public labs to the internal profile", () => {
+  it("keeps roadmap public to product profiles while gating demo navigation", () => {
     const internal = buildAppNav({ internalWorkspaces: true })
     expect(internal.items.map((item) => item.to)).toContain("/roadmap")
     expect((internal.footer ?? []).map((item) => item.to)).toContain("/demos")
@@ -37,7 +36,7 @@ describe("app navigation profiles", () => {
     expect((external.footer ?? []).map((item) => item.to)).not.toContain(
       "/demos",
     )
-    expect(external.items.map((item) => item.to)).not.toContain("/roadmap")
+    expect(external.items.map((item) => item.to)).toContain("/roadmap")
   })
 
   it("orders container-scoped surfaces before principal-level ones (§3.2)", () => {
@@ -45,7 +44,7 @@ describe("app navigation profiles", () => {
       (item) => item.to,
     )
 
-    const containerScoped = ["/home", "/chat"]
+    const containerScoped = ["/home", "/chat", "/roadmap"]
     const principalLevel = ["/agents"]
     const lastScoped = Math.max(
       ...containerScoped.map((to) => order.indexOf(to)),

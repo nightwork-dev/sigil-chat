@@ -35,15 +35,12 @@ export function buildAppNav(options: {
       // front-and-center nav.
       { to: "/home", label: "Home", icon: HouseIcon },
       { to: "/chat", label: "Chat", icon: MessageSquareIcon },
+      // Kanban and specifications are durable product surfaces, not demos.
+      { to: "/roadmap", label: "Roadmap", icon: MapIcon },
       // Agent management — ONE entry into the management session (Agents |
       // Skills | Capabilities share a tab header in the top rail; principal-
       // level, so the breadcrumb omits the container segment here).
       { to: "/agents", label: "Agents", icon: UserRoundIcon },
-      // Kanban is not a demo — the work board is a centered product surface
-      // (internal profile until the scoped-rollup spec lands).
-      ...(options.internalWorkspaces
-        ? [{ to: "/roadmap", label: "Roadmap", icon: MapIcon }]
-        : []),
     ],
     footer: [
       // Demos require the authenticated app boundary. Labs are a separate
