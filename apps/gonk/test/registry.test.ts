@@ -120,7 +120,19 @@ describe("Sigil Chat Gonk registry", () => {
     );
     expect(written).toMatchObject({
       ok: true,
-      data: { content: "Shared note", sessionId: "thread-1" },
+      data: {
+        content: "Shared note",
+        sessionId: "thread-1",
+        clientCommand: {
+          type: "agent.domain.outcome",
+          payload: {
+            kind: "blackboard.changed",
+            resource: { kind: "session-blackboard", id: "thread-1" },
+            operation: "blackboard.write",
+            changedIds: ["thread-1"],
+          },
+        },
+      },
     });
 
     const oversized = await collectToolOutcome(

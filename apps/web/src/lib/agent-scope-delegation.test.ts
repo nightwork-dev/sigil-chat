@@ -173,7 +173,7 @@ describe("agent scope authorization", () => {
       assertAuthorizedScope(
         "workspace:workspace-1",
         "user-outsider",
-        () => false,
+        () => undefined,
         registries,
       ),
     ).toThrow("NOT_AUTHORIZED")

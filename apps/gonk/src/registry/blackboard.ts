@@ -20,6 +20,9 @@ import {
 import { emptyObjectSchema, readHints, writeHints } from "./schemas.js";
 import { hasOnlyKeys, isRecord, isEmptyObject } from "./validators.js";
 
+const BLACKBOARD_OUTCOME_KIND = "blackboard.changed";
+const SESSION_BLACKBOARD_RESOURCE_KIND = "session-blackboard";
+
 interface BlackboardWriteInput {
   content: string;
   expectedRevision: string;
@@ -67,14 +70,33 @@ export function registerBlackboardTools(
       additionalProperties: false,
     },
     hints: writeHints,
-    handler: async (input, ctx) => ({
-      data: await repository.write(
-        requireSessionId(ctx),
+    handler: async (input, ctx) => {
+      const sessionId = requireSessionId(ctx);
+      const document = await repository.write(
+        sessionId,
         input.content,
         ctx.auth?.principal?.id ?? "agent",
         input.expectedRevision,
-      ),
-    }),
+      );
+      return {
+        data: {
+          ...document,
+          clientCommand: {
+            type: "agent.domain.outcome" as const,
+            payload: {
+              id: `blackboard:${sessionId}:${document.revision}`,
+              kind: BLACKBOARD_OUTCOME_KIND,
+              resource: {
+                kind: SESSION_BLACKBOARD_RESOURCE_KIND,
+                id: sessionId,
+              },
+              operation: "blackboard.write",
+              changedIds: [sessionId],
+            },
+          },
+        },
+      };
+    },
   });
 }
 
