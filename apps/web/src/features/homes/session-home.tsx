@@ -5,6 +5,7 @@
 // canonical container — not its property.
 
 import { HomeSection } from "./home-section"
+import { HomeResources } from "./home-resources"
 import { ArchivedBanner, HomeDenied, HomeSkeleton } from "./home-states"
 import { HomeRow, OwnershipChip } from "./home-row"
 import type { HomeState, SessionHomeView } from "./types"
@@ -58,20 +59,7 @@ export function SessionHome({ state, compact }: SessionHomeProps) {
         }
         compact={compact}
       >
-        {view.artifacts.map((artifact, index) => (
-          <HomeRow
-            key={artifact.id}
-            first={index === 0}
-            compact={compact}
-            title={artifact.name}
-            nativeHref={artifact.nativeHref}
-            description={
-              artifact.mountedFromName
-                ? `Shared from ${artifact.mountedFromName}`
-                : undefined
-            }
-          />
-        ))}
+        <HomeResources resources={view.artifacts} compact={compact} />
       </HomeSection>
 
       <HomeSection

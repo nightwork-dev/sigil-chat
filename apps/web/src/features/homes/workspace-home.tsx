@@ -5,6 +5,7 @@
 
 import { HomeSection } from "./home-section"
 import { AgentHomeRow } from "./agent-home-row"
+import { HomeResources } from "./home-resources"
 import { ArchivedBanner, HomeDenied, HomeSkeleton } from "./home-states"
 import { HomeRow, OwnershipChip } from "./home-row"
 import type { HomeState, WorkspaceHomeView } from "./types"
@@ -12,13 +13,6 @@ import type { HomeState, WorkspaceHomeView } from "./types"
 export interface WorkspaceHomeProps {
   readonly state: HomeState<WorkspaceHomeView>
   readonly compact?: boolean
-}
-
-const RESOURCE_KIND_LABEL: Record<string, string> = {
-  artifact: "Artifact",
-  evidence: "Evidence",
-  knowledge: "Knowledge",
-  "saved-view": "Saved view",
 }
 
 export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
@@ -106,25 +100,11 @@ export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
         }
         compact={compact}
       >
-        {view.resources.map((resource, index) => (
-          <HomeRow
-            key={resource.id}
-            first={index === 0}
-            compact={compact}
-            title={resource.name}
-            nativeHref={resource.nativeHref}
-            description={
-              resource.mountedFromName
-                ? `Shared from ${resource.mountedFromName}`
-                : undefined
-            }
-            trailing={
-              <span className="rounded-full border border-border px-1.5 py-px text-[10px] text-muted-foreground">
-                {RESOURCE_KIND_LABEL[resource.kind] ?? resource.kind}
-              </span>
-            }
-          />
-        ))}
+        <HomeResources
+          resources={view.resources}
+          compact={compact}
+          showKind
+        />
       </HomeSection>
 
       <HomeSection

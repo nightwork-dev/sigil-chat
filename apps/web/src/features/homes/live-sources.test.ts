@@ -102,12 +102,14 @@ describe("home route sources", () => {
         id: "newer",
         name: "latest-brief.png",
         kind: "artifact",
+        mediaType: "image/png",
         nativeHref: "/api/media/artifact?key=newer&scope=project%3Aproject-1",
       },
       {
         id: "older",
         name: "old-plan.md",
         kind: "artifact",
+        mediaType: "text/markdown",
         nativeHref: "/api/media/artifact?key=older&scope=project%3Aproject-1",
       },
     ]);
@@ -130,7 +132,12 @@ describe("home route sources", () => {
 
     expect(sources.resources).toEqual([]);
     expect(sources.artifacts).toEqual([
-      { id: "matrix", name: "offer-matrix.csv", kind: "artifact" },
+      {
+        id: "matrix",
+        name: "offer-matrix.csv",
+        kind: "artifact",
+        mediaType: "text/csv",
+      },
     ]);
   });
 
