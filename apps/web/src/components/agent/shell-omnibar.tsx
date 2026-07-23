@@ -30,32 +30,45 @@ import {
 } from "@workspace/ui/components/command"
 import { appNav } from "@/lib/app-nav"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import {
+  useProjectWorkspaceNav,
+  type ProjectWorkspaceNavSummary,
+} from "@/lib/project-workspace-nav"
 import { useAgentThreads, useSetActiveAgentThread } from "@/lib/agent-threads"
 import { useActiveContainer } from "@/lib/active-container"
 import { openAgentHud } from "@/lib/agent-hud-open"
 
 /** Where picking a project from the omnibar lands: its nested home, never
  *  `/chat` (SC.10 §2/§6 step 9 fix — a container pick is "go there", not
- *  "go chat"). Exported for testing. */
-export function projectSwitchHref(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}`
+ *  "go chat"). Always the project's canonical slug (container slugs, SC.10),
+ *  never its id. Exported for testing. */
+export function projectSwitchHref(project: { readonly slug: string }): string {
+  return `/projects/${encodeURIComponent(project.slug)}`
 }
 
 /** Where picking a workspace from the omnibar lands: the nested workspace
  *  home under its own owning project when visible, else the currently
  *  active project — the same canonical-containment fallback the SC.10
- *  step-5 resolvers use (workspaces.$workspaceId.tsx). Never `/chat`.
- *  Undefined only when neither project id is known (no active container and
- *  the workspace's owner is hidden) — the caller skips navigation then
- *  rather than guessing. Exported for testing. */
+ *  step-5 resolvers use (workspaces.$workspaceId.tsx). Never `/chat`. Both
+ *  segments are the canonical slug (container slugs, SC.10) — `nav` resolves
+ *  the owning/active project's id to its slug. Undefined only when neither
+ *  project id is known (no active container and the workspace's owner is
+ *  hidden) — the caller skips navigation then rather than guessing.
+ *  Exported for testing. */
 export function workspaceSwitchHref(
-  workspace: { readonly id: string; readonly projectId?: string },
+  workspace: {
+    readonly id: string
+    readonly slug: string
+    readonly projectId?: string
+  },
+  nav: Pick<ProjectWorkspaceNavSummary, "projects">,
   activeProjectId: string | undefined,
 ): string | undefined {
-  const projectId = workspace.projectId ?? activeProjectId
-  if (!projectId) return undefined
-  return `/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(workspace.id)}`
+  const ownerProjectId = workspace.projectId ?? activeProjectId
+  if (!ownerProjectId) return undefined
+  const ownerProject = nav.projects.find((p) => p.id === ownerProjectId)
+  const projectSlug = ownerProject?.slug ?? ownerProjectId
+  return `/projects/${encodeURIComponent(projectSlug)}/workspaces/${encodeURIComponent(workspace.slug)}`
 }
 
 export function ShellOmnibar() {
@@ -176,7 +189,7 @@ export function ShellOmnibar() {
                   value={project.name}
                   onSelect={() => {
                     container.selectProject(project.id)
-                    go(projectSwitchHref(project.id))
+                    go(projectSwitchHref(project))
                   }}
                 >
                   <FolderIcon className="size-4 text-muted-foreground" />
@@ -204,6 +217,7 @@ export function ShellOmnibar() {
                       container.selectWorkspace(workspace.id)
                       const href = workspaceSwitchHref(
                         workspace,
+                        projectNav.data,
                         container.projectId,
                       )
                       if (href) go(href)

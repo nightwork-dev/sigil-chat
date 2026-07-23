@@ -10,16 +10,30 @@
 // out of `?via=` and into the URL — SC.10 §2). Loader: once the parent
 // layout's access check resolves "readable", warms the scoped work,
 // artifacts, and home signals this view reads.
+//
+// Container slugs (SC.10, CRITICAL BOUNDARY): both $projectId and
+// $workspaceId are either the canonical slug or a legacy/UUID id. This leaf
+// owns the full, unambiguous param set for both, so it's the one that
+// redirects to the canonical slug URL when either differs. Every scope-keyed
+// query below is built from the resolved CANONICAL workspace id — a slug
+// must never reach the work-items scope-access surface.
 
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
 
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
 import { artifactsQueryOptions, useArtifacts } from "@/lib/artifacts"
+import {
+  resolveProjectRouteParam,
+  resolveWorkspaceRouteParam,
+} from "@/lib/container-route-target"
 import { homeSignalsQueryOptions, useHomeSignals } from "@/lib/home-signals"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import {
+  projectWorkspaceNavQueryOptions,
+  useProjectWorkspaceNav,
+} from "@/lib/project-workspace-nav"
 import {
   buildWorkspaceHome,
   type HomesAdapterInput,
@@ -44,17 +58,36 @@ export const Route = createFileRoute(
 )({
   loader: async ({ context, params }) => {
     const principalId = context.user.id
+    const nav = await context.queryClient
+      .ensureQueryData(projectWorkspaceNavQueryOptions(principalId))
+      .catch(() => undefined)
+    const resolvedProject = resolveProjectRouteParam(nav, params.projectId)
+    const resolvedWorkspace = resolveWorkspaceRouteParam(
+      nav,
+      params.workspaceId,
+    )
+    if (
+      (resolvedProject && resolvedProject.slug !== params.projectId) ||
+      (resolvedWorkspace && resolvedWorkspace.slug !== params.workspaceId)
+    ) {
+      throw redirect({
+        to: "/projects/$projectId/workspaces/$workspaceId",
+        params: {
+          projectId: resolvedProject?.slug ?? params.projectId,
+          workspaceId: resolvedWorkspace?.slug ?? params.workspaceId,
+        },
+      })
+    }
+    const workspaceId = resolvedWorkspace?.id ?? params.workspaceId
     const access = await context.queryClient
-      .ensureQueryData(
-        scopeHomeAccessQueryOptions(principalId, params.workspaceId),
-      )
+      .ensureQueryData(scopeHomeAccessQueryOptions(principalId, workspaceId))
       .catch(() => undefined)
     if (access !== "readable") return
-    const scope = artifactScopeForHome("workspace", params.workspaceId)
+    const scope = artifactScopeForHome("workspace", workspaceId)
     await Promise.all([
       context.queryClient
         .ensureQueryData(
-          scopeWorkQueryOptions(principalId, params.workspaceId, "self"),
+          scopeWorkQueryOptions(principalId, workspaceId, "self"),
         )
         .catch(() => undefined),
       context.queryClient
@@ -62,11 +95,7 @@ export const Route = createFileRoute(
         .catch(() => undefined),
       context.queryClient
         .ensureQueryData(
-          homeSignalsQueryOptions(
-            principalId,
-            "workspace",
-            params.workspaceId,
-          ),
+          homeSignalsQueryOptions(principalId, "workspace", workspaceId),
         )
         .catch(() => undefined),
     ])
@@ -75,11 +104,20 @@ export const Route = createFileRoute(
 })
 
 function WorkspaceHomeRoute() {
-  const { projectId: via, workspaceId } = Route.useParams()
+  const { projectId: routeProjectId, workspaceId: routeWorkspaceId } =
+    Route.useParams()
   const nav = useProjectWorkspaceNav()
   const threads = useAgentThreads()
   const roster = useAgentRoster()
   const compact = useMediaQuery("(max-width: 640px)")
+  // The route params may still be slugs mid-redirect, or (transiently)
+  // legacy UUIDs — resolve against the already-fetched nav the same way the
+  // loader did (cache hit).
+  const via =
+    resolveProjectRouteParam(nav.data, routeProjectId)?.id ?? routeProjectId
+  const workspaceId =
+    resolveWorkspaceRouteParam(nav.data, routeWorkspaceId)?.id ??
+    routeWorkspaceId
   const access = useScopeHomeAccess(workspaceId)
   const scopedWork = useScopeWork(
     workspaceId,

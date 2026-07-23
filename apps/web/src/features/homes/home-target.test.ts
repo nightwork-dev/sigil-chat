@@ -27,34 +27,34 @@ const nav: ProjectWorkspaceNavSummary = {
 }
 
 describe("homeTarget", () => {
-  it("no selection → the personal project home", () => {
+  it("no selection → the personal project home, as its slug", () => {
     expect(
       homeTarget({ projectId: undefined, workspaceId: undefined }, nav),
-    ).toBe("/projects/personal:u1")
+    ).toBe("/projects/personal")
   })
 
-  it("project only → that project home", () => {
+  it("project only → that project home, as its slug", () => {
     expect(
       homeTarget({ projectId: "project:brand", workspaceId: undefined }, nav),
-    ).toBe("/projects/project:brand")
+    ).toBe("/projects/brand")
   })
 
-  it("workspace in its canonical project → nested canonical workspace home", () => {
+  it("workspace in its canonical project → nested canonical workspace home, both as slugs", () => {
     expect(
       homeTarget(
         { projectId: "project:brand", workspaceId: "workspace:holiday" },
         nav,
       ),
-    ).toBe("/projects/project:brand/workspaces/workspace:holiday")
+    ).toBe("/projects/brand/workspaces/holiday")
   })
 
-  it("workspace entered via a non-owner project → that project is the path prefix", () => {
+  it("workspace entered via a non-owner project → that project is the path prefix, as its slug", () => {
     expect(
       homeTarget(
         { projectId: "project:commerce", workspaceId: "workspace:holiday" },
         nav,
       ),
-    ).toBe("/projects/project:commerce/workspaces/workspace:holiday")
+    ).toBe("/projects/commerce/workspaces/holiday")
   })
 
   it("workspace whose canonical home is hidden → entered-via project still the path prefix", () => {
@@ -67,7 +67,7 @@ describe("homeTarget", () => {
         { projectId: "project:commerce", workspaceId: "workspace:holiday" },
         hiddenNav,
       ),
-    ).toBe("/projects/project:commerce/workspaces/workspace:holiday")
+    ).toBe("/projects/commerce/workspaces/holiday")
   })
 
   it("a workspace that vanished from the visible nav falls back to the project home", () => {
@@ -76,6 +76,6 @@ describe("homeTarget", () => {
         { projectId: "project:brand", workspaceId: "workspace:gone" },
         nav,
       ),
-    ).toBe("/projects/project:brand")
+    ).toBe("/projects/brand")
   })
 })
