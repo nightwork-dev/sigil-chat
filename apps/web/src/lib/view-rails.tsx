@@ -12,9 +12,9 @@
 //
 // Declaration (in a route file):
 //
-//   export const Route = createFileRoute("/_app/chat")({
-//     staticData: { rail: { top: ChatRailTop, chords: [...] } },
-//     component: AppChat,
+//   export const Route = createFileRoute("/_app/skills")({
+//     staticData: { rail: { top: ManagementTabs } },
+//     component: SkillsManager,
 //   })
 
 import type { ComponentType } from "react"

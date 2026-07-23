@@ -4,10 +4,11 @@
 //   apps/web/src/routes/_app.tsx                                    — one-rail product shell, breadcrumb bar, theme picker
 //   apps/web/src/routes/_app/projects/$projectId/route.tsx          — project layout, renders <Outlet/>
 //   apps/web/src/routes/_app/projects/$projectId/sessions/$threadId.tsx — THIS FILE
-// Content: SessionHome for a project-level (workspace-less) session — owned
-// session output and explicitly linked durable commitments. The containing
-// project is the path prefix; there is no workspace ancestor, so no
-// "Shared from" ownership cue ever applies here (mirrors the prior
+// Content: the session surface for a project-level (workspace-less) session
+// (SC.10 §3.1/§6 step 8) — a constrained conversation column beside the
+// SessionHome rail (produced artifacts, linked commitments, live attention).
+// The containing project is the path prefix; there is no workspace ancestor,
+// so no "Shared from" ownership cue ever applies here (mirrors the prior
 // workspace-less-thread behavior at /sessions/$threadId with no `via`).
 // Loader: warms the thread, its commitments, artifacts, and home signals.
 
@@ -25,8 +26,8 @@ import {
   liveWorkSource,
   routeSources,
 } from "@/features/homes/live-sources"
-import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
+import { SessionChatSurface } from "@/components/agent/session-chat-surface"
 import {
   sessionCommitmentsQueryOptions,
   useSessionCommitments,
@@ -136,5 +137,7 @@ function ProjectSessionHomeRoute() {
     artifactScope,
   ])
 
-  return <SessionHome state={state} compact={compact} />
+  return (
+    <SessionChatSurface compact={compact} railState={state} threadId={threadId} />
+  )
 }

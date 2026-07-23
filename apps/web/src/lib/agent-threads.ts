@@ -305,12 +305,16 @@ export function useAgentThread(id: string | undefined, enabled = true) {
   return useQuery(agentThreadQueryOptions(principalId, id, enabled));
 }
 
-export function useActiveAgentThreadPreference() {
-  const principalId = useAgentPrincipalId();
-  return useQuery({
+export function activeAgentThreadPreferenceQueryOptions(principalId: string) {
+  return queryOptions({
     queryKey: agentThreadKeys.preference(principalId),
     queryFn: () => getActiveAgentThreadPreferenceFn(),
   });
+}
+
+export function useActiveAgentThreadPreference() {
+  const principalId = useAgentPrincipalId();
+  return useQuery(activeAgentThreadPreferenceQueryOptions(principalId));
 }
 
 export function useSetActiveContainer() {
