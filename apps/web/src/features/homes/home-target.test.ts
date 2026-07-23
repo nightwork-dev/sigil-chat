@@ -9,13 +9,14 @@ import { homeTarget } from "./home-target"
 const nav: ProjectWorkspaceNavSummary = {
   personalProjectId: "personal:u1",
   projects: [
-    { id: "personal:u1", name: "Personal", description: "" },
-    { id: "project:brand", name: "Brand", description: "" },
-    { id: "project:commerce", name: "Commerce", description: "" },
+    { id: "personal:u1", slug: "personal", name: "Personal", description: "" },
+    { id: "project:brand", slug: "brand", name: "Brand", description: "" },
+    { id: "project:commerce", slug: "commerce", name: "Commerce", description: "" },
   ],
   workspaces: [
     {
       id: "workspace:holiday",
+      slug: "holiday",
       projectId: "project:brand",
       mountedProjectIds: ["project:commerce"],
       name: "Holiday Launch",

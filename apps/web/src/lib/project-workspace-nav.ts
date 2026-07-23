@@ -8,12 +8,19 @@ export interface ProjectWorkspaceNavSummary {
   personalProjectId: string;
   projects: Array<{
     id: string;
+    /** Short, immutable, URL-friendly alias for `id` (container slugs).
+     *  Display/routing only — `id` remains the scope key everywhere
+     *  authorization is concerned; resolve slug→id at the route boundary
+     *  before any scope-keyed query fires, never pass this through. */
+    slug: string;
     name: string;
     description: string;
     icon?: string;
   }>;
   workspaces: Array<{
     id: string;
+    /** See projects[].slug — same contract. */
+    slug: string;
     /** Present only when the canonical project is visible to this principal. */
     projectId?: string;
     mountedProjectIds: string[];
@@ -35,12 +42,14 @@ const loadProjectWorkspaceNavFn = createServerFn({ method: "GET" }).handler(
       personalProjectId: nav.personalProjectId,
       projects: nav.projects.map((project) => ({
         id: project.id,
+        slug: project.slug ?? project.id,
         name: project.name,
         description: project.description,
         icon: project.icon,
       })),
       workspaces: nav.workspaces.map((workspace) => ({
         id: workspace.id,
+        slug: workspace.slug ?? workspace.id,
         ...(nav.projects.some(
           (project) =>
             project.id === (workspace.homeScopeId ?? workspace.projectId),

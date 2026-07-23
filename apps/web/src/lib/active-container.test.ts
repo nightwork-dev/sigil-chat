@@ -16,11 +16,12 @@ describe("resolveActiveContainerSelection", () => {
       {
         personalProjectId: "project-a",
         projects: [
-          { id: "project-a", name: "Project A", description: "" },
+          { id: "project-a", slug: "project-a", name: "Project A", description: "" },
         ],
         workspaces: [
           {
             id: "workspace-b",
+            slug: "direct-grant",
             name: "Direct grant",
             description: "",
             mountedProjectIds: [],
