@@ -10,12 +10,16 @@ import type { KvStore } from "@gonk/store/types"
 
 import {
   RegistryRevisionConflictError,
+  isNonEmptySlug,
+  kebabCase,
+  randomSlugSuffix,
   type ProjectRegistry,
   type RegistryUpsertOptions,
   withRegistryRecordLock,
 } from "./project-registry"
 
 const WORKSPACE_NAMESPACE = "sigil-chat.workspaces.v1"
+const MAX_SLUG_MINT_ATTEMPTS = 10
 
 export type WorkspaceStatus = "active" | "archived"
 
@@ -33,6 +37,19 @@ export interface Workspace {
   readonly description: string
   /** Visual identity in the chrome (see Project.icon). */
   readonly icon?: string
+  /**
+   * Short, immutable, URL-friendly alias for `id` — kebab-case of `name` at
+   * mint time, suffixed with a short base36 tag only on collision. Globally
+   * unique across every workspace (some resolution paths — e.g. the shallow
+   * /workspaces/$id resolver — have no project prefix to scope collisions
+   * within). Display/routing alias ONLY: `id` remains the scope key
+   * everywhere authorization is concerned. Minted once and never
+   * regenerated, including across a rename. Optional in the type (matches
+   * `revision?`/`homeScopeId?`) because a pre-migration record may not have
+   * one yet; `normalize()` backfills it, same idiom as this file's existing
+   * homeScopeId/revision backfill.
+   */
+  readonly slug?: string
   readonly status: WorkspaceStatus
   readonly createdAt: string
   readonly createdBy: string
@@ -119,6 +136,11 @@ export class WorkspaceRegistry {
       assertExpectedRevision(normalized.id, current, options.expectedRevision)
       const next = {
         ...normalized,
+        // Immutable once minted: an existing record's slug can never change
+        // via upsert, regardless of what the caller's payload carries —
+        // enforced here (registry level), not only by the tool-handler
+        // policy in containers.ts, so this holds for every caller.
+        ...(isNonEmptySlug(current?.slug) ? { slug: current.slug } : {}),
         revision:
           options.expectedRevision !== undefined
             ? (current?.revision ?? 0) + 1
@@ -135,16 +157,69 @@ export class WorkspaceRegistry {
     })
   }
 
+  /** Resolves a workspace by its immutable slug. Global across every
+   *  workspace — some resolution paths (the shallow /workspaces/$id
+   *  resolver) have no project prefix to scope collisions within. */
+  getBySlug(slug: string): Workspace | undefined {
+    const normalizedSlug = slug.trim().toLowerCase()
+    if (!normalizedSlug) return undefined
+    for (const { key, value } of this.workspaces.entries()) {
+      if (!isStoredWorkspace(value) || value.id !== key) continue
+      const workspace = this.normalize(value)
+      if (workspace.slug === normalizedSlug) return workspace
+    }
+    return undefined
+  }
+
+  /** The route-boundary resolver (container slugs): tries the exact id
+   *  lookup first (an id and a slug never collide as KV keys), then falls
+   *  back to slug resolution. Callers redirect to `.slug` when it differs
+   *  from what was requested. */
+  resolveByRouteParam(candidate: string): Workspace | undefined {
+    const trimmed = candidate.trim()
+    if (!trimmed) return undefined
+    return this.get(trimmed) ?? this.getBySlug(trimmed)
+  }
+
   private normalize(workspace: StoredWorkspace): NormalizedWorkspace {
     const normalized = normalizeWorkspace(workspace)
-    const versioned = { ...normalized, revision: workspace.revision ?? 1 }
+    const needsSlug = !isNonEmptySlug(normalized.slug)
+    const versioned = {
+      ...normalized,
+      revision: workspace.revision ?? 1,
+      ...(needsSlug
+        ? { slug: this.mintUniqueSlug(normalized.name, normalized.id) }
+        : { slug: normalized.slug!.trim().toLowerCase() }),
+    }
     if (
       workspace.homeScopeId === undefined ||
-      workspace.revision === undefined
+      workspace.revision === undefined ||
+      needsSlug
     ) {
       this.workspaces.set(versioned.id, clone(versioned))
     }
     return clone(versioned)
+  }
+
+  /** Kebab-case of `name`, uniquified with a short base36 suffix only on
+   *  collision. `excludeId` skips the record being normalized itself. */
+  private mintUniqueSlug(name: string, excludeId: string): string {
+    const base = kebabCase(name) || "workspace"
+    const existing = new Set(
+      this.workspaces
+        .entries()
+        .filter(({ key }) => key !== excludeId)
+        .map(({ value }) => (isStoredWorkspace(value) ? value.slug : undefined))
+        .filter((slug): slug is string => isNonEmptySlug(slug)),
+    )
+    if (!existing.has(base)) return base
+    for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
+      const candidate = `${base}-${randomSlugSuffix()}`
+      if (!existing.has(candidate)) return candidate
+    }
+    throw new Error(
+      `Could not mint a unique slug for workspace ${excludeId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
+    )
   }
 }
 
@@ -166,6 +241,7 @@ function isStoredWorkspace(value: unknown): value is StoredWorkspace {
     isIdentifier(value.name) &&
     typeof value.description === "string" &&
     (value.icon === undefined || typeof value.icon === "string") &&
+    (value.slug === undefined || typeof value.slug === "string") &&
     (value.status === "active" || value.status === "archived") &&
     isIdentifier(value.createdAt) &&
     isIdentifier(value.createdBy) &&
@@ -180,6 +256,7 @@ const workspaceKeys = [
   "name",
   "description",
   "icon",
+  "slug",
   "status",
   "createdAt",
   "createdBy",

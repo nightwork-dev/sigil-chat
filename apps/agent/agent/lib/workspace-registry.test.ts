@@ -30,7 +30,8 @@ const workspace: Workspace = {
   createdBy: "user-owner",
 }
 
-const versionedWorkspace = { ...workspace, revision: 1 }
+// Container slugs: normalize() backfills a kebab-of-name slug on first read.
+const versionedWorkspace = { ...workspace, revision: 1, slug: "workspace-one" }
 
 afterEach(async () => {
   await Promise.all(
@@ -197,6 +198,66 @@ describe("WorkspaceRegistry", () => {
         projects,
       }).get(workspace.id),
     ).toEqual(winners[0].value)
+  })
+
+  describe("container slugs", () => {
+    function freshStore() {
+      const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+      projects.upsert(project)
+      return new WorkspaceRegistry({ projects, store: memoryKv(new Map()) })
+    }
+
+    it("mints a kebab-of-name slug on create", () => {
+      const store = freshStore()
+      const created = store.upsert(workspace)
+
+      expect(created.slug).toBe("workspace-one")
+    })
+
+    it("lazily backfills a slug for a pre-migration record on read, and persists it", () => {
+      const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+      projects.upsert(project)
+      const values = new Map<string, unknown>([[workspace.id, workspace]])
+      const store = new WorkspaceRegistry({ projects, store: memoryKv(values) })
+      expect(values.get(workspace.id)).not.toHaveProperty("slug")
+
+      const read = store.get(workspace.id)
+
+      expect(read?.slug).toBe("workspace-one")
+      expect(values.get(workspace.id)).toMatchObject({ slug: "workspace-one" })
+    })
+
+    it("suffixes a colliding kebab slug and never regenerates it on update", () => {
+      const store = freshStore()
+      const first = store.upsert(workspace)
+      const second = store.upsert({
+        ...workspace,
+        id: "workspace-2",
+        name: "Workspace One", // Same name — kebab collides with `first`.
+      })
+
+      expect(first.slug).toBe("workspace-one")
+      expect(second.slug).toMatch(/^workspace-one-[0-9a-z]{4}$/)
+
+      // Immutable across a rename, even if the caller's payload tries to
+      // change or drop it — the registry preserves the current slug.
+      const renamed = store.upsert(
+        { ...second, name: "Totally Different Name", slug: undefined },
+        { expectedRevision: second.revision },
+      )
+      expect(renamed.slug).toBe(second.slug)
+    })
+
+    it("resolves a workspace by slug, and by id-or-slug at the route boundary", () => {
+      const store = freshStore()
+      const created = store.upsert(workspace)
+
+      expect(store.getBySlug("workspace-one")?.id).toBe(created.id)
+      expect(store.getBySlug("no-such-slug")).toBeUndefined()
+      expect(store.resolveByRouteParam(created.id)?.slug).toBe("workspace-one")
+      expect(store.resolveByRouteParam("workspace-one")?.id).toBe(created.id)
+      expect(store.resolveByRouteParam("nothing-here")).toBeUndefined()
+    })
   })
 })
 
