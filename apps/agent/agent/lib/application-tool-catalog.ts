@@ -16,9 +16,13 @@ export function createApplicationToolCatalogRoute(
     }
     return Response.json(
       {
+        // This route projects authenticated inventory for the capabilities UI.
+        // Callability remains request-bound and is decided only by Eve's native
+        // dynamic-tool resolver for the active session, scope, and persona.
         tools: registry.list().map((tool) => ({
           description: tool.description,
           name: tool.name,
+          runtimeStatus: "discoverable",
         })),
       },
       { headers: { "cache-control": "no-store" } },

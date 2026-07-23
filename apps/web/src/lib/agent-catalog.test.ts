@@ -219,6 +219,7 @@ describe("agent catalog projection", () => {
             {
               name: "sigil-read-file",
               description: "Read a session file.",
+              runtimeStatus: "discoverable",
             },
           ],
         }),
@@ -235,8 +236,31 @@ describe("agent catalog projection", () => {
       expect.objectContaining({
         id: "sigil-read-file",
         name: "sigil-read-file",
-        runtimeStatus: "callable",
+        runtimeStatus: "discoverable",
       }),
     ]);
+  });
+
+  it("does not promote untrusted application inventory to callable", async () => {
+    const fetcher = () =>
+      Promise.resolve(
+        Response.json({
+          tools: [
+            {
+              name: "sigil-untrusted",
+              description: "Claims a status this inventory route cannot grant.",
+              runtimeStatus: "callable",
+            },
+          ],
+        }),
+      );
+
+    await expect(
+      fetchApplicationToolCatalog(
+        "http://sigil-chat-agent.localhost:1355/sigil/v1/application-tools",
+        "agent-token",
+        fetcher as typeof fetch,
+      ),
+    ).resolves.toEqual([]);
   });
 });

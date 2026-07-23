@@ -16,7 +16,7 @@ describe("application tool catalog route", () => {
     expect(response.status).toBe(401)
   })
 
-  it("projects neutral application tool metadata", async () => {
+  it("projects authenticated inventory without claiming request-bound callability", async () => {
     const registry = new ToolRegistry()
     registry.register({
       name: "sigil-example",
@@ -48,6 +48,7 @@ describe("application tool catalog route", () => {
         {
           description: "Example application tool",
           name: "sigil-example",
+          runtimeStatus: "discoverable",
         },
       ],
     })

@@ -38,7 +38,7 @@ export interface AgentToolCatalogItem {
   description: string;
   origin: "application";
   availability: "available";
-  runtimeStatus: "callable";
+  runtimeStatus: "discoverable";
 }
 
 export interface AgentRuntimeToolCatalogItem {
@@ -193,6 +193,7 @@ const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
 interface ApplicationToolInfo {
   name?: unknown;
   description?: unknown;
+  runtimeStatus?: unknown;
 }
 
 export async function fetchApplicationToolCatalog(
@@ -224,7 +225,7 @@ export async function fetchApplicationToolCatalog(
     if (typeof candidate !== "object" || candidate === null) return [];
     const tool = candidate as ApplicationToolInfo;
     const name = stringValue(tool.name, "");
-    if (!name) return [];
+    if (!name || tool.runtimeStatus !== "discoverable") return [];
     return [
       {
         id: name,
@@ -232,7 +233,9 @@ export async function fetchApplicationToolCatalog(
         description: stringValue(tool.description, "Application tool"),
         origin: "application" as const,
         availability: "available" as const,
-        runtimeStatus: "callable" as const,
+        // Inventory is useful for explaining capabilities, but only Eve's
+        // request-bound resolver can decide whether this tool is callable now.
+        runtimeStatus: "discoverable" as const,
       },
     ];
   });

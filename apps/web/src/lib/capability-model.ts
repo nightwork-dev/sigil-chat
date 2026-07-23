@@ -229,7 +229,7 @@ function applicationToolItem(
     description: tool.description,
     source: "Application tool",
     scope: scopeForApplicationTool(tool.name),
-    availability: "Available",
+    availability: "Discoverable",
     consent: consentForApplicationTool(tool, defaultMode, overrides),
   }
 }

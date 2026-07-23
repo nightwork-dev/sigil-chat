@@ -69,7 +69,7 @@ const catalog: AgentCatalog = {
       description: "Generate a new image.",
       origin: "application",
       availability: "available",
-      runtimeStatus: "callable",
+      runtimeStatus: "discoverable",
     },
     {
       id: "sigil-review-inspect",
@@ -77,7 +77,7 @@ const catalog: AgentCatalog = {
       description: "Inspect a review document.",
       origin: "application",
       availability: "available",
-      runtimeStatus: "callable",
+      runtimeStatus: "discoverable",
     },
   ],
   management: {
@@ -105,6 +105,7 @@ describe("capability presentation model", () => {
       expect.objectContaining({
         name: "Generate Image",
         source: "Application tool",
+        availability: "Discoverable",
         consent: "Runs without a prompt",
       }),
     ])
