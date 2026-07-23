@@ -51,7 +51,14 @@ export function SessionChatSurface({
   railState,
   compact = false,
 }: {
-  threadId: string
+  /**
+   * The thread's CANONICAL id, not the route's raw (possibly-slug) param —
+   * setActiveThread's server fn does an exact id lookup, it doesn't resolve
+   * slugs (only agentThreadQueryOptions/getAgentThreadFn does, at the
+   * boundary). Undefined while the route's own thread query hasn't resolved
+   * yet; the sync effect below simply waits.
+   */
+  threadId: string | undefined
   railState: HomeState<SessionHomeView>
   compact?: boolean
 }) {
@@ -63,14 +70,16 @@ export function SessionChatSurface({
 
   useEffect(() => {
     if (
+      threadId &&
       preference.data &&
       preference.data.activeThreadId !== threadId &&
       !setActiveThread.isPending
     ) {
       setActiveThread.mutate({ id: threadId })
     }
-    // Only re-sync when the route's thread or the resolved preference
-    // change — setActiveThread is a stable mutation object, not a dependency.
+    // Only re-sync when the route's canonical thread id or the resolved
+    // preference change — setActiveThread is a stable mutation object, not a
+    // dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, preference.data?.activeThreadId])
 

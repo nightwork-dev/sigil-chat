@@ -56,10 +56,14 @@ export function ContainerBreadcrumb() {
   )
 
   const nav = liveNav.data
-  const sessionThreadId = sessionMatch
+  // The route param — canonically a slug now (session slugs, SC.10); may be
+  // a legacy UUID transiently, right before the route's own redirect fires.
+  // useAgentThread resolves either transparently.
+  const sessionRouteParam = sessionMatch
     ? (sessionMatch.params as { threadId: string }).threadId
     : undefined
-  const liveSession = useAgentThread(sessionThreadId, Boolean(sessionMatch))
+  const liveSession = useAgentThread(sessionRouteParam, Boolean(sessionMatch))
+  const sessionSlug = liveSession.data?.slug ?? sessionRouteParam
 
   // Not a container-scoped route at all (principal-level surfaces, /chat,
   // /home) — the segment omits itself.
@@ -88,10 +92,10 @@ export function ContainerBreadcrumb() {
   const workspaceHomeHref = workspaceId
     ? `/projects/${projectId}/workspaces/${workspaceId}`
     : undefined
-  const sessionHomeHref = sessionThreadId
+  const sessionHomeHref = sessionSlug
     ? workspaceId
-      ? `/projects/${projectId}/workspaces/${workspaceId}/sessions/${sessionThreadId}`
-      : `/projects/${projectId}/sessions/${sessionThreadId}`
+      ? `/projects/${projectId}/workspaces/${workspaceId}/sessions/${sessionSlug}`
+      : `/projects/${projectId}/sessions/${sessionSlug}`
     : undefined
 
   // Sibling sessions for the session switcher: within a workspace, other
@@ -122,16 +126,16 @@ export function ContainerBreadcrumb() {
     })
   }
 
-  const selectSession = (nextThreadId: string) => {
+  const selectSession = (nextSlug: string) => {
     if (workspaceId) {
       void navigate({
         to: "/projects/$projectId/workspaces/$workspaceId/sessions/$threadId",
-        params: { projectId, workspaceId, threadId: nextThreadId },
+        params: { projectId, workspaceId, threadId: nextSlug },
       })
     } else {
       void navigate({
         to: "/projects/$projectId/sessions/$threadId",
-        params: { projectId, threadId: nextThreadId },
+        params: { projectId, threadId: nextSlug },
       })
     }
   }
@@ -182,7 +186,7 @@ export function ContainerBreadcrumb() {
         </>
       ) : null}
 
-      {sessionMatch && sessionThreadId ? (
+      {sessionMatch && sessionSlug ? (
         <>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -192,8 +196,8 @@ export function ContainerBreadcrumb() {
               items={siblingSessions.map((thread) => ({
                 id: thread.id,
                 label: thread.title,
-                active: thread.id === sessionThreadId,
-                onSelect: () => selectSession(thread.id),
+                active: thread.slug === sessionSlug,
+                onSelect: () => selectSession(thread.slug),
               }))}
             />
           </BreadcrumbItem>
