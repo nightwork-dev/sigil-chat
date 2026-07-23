@@ -6,7 +6,12 @@ It is not a deployment kit. It intentionally uses `.invalid` for the public
 host and local `:spec-only` image names.
 
 The base file defines the one-public-origin topology and hardening contract.
-Select exactly one model-auth overlay:
+These two overlays remain narrow credential-isolation fixtures, so select
+exactly one when rendering them. They do not model the later owner-managed,
+multi-provider runtime in
+[`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](../../MODEL-ADMINISTRATION-AND-USAGE-SPEC.md);
+the production fixture must be revised before that runtime can claim its remote
+deployment proof.
 
 ```bash
 docker compose \
