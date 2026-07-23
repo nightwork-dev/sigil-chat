@@ -1,4 +1,9 @@
-import { useCallback, useState, type ReactNode } from "react"
+import {
+  useCallback,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react"
 import { AlertTriangleIcon, WrenchIcon } from "lucide-react"
 
 import {
@@ -35,17 +40,21 @@ import {
 } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { AddMenu } from "@/components/agent/add-menu"
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
+import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
+import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
   AGENT_SCOPE_HEADER,
   sessionResourceScope,
 } from "@/lib/agent-session-scope"
 import type { ToolApprovalMode } from "@/lib/agent-tool-approval"
+import { isAtWordBoundary } from "@/lib/mention-trigger"
 
 export interface AgentChatProps {
   session?: AgentRuntimeSession
@@ -83,6 +92,8 @@ export function AgentChat({
   const threadControls = useAgentThreadControls()
   const [input, setInput] = useState("")
   const busy = isAgentSessionBusy(session)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const blackboardContainers = useActiveThreadContainers()
 
   const uploadAttachment = useUploadAgentAttachment()
   const activeSessionScope =
@@ -112,6 +123,31 @@ export function AgentChat({
   const handleAttachUrl = useCallback(
     (url: string) => addUrl(url, { mediaType: imageMediaTypeFromUrl(url) }),
     [addUrl],
+  )
+
+  const handleAttachResource = useCallback(
+    (candidate: WorkspaceResourceCandidate) =>
+      addUrl(candidate.url, {
+        mediaType: candidate.mediaType,
+        filename: candidate.filename,
+        size: candidate.size,
+      }),
+    [addUrl],
+  )
+
+  // §9.8(c) — `@` at a word boundary opens the same Add menu the ＋ trigger
+  // does (one popover, two triggers). We don't preventDefault: the `@`
+  // still lands in the text normally, since this composer's a plain
+  // textarea with no inline mention-chip rendering to replace it with.
+  const handleComposerKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key !== "@") return
+      const cursor = e.currentTarget.selectionStart
+      if (isAtWordBoundary(e.currentTarget.value, cursor)) {
+        setAddMenuOpen(true)
+      }
+    },
+    [],
   )
 
   const handleSend = useCallback(async () => {
@@ -227,9 +263,28 @@ export function AgentChat({
         disabled={session.status === "error" || attachmentsUploading}
         isStreaming={busy}
         leadingControls={
-          hideHeader && showApprovalMode && approvalMode && onApprovalModeChange
-            ? () => (
-                <ApprovalChip mode={approvalMode} onChange={onApprovalModeChange} />
+          hideHeader
+            ? (controls) => (
+                <>
+                  {threadControls?.activeThreadId ? (
+                    <AddMenu
+                      artifactScope={activeResourceScope}
+                      onAttachResource={handleAttachResource}
+                      onOpenChange={setAddMenuOpen}
+                      open={addMenuOpen}
+                      openFilePicker={controls.openFilePicker}
+                      projectId={blackboardContainers?.projectId}
+                      sessionId={threadControls.activeThreadId}
+                      workspaceId={blackboardContainers?.workspaceId}
+                    />
+                  ) : null}
+                  {showApprovalMode && approvalMode && onApprovalModeChange ? (
+                    <ApprovalChip
+                      mode={approvalMode}
+                      onChange={onApprovalModeChange}
+                    />
+                  ) : null}
+                </>
               )
             : undefined
         }
@@ -237,6 +292,7 @@ export function AgentChat({
         onAttach={addFiles}
         onAttachUrl={handleAttachUrl}
         onChange={setInput}
+        onKeyDown={handleComposerKeyDown}
         onRemoveAttachment={removeAttachment}
         onSend={handleSend}
         onStop={session.stop}
