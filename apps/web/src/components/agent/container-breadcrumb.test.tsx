@@ -14,13 +14,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import { fixtureNav, NORTHSTAR } from "@/features/homes/fixtures"
-
-import {
-  ContainerMenu,
-  parseHomeRoute,
-  resolveHomeBreadcrumbSelection,
-} from "./container-breadcrumb"
+import { ContainerMenu } from "./container-breadcrumb"
 
 beforeAll(() => {
   ;(
@@ -85,55 +79,10 @@ describe("ContainerMenu split control", () => {
   })
 })
 
-describe("home route breadcrumb selection", () => {
-  it("uses the project encoded by a project-home route", () => {
-    const route = parseHomeRoute(`/projects/${NORTHSTAR.commerce}`)
-    expect(route).toEqual({ kind: "project", projectId: NORTHSTAR.commerce })
-    expect(
-      resolveHomeBreadcrumbSelection({ route: route!, nav: fixtureNav }),
-    ).toEqual({ projectId: NORTHSTAR.commerce })
-  })
-
-  it("preserves a visible mounted-in perspective", () => {
-    const route = parseHomeRoute(`/workspaces/${NORTHSTAR.holidayLaunch}`)
-    expect(
-      resolveHomeBreadcrumbSelection({
-        route: route!,
-        nav: fixtureNav,
-        viaProjectId: NORTHSTAR.commerce,
-      }),
-    ).toEqual({
-      projectId: NORTHSTAR.commerce,
-      workspaceId: NORTHSTAR.holidayLaunch,
-    })
-  })
-
-  it("rejects a hidden or structurally invalid via project", () => {
-    const route = parseHomeRoute(`/workspaces/${NORTHSTAR.holidayLaunch}`)
-    expect(
-      resolveHomeBreadcrumbSelection({
-        route: route!,
-        nav: fixtureNav,
-        viaProjectId: "project:hidden",
-      }),
-    ).toEqual({
-      projectId: NORTHSTAR.brand,
-      workspaceId: NORTHSTAR.holidayLaunch,
-    })
-  })
-
-  it("derives a session breadcrumb from its owned workspace", () => {
-    const route = parseHomeRoute(`/sessions/${NORTHSTAR.draftOffers}`)
-    expect(
-      resolveHomeBreadcrumbSelection({
-        route: route!,
-        nav: fixtureNav,
-        viaProjectId: NORTHSTAR.commerce,
-        sessionWorkspaceId: NORTHSTAR.holidayLaunch,
-      }),
-    ).toEqual({
-      projectId: NORTHSTAR.commerce,
-      workspaceId: NORTHSTAR.holidayLaunch,
-    })
-  })
-})
+// Breadcrumb chain derivation (SC.10 §4/§5: matched-route container
+// descriptors, not `?via=` parsing) is exercised end-to-end by the nested
+// route tree itself — see the home route tests under features/homes/ — and
+// by the ContainerBreadcrumb component reading useMatches() directly, which
+// requires a real matched router rather than the bare RootRoute harness
+// above. No unit-level parse/resolve helpers remain in this module to test
+// in isolation now that the via-path reconstruction is gone.
