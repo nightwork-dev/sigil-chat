@@ -322,6 +322,41 @@ home header), now driven by `canonicalOwnerId ≠ enteredViaId` from context.
 Mobile: the breadcrumb truncates to focus + one level up with the rest in
 overflow (SC.7 rule, preserved); the three-level spine does not add a row.
 
+### 5.1 No tautological home leaf (owner demo call)
+
+When the current location is a container's **own** home (project root, workspace
+root), the container-name crumb is the **terminal** crumb — no "Project Home" /
+"Workspace Home" leaf is appended. `Commerce Platform › Project Home` becomes
+just `Commerce Platform`: the container crumb already *is* the home, so the leaf
+is a constant-value label (design language: a label that never changes is
+decoration, not information). The leaf crumb appears **only when it names a
+distinct child location** — a session under a workspace, e.g.
+`Commerce Platform › Holiday Launch › <session title>`.
+
+This is a **clean drop** — nothing functional rode on the leaf, and it's a
+legibility *gain*, verified against §5 and §9:
+
+- **The switcher never lived on the leaf.** The sibling-switcher chevron is on
+  the *container* crumbs (`ContainerMenu` — project, workspace), not on the
+  terminal page label (`useContainerBreadcrumbPage`'s "Project Home"/"Workspace
+  Home"/"Session" text, which is a plain non-interactive `BreadcrumbPage`).
+  Dropping the label removes no affordance; project/workspace switchers stay put.
+- **Presence now carries state.** Leaf absent → you're at this container's own
+  home; leaf present → you're in a named child. That's strictly more legible
+  than a leaf that always says "Home" — it answers "root or child?" that the old
+  tautology couldn't.
+- **Session lateral movement is unaffected.** Session→session switching lives in
+  the persistent session list (§9.2), not this crumb, so the session leaf is a
+  plain title (current-page styling), no switcher needed on it.
+
+Implementation note for the worker: `useContainerBreadcrumbPage()` returns
+`undefined` for a container-own-home location (so the shell appends no page
+crumb), and `ContainerBreadcrumb` renders the **terminal container crumb with
+current-page styling** (`aria-current="page"`) **while keeping its switcher
+chevron** — the crumb is simultaneously "where I am" and "switch siblings." The
+page crumb is supplied only when the leaf names a distinct child (the session
+title).
+
 ## 6. Migration + guardrails
 
 Design decisions are all made here; the steps are plumbing, dispatchable to a
