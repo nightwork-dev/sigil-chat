@@ -77,6 +77,25 @@ describe("ContainerMenu split control", () => {
     expect(el.querySelector("a")).toBeNull()
     expect(el.textContent).toContain("Workspace")
   })
+
+  // §5.1 — a container's own home: the crumb itself is the terminal,
+  // current-page-styled location, but the switcher chevron stays live.
+  it("current renders the label as the page, not a link, while keeping the switcher", async () => {
+    const el = await render(
+      <ContainerMenu
+        current
+        label="Commerce Platform"
+        href="/projects/p1"
+        items={items}
+      />,
+    )
+    expect(el.querySelector("[data-testid='crumb-home-link']")).toBeNull()
+    expect(el.querySelector("a")).toBeNull()
+    const current = el.querySelector("[aria-current='page']")
+    expect(current?.textContent).toContain("Commerce Platform")
+    const trigger = el.querySelector("[aria-label='Switch Commerce Platform']")
+    expect(trigger).toBeTruthy()
+  })
 })
 
 // Breadcrumb chain derivation (SC.10 §4/§5: matched-route container

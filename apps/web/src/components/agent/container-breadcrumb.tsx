@@ -58,6 +58,10 @@ export function ContainerBreadcrumb() {
       m.routeId === PROJECT_SESSION_ROUTE_ID ||
       m.routeId === WORKSPACE_SESSION_ROUTE_ID,
   )
+  // §5.1 — at a container's OWN home (no deeper match), that container's
+  // crumb is the terminal one: current-page styling, switcher chevron kept.
+  const projectIsTerminal = !workspaceMatch && !sessionMatch
+  const workspaceIsTerminal = Boolean(workspaceMatch) && !sessionMatch
 
   const nav = liveNav.data
   // The route param — canonically a slug now (session slugs, SC.10); may be
@@ -169,6 +173,7 @@ export function ContainerBreadcrumb() {
     <>
       <BreadcrumbItem>
         <ContainerMenu
+          current={projectIsTerminal}
           icon={activeProject?.icon}
           label={activeProject?.name ?? "Personal"}
           href={projectHomeHref}
@@ -187,6 +192,7 @@ export function ContainerBreadcrumb() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <ContainerMenu
+              current={workspaceIsTerminal}
               icon={activeWorkspace?.icon}
               label={activeWorkspace?.name ?? "Workspace"}
               href={workspaceHomeHref}
@@ -234,17 +240,29 @@ export function ContainerBreadcrumb() {
   )
 }
 
-export function useContainerBreadcrumbPage(): string | undefined {
+/** §5.1 — three outcomes, not two, because "no override" (`none`, a
+ *  non-container route — let the shell fall back to the nav label) and "no
+ *  leaf, the container crumb is the whole story" (`own-home`) both used to
+ *  collapse to the same `undefined`. That conflation is exactly what made
+ *  "Project Home"/"Workspace Home" render as a tautological label instead
+ *  of disappearing: `_app.tsx` couldn't tell "not container-scoped" from
+ *  "container-scoped, at its own root" from a single optional string. */
+export type ContainerBreadcrumbPage =
+  | { readonly kind: "none" }
+  | { readonly kind: "own-home" }
+  | { readonly kind: "label"; readonly label: string }
+
+export function useContainerBreadcrumbPage(): ContainerBreadcrumbPage {
   const matches = useMatches()
   if (matches.some((m) => m.routeId === PROJECT_SESSION_ROUTE_ID))
-    return "Session"
+    return { kind: "label", label: "Session" }
   if (matches.some((m) => m.routeId === WORKSPACE_SESSION_ROUTE_ID))
-    return "Session"
+    return { kind: "label", label: "Session" }
   if (matches.some((m) => m.routeId === WORKSPACE_ROUTE_ID))
-    return "Workspace Home"
+    return { kind: "own-home" }
   if (matches.some((m) => m.routeId === PROJECT_ROUTE_ID))
-    return "Project Home"
-  return undefined
+    return { kind: "own-home" }
+  return { kind: "none" }
 }
 
 /** Split control: the crumb LABEL navigates to the container's home (SC.7 —
@@ -256,6 +274,7 @@ export function ContainerMenu({
   label,
   href,
   items,
+  current = false,
 }: {
   icon?: string
   label: string
@@ -268,10 +287,26 @@ export function ContainerMenu({
     active: boolean
     onSelect: () => void
   }>
+  /** §5.1 — this crumb IS the current location (a container's own home, no
+   *  deeper match) — render it like `BreadcrumbPage` (current-page styling,
+   *  non-navigable) instead of a link to itself, while keeping the switcher
+   *  chevron below untouched: "where I am" and "switch siblings" stay on
+   *  one control either way. */
+  current?: boolean
 }) {
   return (
     <span className="flex items-center">
-      {href ? (
+      {current ? (
+        <span
+          aria-current="page"
+          aria-disabled="true"
+          role="link"
+          className="flex min-h-11 items-center gap-1 px-1 text-xs font-normal text-foreground md:min-h-0"
+        >
+          {icon ? <span aria-hidden>{icon}</span> : null}
+          <span className="max-w-36 truncate">{label}</span>
+        </span>
+      ) : href ? (
         <Link
           to={href}
           data-testid="crumb-home-link"

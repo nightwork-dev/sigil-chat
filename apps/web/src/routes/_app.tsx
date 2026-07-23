@@ -96,7 +96,12 @@ function AppLayout() {
                   </>
                 }
                 breadcrumbContext={<ContainerBreadcrumb />}
-                breadcrumbPage={breadcrumbPage}
+                breadcrumbPage={
+                  breadcrumbPage.kind === "label"
+                    ? breadcrumbPage.label
+                    : undefined
+                }
+                hideBreadcrumbPage={breadcrumbPage.kind === "own-home"}
                 viewContent={<ViewRailTop />}
                 statusRailStart={<ViewRailStatusStart />}
                 statusRailEnd={
