@@ -130,7 +130,7 @@ function Thing({ className, variant, size, ...props }: React.ComponentProps<"div
 ```
 
 **Compound Root/Parts + Context is mandatory for domain objects** rendered
-in more than one place — this is stated in the root `AGENTS.md` and is
+in more than one place — this is stated in the root `CLAUDE.md` and is
 non-negotiable, not a style preference. Context provides the shared value,
 each part reads what it needs via a `use<Thing>()` hook, and a
 `{ Root, PartA, PartB }` namespace object is the export:
@@ -217,7 +217,7 @@ polymorphism is the `render` prop, not `asChild`. Match it:
 ## Minimize `useEffect` / `useMemo`
 
 - **No `useEffect` for data fetching or derived state** — see root
-  `AGENTS.md`. Legitimate uses: event listeners, DOM measurement,
+  `CLAUDE.md`. Legitimate uses: event listeners, DOM measurement,
   third-party integration, `requestAnimationFrame`/`setInterval` loops,
   cleanup.
 - **Avoid `useMemo` by default.** It's not an organization tool. Compute

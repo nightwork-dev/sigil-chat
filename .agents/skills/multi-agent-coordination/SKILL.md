@@ -10,6 +10,10 @@ Multiple agents work this repo at once — Claude Code sessions, dispatched
 double-works, or ships unverified changes. Read it before starting
 non-trivial work.
 
+Re-read the current roadmap and repository instructions after every completed
+task. Include that requirement in every dispatch brief for a multi-task
+worker; finishing work against stale direction wastes it.
+
 ## Agent roles (stay in your lane)
 
 - **Strategist — strategic coordination.** Ecosystem-wide product direction
@@ -37,6 +41,9 @@ agent's lane without coordinating through the roadmap.
   story with YAML frontmatter + an index. It is NOT git-tracked and is
   shared across every worktree/branch/agent. Do not put stories in a
   worktree's tracked tree.
+- The roadmap store is its own local git repository. Its adapter commits each
+  mutation so shared work status has restorable history independent of every
+  product branch.
 - Every story's frontmatter carries `worktree` (which workstream it belongs
   to) and `epic`. Filter to your own worktree/epic — don't act on another
   stream's stories, and don't be confused by them.
@@ -45,6 +52,16 @@ agent's lane without coordinating through the roadmap.
 - Claim before you work. When you start a story set its `status`
   (`in-progress`) and `assignee`; when done, `verify`/`shipped`. That's how
   another agent knows not to pick it up.
+
+## What belongs where
+
+- Product code and shipped documentation live in this repository.
+- Repo-internal working notes use the existing gitignored local notes home.
+- Roadmap stories live only in `SIGIL_ROADMAP_DIR`.
+- Ecosystem handoffs and strategy use the existing untracked workspace-level
+  notes home.
+- Never create a bespoke coordination directory. Local-only names use
+  `*.local` / `*.local.*` unless the repository is itself local-only.
 
 ## Worktrees + branches
 
@@ -97,6 +114,11 @@ gpt-5.6-luna` at high thinking, or codex doing the equivalent mechanical
 
 - Commit verified work to `dev` as it lands; concern-grouped commits (one
   feature/concern per commit), not a mega-commit.
+- Any story touching components, hooks, or presentation must carry the
+  registry-loop extraction verdict from `building-in-sigil-chat`:
+  `consumed`, `extracted`, `candidate:<X#>` with a real roadmap story, or
+  `app-domain` with the reason. Missing verdict means the story is not ready
+  to merge.
 - One repo per shell call; anchor every call with an absolute `cd`/`git -C`
   (cwd drifts between calls, and this repo has sibling worktrees that are
   easy to confuse with each other).
@@ -115,6 +137,8 @@ gpt-5.6-luna` at high thinking, or codex doing the equivalent mechanical
   transport path. `exec`-tier tools are denied by policy.
 - Sigil-first: generalizable UI belongs in sigil-design first (canonical) +
   a `/showcase` example, then carried into sigil-chat as owned source and
-  consumed. Don't build app-local what the design system should own.
+  consumed. Before authoring, check `packages/ui`, the Sigil Design showcase,
+  and the registry; before closing, record the extraction verdict. Don't build
+  app-local what the design system should own.
 - `SIGIL_AGENT_BINDING_SECRET` is shared only by web and Eve for the private
   verified-principal binding route; it does not authorize tool calls.
