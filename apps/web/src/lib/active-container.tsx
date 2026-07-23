@@ -6,19 +6,20 @@
 // or the active-thread preference directly (container-breadcrumb.tsx,
 // routes/_app/chat.tsx's resolver), never from this provider. This provider
 // is now scoped to two legitimate remaining consumers, neither of which
-// decides what a route renders:
+// reads it back to decide what a route renders:
 // - The `/home` redirect (routes/_app/home.tsx) — "remember where I was"
 //   read, the one place this selection is still authoritative.
-// - shell-omnibar.tsx and the conversation-sheet ProjectWorkspaceNav
-//   (rendered inside AgentChatHeader, now mounted on every session leaf) —
-//   both use it only as a DEFAULT filter for their own project/workspace
-//   picker UI, never to choose a navigation target. Known gap: the omnibar's
-//   "switch workspace" action still calls `go("/chat")` after writing this
-//   provider, but `/chat` now resolves to the app-global ACTIVE THREAD
-//   (independent of this selection) rather than reflecting the just-picked
-//   workspace — selecting a workspace with no thread of its own yet no
-//   longer visibly "switches" via the omnibar. Flagged, not fixed, as part
-//   of the SC.10 step 8 batch; the omnibar's switcher itself is out of scope.
+// - shell-omnibar.tsx's project/workspace switcher and the conversation-sheet
+//   ProjectWorkspaceNav (rendered inside AgentChatHeader, now mounted on
+//   every session leaf). The omnibar's switcher WRITES this provider on
+//   selection (the persist-on-navigate hook below) and then navigates
+//   directly to the picked container's own nested home
+//   (/projects/$projectId or /projects/$projectId/workspaces/$workspaceId —
+//   never through `/chat`, which would land on the app-global active thread
+//   instead of the just-picked container). The conversation-sheet
+//   ProjectWorkspaceNav only READS container.projectId, and only as a
+//   default filter for its own picker UI — never to choose a navigation
+//   target.
 // selectProject/selectWorkspace stay wired as a persist-on-navigate hook so
 // the next `/home` visit lands where the principal last was — writing here
 // is fine; reading it back to decide what a container-scoped route renders
