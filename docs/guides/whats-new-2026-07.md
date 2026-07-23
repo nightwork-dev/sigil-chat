@@ -61,4 +61,6 @@ only under its Gonk volume, copy that `artifacts/` directory into the new shared
 data root before retiring the volume. Managed skills now live under
 `SIGIL_DATA_DIR/skills`; copy any authored skills out of a prior mutable agent
 source tree before retiring it. No browser migration is required; legacy
-`gonk__` approval keys are normalized on read.
+`gonk__` approval keys are normalized on read. Existing thread records with an
+`eve` snapshot field are rewritten once into the schema-versioned neutral
+`runtime` envelope; new writes never recreate the old field.

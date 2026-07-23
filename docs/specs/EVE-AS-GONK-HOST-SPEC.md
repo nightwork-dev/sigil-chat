@@ -141,6 +141,8 @@ This is a deployment migration, not a permanent dual-runtime mode:
   new shared skills root if an existing instance needs them;
 - remove obsolete Gonk URL/key configuration and secret files;
 - provide `SIGIL_AGENT_BINDING_SECRET` to web and Eve;
+- allow the thread repository to rewrite old `eve` snapshot fields once into
+  its schema-versioned `runtime` envelope;
 - install the released lockfile and start the two-service stack.
 
 New tool names are native registry names. Readers normalize legacy persisted

@@ -1,13 +1,13 @@
 // Local-dev seed for exercising product homes through the same durable stores
 // and authorization paths used by the running application.
 
-import type { HandleMessageStreamEvent } from "eve/client"
 import { getSessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { BoardView, Story } from "@workspace/work-items-store/types"
 import { workItemsRepository } from "@workspace/work-items-store"
 
 import { getProjectWorkspaceRegistries } from "../../agent/agent/lib/project-workspace-registries"
 import type { ScopeLinkKind } from "../../agent/agent/lib/scope-graph"
+import type { AgentRuntimeStreamEvent } from "../src/lib/agent-event-retention"
 import { getAuthDbClient } from "../src/lib/auth/server"
 import {
   agentThreadBindingService,
@@ -345,7 +345,7 @@ function ensureThread(input: {
   title: string
   workspaceId: string
   viaProjectId: string
-  events: HandleMessageStreamEvent[]
+  events: AgentRuntimeStreamEvent[]
 }) {
   const existing = agentThreadRepository
     .list(principal.id, true)
@@ -368,7 +368,7 @@ function ensureThread(input: {
   return agentThreadRepository.saveSnapshot(
     principal.id,
     created.id,
-    { session: created.eve.session, events: input.events },
+    { session: created.runtime.session, events: input.events },
     created.revision,
   )
 }
@@ -378,7 +378,7 @@ function completedMessage(
   turnId: string,
   at: string,
   stepIndex = 1,
-): HandleMessageStreamEvent {
+): AgentRuntimeStreamEvent {
   return {
     type: "message.completed",
     data: { finishReason: "stop", message, sequence: 3, stepIndex, turnId },
@@ -392,7 +392,7 @@ function completedAnnotation(
   label: string,
   turnId: string,
   at: string,
-): HandleMessageStreamEvent {
+): AgentRuntimeStreamEvent {
   return {
     type: "action.result",
     data: {

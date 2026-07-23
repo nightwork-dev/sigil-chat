@@ -170,7 +170,7 @@ function ActiveAgentSession({
   const consumeForkSeed = useConsumeAgentThreadForkSeed()
   const renameThread = useRenameAgentThread()
   const eventsRef = useRef<AgentRuntimeStreamEvent[]>([
-    ...agentEventsForReplay(thread.eve.events),
+    ...agentEventsForReplay(thread.runtime.events),
   ])
   const persistence = useRef(
     new AgentSessionPersistenceCoordinator(thread.revision),
@@ -198,7 +198,7 @@ function ActiveAgentSession({
 
   const persistSnapshot = useCallback(
     (
-      session: AgentThread["eve"]["session"],
+      session: AgentThread["runtime"]["session"],
       events: readonly AgentRuntimeStreamEvent[] = eventsRef.current,
     ) => {
       const operation = persistence.current.persist((expectedRevision) =>
@@ -301,8 +301,8 @@ function ActiveAgentSession({
   const eveSession = useEveRuntimeSession({
     ...persistenceCallbacks,
     auth: { bearer: getEveBearerToken },
-    initialEvents: agentEventsForReplay(thread.eve.events),
-    initialSession: thread.eve.session,
+    initialEvents: agentEventsForReplay(thread.runtime.events),
+    initialSession: thread.runtime.session,
     onEvent: handleEvent,
   })
   const turnActive = useRef(false)

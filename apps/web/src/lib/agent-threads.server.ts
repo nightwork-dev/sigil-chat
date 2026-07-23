@@ -58,8 +58,8 @@ export function resolveAgentThreadExecutionBinding(
   return {
     threadId,
     ...thread.executionBinding,
-    ...(thread.eve.session.sessionId
-      ? { eveSessionId: thread.eve.session.sessionId }
+    ...(thread.runtime.session.sessionId
+      ? { eveSessionId: thread.runtime.session.sessionId }
       : {}),
   };
 }

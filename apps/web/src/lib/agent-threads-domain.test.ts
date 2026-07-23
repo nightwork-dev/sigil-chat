@@ -70,7 +70,8 @@ describe("AgentThreadRepository", () => {
       title: "Incident analysis",
     });
 
-    expect(first.eve).toEqual({
+    expect(first.runtime).toEqual({
+      schemaVersion: 1,
       session: { streamIndex: 0 },
       events: [],
       compaction: {
@@ -309,16 +310,16 @@ describe("AgentThreadRepository", () => {
     );
 
     expect(saved.revision).toBe(2);
-    expect(saved.eve.session).toEqual({
+    expect(saved.runtime.session).toEqual({
       continuationToken: "continue-secret",
       sessionId: "eve-session-1",
       streamIndex: 17,
     });
-    expect(saved.eve.events.map((event) => event.type)).toEqual([
+    expect(saved.runtime.events.map((event) => event.type)).toEqual([
       "message.received",
       "message.completed",
     ]);
-    expect(saved.eve.compaction).toEqual({
+    expect(saved.runtime.compaction).toEqual({
       policyVersion: "sigil-chat-event-retention-v2",
       firstRetainedStreamIndex: 0,
       omittedEventCount: 1,
@@ -513,7 +514,8 @@ describe("AgentThreadRepository", () => {
     expect(fork.forkedFrom).toBe(source.id);
     expect(fork.personaId).toBe(source.personaId);
     expect(fork.executionBinding).toEqual(source.executionBinding);
-    expect(fork.eve).toEqual({
+    expect(fork.runtime).toEqual({
+      schemaVersion: 1,
       session: { streamIndex: 0 },
       events: [],
       compaction: {
@@ -680,6 +682,8 @@ describe("AgentThreadRepository", () => {
       userId: USER_A,
     });
     expect(repo.get(USER_A, "legacy")?.members).toEqual([USER_A]);
+    expect(repo.get(USER_A, "legacy")?.runtime.schemaVersion).toBe(1);
+    expect(threads.get("thread:legacy")).not.toHaveProperty("eve");
     expect(repo.getActivePreference(USER_A).activeThreadId).toBe("legacy");
     expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
       claimedPreferences: 0,

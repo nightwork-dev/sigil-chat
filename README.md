@@ -242,10 +242,11 @@ or stream access when the persisted session owner differs from the verified
 subject. The current agent
 catalog projection is read-only and removes host filesystem paths.
 
-Persisted Eve snapshots currently include the event projection and a resumable
-continuation token. They are acceptable only under this local trust model. The
-required retention, redaction, secret-storage, and owner-scoped resume contract
-is tracked in
+Persisted agent-thread runtime envelopes are Sigil-owned and schema-versioned;
+the `@zigil/agent-eve` adapter translates their event projection for Eve.
+Those envelopes still include a resumable continuation token and are acceptable
+only under this local trust model. The required retention, redaction,
+secret-storage, and owner-scoped resume contract is tracked in
 [`docs/specs/AGENT-SESSION-RETENTION-ISSUE.md`](docs/specs/AGENT-SESSION-RETENTION-ISSUE.md).
 
 Add application tools in [`packages/agent-tools/src`](packages/agent-tools/src).

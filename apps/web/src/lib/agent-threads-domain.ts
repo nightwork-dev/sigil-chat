@@ -59,7 +59,8 @@ export interface AgentThread {
   updatedAt: string;
   status: AgentThreadStatus;
   revision: number;
-  eve: {
+  runtime: {
+    schemaVersion: 1;
     session: AgentRuntimeSessionState;
     events: PersistedAgentEvent[];
     compaction: AgentEventCompactionReceipt;
@@ -228,8 +229,9 @@ export class AgentThreadRepository {
       updatedAt: timestamp,
       status: "active",
       revision: 1,
-      eve: {
-        session: freshEveSession(),
+      runtime: {
+        schemaVersion: 1,
+        session: freshRuntimeSession(),
         events: [],
         compaction: emptyCompaction(timestamp),
       },
@@ -345,7 +347,8 @@ export class AgentThreadRepository {
       ...thread,
       updatedAt: timestamp,
       revision: thread.revision + 1,
-      eve: {
+      runtime: {
+        schemaVersion: 1,
         session: cloneSession(snapshot.session),
         ...sanitizeAndBoundAgentEvents(snapshot.events, {
           now: () => new Date(timestamp),
@@ -376,8 +379,9 @@ export class AgentThreadRepository {
       updatedAt: timestamp,
       status: "active",
       revision: 1,
-      eve: {
-        session: freshEveSession(),
+      runtime: {
+        schemaVersion: 1,
+        session: freshRuntimeSession(),
         events: [],
         compaction: emptyCompaction(timestamp),
       },
@@ -501,13 +505,22 @@ export class AgentThreadRepository {
   }
 
   private normalizeThread(thread: AgentThread): AgentThread {
+    const stored = thread as StoredAgentThread;
     const hasPersonaId =
       typeof thread.personaId === "string" && thread.personaId.trim();
+    const { eve: legacyRuntime, ...withoutLegacy } = stored;
+    const runtime = stored.runtime ??
+      (legacyRuntime
+        ? { ...legacyRuntime, schemaVersion: 1 as const }
+        : freshRuntimeRecord(thread.updatedAt));
     const normalized = cloneThread({
-      ...thread,
+      ...withoutLegacy,
       personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
+      runtime,
     });
-    if (!hasPersonaId) this.threads.set(threadKey(thread.id), normalized);
+    if (!hasPersonaId || legacyRuntime || stored.runtime?.schemaVersion !== 1) {
+      this.threads.set(threadKey(thread.id), normalized);
+    }
     return normalized;
   }
 
@@ -576,7 +589,7 @@ export function buildForkSeed(
   createdAt: string,
 ): AgentThreadForkSeed {
   const messages: AgentThreadForkMessage[] = [];
-  for (const event of source.eve.events) {
+  for (const event of source.runtime.events) {
     const message = forkMessageFromEvent(event);
     if (!message) continue;
     messages.push(message);
@@ -832,8 +845,22 @@ function isMember(members: unknown, userId: string): boolean {
   return Array.isArray(members) && members.includes(userId);
 }
 
-function freshEveSession(): AgentRuntimeSessionState {
+type StoredAgentThread = Omit<AgentThread, "runtime"> & {
+  runtime?: AgentThread["runtime"];
+  eve?: Omit<AgentThread["runtime"], "schemaVersion">;
+};
+
+function freshRuntimeSession(): AgentRuntimeSessionState {
   return { streamIndex: 0 };
+}
+
+function freshRuntimeRecord(timestamp: string): AgentThread["runtime"] {
+  return {
+    schemaVersion: 1,
+    session: freshRuntimeSession(),
+    events: [],
+    compaction: emptyCompaction(timestamp),
+  };
 }
 
 function emptyCompaction(timestamp: string): AgentEventCompactionReceipt {
