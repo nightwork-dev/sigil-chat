@@ -225,6 +225,15 @@ Mechanics and constraints:
   on the GZ.1 spike) would eventually feed this same section — noted as a
   downstream input, explicitly **not** designed for in this proposal.
 
+**Standalone `/chat` vs. nested session chat — one rule, because they are one
+surface.** The constraint is not "only the standalone `/chat` route": since
+`/chat` folds into the session leaf (it resolves to the active session), the
+conversation renders in exactly one place — the session leaf — whether reached
+by `/chat`, by a canonical `.../sessions/$threadId`, or by a via-prefixed path.
+The `max-w-3xl` column and the context rail are properties of that leaf, so the
+constraint holds identically everywhere the conversation appears; there is no
+second, unconstrained chat surface to keep in sync.
+
 Scope boundary: this constrains the **session/chat** surface only. The other
 `_app` workspaces (roadmap, reducer studio, review, agents) keep their own
 widths; the width constraint and context rail are a property of the session
