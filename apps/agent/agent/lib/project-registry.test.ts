@@ -54,6 +54,33 @@ describe("ProjectRegistry", () => {
     expect(reopened.hasMember("project-1", "user-outsider")).toBe(false)
   })
 
+  // Authz finding 2 (2026-07-23, Annika): upsert() reads its own
+  // just-written record back (`persisted = this.get(project.id)`) to return
+  // it, from INSIDE its own withRegistryRecordLock — and that record still
+  // needs a slug backfilled on a fresh create, so this hits the locked
+  // backfill path for the SAME id, on a REAL file lock (this test uses
+  // cwd/projectRoot, not an injected store — `store:` disables locking
+  // entirely). Without the reentrancy guard, this self-deadlocks: the
+  // nested acquire spins on the lock file the outer call already holds
+  // until LOCK_TIMEOUT_MS, then throws. A second real upsert on the SAME
+  // id makes the read-back path unavoidable, so this fails loudly (timeout
+  // + throw) if the guard regresses, rather than silently.
+  it("does not self-deadlock when upsert's own read-back needs a locked backfill", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-projects-lock-"))
+    temporaryDirectories.push(directory)
+    const store = new ProjectRegistry({ cwd: directory, projectRoot: directory })
+
+    const first = store.upsert(project)
+    expect(first.slug).toBe("project-one")
+
+    const second = store.upsert(
+      { ...first, description: "Updated description." },
+      { expectedRevision: first.revision! },
+    )
+    expect(second.slug).toBe("project-one")
+    expect(second.description).toBe("Updated description.")
+  })
+
   it("fails closed for corrupt project records", () => {
     const store = new ProjectRegistry({
       store: memoryKv(new Map([["project-1", { id: "project-1" }]])),
@@ -109,7 +136,7 @@ describe("ProjectRegistry", () => {
       cwd: directory,
       projectRoot: directory,
     })
-    const created = seed.upsert(project)
+    seed.upsert(project)
     const moduleUrl = new URL("./project-registry.ts", import.meta.url).href
     const contenderSource = `
       import { ProjectRegistry } from ${JSON.stringify(moduleUrl)}
@@ -246,15 +273,50 @@ describe("ProjectRegistry", () => {
       expect(renamed.slug).toBe(second.slug)
     })
 
-    it("resolves a project by slug, and by id-or-slug at the route boundary", () => {
+    // Authz finding (2026-07-23, Annika): id and slug share one namespace,
+    // and a caller-supplied id is otherwise unconstrained. Without this
+    // guard, an attacker could create a project whose id equals an existing
+    // project's slug and shadow it at the route-resolution boundary.
+    it("rejects creating a project whose id collides with an existing project's slug", () => {
       const store = new ProjectRegistry({ store: memoryKv(new Map()) })
-      const created = store.upsert(project)
+      const victim = store.upsert(project)
+      expect(victim.slug).toBe("project-one")
 
-      expect(store.getBySlug("project-one")?.id).toBe(created.id)
-      expect(store.getBySlug("no-such-slug")).toBeUndefined()
-      expect(store.resolveByRouteParam(created.id)?.slug).toBe("project-one")
-      expect(store.resolveByRouteParam("project-one")?.id).toBe(created.id)
-      expect(store.resolveByRouteParam("nothing-here")).toBeUndefined()
+      expect(() =>
+        store.upsert({
+          id: "project-one", // the victim's slug, used as a NEW project's id
+          name: "Spoofing Project",
+          description: "",
+          members: [{ principalId: "attacker", role: "owner" }],
+          settings: {},
+          createdAt: "2026-07-21T00:00:00.000Z",
+          createdBy: "attacker",
+        }),
+      ).toThrow(/collides with an existing project's slug/)
+
+      // The victim is unaffected by the rejected attempt.
+      expect(store.get(victim.id)?.slug).toBe("project-one")
+      expect(store.get("project-one")).toBeUndefined()
+    })
+
+    // The reverse direction: a freshly minted slug must not shadow an
+    // EXISTING project's id either (mintUniqueSlug's half of the guard).
+    it("never mints a slug that collides with an existing project's id", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      // This project's id happens to equal the kebab-case of the name the
+      // next project will mint a slug from.
+      store.upsert({
+        ...project,
+        id: "second-project",
+        name: "Placeholder",
+      })
+      const second = store.upsert({
+        ...project,
+        id: "project-2",
+        name: "Second Project", // kebab-cases to "second-project"
+      })
+      expect(second.slug).not.toBe("second-project")
+      expect(second.slug).toMatch(/^second-project-[0-9a-z]{4}$/)
     })
   })
 })

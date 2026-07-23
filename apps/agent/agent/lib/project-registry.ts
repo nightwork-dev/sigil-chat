@@ -130,7 +130,7 @@ export class ProjectRegistry {
     if (!isStoredProject(value) || value.id !== id) {
       throw new Error(`Project registry is corrupt for ${id}.`)
     }
-    return this.normalize(value)
+    return this.readNormalized(id, value)
   }
 
   list(): Project[] {
@@ -140,7 +140,7 @@ export class ProjectRegistry {
         if (!isStoredProject(value) || value.id !== key) {
           throw new Error(`Project registry is corrupt for ${key}.`)
         }
-        return this.normalize(value)
+        return this.readNormalized(key, value)
       })
       .sort((left, right) => left.id.localeCompare(right.id))
   }
@@ -150,6 +150,16 @@ export class ProjectRegistry {
     return withRegistryRecordLock(this.lockDirectory, project.id, () => {
       const current = this.get(project.id)
       assertExpectedRevision(project.id, current, options.expectedRevision)
+      // Authz finding (2026-07-23, Annika): id and slug share one
+      // namespace, and a caller-supplied id is otherwise unconstrained
+      // (minLength:1 only). Without this guard, creating a project whose
+      // id equals an existing project's slug lets it shadow that project
+      // at the route-resolution boundary (first-match id-or-slug lookup).
+      // Only matters at CREATE — an update keeps its own id, so it can't
+      // newly collide with anything by upserting.
+      if (!current) {
+        this.assertIdDoesNotAliasSlug(project.id)
+      }
       const next = {
         ...project,
         // Immutable once minted: an existing record's slug can never change
@@ -192,63 +202,84 @@ export class ProjectRegistry {
     )
   }
 
-  /** Resolves a project by its immutable slug. Global across every project —
-   *  the URL carries no further disambiguating prefix for a project. */
-  getBySlug(slug: string): Project | undefined {
-    const normalizedSlug = slug.trim().toLowerCase()
-    if (!normalizedSlug) return undefined
+  /** Rejects an id that would alias an EXISTING different record's slug —
+   *  the create-time half of the id/slug collision guard (mintUniqueSlug's
+   *  existing-id check below is the other half). Only meaningful before the
+   *  record exists; `upsert()` only calls this on a fresh create. */
+  private assertIdDoesNotAliasSlug(id: string): void {
     for (const { key, value } of this.projects.entries()) {
-      if (!isStoredProject(value) || value.id !== key) continue
-      const project = this.normalize(value)
-      if (project.slug === normalizedSlug) return project
+      if (key === id) continue
+      if (!isStoredProject(value)) continue
+      if (isNonEmptySlug(value.slug) && value.slug === id) {
+        throw new Error(
+          `Project id "${id}" collides with an existing project's slug — choose a different id.`,
+        )
+      }
     }
-    return undefined
   }
 
-  /** The route-boundary resolver (container slugs): a URL segment is either
-   *  the canonical id or the short slug. Tries the exact id lookup first —
-   *  an id and a slug never collide as KV keys — then falls back to slug
-   *  resolution; this ordering (not a shape check) is what keeps synthetic
-   *  non-slug-shaped test ids resolving correctly too. Callers redirect to
-   *  `.slug` when it differs from what was requested. */
-  resolveByRouteParam(candidate: string): Project | undefined {
-    const trimmed = candidate.trim()
-    if (!trimmed) return undefined
-    return this.get(trimmed) ?? this.getBySlug(trimmed)
-  }
-
-  private normalize(project: StoredProject): Project {
-    const needsSlug = !isNonEmptySlug(project.slug)
-    const normalized = {
-      ...project,
-      revision: project.revision ?? 1,
-      ...(needsSlug
-        ? { slug: this.mintUniqueSlug(project.name, project.id) }
-        : { slug: project.slug!.trim().toLowerCase() }),
+  /** Fast path for an already-fully-normalized record: no lock, because
+   *  nothing here can race — revision and slug are immutable once set, so
+   *  concurrent readers agree by construction. Falls through to a LOCKED
+   *  backfill only when minting or a revision default is actually needed
+   *  (finding 2, 2026-07-23 — see withRegistryRecordLock's reentrancy note
+   *  above: this can itself run from inside upsert()'s own lock). */
+  private readNormalized(id: string, value: StoredProject): Project {
+    if (value.revision !== undefined && isNonEmptySlug(value.slug)) {
+      return clone({
+        ...value,
+        revision: value.revision,
+        slug: value.slug.trim().toLowerCase(),
+      })
     }
-    if (project.revision === undefined || needsSlug) {
+    return withRegistryRecordLock(this.lockDirectory, id, () => {
+      // Re-read fresh under the lock: a racer that lost the lock race sees
+      // whatever the winner already persisted, instead of computing (and
+      // possibly minting a DIFFERENT slug for) its own.
+      const raw = this.projects.get(id)
+      const latest = isStoredProject(raw) && raw.id === id ? raw : value
+      if (latest.revision !== undefined && isNonEmptySlug(latest.slug)) {
+        return clone({
+          ...latest,
+          revision: latest.revision,
+          slug: latest.slug.trim().toLowerCase(),
+        })
+      }
+      const needsSlug = !isNonEmptySlug(latest.slug)
+      const normalized = {
+        ...latest,
+        revision: latest.revision ?? 1,
+        ...(needsSlug
+          ? { slug: this.mintUniqueSlug(latest.name, latest.id) }
+          : { slug: latest.slug!.trim().toLowerCase() }),
+      }
       this.projects.set(normalized.id, clone(normalized))
-    }
-    return clone(normalized)
+      return clone(normalized)
+    })
   }
 
   /** Kebab-case of `name`, uniquified with a short base36 suffix only on
    *  collision. `excludeId` skips the record being normalized itself, so a
    *  re-normalize of the SAME record (e.g. a bare revision backfill on a
-   *  record that already has this exact slug) never collides with itself. */
+   *  record that already has this exact slug) never collides with itself.
+   *  The taken set includes every OTHER record's id as well as its slug —
+   *  the other half of the id/slug collision guard (assertIdDoesNotAliasSlug
+   *  above is the create-time half) — so a freshly minted slug can never
+   *  shadow an existing record's id either. */
   private mintUniqueSlug(name: string, excludeId: string): string {
     const base = kebabCase(name) || "project"
-    const existing = new Set(
-      this.projects
-        .entries()
-        .filter(({ key }) => key !== excludeId)
-        .map(({ value }) => (isStoredProject(value) ? value.slug : undefined))
-        .filter((slug): slug is string => isNonEmptySlug(slug)),
-    )
-    if (!existing.has(base)) return base
+    const taken = new Set<string>()
+    for (const { key, value } of this.projects.entries()) {
+      if (key === excludeId) continue
+      taken.add(key)
+      if (isStoredProject(value) && isNonEmptySlug(value.slug)) {
+        taken.add(value.slug)
+      }
+    }
+    if (!taken.has(base)) return base
     for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
       const candidate = `${base}-${randomSlugSuffix()}`
-      if (!existing.has(candidate)) return candidate
+      if (!taken.has(candidate)) return candidate
     }
     throw new Error(
       `Could not mint a unique slug for project ${excludeId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
@@ -256,12 +287,27 @@ export class ProjectRegistry {
   }
 }
 
+// Reentrancy guard for withRegistryRecordLock (finding 2, 2026-07-23,
+// Annika): a locked backfill read (readNormalized()) can now be called from
+// INSIDE an already-locked upsert() for the same id (upsert reads the
+// current record before writing). The file lock below isn't reentrant —
+// openSync(path, "wx") fails on a lock file this same call already created
+// — so a naive nested acquire would self-deadlock, spinning until
+// LOCK_TIMEOUT_MS and throwing. JS is single-threaded, so nothing else can
+// interleave between an outer lock's acquisition and a nested call within
+// the same synchronous stack; it's safe to skip re-acquiring the file lock
+// in that case; the outer acquisition already excludes every OTHER process.
+const heldLockKeys = new Set<string>()
+
 export function withRegistryRecordLock<T>(
   lockDirectory: string | undefined,
   id: string,
   operation: () => T,
 ): T {
   if (lockDirectory === undefined) return operation()
+
+  const lockKey = `${lockDirectory} ${id}`
+  if (heldLockKeys.has(lockKey)) return operation()
 
   mkdirSync(lockDirectory, { recursive: true })
   const lockName = createHash("sha256").update(id).digest("hex")
@@ -279,6 +325,7 @@ export function withRegistryRecordLock<T>(
       continue
     }
 
+    heldLockKeys.add(lockKey)
     try {
       writeFileSync(
         descriptor,
@@ -287,6 +334,7 @@ export function withRegistryRecordLock<T>(
       )
       return operation()
     } finally {
+      heldLockKeys.delete(lockKey)
       try {
         closeSync(descriptor)
       } finally {

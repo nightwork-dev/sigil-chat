@@ -746,6 +746,49 @@ describe("AgentThreadRepository", () => {
       expect(repo.list(USER_A)[0]?.slug).toBe(read?.slug);
     });
 
+    // Authz finding 2 (2026-07-23, Annika): web and Eve share the same
+    // store and can race to backfill the SAME slug-less thread on their
+    // first independent read. Before the fix, each process's random mint
+    // would diverge; last-write-wins would silently break "minted once,
+    // never regenerated." Two separate repository instances sharing one
+    // underlying store stand in for the two racing processes here.
+    it("two racing processes backfilling the same thread converge on the identical slug", () => {
+      const threads = new MemoryKv<AgentThread>();
+      const preferences = new MemoryKv<AgentThreadPreference>();
+      const seedRepo = new AgentThreadRepository({
+        defaultPersonaId: "agent-a",
+        threads,
+        preferences,
+        createId: () => "thread-race",
+        now: () => new Date("2026-07-23T00:00:00.000Z"),
+      });
+      const preSlug = seedRepo.create(USER_A, { title: "Racing backfill" });
+      const { slug: _slug, ...withoutSlug } = preSlug;
+      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread);
+
+      // Two independent repository instances over the SAME underlying
+      // store — standing in for web and Eve as separate processes.
+      const processA = new AgentThreadRepository({
+        defaultPersonaId: "agent-a",
+        threads,
+        preferences,
+      });
+      const processB = new AgentThreadRepository({
+        defaultPersonaId: "agent-a",
+        threads,
+        preferences,
+      });
+
+      const backfilledByA = processA.get(USER_A, preSlug.id);
+      // Reset the stored record to slug-less again, simulating process B's
+      // read racing BEFORE it observed process A's write.
+      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread);
+      const backfilledByB = processB.get(USER_A, preSlug.id);
+
+      expect(backfilledByA?.slug).toBeTruthy();
+      expect(backfilledByB?.slug).toBe(backfilledByA?.slug);
+    });
+
     it("regenerates on collision (per-principal collision scope)", () => {
       const threads = new MemoryKv<AgentThread>();
       const preferences = new MemoryKv<AgentThreadPreference>();

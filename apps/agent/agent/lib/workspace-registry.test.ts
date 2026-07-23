@@ -67,6 +67,31 @@ describe("WorkspaceRegistry", () => {
     expect(reopened.list(project.id)).toEqual([versionedWorkspace])
   })
 
+  // Authz finding 2 (2026-07-23, Annika) — same reentrancy hazard as
+  // ProjectRegistry's (project-registry.test.ts): upsert()'s own read-back
+  // hits a locked backfill for the SAME id, on a real file lock.
+  it("does not self-deadlock when upsert's own read-back needs a locked backfill", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-workspaces-lock-"))
+    temporaryDirectories.push(directory)
+    const projects = new ProjectRegistry({ cwd: directory, projectRoot: directory })
+    projects.upsert(project)
+    const store = new WorkspaceRegistry({
+      cwd: directory,
+      projectRoot: directory,
+      projects,
+    })
+
+    const first = store.upsert(workspace)
+    expect(first.slug).toBe("workspace-one")
+
+    const second = store.upsert(
+      { ...first, description: "Updated description." },
+      { expectedRevision: first.revision! },
+    )
+    expect(second.slug).toBe("workspace-one")
+    expect(second.description).toBe("Updated description.")
+  })
+
   it("refuses a workspace whose parent project does not exist", () => {
     const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
     const store = new WorkspaceRegistry({
@@ -248,15 +273,44 @@ describe("WorkspaceRegistry", () => {
       expect(renamed.slug).toBe(second.slug)
     })
 
-    it("resolves a workspace by slug, and by id-or-slug at the route boundary", () => {
+    // Authz finding (2026-07-23, Annika) — same guard as ProjectRegistry's
+    // (project-registry.test.ts), applied here for workspaces.
+    it("rejects creating a workspace whose id collides with an existing workspace's slug", () => {
       const store = freshStore()
-      const created = store.upsert(workspace)
+      const victim = store.upsert(workspace)
+      expect(victim.slug).toBe("workspace-one")
 
-      expect(store.getBySlug("workspace-one")?.id).toBe(created.id)
-      expect(store.getBySlug("no-such-slug")).toBeUndefined()
-      expect(store.resolveByRouteParam(created.id)?.slug).toBe("workspace-one")
-      expect(store.resolveByRouteParam("workspace-one")?.id).toBe(created.id)
-      expect(store.resolveByRouteParam("nothing-here")).toBeUndefined()
+      expect(() =>
+        store.upsert({
+          id: "workspace-one", // the victim's slug, used as a NEW workspace's id
+          projectId: project.id,
+          homeScopeId: project.id,
+          name: "Spoofing Workspace",
+          description: "",
+          status: "active",
+          createdAt: "2026-07-21T00:00:00.000Z",
+          createdBy: "attacker",
+        }),
+      ).toThrow(/collides with an existing workspace's slug/)
+
+      expect(store.get(victim.id)?.slug).toBe("workspace-one")
+      expect(store.get("workspace-one")).toBeUndefined()
+    })
+
+    it("never mints a slug that collides with an existing workspace's id", () => {
+      const store = freshStore()
+      store.upsert({
+        ...workspace,
+        id: "second-workspace",
+        name: "Placeholder",
+      })
+      const second = store.upsert({
+        ...workspace,
+        id: "workspace-2",
+        name: "Second Workspace", // kebab-cases to "second-workspace"
+      })
+      expect(second.slug).not.toBe("second-workspace")
+      expect(second.slug).toMatch(/^second-workspace-[0-9a-z]{4}$/)
     })
   })
 })
