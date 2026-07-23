@@ -4,7 +4,9 @@
 > Status: specification only; **NO-GO for public deployment**
 > Owner: Sigil Chat deployment composition
 > Fixture: [`fixtures/invite-demo/`](fixtures/invite-demo/)
-> Related: [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md), [`AGENT-SESSION-RETENTION-ISSUE.md`](AGENT-SESSION-RETENTION-ISSUE.md)
+> Related: [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md),
+> [`AGENT-SESSION-RETENTION-ISSUE.md`](AGENT-SESSION-RETENTION-ISSUE.md), and
+> [`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](MODEL-ADMINISTRATION-AND-USAGE-SPEC.md)
 
 ## Decision
 
@@ -164,15 +166,19 @@ remaining membership and retention policy authorize them.
 
 ## Model credential profiles
 
-Exactly one profile is selected for a deployment. Neither profile identifies or
-authorizes invited users; Better Auth plus membership remains the human trust
-boundary.
+The model-administration spec supersedes this section's earlier single-profile
+assumption. A deployment may enable multiple owner-approved profiles while each
+thread binds immutably to one profile revision. No provider credential
+identifies or authorizes invited users; Better Auth plus membership remains the
+human trust boundary.
 
 ### Preferred: dedicated Codex device login
 
 - Eve runs as a dedicated non-root service account.
-- `codex login --device-auth` runs out of band, never through a web route or
-  tool. The one-time human step is not automated or recorded.
+- `codex login --device-auth` may run out of band or through the constrained,
+  owner-only remote-management flow defined by the model-administration spec.
+  It is never exposed as a Gonk tool or agent action, and the one-time challenge
+  is delivered privately only to the initiating owner.
 - A dedicated `CODEX_HOME` is mounted read/write into Eve only, from an
   encrypted persistent volume. Web, Gonk, backup jobs, tools, and any sandbox
   cannot mount it.
@@ -279,10 +285,12 @@ secrets, and have a tested restore into a fresh project.
 
 ### 7. Model credential isolation
 
-One and only one model-auth profile is active. The credential is visible to Eve
-only and never authenticates invited users. Device auth requires encrypted
-persistence and restart/refresh proof; API/Gateway requires a read-only runtime
-secret and upstream scope/spend controls.
+One or more owner-approved model profiles may be enabled, but each call resolves
+exactly one bound profile and one installation credential. Credentials are
+available at rest only to Eve and never authenticate invited users. Device auth
+requires protected persistence and restart/refresh proof; remotely managed
+API/Gateway credentials require the encrypted Eve-owned vault, rotation and
+revocation proof, and upstream scope/spend controls.
 
 > **Proof command/check:** inspect every container mount/environment and require
 > only Eve to have the selected credential path; run seeded secret-canary scans

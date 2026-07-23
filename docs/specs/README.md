@@ -13,6 +13,12 @@ Currently authoritative for this product's design/implementation.
   inside Eve; Sigil Chat operates web and Eve, not a third Gonk service.
   Implemented architecture contract; release verification pending.
 
+- [`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](MODEL-ADMINISTRATION-AND-USAGE-SPEC.md) —
+  owner-managed Codex/OpenAI and OpenAI-compatible model access, remotely
+  managed standard `CODEX_HOME` authentication, immutable per-thread model
+  bindings, and append-only per-user usage metering without limits or BYOK.
+  Draft product and architecture contract; depends on Eve 0.27+.
+
 - [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md) —
   canonical ownership remains singular while typed, ordered scope links enable
   shared workspaces, resource participation, default contribution, and

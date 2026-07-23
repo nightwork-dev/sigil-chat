@@ -5,8 +5,8 @@ Sigil Chat has three configuration layers:
 1. `pnpm dev` needs no environment file. It derives worktree URLs and creates
    disposable data, an agent binding secret, migrations, and the development owner.
 2. `fixtures/application/sigil-chat.yaml` is a typed Mirk fixture for checked-in
-   product behavior: branding, model choice, registration policy, and image
-   quality/preset.
+   product behavior: branding, the fresh-install bootstrap model, registration
+   policy, and image quality/preset.
 3. Environment variables are reserved for deployment identity, secrets,
    external services, and unusual topology.
 
@@ -77,9 +77,18 @@ SIGIL_IMAGE_EDIT_GATEWAY_KEY=
 SIGIL_IMAGE_EDIT_DOWNLOAD_ORIGINS=https://assets.example
 ```
 
-Its `preset` and `quality` live in the Mirk fixture. The agent's Codex model is
-also `agent.model` there; changing either is product behavior, not a secret or
-machine-local deployment address.
+Its `preset` and `quality` live in the Mirk fixture. `agent.model` is the
+fresh-install bootstrap model: once an installation has owner-managed model
+profiles, changing the fixture does not silently rewrite its default or any
+existing thread binding. Provider endpoints, credentials, and usage are
+installation state governed by
+[`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](../specs/MODEL-ADMINISTRATION-AND-USAGE-SPEC.md).
+
+Eve honors standard `CODEX_HOME` when it is set and otherwise uses
+`~/.codex`. Local development therefore reuses the operator's existing Codex
+login by default. Remote deployments may set `CODEX_HOME` to a dedicated
+persistent Eve-only volume so the owner can manage ChatGPT device login or an
+OpenAI API-key login remotely. There is no Sigil-specific Codex-home variable.
 
 Only the `SIGIL_IMAGE_EDIT_*` names are supported; the former generic gateway
 aliases were removed so unrelated service credentials cannot be picked up by
