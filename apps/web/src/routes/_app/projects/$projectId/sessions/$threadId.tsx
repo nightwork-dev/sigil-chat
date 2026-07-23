@@ -9,14 +9,15 @@
 // project is the path prefix; there is no workspace ancestor, so no
 // "Shared from" ownership cue ever applies here (mirrors the prior
 // workspace-less-thread behavior at /sessions/$threadId with no `via`).
+// Loader: warms the thread, its commitments, artifacts, and home signals.
 
 import { createFileRoute } from "@tanstack/react-router"
 import { useMemo } from "react"
 
+import { agentThreadQueryOptions, useAgentThread } from "@/lib/agent-threads"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
-import { useAgentThread } from "@/lib/agent-threads"
-import { useArtifacts } from "@/lib/artifacts"
-import { useHomeSignals } from "@/lib/home-signals"
+import { artifactsQueryOptions, useArtifacts } from "@/lib/artifacts"
+import { homeSignalsQueryOptions, useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import {
   artifactRowsFromRecords,
@@ -26,11 +27,36 @@ import {
 } from "@/features/homes/live-sources"
 import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
-import { useSessionCommitments } from "@/lib/work-items"
+import {
+  sessionCommitmentsQueryOptions,
+  useSessionCommitments,
+} from "@/lib/work-items"
 
 export const Route = createFileRoute(
   "/_app/projects/$projectId/sessions/$threadId",
 )({
+  loader: async ({ context, params }) => {
+    const principalId = context.user.id
+    await context.queryClient
+      .ensureQueryData(agentThreadQueryOptions(principalId, params.threadId))
+      .catch(() => undefined)
+    const scope = artifactScopeForHome("session", params.threadId)
+    await Promise.all([
+      context.queryClient
+        .ensureQueryData(
+          sessionCommitmentsQueryOptions(principalId, params.threadId),
+        )
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(artifactsQueryOptions(scope))
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(
+          homeSignalsQueryOptions(principalId, "session", params.threadId),
+        )
+        .catch(() => undefined),
+    ])
+  },
   component: ProjectSessionHomeRoute,
 })
 

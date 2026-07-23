@@ -27,6 +27,7 @@ import { AgentRailStatus } from "@/components/agent/agent-rail-status"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
 import { ActiveContainerProvider } from "@/lib/active-container"
+import { projectWorkspaceNavQueryOptions } from "@/lib/project-workspace-nav"
 import { AgentSurfaceProvider } from "@/lib/agent-surface-registry"
 import {
   ViewRailChords,
@@ -45,6 +46,15 @@ export const Route = createFileRoute("/_app")({
       })
     }
     return { user }
+  },
+  // Principal-wide: loaded once here, shared by the breadcrumb and every
+  // project/workspace/session home below via the same query key. A loader
+  // failure must never break navigation — it only means the component-level
+  // hook falls back to fetching client-side, so swallow it.
+  loader: async ({ context }) => {
+    await context.queryClient
+      .ensureQueryData(projectWorkspaceNavQueryOptions(context.user.id))
+      .catch(() => undefined)
   },
   component: AppLayout,
 })
