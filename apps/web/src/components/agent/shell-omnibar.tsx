@@ -35,6 +35,29 @@ import { useAgentThreads, useSetActiveAgentThread } from "@/lib/agent-threads"
 import { useActiveContainer } from "@/lib/active-container"
 import { openAgentHud } from "@/lib/agent-hud-open"
 
+/** Where picking a project from the omnibar lands: its nested home, never
+ *  `/chat` (SC.10 §2/§6 step 9 fix — a container pick is "go there", not
+ *  "go chat"). Exported for testing. */
+export function projectSwitchHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}`
+}
+
+/** Where picking a workspace from the omnibar lands: the nested workspace
+ *  home under its own owning project when visible, else the currently
+ *  active project — the same canonical-containment fallback the SC.10
+ *  step-5 resolvers use (workspaces.$workspaceId.tsx). Never `/chat`.
+ *  Undefined only when neither project id is known (no active container and
+ *  the workspace's owner is hidden) — the caller skips navigation then
+ *  rather than guessing. Exported for testing. */
+export function workspaceSwitchHref(
+  workspace: { readonly id: string; readonly projectId?: string },
+  activeProjectId: string | undefined,
+): string | undefined {
+  const projectId = workspace.projectId ?? activeProjectId
+  if (!projectId) return undefined
+  return `/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(workspace.id)}`
+}
+
 export function ShellOmnibar() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -140,8 +163,11 @@ export function ShellOmnibar() {
             </CommandGroup>
           ) : null}
 
-          {/* Project switching (§3.3) — selects the active container (Level 1),
-              not just a navigation target. */}
+          {/* Project switching (§3.3) — selects the active container (Level 1)
+              AND lands on that container's home (SC.10 §2: the nested
+              /projects/$projectId tree, not /chat — picking a container is
+              "go there", not "go chat"). container.selectProject still fires
+              as the persist-on-navigate write (SC.10 §6 step 7). */}
           {!hasQuery && projectNav.data ? (
             <CommandGroup heading="Projects">
               {projectNav.data.projects.map((project) => (
@@ -150,7 +176,7 @@ export function ShellOmnibar() {
                   value={project.name}
                   onSelect={() => {
                     container.selectProject(project.id)
-                    go("/chat")
+                    go(projectSwitchHref(project.id))
                   }}
                 >
                   <FolderIcon className="size-4 text-muted-foreground" />
@@ -160,7 +186,12 @@ export function ShellOmnibar() {
             </CommandGroup>
           ) : null}
 
-          {/* Workspace switching — the workspaces inside the active project. */}
+          {/* Workspace switching — the workspaces inside the active project.
+              Lands on the nested workspace home; the prefix is the workspace's
+              own owning project when visible, else the currently active
+              project — the same canonical-containment resolution the SC.10
+              step-5 resolvers use (workspaces.$workspaceId.tsx), since this
+              list is itself already filtered to the active project. */}
           {!hasQuery && projectNav.data ? (
             <CommandGroup heading="Workspaces">
               {projectNav.data.workspaces
@@ -171,7 +202,11 @@ export function ShellOmnibar() {
                     value={workspace.name}
                     onSelect={() => {
                       container.selectWorkspace(workspace.id)
-                      go("/chat")
+                      const href = workspaceSwitchHref(
+                        workspace,
+                        container.projectId,
+                      )
+                      if (href) go(href)
                     }}
                   >
                     <FolderIcon className="size-4 text-muted-foreground" />
