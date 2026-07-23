@@ -11,6 +11,27 @@ expose the other skills named here, treat their file paths under
 `.agents/skills/` (or `.claude/skills/` / `.pi/skills/`) as the fallback
 reference — the content exists even if your tool can't auto-load it.
 
+## Start the real development instance
+
+From any fresh checkout or linked worktree, the setup and run contract is:
+
+```bash
+pnpm dev
+```
+
+Do not pre-run `pnpm install`, copy or symlink `.env`, migrate auth, seed an
+owner, generate a Gonk key, or start the three apps separately. The launcher
+owns that preparation and prints the correct branch-namespaced URLs after it
+proves the authenticated Web → Eve → Gonk path. Use its private single-use
+sign-in URL rather than resetting the owner's password.
+
+Each worktree is an independent development instance with its own `.data`, Eve
+state, credentials, and Portless prefix. To rebuild only that instance, stop
+the launcher and run `pnpm dev:reset`; use the printed `pnpm dev:restore`
+command if the old state is needed. Never delete or borrow another worktree's
+state as routine setup. The complete edit and verification loop is in
+`docs/guides/development.md`.
+
 ## The layer stack
 
 The ecosystem layers, from lowest to highest, are:

@@ -8,6 +8,24 @@ description: End-to-end "how to build a feature here" for Sigil Chat — the lay
 This is the map. Read it before starting a feature, then jump to the deeper
 skill for whichever layer you're actually touching.
 
+## Start the real development instance
+
+From any fresh checkout or linked worktree, run:
+
+```bash
+pnpm dev
+```
+
+Do not pre-run `pnpm install`, copy or symlink `.env`, migrate auth, seed an
+owner, generate a Gonk key, or start the apps separately. The launcher owns
+that preparation, proves the authenticated Web → Eve → Gonk path, and prints
+the correct branch-namespaced URLs plus a private single-use owner sign-in URL.
+
+Each worktree owns its `.data`, Eve state, credentials, and Portless prefix.
+For a clean first-start proof, stop the launcher and use `pnpm dev:reset`; use
+the printed `pnpm dev:restore` command to recover the previous instance. The
+complete edit and verification loop is in `docs/guides/development.md`.
+
 ## The layer stack
 
 The ecosystem layers, from lowest to highest, are:

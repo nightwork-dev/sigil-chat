@@ -182,6 +182,6 @@ Always before calling a route/workspace change done:
    the console for errors/warnings, not just that the page renders.
    Render-phase store conflicts and hydration mismatches only show up here,
    never as type errors. If the change touches the agent loop, drive it
-   through `http://sigil-chat.localhost:1355` with the Eve
-   (`sigil-chat-agent`) and Gonk (`sigil-chat-gonk`) services also running —
-   a route change alone won't exercise the tool-call path.
+   through the app origin printed by this worktree's readiness summary; that
+   stack already includes its correctly namespaced Eve and Gonk services. A
+   route change alone won't exercise the tool-call path.

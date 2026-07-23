@@ -75,16 +75,16 @@ the tool.
 
 ## RULE 3: Discovery is automatic — do NOT hand-copy tool names into Eve
 
-`apps/agent/agent/connections/gonk.ts` is an MCP client connection pointed
-at `http://sigil-chat-gonk.localhost:1355/mcp` (or `GONK_MCP_URL`). A new
+`apps/agent/agent/connections/gonk.ts` is an MCP client connection pointed at
+the Gonk URL derived for this worktree (or explicit `GONK_MCP_URL`). A new
 `registry.register()` call is picked up the next time Eve lists tools — no
 other step required. NEVER add a tool name/definition to any file under
 `apps/agent/agent/`.
 
-## RULE 4: `GONK_MCP_KEY` MUST be set identically on BOTH processes
+## RULE 4: `GONK_MCP_KEY` is REQUIRED but `pnpm dev` owns it locally
 
 `apps/gonk/src/server.ts` calls `process.exit(1)` on startup if
-`GONK_MCP_KEY` is unset. Set the SAME token on:
+`GONK_MCP_KEY` is unset. The SAME token must reach:
 - `apps/gonk` (`server.ts` authenticates incoming requests; `auth.ts` is
   the authorization policy after the bearer check).
 - `apps/agent`'s `connections/gonk.ts` (reads the same var, sends it as
@@ -92,7 +92,10 @@ other step required. NEVER add a tool name/definition to any file under
 
 If a new tool doesn't show up: CHECK THIS FIRST, before suspecting the
 registry code. A missing/mismatched key means Eve cannot reach Gonk at
-all — it is NOT a silent unauthenticated fallback.
+all — it is NOT a silent unauthenticated fallback. In ordinary local
+development, NEVER set or synchronize it manually: `pnpm dev` generates
+`.data/dev/gonk-mcp-key` and supplies it to every service. An exported value
+is an override, not a setup step.
 
 ## RULE 5: Client "ask" consent is a DIFFERENT gate than RULE 2 — do not conflate them
 
@@ -115,14 +118,14 @@ reason using `approval` tier + `sigilApprovalProvider`.
 
 ## RULE 6: Verify — run all three, in order
 
-1. **Registry sees it.** With `GONK_MCP_KEY` identical on both processes
-   and `pnpm dev` running, `tools/list` over Streamable HTTP against
-   `http://sigil-chat-gonk.localhost:1355/mcp` with `Authorization: Bearer
-   $GONK_MCP_KEY` MUST include the new tool name.
-2. **Drive it in chat.** Open `http://sigil-chat.localhost:1355/chat`, ask
-   for something that triggers the tool. In default `"ask"` mode, the
-   consent prompt MUST name the tool before it runs; approve and confirm
-   the handler's `data` appears in the response.
+1. **Registry sees it.** Run `pnpm dev`. Use the Gonk origin from this
+   worktree's readiness summary plus `/mcp`, and the generated bearer at
+   `.data/dev/gonk-mcp-key`, for a direct `tools/list` probe. NEVER borrow a
+   URL or key from another checkout. The response MUST include the tool.
+2. **Drive it in chat.** Use the private sign-in URL printed/opened by this
+   worktree's launcher and ask for something that triggers the tool. In
+   default `"ask"` mode, the consent prompt MUST name the tool before it
+   runs; approve and confirm the handler's `data` appears in the response.
 3. **Check the `exec` deny path** if testing registry policy itself:
    register a throwaway `approval: "exec"` tool and confirm
    `sigilApprovalProvider` denies it. A regression test for this belongs in

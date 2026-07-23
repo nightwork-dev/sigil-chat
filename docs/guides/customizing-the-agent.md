@@ -119,9 +119,9 @@ two-file shape in a new `subagents/<name>/` directory.
 
 `apps/agent/.eve/` holds local runtime state: `dev-server-state.v1.json`,
 `.workflow-data/`, `dev-hosts/`, `dev-runtime/`, and `sandbox-cache/`. It's
-gitignored and disposable — not fixture data. Deleting `apps/agent/.eve`
-before a `pnpm dev` restart resets Eve's local dev session/host state
-entirely (equivalent to the cleanup step in the "Use as a template" section
-of the README: `rm -rf .data apps/agent/.eve`). Do this if Eve's local dev
-state gets into a confusing condition (stale sessions, a Portless host
-registration that no longer matches).
+gitignored and disposable — not fixture data. If Eve's local state becomes
+confusing, stop the stack and run `pnpm dev:reset`; the reset quarantines Eve
+state together with this worktree's other disposable application state and
+prints an exact restore command. Run `pnpm dev` afterward to exercise the real
+first-start path. Do not delete `.eve` or `.data` by hand as the normal
+recovery procedure.

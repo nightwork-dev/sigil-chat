@@ -312,10 +312,10 @@ existing demo, but not where you wire a demo for new product work; see
    checked; a scroll-spy shell needs actual overflow and an actual scroll,
    not just a snapshot of the DOM at rest. Run `pnpm dev` (starts all three
    Portless services) and drive the component inside the actual workspace
-   that consumes it — `http://sigil-chat.localhost:1355/chat`,
-   `/studio`, `/review`, etc. — as part of the same change, not as a
-   follow-up. If the component is genuinely shared/generic with no product
-   consumer yet, the inherited `/showcase/<category>` catalog is an
+   that consumes it, using the app origin printed by this worktree's readiness
+   summary, as part of the same change—not as a follow-up. If the component is
+   genuinely shared/generic with no product consumer yet, the inherited
+   `/showcase/<category>` catalog is an
    acceptable interim home, but note in the change that it still needs a
    real consumer.
 4. Check the browser console for errors/warnings, not just that the page

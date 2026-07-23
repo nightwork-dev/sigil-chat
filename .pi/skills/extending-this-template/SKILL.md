@@ -143,8 +143,8 @@ Do not treat their existence as precedent for a new package.
    Portless services — see README service table). Check the console for
    errors/warnings, NOT just that the page renders. If the change touches
    the agent/tool-call loop, this means driving it through
-   `http://sigil-chat.localhost:1355` with `sigil-chat-agent` and
-   `sigil-chat-gonk` both live — typecheck alone does NOT exercise the
-   tool-call path.
+   the app origin printed by THIS worktree's readiness summary; its namespaced
+   Eve and Gonk services are already part of that stack. Typecheck alone does
+   NOT exercise the tool-call path.
 
 If any of the three is skipped, the change is not verified.

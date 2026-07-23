@@ -5,6 +5,21 @@ description: End-to-end "how to build a feature here" for Sigil Chat — the lay
 
 # Building in Sigil Chat — hard rules
 
+## RULE -1: One command owns development setup
+
+- [ ] From every fresh checkout or linked worktree, run `pnpm dev`.
+- [ ] Do NOT pre-run `pnpm install`, copy/symlink `.env`, migrate auth, seed an
+      owner, generate a Gonk key, or start apps separately. The launcher owns
+      all of it.
+- [ ] Use the branch-namespaced app URL and private single-use sign-in URL
+      printed after authenticated readiness. Do NOT assume the primary
+      `sigil-chat.localhost` URL and do NOT reset the owner password.
+- [ ] Each worktree owns `.data`, Eve state, credentials, and its Portless
+      prefix. For a clean instance, stop the launcher and run
+      `pnpm dev:reset`; recover only with the printed `pnpm dev:restore`
+      command. Never borrow or manually delete another worktree's state.
+- [ ] Follow `docs/guides/development.md` for the edit/verify loop.
+
 ## RULE 0: Know the layer stack before touching anything
 
 The ecosystem layers, from lowest to highest, are:

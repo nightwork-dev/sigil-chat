@@ -56,6 +56,16 @@ agent's lane without coordinating through the roadmap.
 - Run `git worktree list` from any checkout to see the live set — it
   reflects reality better than any doc, since worktrees get added/retired as
   workstreams open and close.
+- A fresh worktree needs no configuration handoff. Enter it and run `pnpm dev`;
+  the launcher synchronizes dependencies, creates that worktree's credentials
+  and owner, and assigns one branch-derived Portless prefix to all three apps.
+- Never copy or symlink `.env`, `.data`, `apps/agent/.eve`, or generated
+  credentials between worktrees. The external roadmap is shared; runtime state
+  is deliberately isolated.
+- Use the URLs printed by that worktree's readiness summary. Multiple full
+  stacks can run concurrently without sharing the primary checkout's names.
+- Stop the stack and use `pnpm dev:reset` / the printed `pnpm dev:restore`
+  command for state recovery. Do not delete runtime directories by hand.
 
 ## Model routing (who does what)
 
@@ -116,5 +126,7 @@ agent's lane without coordinating through the roadmap.
 - Sigil-first: generalizable UI belongs in sigil-design first (canonical) +
   a `/showcase` example, then carried into sigil-chat as owned source and
   consumed. Don't build app-local what the design system should own.
-- `GONK_MCP_KEY` must match on the gonk + agent processes; it lives in the
-  root `.env` (single source, loaded by gonk + web; agent symlink).
+- `pnpm dev` generates the worktree's Gonk bearer under
+  `.data/dev/gonk-mcp-key` and supplies it to every service. Do not copy,
+  export, or symlink it during ordinary local development; explicit
+  `GONK_MCP_KEY` configuration is a deployment/override concern.

@@ -67,6 +67,10 @@ The next `pnpm dev` invocation rebuilds the database, credentials, and owner so
 the normal startup path is the first-run path. Reset does not touch `.env`, the
 external roadmap repository, or another worktree.
 
+See [Development without ceremony](docs/guides/development.md) for the normal
+edit/verify loop, branch-worktree behavior, reset/restore recovery, and the
+short troubleshooting path.
+
 Eve's `experimental_chatgpt()` model
 reads that local login and calls the Codex backend directly; Sigil Chat does not
 use Vercel AI Gateway. The template's model is the checked-in `agent.model` in
