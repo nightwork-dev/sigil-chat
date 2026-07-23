@@ -135,6 +135,7 @@ export function SidebarShell({
   sidebarSecondary,
   breadcrumbContext,
   breadcrumbPage,
+  hideBreadcrumbPage,
   viewContent,
   statusRailStart,
   statusRailEnd,
@@ -166,6 +167,15 @@ export function SidebarShell({
    * their current surface.
    */
   breadcrumbPage?: ReactNode
+  /**
+   * Suppress the trailing page crumb entirely instead of falling back to the
+   * active navigation label — distinct from omitting `breadcrumbPage`, which
+   * still renders the fallback. For a location whose `breadcrumbContext`
+   * already ends in a current-page-styled crumb (SC.10 §5.1's
+   * container-own-home case: the last container crumb IS the page, so a
+   * second trailing label would be a tautological duplicate).
+   */
+  hideBreadcrumbPage?: boolean
   /**
    * View-owned content filling the top rail between the breadcrumb and the
    * header actions (e.g. the chat surface's status + session switcher). One
@@ -245,14 +255,16 @@ export function SidebarShell({
           <Breadcrumb>
             <BreadcrumbList>
               {breadcrumbContext}
-              <BreadcrumbItem>
-                <BreadcrumbPage className="text-xs">
-                  {breadcrumbPage ??
-                    active?.label ??
-                    nav.brand?.label ??
-                    "Home"}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
+              {hideBreadcrumbPage ? null : (
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-xs">
+                    {breadcrumbPage ??
+                      active?.label ??
+                      nav.brand?.label ??
+                      "Home"}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              )}
             </BreadcrumbList>
           </Breadcrumb>
           {viewContent ? (
