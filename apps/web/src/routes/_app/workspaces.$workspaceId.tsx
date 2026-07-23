@@ -1,11 +1,16 @@
-// Route: /workspaces/$workspaceId?via=<projectId>
+// Route: /workspaces/$workspaceId?via=<projectId>  (RESOLVER)
 // Tree:
 //   apps/web/src/routes/__root.tsx                       — HTML shell, theme/query providers, shared agent session (no visible chrome)
-//   apps/web/src/routes/_app.tsx                         — one-rail product shell, breadcrumb via-path, theme picker
+//   apps/web/src/routes/_app.tsx                         — one-rail product shell, breadcrumb bar, theme picker
 //   apps/web/src/routes/_app/workspaces.$workspaceId.tsx — THIS FILE
-// Content: WorkspaceHome — permission-filtered initiative composition with validated via display
+// Content: keeps old links, directly-granted access, and workspace-less
+// sessions working (SC.10 §2). `beforeLoad` resolves canonical containment
+// from the permission-filtered nav and `throw redirect`s into
+// /projects/$projectId/workspaces/$workspaceId. When no containing project
+// is visible to this principal, it renders WorkspaceHome directly at this
+// shallow depth — the honest home for that principal, not a placeholder.
 
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
 
 import { useAgentRoster } from "@/lib/agent-profile"
@@ -13,7 +18,10 @@ import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
 import { useArtifacts } from "@/lib/artifacts"
 import { useHomeSignals } from "@/lib/home-signals"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import {
+  projectWorkspaceNavQueryOptions,
+  useProjectWorkspaceNav,
+} from "@/lib/project-workspace-nav"
 import {
   buildWorkspaceHome,
   type HomesAdapterInput,
@@ -32,6 +40,26 @@ export const Route = createFileRoute("/_app/workspaces/$workspaceId")({
   validateSearch: (search: Record<string, unknown>): { via?: string } => ({
     ...(typeof search.via === "string" ? { via: search.via } : {}),
   }),
+  beforeLoad: async ({ context, params, search }) => {
+    const principalId = context.user.id
+    const nav = await context.queryClient
+      .ensureQueryData(projectWorkspaceNavQueryOptions(principalId))
+      .catch(() => undefined)
+    const workspace = nav?.workspaces.find((w) => w.id === params.workspaceId)
+    if (!workspace) return
+    const viaVisible =
+      search.via &&
+      nav!.projects.some((p) => p.id === search.via) &&
+      (workspace.projectId === search.via ||
+        workspace.mountedProjectIds.includes(search.via))
+    const targetProjectId = viaVisible ? search.via : workspace.projectId
+    if (targetProjectId) {
+      throw redirect({
+        to: "/projects/$projectId/workspaces/$workspaceId",
+        params: { projectId: targetProjectId, workspaceId: params.workspaceId },
+      })
+    }
+  },
   component: WorkspaceHomeRoute,
 })
 
