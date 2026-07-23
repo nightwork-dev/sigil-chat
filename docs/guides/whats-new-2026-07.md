@@ -27,6 +27,11 @@ Sigil Chat now has one less service and one less conceptual tax.
   and release-manifest entry
 - the web external MCP/API-key gateway
 - web-to-Gonk HTTP proxying for artifacts, skills, status, and tool catalog
+- the web app's direct `eve`, `@gonk/eve-host`, `@gonk/skills`, and
+  `@better-auth/api-key` dependencies
+- Sigil Chat's direct `@zigil/agent-gonk` and `@gonk/tool-registry-mcp`
+  dependencies (the remote adapter remains available upstream for real remote
+  consumers)
 - qualified `gonk__*` names for new tool calls (legacy persisted names remain
   readable during migration)
 

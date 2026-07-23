@@ -50,8 +50,8 @@ data/access, defect, or workflow needs that should enter request intake. Do not
 turn every passing thought, todo, checklist, or your own execution plan into
 roadmap work. Search with `sigil-request-search` first; when a matching request
 exists, use `sigil-request-add-evidence` instead of creating a duplicate. The
-older `sigil-feature-request-propose` tool is a compatibility path for feature
-requests only.
+specialized `sigil-feature-request-propose` tool accepts feature requests only;
+both paths write through the same durable `WorkItemsRepository`.
 
 The `todo` tool is Eve's live checklist for this session, not a second roadmap.
 A todo item never creates, closes, ships, sponsors, prioritizes, or assigns
