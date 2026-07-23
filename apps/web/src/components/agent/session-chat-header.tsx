@@ -1,26 +1,30 @@
 "use client"
 
-// SC.10 §9.4/§9.5 step 4 — the session surface's reduced top rail: session
-// identity + run status ONLY. Everything else the old inline AgentChatHeader
-// rendered here moved or dropped per §9.4's dedupe table:
-// - context/token/attention readout → the context rail header (step 3)
-// - approval mode (+ model, N/A — this app has none) → the composer
-//   (agent-chat.tsx, gated on hideHeader)
+// SC.10 §9.4/§9.5 step 4, revised by §9.7 — the session surface's reduced
+// top rail: session identity ONLY now. Everything else the old inline
+// AgentChatHeader rendered here moved or dropped:
+// - run status → the composer's send/stop button (§9.7: ChatInput already
+//   flips to a stop icon while streaming — that IS the run-state display,
+//   and where the interrupt action lives; the status dot here would be a
+//   second, redundant voice for the same datum). AgentStatusIndicator is no
+//   longer imported here.
+// - context/token/attention readout → the context rail header (§9.5 step 3)
+// - approval mode (+ model) → the composer (agent-chat.tsx, gated on
+//   hideHeader)
 // - session switcher Sheet trigger → the persistent list pane (§9.2,
 //   desktop); kept here ONLY at compact/mobile widths, since the pane isn't
 //   reachable there without opening the whole app sidebar
 // - ⌘K/⌘B chord hints → dropped (not session data; §9.4 says global,
 //   discoverable affordances don't belong on this surface)
-// SessionBlackboard isn't in the dedupe table (it's a distinct feature, not
-// status/context/approval chrome) — preserved here unchanged.
+// SessionBlackboard is NOT dropped by §9.7 (its own step list doesn't
+// mention it) — it moves in the §9.8 batch, which explicitly reassigns its
+// action into the `＋` Add menu's "Session note" entry ("orphaned out of the
+// header in §9.4" — that rehoming is §9.8's, not this commit's).
 
 import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
 import { isAgentSessionBusy } from "@zigil/agent-surface/contracts"
 
-import {
-  AgentSessionSwitcher,
-  AgentStatusIndicator,
-} from "@/components/agent/agent-chat-header"
+import { AgentSessionSwitcher } from "@/components/agent/agent-chat-header"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import { SessionBlackboard } from "@/components/agent/session-blackboard"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
@@ -66,8 +70,6 @@ export function SessionChatHeader({ compact }: { compact: boolean }) {
 
   return (
     <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
-      <AgentStatusIndicator showLabel={false} status={session.status} />
-
       {compact && threadControls ? (
         <AgentSessionSwitcher
           busy={busy}
