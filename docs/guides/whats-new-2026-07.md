@@ -1,85 +1,64 @@
 # What changed in July 2026
 
-This is the plain-language guide to the current development slice. It explains
-what now works in the product, what changed underneath it, and what still needs
-a visible UI or deployment proof.
-
 ## The five-minute version
 
-Imagine Sigil Chat as a shared office where people and agents work together.
-This release improves five parts of that office:
+Sigil Chat now has one less service and one less conceptual tax.
 
-1. **Projects and workspaces have real locks.** An agent cannot merely name a
-   project and gain access. Membership is checked, registry changes use
-   revision checks, and project/workspace changes tell the open browser to
-   refresh.
-2. **Agent edits show up promptly.** When an agent changes a blackboard, the
-   browser receives a precise `blackboard.changed` outcome and refreshes the
-   affected blackboard. The old 15-second poll remains only as a safety net.
-3. **Memory has privacy tests, not just a database.** Tests now prove that
-   irrelevant prompts do not receive unrelated memories, a different
-   principal cannot receive someone else's memory, and per-turn recall does
-   not mutate the cache-stable prompt prefix.
-4. **Requests can become durable work.** Humans and agents now share one
-   request-intake substrate for proposing a feature/tool/workflow need,
-   searching for duplicates, inspecting it, and adding evidence. Scope checks
-   prevent one workspace from reading another workspace's requests.
-5. **External clients have a secure MCP foundation.** The web app exposes an
-   authenticated `/api/mcp` gateway backed by user-owned API keys and explicit
-   resource/tool grants. Creating, replacing, or revoking a key requires a
-   one-time password-verified step-up receipt.
+1. **Eve hosts Gonk directly.** Gonk remains the universal application-tool,
+   scope, memory, and skill substrate, but it is a library inside the Eve
+   process—not a third HTTP service.
+2. **TanStack owns web-shaped work.** Uploads, artifact previews, skill-manager
+   operations, and other web endpoints call shared repositories directly.
+3. **Tasking stays unified.** Eve's native `todo` tracks the current turn's
+   execution checklist. Durable requests and roadmap work still go through the
+   shared `WorkItemsRepository`; no second task database was added.
+4. **Authorization is live.** Native tool discovery and invocation rebuild the
+   authenticated Gonk context from Eve's current session, then recheck scope,
+   roles, allowed callers, auth level, and persona before side effects.
+5. **Fresh worktrees are boring.** `pnpm dev` prepares one data root, one owner,
+   one binding secret, and two Portless services, then proves the authenticated
+   web → Eve → native-tools path before opening the app.
 
-The `/status` surface and Eve healthcheck also report useful, secret-free
-readiness details instead of only saying red or green.
+## What was removed
 
-## What this means for a user
+- `apps/gonk`
+- the Eve-to-Gonk MCP connection
+- `GONK_MCP_URL`, `GONK_MCP_KEY`, health probes, Docker image, Compose service,
+  and release-manifest entry
+- the web external MCP/API-key gateway
+- web-to-Gonk HTTP proxying for artifacts, skills, status, and tool catalog
+- qualified `gonk__*` names for new tool calls (legacy persisted names remain
+  readable during migration)
 
-- Project and workspace membership is enforced when tools read or mutate
-  container data.
-- Concurrent container edits fail with a revision conflict instead of silently
-  overwriting each other.
-- An agent-written blackboard update can appear immediately in an open view.
-- A remembered fact can be recalled in a later session without being exposed
-  to a different authenticated principal.
-- A feature or tool request can retain its requester, scope, evidence, and
-  duplicate history instead of becoming an untraceable chat promise.
-- A CLI or another MCP client can eventually use a narrowly scoped user key
-  without receiving the deployment-wide internal `GONK_MCP_KEY`.
-- Operators can distinguish model-login problems from Eve runtime failures and
-  see sanitized diagnostics for the web, Eve, and Gonk services.
+There is no runtime feature flag or fallback bridge. The old topology is gone.
 
 ## Technical map
 
-| Capability                        | Main implementation                                                                                    | Important boundary                                                                                      |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Container authorization           | `apps/gonk/src/registry/containers.ts`, app-owned registries and scope authorization                   | Registry membership and live grants authorize access; scope names do not.                               |
-| Live container/blackboard refresh | `apps/web/src/lib/agent-domain-outcomes.tsx`                                                           | Outcomes reconcile React Query state; they do not grant authority.                                      |
-| Memory verification               | `apps/agent/agent/lib/memory.test.ts`                                                                  | Recall is audience-scoped and delivered with the turn; semantic/vector retrieval remains separate work. |
-| Request intake                    | `packages/work-items-store`, `apps/gonk/src/registry/request.ts`, `apps/web/src/lib/request-intake.ts` | Search, inspect, and evidence writes are scope-filtered; unknown and denied records fail opaquely.      |
-| External MCP gateway              | `apps/web/src/routes/api/mcp.ts`, `apps/web/src/lib/external-mcp.server.ts`                            | Public keys are user credentials with explicit grants; `GONK_MCP_KEY` stays internal.                   |
-| Readiness diagnostics             | `apps/web/src/lib/system-status.server.ts`, `apps/agent/scripts/healthcheck.mjs`                       | Diagnostics are sanitized and model-aware; HTTP availability alone is not readiness.                    |
-
-## What is not finished
-
-- Request intake has server functions, tools, persistence, and reconciliation,
-  but still needs its inbox/detail/form UI, duplicate-candidate interaction,
-  triage/promotion UI, and browser-owner review.
-- External MCP still needs the Settings > Security key-management UI and a
-  real deployed remote-client smoke. Its in-memory rate/session counters need
-  shared storage before a multi-instance deployment.
-- Memory episode provenance is preserved when supplied, but Eve does not yet
-  expose the complete episode-finished capture seam. Semantic/vector recall is
-  tracked separately.
-- Project/workspace homes and scoped boards still have owner-facing review
-  gates. Passing package tests is not the same as proving the visible product.
-- Per-agent tool surfacing is deferred because that work may belong in the
-  released `@zigil/agent-*` packages rather than this app.
+| Capability            | Main implementation                                      | Boundary                                                                      |
+| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Native tool host      | `apps/agent/agent/tools/gonk.ts`, `@gonk/eve-host/tools` | Eve owns execution; Gonk owns registry contracts.                             |
+| Application tools     | `packages/agent-tools`                                   | Repositories are injected; the package imports no app singleton or transport. |
+| Artifacts             | `packages/artifact-store`                                | TanStack owns HTTP/upload presentation; Eve tools use the same repository.    |
+| Durable tasking       | `packages/work-items-store`                              | Agent and human work share one revisioned store.                              |
+| Runtime authorization | `apps/agent/agent/lib/gonk-tool-context.ts`              | Auth is reconstructed and checked at discovery/invocation time.               |
+| Readiness             | `/sigil/v1/readiness`, `scripts/dev-readiness.mjs`       | Ready means model auth plus a non-empty native application-tool registry.     |
 
 ## Security model in one paragraph
 
-There are three different credentials. A normal web session identifies a
-human using the browser. A user-owned external MCP API key identifies that same
-human to `/api/mcp`, but only with the key's explicit resource and tool grants.
-The deployment-wide `GONK_MCP_KEY` authenticates traffic between Sigil's own
-services. These credentials are not interchangeable, and every real operation
-must re-check its current resource authorization before side effects.
+The browser session identifies the human. The web app mints a short-lived Eve
+JWT and signed session/scope bindings using `SIGIL_AGENT_BINDING_SECRET`. Eve
+binds its durable session to that principal. For every tool step, the native
+host constructs an authenticated Gonk context and rechecks current application
+authorization. The client approval header is only a prompt preference; it
+cannot grant identity, scope, role, or persona access.
+
+## Migration
+
+Existing installations remove the Gonk container and image, replace the old
+MCP secret with `SIGIL_AGENT_BINDING_SECRET`, and mount the ordinary
+`SIGIL_DATA_DIR` into both web and Eve. If an older deployment stored artifacts
+only under its Gonk volume, copy that `artifacts/` directory into the new shared
+data root before retiring the volume. Managed skills now live under
+`SIGIL_DATA_DIR/skills`; copy any authored skills out of a prior mutable agent
+source tree before retiring it. No browser migration is required; legacy
+`gonk__` approval keys are normalized on read.

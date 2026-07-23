@@ -30,7 +30,7 @@ SIGIL_PUBLIC_URL=https://lantern.example
 
 ## Worktree identity
 
-Development worktrees need no configuration. Portless gives all three services
+Development worktrees need no configuration. Portless gives both services
 one branch-derived namespace, and the browser title gains that label plus a
 stable generated accent. For example, `feature/chrome` becomes
 `[feature-chrome] Lantern — campaign room`.

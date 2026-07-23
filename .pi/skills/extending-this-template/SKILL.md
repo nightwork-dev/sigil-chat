@@ -139,12 +139,12 @@ Do not treat their existence as precedent for a new package.
 2. `pnpm --filter web test` (vitest) if the change has test coverage —
    `apps/web/src/components/agent/agent-outcome-projector.test.ts` is the
    reference pattern for outcome-handling logic.
-3. Load it in a real browser with `pnpm dev` running (starts all three
+3. Load it in a real browser with `pnpm dev` running (starts both
    Portless services — see README service table). Check the console for
    errors/warnings, NOT just that the page renders. If the change touches
    the agent/tool-call loop, this means driving it through
-   the app origin printed by THIS worktree's readiness summary; its namespaced
-   Eve and Gonk services are already part of that stack. Typecheck alone does
-   NOT exercise the tool-call path.
+   the app origin printed by THIS worktree's readiness summary with its
+   namespaced Eve service live, then invoking a native application tool —
+   typecheck alone does NOT exercise the tool-call path.
 
 If any of the three is skipped, the change is not verified.

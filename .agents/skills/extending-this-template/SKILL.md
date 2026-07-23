@@ -178,10 +178,10 @@ Always before calling a route/workspace change done:
    e.g. `apps/web/src/components/agent/agent-outcome-projector.test.ts` is
    the pattern for outcome-handling logic.
 3. Load it in a real browser against the running Portless services
-   (`pnpm dev` starts all three — see the README's service table) and check
+   (`pnpm dev` starts both — see the README's service table) and check
    the console for errors/warnings, not just that the page renders.
    Render-phase store conflicts and hydration mismatches only show up here,
    never as type errors. If the change touches the agent loop, drive it
-   through the app origin printed by this worktree's readiness summary; that
-   stack already includes its correctly namespaced Eve and Gonk services. A
+   through the app origin printed by this worktree's readiness summary with
+   its correctly namespaced Eve service, and invoke a native application tool — a
    route change alone won't exercise the tool-call path.

@@ -3,7 +3,8 @@
 > Date: 2026-07-18
 > Status: ratified architecture contract; subsequent slices added invitations,
 > authentication email delivery, environment-configured OAuth sign-in, and
-> connected-method management. Gonk human-principal propagation remains open.
+> connected-method management. Trusted human-principal propagation into the
+> Eve-hosted application-tool boundary is implemented.
 > Owner: Sigil Chat application composition
 > Related: `AGENT-SESSION-RETENTION-ISSUE.md`, `AGENT-CONTEXT-AWARENESS-SPEC.md`, `GONK-MCP-AUTH-INTEGRATION-SPEC.md`
 
@@ -13,9 +14,9 @@ Sigil Chat uses Better Auth for human accounts and browser sessions, with
 username/password always available and magic-link, recovery, verification, or
 OAuth methods enabled by complete environment configuration. Authentication
 terminates in `apps/web`.
-The authenticated principal is then carried explicitly into Eve and Gonk;
-neither the browser's tool-approval preference nor possession of the internal
-`GONK_MCP_KEY` stands in for user identity.
+The authenticated principal is then carried explicitly into Eve's embedded
+Gonk policy boundary. The browser's tool-approval preference is never treated
+as user identity or authorization.
 
 User settings are owned by Sigil Chat and keyed by the authenticated user.
 Workspace- and channel-specific settings add a second scope coordinate, but
@@ -38,7 +39,7 @@ The first release is deliberately small:
   authentication email delivery is configured;
 - owner-scoped channels, explicit participants, and active-channel preference;
 - authenticated Web-to-Eve calls with a short-lived service token;
-- trusted principal propagation toward Gonk's invocation boundary.
+- trusted principal propagation into the embedded application-tool boundary.
 
 Organizations, billing, API keys, passkeys, and two-factor authentication are
 not part of the first release.
@@ -164,8 +165,8 @@ flowchart LR
   Browser["Browser"] -->|"host-only Better Auth cookie"| Web["apps/web"]
   Web -->|"Better Auth and settings queries"| DB["Auth and settings database"]
   Browser -->|"short-lived JWT from authenticated session"| Eve["apps/agent / Eve"]
-  Eve -->|"service-authenticated MCP plus trusted user context"| Gonk["apps/gonk"]
-  Gonk -->|"authorization at invocation"| Resources["Workspace resources"]
+  Eve -->|"request-bound principal and scope"| Gonk["embedded Gonk policy + registry"]
+  Gonk -->|"authorization at discovery and invocation"| Resources["Workspace resources"]
 ```
 
 ### Web application
@@ -226,20 +227,15 @@ existing one.
 
 ### Gonk authentication and authorization
 
-`GONK_MCP_KEY` remains service-to-service transport authentication between Eve
-and Gonk. It identifies Eve as an allowed caller; it does not identify the
-human user.
+The `@gonk/eve-host` adapter projects the application registry directly into
+Eve. Each discovery and invocation reconstructs trusted host context from the
+verified Eve caller and immutable execution binding, then authorizes against
+the current principal, persona, application thread, and resource scope.
+Revocation is checked again on the next discovery or invocation.
 
-Before user-dependent tools are enabled, principal propagation lands at the
-`@gonk/eve-host` adapter seam: the adapter must carry the verified human
-principal to each invocation in trusted host context. Gonk then
-authorizes the operation against that principal, the active workspace channel,
-and the target resource. A browser-supplied principal, `clientContext`, tool
-input field, or approval header is never trusted identity.
-
-If the published adapter cannot carry per-invocation principal context, that is
-a release blocker for multi-user deployment. Do not work around it by adding a
-`userId` argument to every tool.
+A browser-supplied principal, `clientContext`, tool input field, or approval
+header is never trusted identity. Do not work around this boundary by adding a
+`userId` argument to tools.
 
 ## Persistence
 

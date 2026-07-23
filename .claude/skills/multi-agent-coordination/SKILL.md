@@ -85,36 +85,35 @@ bespoke folders — both anti-patterns. Four tiers:
   human smokes `dev`.
 - **Parallel work gets its own worktree — and the ORCHESTRATOR owns its
   lifecycle, NOT the agent.** Default, not the exception. Fanning out concurrent
-  streams in a *single* tree is what collides on shared files (`.gitignore`,
+  streams in a _single_ tree is what collides on shared files (`.gitignore`,
   `CLAUDE.md`, `registry.ts`, `_app.tsx`).
-  - **Orchestrator (the tactical coordinator):** create the worktree, dispatch
-    the agent into it, and after it reports — review, **merge or open a PR**,
-    and only THEN remove the worktree + branch.
+  - **Orchestrator (the tactical coordinator):** create the worktree,
+    **point it at shared config** (a fresh worktree lacks the gitignored `.env`),
+    dispatch the agent into it, and after it reports — review, **merge or open a
+    PR**, and only THEN remove the worktree + branch.
     ```
     git worktree add ../<stream> -b <branch> dev              # orchestrator creates
-    (cd ../<stream> && pnpm dev)                              # complete isolated instance
+    ln -s <shared>/.env ../<stream>/.env                      # point at shared env (secrets), not re-provisioned
+    (cd ../<stream> && pnpm install)                          # link workspace deps
     # …dispatched agent works + verifies in ../<stream>, reports back…
-    git -C <dev-path> merge <branch>                          # integrate against current dev
+    git -C <dev-path> merge --no-ff <branch>                  # orchestrator integrates
     git worktree remove ../<stream> && git branch -d <branch> # orchestrator cleans up — AFTER merge
     ```
-    `pnpm dev` synchronizes the frozen install, generates worktree-local
-    credentials, migrates and seeds auth, starts the full stack, proves
-    authenticated readiness, and prints the private owner sign-in URL. There is
-    no setup-worktree helper or shared `.env` step to remember.
-  - **What's worktree-specific vs. shared:**
-    - *Worktree-specific:* the branch/tree; generated files (`routeTree.gen.ts`,
-      `.output`/`dist`); `.data`; `apps/agent/.eve`; generated owner and service
-      credentials; turbo/vite caches; and the branch-derived Portless prefix.
-      Multiple full stacks can run concurrently because every app in a worktree
-      receives the same unique prefix. Use the readiness summary's URLs rather
-      than the primary checkout's hard-coded names.
-    - *Shared deliberately:* the external roadmap store
-      (`SIGIL_ROADMAP_DIR`) and pnpm's content-addressed package store. Checked-in
-      application behavior is shared through Git. Never copy or symlink `.env`,
-      runtime directories, or generated credentials between worktrees.
-  - **Recovery:** stop the worktree's stack and use `pnpm dev:reset`; restore
-    only with the exact `pnpm dev:restore` command it prints. Do not hand-delete
-    state or borrow another worktree's instance.
+    A `scripts/setup-worktree` helper should collapse the create + symlink +
+    install into one command (roadmap S-worktree-tooling). Shared secrets live in
+    ONE canonical `.env` co-located near the repos; worktrees symlink, never copy.
+  - **What's worktree-specific vs. shared** (the helper links the shared, inits
+    the specific):
+    - _Worktree-specific:_ the branch/tree; generated files (`routeTree.gen.ts`,
+      `.output`/`dist`); the **dev runtime** — portless names/ports, `apps/agent/.eve/`,
+      `.data/` sessions, turbo/vite caches. **Two live dev stacks collide on
+      `:1355`**, so a worker worktree does **typecheck/build only**; browser
+      verification runs against the integrated `dev` stack (or a uniquely-prefixed
+      portless name), never a second dev server spun up by the worker.
+    - _Shared:_ the roadmap store (`SIGIL_ROADMAP_DIR`, already external);
+      `node_modules` via pnpm's global store (`pnpm install` per worktree =
+      cheap hardlinks); the machine-local coordination skill (describes the
+      machine, not the branch).
   - **Dispatched agents: work + verify in your assigned worktree and REPORT.
     Do NOT merge, do NOT `git worktree remove`, do NOT delete your branch.**
     Leave it intact for the orchestrator — removing it yourself can destroy
@@ -136,9 +135,9 @@ bespoke folders — both anti-patterns. Four tiers:
 - **`pi` is SERIAL: only ONE `pi` process at a time** (its extensions share a
   SQLite db and will `database is locked` otherwise). Queue pi work.
 - Claude/codex agents run in parallel **only on disjoint files**.
-- **Hot shared files** — `apps/gonk/src/registry.ts`, `apps/web/src/routes/_app.tsx`,
+- **Hot shared files** — `packages/agent-tools/src/registry.ts`, `apps/web/src/routes/_app.tsx`,
   `apps/web/src/lib/agent-domain-outcomes.tsx`, `packages/agent-contracts/src/client-command.ts`
-  — are **owned by the orchestrator**. Feature agents add their *own* new files
+  — are **owned by the orchestrator**. Feature agents add their _own_ new files
   and report the nav entry / tool registration for the orchestrator to batch;
   do NOT have N agents edit the same hub file in parallel.
 - If two streams genuinely must edit the same file, isolate them in separate
@@ -177,9 +176,10 @@ bespoke folders — both anti-patterns. Four tiers:
 
 ## Where things live
 
-- **Gonk application tools** → `apps/gonk/src/registry.ts` (+ `registry/*.ts`).
-  Eve discovers them over MCP via `apps/agent/agent/connections/gonk.ts` — never
-  hand-copy tool defs into eve. `exec`-tier tools are denied by policy.
+- **Application tools** → `packages/agent-tools/src` and its `registry.ts`
+  composition hub. Eve hosts that one Gonk registry through
+  `apps/agent/agent/tools/gonk.ts`; never hand-copy definitions or add a
+  second transport path. `exec`-tier tools are denied by policy.
 - **Sigil-first is the registry loop, enforced:** consume-first check before
   authoring any component/hook (grep `packages/ui` → check sigil-design
   `/showcase` + registry → install, don't re-author), and an extraction
@@ -187,7 +187,5 @@ bespoke folders — both anti-patterns. Four tiers:
   `candidate:<X#>` / `app-domain`). Full contract in `building-in-sigil-chat`;
   the verdict is checked at merge (see commit protocol). The `packages/data`
   `ResourceManager` and the ingress/emphasis extractions are the pattern.
-- **`GONK_MCP_KEY`** is generated by `pnpm dev` under this worktree's
-  `.data/dev/gonk-mcp-key` and supplied to every service. Do not copy, export,
-  or symlink it for ordinary local development; an explicit value is a
-  deployment/override concern.
+- **`SIGIL_AGENT_BINDING_SECRET`** is shared only by web and Eve for the
+  private verified-principal binding route; it does not authorize tool calls.

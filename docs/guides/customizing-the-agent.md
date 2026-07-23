@@ -2,7 +2,7 @@
 
 `apps/agent` is the Eve host — the process that owns durable sessions,
 streaming, interruption, and the model call. This guide walks its real
-anatomy: model config, the HTTP channel, connections, instructions, and
+anatomy: model config, the HTTP channel, native tools, instructions, and
 subagents, plus what resetting local Eve state means in dev.
 
 ## `agent.ts` — model configuration
@@ -10,16 +10,16 @@ subagents, plus what resetting local Eve state means in dev.
 The whole file, in full:
 
 ```ts
-import { defineAgent } from "eve"
-import { experimental_chatgpt } from "eve/models/openai"
-import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
+import { defineAgent } from "eve";
+import { experimental_chatgpt } from "eve/models/openai";
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config";
 
-const { value: sigilConfig } = await loadSigilConfigFixture()
+const { value: sigilConfig } = await loadSigilConfigFixture();
 
 export default defineAgent({
   model: experimental_chatgpt(sigilConfig.agent.model),
   modelContextWindowTokens: 200_000,
-})
+});
 ```
 
 `experimental_chatgpt()` reads the local `codex login` session and calls the
@@ -38,7 +38,7 @@ sibling file, next.
 
 [`apps/agent/agent/instructions.md`](../../apps/agent/agent/instructions.md)
 is the agent's system instructions, read as plain Markdown. The real file
-covers, in order: how to use `gonk`-connection tools (prefer live application
+covers, in order: how to use application tools (prefer live application
 state over guessing, explain what a mutation changed, never claim success a
 tool result doesn't confirm), how to treat client context (task-relevant
 attention, not surveillance — the user controls its privacy level), the
@@ -58,7 +58,7 @@ export default createOwnedEveChannel({
   auth: authenticatePrincipal,
   onMessage,
   ownerStore: eveSessionOwnerStore,
-})
+});
 ```
 
 Two things happen here that matter if you're customizing the agent:
@@ -71,33 +71,35 @@ Two things happen here that matter if you're customizing the agent:
   the client-declared `x-sigil-tool-approval` preference to auth attributes;
   that preference remains non-authoritative (see `adding-a-tool.md`).
 - **`onMessage`** is built by `createSigilEveOnMessage()` from
-  `apps/agent/agent/lib/sigil-context.ts` — this compiles server-side managed
-  skill context (via `@gonk/context` and `@gonk/skills`) into the message
-  before Eve sends it to the model. Retrieval is not registered because this
+  `apps/agent/agent/lib/sigil-context.ts` — this compiles managed skill context
+  (via `@gonk/context` and `@gonk/skills`) into the message. Each turn binds the
+  registry to the trusted Eve persona and application-thread context, while
+  all tiers remain durable under `SIGIL_DATA_DIR/skills` for web/Eve parity.
+  The compiler adds the selected context before Eve sends it to the model.
+  Retrieval is not registered because this
   template has no production retrieval source; add a source-backed contributor
   when the application has one rather than advertising an empty default. Two
   env vars gate the current compiler: `SIGIL_CONTEXT_REQUIRED_SKILLS` and
   `SIGIL_CONTEXT_PINNED_RESOURCE_KEYS`, both comma-separated lists read by
   `readCsvEnv()` in `eve.ts`. This is distinct from the client-side attention
   context covered in `building-workspaces.md` — this file compiles
-  *server-owned* managed skills; the client sends its own *application*
+  _server-owned_ managed skills; the client sends its own _application_
   context (selections, attachments) separately as
   `clientContext` on the send call.
 
-## `connections/` — adding a second MCP connection
+## `tools/gonk.ts` — native application tools
 
-There is currently one connection,
-[`apps/agent/agent/connections/gonk.ts`](../../apps/agent/agent/connections/gonk.ts),
-built with `defineMcpClientConnection` from `eve/connections`. To add a
-second MCP server, add a sibling file in the same directory that calls
-`defineMcpClientConnection` with that server's URL, `description`, and
-`approval` policy — Eve loads every file in `connections/` the same way, so a
-second connection doesn't require touching `channels/eve.ts` or `agent.ts`.
-Keep the same shape as `gonk.ts`: a clear `description` (this is what the
-model sees when deciding which connection's tools to reach for), an explicit
-`approval` function rather than a blanket allow, and bearer auth read from an
-env var with a startup failure if it's required and missing (see
-`apps/gonk/src/server.ts`'s `process.exit(1)` pattern in `adding-a-tool.md`).
+[`apps/agent/agent/tools/gonk.ts`](../../apps/agent/agent/tools/gonk.ts) projects
+the injected `@workspace/agent-tools` registry through
+`@gonk/eve-host/tools`. The companion `gonk-tool-context.ts` builds the trusted
+principal, rechecks live scope/role/caller/persona authorization, maps
+cancellation, and reads the current session's approval preference. Add tools to
+the package registry, not this adapter.
+
+Optional third-party MCP services can still be added as Eve connections when
+the product genuinely needs one. They are integrations, not the application
+tool substrate, and must bring their own authentication and authorization
+contract. Do not recreate the deleted in-repo Gonk bridge as a connection.
 
 ## `subagents/` — delegating to an isolated specialist
 

@@ -75,10 +75,10 @@ worked examples below rather than trusting the description alone.
    and the registry), `packages/work-items-store` — its `package.json`
    `exports` map (`.`, `./types`, `./repository`) is the pattern
    for explicit subpath exports (no barrel `export *`).
-2. **Gonk tool.** `apps/gonk/src/registry.ts` composes per-domain
-   registration functions from `apps/gonk/src/registry/*.ts` (e.g.
-   `registerReviewTools`, `registerStoryTools`, `registerSkillTools`) into
-   one `ToolRegistry`. A tool's handler returns `{ data }`, and if it needs
+2. **Application tool.** `packages/agent-tools/src/registry.ts` composes
+   per-domain registration functions into one Gonk `ToolRegistry`, hosted
+   natively by Eve through `apps/agent/agent/tools/gonk.ts`. A tool's handler
+   returns `{ data }`, and if it needs
    to update client UI it also returns a `clientCommand` inside `data`. Full
    rules (tiering, visibility, approval, verification) live in the
    `adding-gonk-tools` skill — treat this step as a pointer, not the spec.
@@ -104,14 +104,15 @@ worked examples below rather than trusting the description alone.
    skill — coordinate before editing it concurrently with another agent.
 
 **Worked examples to read start-to-end, not just cite:**
-- Review/annotation: `packages/review-store` → `apps/gonk/src/registry/review.ts`
+
+- Review/annotation: `packages/review-store` → `packages/agent-tools/src/review.ts`
   → `apps/web/src/lib/review-document.ts` → `apps/web/src/routes/_app/review.tsx`
   → the `review.document.changed` handler in `agent-domain-outcomes.tsx`.
 - Work items: `packages/work-items-store` → `registerStoryTools` in
-  `apps/gonk/src/registry.ts` → `apps/web/src/lib/work-items.ts` → the
+  `packages/agent-tools/src/registry.ts` → `apps/web/src/lib/work-items.ts` → the
   in-app board.
 - Skills catalog: `@gonk/skills` (`FilesystemManagedSkillRegistry`) →
-  `registerSkillTools` in `apps/gonk/src/registry/skills.ts` →
+  `registerSkillTools` in `packages/agent-tools/src/skills.ts` →
   `apps/web/src/lib/skills.ts` → `apps/web/src/routes/_app/skills.tsx` →
   the `"skills.changed"` handler.
 
@@ -139,13 +140,12 @@ worked examples below rather than trusting the description alone.
   belongs in `sigil-design` first. If a needed atom/molecule/pattern is
   missing there, add it there — don't work around it here.
 - **Formatting matches the file you're editing**, not a blanket rule:
-  `apps/web`/`apps/gonk` are semicolon-free; `apps/agent` is mixed.
+  `apps/web` is semicolon-free; `apps/agent` is mixed.
 
 ## Where to go deeper
 
-- Adding or changing a Gonk tool → `adding-gonk-tools` skill (tier/
-  visibility/approval semantics, the Eve discovery path, `GONK_MCP_KEY`,
-  ask-mode consent vs. the `ApprovalProvider` boundary, verification steps).
+- Adding or changing an application tool → `adding-gonk-tools` skill (native
+  Eve hosting, Gonk tier/visibility/authorization/approval, and verification).
 - Writing or extracting a component → `component-development` skill (Root/
   Parts standard, CVA, decoupling from source-project domain types).
 - Adding a route, layout, or top-level section → `extending-this-template`

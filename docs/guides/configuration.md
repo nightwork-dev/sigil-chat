@@ -3,7 +3,7 @@
 Sigil Chat has three configuration layers:
 
 1. `pnpm dev` needs no environment file. It derives worktree URLs and creates
-   disposable data, service credentials, migrations, and the development owner.
+   disposable data, an agent binding secret, migrations, and the development owner.
 2. `fixtures/application/sigil-chat.yaml` is a typed Mirk fixture for checked-in
    product behavior: branding, model choice, registration policy, and image
    quality/preset.
@@ -14,19 +14,19 @@ Sigil Chat has three configuration layers:
 
 Most installations need six values:
 
-| Variable | Purpose |
-| --- | --- |
-| `SIGIL_PUBLIC_URL` | One public origin for auth identity and metadata |
-| `SIGIL_DATA_DIR` | Default root for database and application stores |
-| `BETTER_AUTH_SECRET` | Stable human-auth signing secret (32+ characters) |
-| `GONK_MCP_KEY` | Stable Eve/web to Gonk transport bearer |
-| `SIGIL_INSTALLATION_ID` | Stable non-secret deployment identifier |
-| `SIGIL_INVITE_TOKEN_PEPPER_FILE` | Mounted secret used to digest invitation tokens |
+| Variable                         | Purpose                                                       |
+| -------------------------------- | ------------------------------------------------------------- |
+| `SIGIL_PUBLIC_URL`               | One public origin for auth identity and metadata              |
+| `SIGIL_DATA_DIR`                 | Default root for database and application stores              |
+| `BETTER_AUTH_SECRET`             | Stable human-auth signing secret (32+ characters)             |
+| `SIGIL_AGENT_BINDING_SECRET`     | Stable web/agent secret for signed session and scope bindings |
+| `SIGIL_INSTALLATION_ID`          | Stable non-secret deployment identifier                       |
+| `SIGIL_INVITE_TOKEN_PEPPER_FILE` | Mounted secret used to digest invitation tokens               |
 
 The production Compose file uses secret files where appropriate. Set
 `SIGIL_DATABASE_URL` only for a database outside `SIGIL_DATA_DIR`. Set
-`EVE_ORIGIN` or `GONK_MCP_URL` only when the services do not use the standard
-network topology. Eve derives JWKS discovery from `SIGIL_PUBLIC_URL`; set
+`EVE_ORIGIN` only when the two services do not use the standard network
+topology. Eve derives JWKS discovery from `SIGIL_PUBLIC_URL`; set
 `SIGIL_EVE_AUTH_JWKS_URL` only when it should fetch those same public keys over
 an internal service address such as `http://web:3000/api/auth/jwks`. This does
 not change the public JWT issuer.
@@ -87,8 +87,10 @@ accident.
 
 ## Isolated storage mounts
 
-`SIGIL_DATA_DIR` supplies the normal layout. The AWS deployment deliberately
-keeps identity, blackboard, roadmap, and container-registry volumes isolated,
+`SIGIL_DATA_DIR` supplies the normal layout, including the shared
+`skills/` substrate used by both web management and Eve's request-bound Gonk
+skill resolution. The AWS deployment deliberately keeps identity, blackboard,
+roadmap, and container-registry volumes isolated,
 so it uses the narrower `SIGIL_PERSONA_DIR`, `SIGIL_MEMORY_DIR`,
 `SIGIL_BLACKBOARD_DIR`, `SIGIL_ROADMAP_DIR`, and
 `SIGIL_CONTAINER_REGISTRY_ROOT` overrides at those service boundaries. These
