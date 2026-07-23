@@ -32,6 +32,10 @@ import {
 
 import { useActiveContainer } from "@/lib/active-container"
 import { useAgentThread, useAgentThreads } from "@/lib/agent-threads"
+import {
+  resolveProjectRouteParam,
+  resolveWorkspaceRouteParam,
+} from "@/lib/container-route-target"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 
 const PROJECT_ROUTE_ID = "/_app/projects/$projectId"
@@ -69,10 +73,24 @@ export function ContainerBreadcrumb() {
   // /home) — the segment omits itself.
   if (!projectMatch || !nav) return null
 
-  const projectId = (projectMatch.params as { projectId: string }).projectId
-  const workspaceId = workspaceMatch
+  // Route params are canonically slugs now (container slugs, SC.10); may be
+  // legacy/UUID ids transiently, right before the route's own redirect
+  // fires. Resolve to the canonical {id, slug} pair once: `id` for every
+  // internal comparison/filter below (nav records are keyed by id, never by
+  // slug), `slug` for every href/navigate target.
+  const routeProjectId = (projectMatch.params as { projectId: string })
+    .projectId
+  const routeWorkspaceId = workspaceMatch
     ? (workspaceMatch.params as { workspaceId: string }).workspaceId
     : undefined
+  const resolvedProject = resolveProjectRouteParam(nav, routeProjectId)
+  const projectId = resolvedProject?.id ?? routeProjectId
+  const projectSlug = resolvedProject?.slug ?? routeProjectId
+  const resolvedWorkspace = routeWorkspaceId
+    ? resolveWorkspaceRouteParam(nav, routeWorkspaceId)
+    : undefined
+  const workspaceId = resolvedWorkspace?.id ?? routeWorkspaceId
+  const workspaceSlug = resolvedWorkspace?.slug ?? routeWorkspaceId
 
   const activeProject = nav.projects.find((p) => p.id === projectId)
   const activeWorkspace = workspaceId
@@ -88,14 +106,14 @@ export function ContainerBreadcrumb() {
     (w) => w.projectId !== projectId && w.mountedProjectIds.includes(projectId),
   )
 
-  const projectHomeHref = `/projects/${projectId}`
-  const workspaceHomeHref = workspaceId
-    ? `/projects/${projectId}/workspaces/${workspaceId}`
+  const projectHomeHref = `/projects/${projectSlug}`
+  const workspaceHomeHref = workspaceSlug
+    ? `/projects/${projectSlug}/workspaces/${workspaceSlug}`
     : undefined
   const sessionHomeHref = sessionSlug
-    ? workspaceId
-      ? `/projects/${projectId}/workspaces/${workspaceId}/sessions/${sessionSlug}`
-      : `/projects/${projectId}/sessions/${sessionSlug}`
+    ? workspaceSlug
+      ? `/projects/${projectSlug}/workspaces/${workspaceSlug}/sessions/${sessionSlug}`
+      : `/projects/${projectSlug}/sessions/${sessionSlug}`
     : undefined
 
   // Sibling sessions for the session switcher: within a workspace, other
@@ -110,32 +128,39 @@ export function ContainerBreadcrumb() {
     )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
-  const selectProject = (nextProjectId: string) => {
+  const selectProject = (nextProjectId: string, nextProjectSlug: string) => {
     container.selectProject(nextProjectId)
     void navigate({
       to: "/projects/$projectId",
-      params: { projectId: nextProjectId },
+      params: { projectId: nextProjectSlug },
     })
   }
 
-  const selectWorkspace = (nextWorkspaceId: string) => {
+  const selectWorkspace = (
+    nextWorkspaceId: string,
+    nextWorkspaceSlug: string,
+  ) => {
     container.selectWorkspace(nextWorkspaceId)
     void navigate({
       to: "/projects/$projectId/workspaces/$workspaceId",
-      params: { projectId, workspaceId: nextWorkspaceId },
+      params: { projectId: projectSlug, workspaceId: nextWorkspaceSlug },
     })
   }
 
   const selectSession = (nextSlug: string) => {
-    if (workspaceId) {
+    if (workspaceSlug) {
       void navigate({
         to: "/projects/$projectId/workspaces/$workspaceId/sessions/$threadId",
-        params: { projectId, workspaceId, threadId: nextSlug },
+        params: {
+          projectId: projectSlug,
+          workspaceId: workspaceSlug,
+          threadId: nextSlug,
+        },
       })
     } else {
       void navigate({
         to: "/projects/$projectId/sessions/$threadId",
-        params: { projectId, threadId: nextSlug },
+        params: { projectId: projectSlug, threadId: nextSlug },
       })
     }
   }
@@ -152,7 +177,7 @@ export function ContainerBreadcrumb() {
             label: project.name,
             icon: project.icon,
             active: project.id === projectId,
-            onSelect: () => selectProject(project.id),
+            onSelect: () => selectProject(project.id, project.slug),
           }))}
         />
       </BreadcrumbItem>
@@ -171,14 +196,14 @@ export function ContainerBreadcrumb() {
                   label: workspace.name,
                   icon: workspace.icon,
                   active: workspace.id === workspaceId,
-                  onSelect: () => selectWorkspace(workspace.id),
+                  onSelect: () => selectWorkspace(workspace.id, workspace.slug),
                 })),
                 ...mountedWorkspaces.map((workspace) => ({
                   id: workspace.id,
                   label: `${workspace.name} · Shared`,
                   icon: workspace.icon,
                   active: workspace.id === workspaceId,
-                  onSelect: () => selectWorkspace(workspace.id),
+                  onSelect: () => selectWorkspace(workspace.id, workspace.slug),
                 })),
               ]}
             />

@@ -8,16 +8,28 @@
 // Loader: once the parent layout's access check resolves "readable", warms
 // the scoped work, artifacts, and home signals this view reads. Skips the
 // prefetch entirely otherwise — those queries stay disabled client-side too.
+//
+// Container slugs (SC.10, CRITICAL BOUNDARY): $projectId is either the
+// canonical slug or a legacy/UUID id. This leaf owns the full, unambiguous
+// param set, so it's the one that redirects to the canonical slug URL when
+// they differ. Every scope-keyed query below (scopeHomeAccessQueryOptions,
+// scopeWorkQueryOptions, artifactScopeForHome, homeSignalsQueryOptions) is
+// built from the resolved CANONICAL id — a slug must never reach the
+// work-items scope-access surface.
 
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
 
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
 import { artifactsQueryOptions, useArtifacts } from "@/lib/artifacts"
+import { resolveProjectRouteParam } from "@/lib/container-route-target"
 import { homeSignalsQueryOptions, useHomeSignals } from "@/lib/home-signals"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import {
+  projectWorkspaceNavQueryOptions,
+  useProjectWorkspaceNav,
+} from "@/lib/project-workspace-nav"
 import { buildProjectHome } from "@/features/homes/home-view-model"
 import {
   artifactRowsFromRecords,
@@ -37,21 +49,26 @@ import {
 export const Route = createFileRoute("/_app/projects/$projectId/")({
   loader: async ({ context, params }) => {
     const principalId = context.user.id
+    const nav = await context.queryClient
+      .ensureQueryData(projectWorkspaceNavQueryOptions(principalId))
+      .catch(() => undefined)
+    const resolved = resolveProjectRouteParam(nav, params.projectId)
+    if (resolved && resolved.slug !== params.projectId) {
+      throw redirect({
+        to: "/projects/$projectId",
+        params: { projectId: resolved.slug },
+      })
+    }
+    const projectId = resolved?.id ?? params.projectId
     const access = await context.queryClient
-      .ensureQueryData(
-        scopeHomeAccessQueryOptions(principalId, params.projectId),
-      )
+      .ensureQueryData(scopeHomeAccessQueryOptions(principalId, projectId))
       .catch(() => undefined)
     if (access !== "readable") return
-    const scope = artifactScopeForHome("project", params.projectId)
+    const scope = artifactScopeForHome("project", projectId)
     await Promise.all([
       context.queryClient
         .ensureQueryData(
-          scopeWorkQueryOptions(
-            principalId,
-            params.projectId,
-            "self-and-rollups",
-          ),
+          scopeWorkQueryOptions(principalId, projectId, "self-and-rollups"),
         )
         .catch(() => undefined),
       context.queryClient
@@ -59,7 +76,7 @@ export const Route = createFileRoute("/_app/projects/$projectId/")({
         .catch(() => undefined),
       context.queryClient
         .ensureQueryData(
-          homeSignalsQueryOptions(principalId, "project", params.projectId),
+          homeSignalsQueryOptions(principalId, "project", projectId),
         )
         .catch(() => undefined),
     ])
@@ -68,11 +85,16 @@ export const Route = createFileRoute("/_app/projects/$projectId/")({
 })
 
 function ProjectHomeRoute() {
-  const { projectId } = Route.useParams()
+  const { projectId: routeProjectId } = Route.useParams()
   const nav = useProjectWorkspaceNav()
   const threads = useAgentThreads()
   const roster = useAgentRoster()
   const compact = useMediaQuery("(max-width: 640px)")
+  // The route param may still be the slug that's about to redirect from a
+  // stale render, or (transiently) a legacy UUID — resolve it against the
+  // already-fetched nav the same way the loader did (cache hit).
+  const projectId =
+    resolveProjectRouteParam(nav.data, routeProjectId)?.id ?? routeProjectId
   const access = useScopeHomeAccess(projectId)
   const scopedWork = useScopeWork(
     projectId,

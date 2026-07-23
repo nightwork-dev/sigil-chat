@@ -17,12 +17,16 @@ export function homeTarget(
   nav: ProjectWorkspaceNavSummary,
 ): string {
   const projectId = selection.projectId ?? nav.personalProjectId
+  // Container slugs (SC.10): the emitted href is always the canonical slug
+  // form, never the raw id — `id` here is only the lookup key into `nav`.
+  const project = nav.projects.find((entry) => entry.id === projectId)
+  const projectSlug = project?.slug ?? projectId
   if (selection.workspaceId) {
     const workspace = nav.workspaces.find(
       (entry) => entry.id === selection.workspaceId,
     )
-    if (!workspace) return `/projects/${projectId}`
-    return `/projects/${projectId}/workspaces/${workspace.id}`
+    if (!workspace) return `/projects/${projectSlug}`
+    return `/projects/${projectSlug}/workspaces/${workspace.slug}`
   }
-  return `/projects/${projectId}`
+  return `/projects/${projectSlug}`
 }
