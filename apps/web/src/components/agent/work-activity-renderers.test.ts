@@ -46,6 +46,15 @@ describe("work activity renderers", () => {
     expect(html).not.toContain('"todos"')
   })
 
+  it("falls back to the generic tool receipt for malformed todo output", () => {
+    const html = renderToStaticMarkup(
+      createElement(TodoActivityRenderer, tool("todo", { todos: "invalid" })),
+    )
+
+    expect(html).not.toContain("Session checklist")
+    expect(html).toContain("todo")
+  })
+
   it("renders the sandbox command result with its exit state", () => {
     const html = renderToStaticMarkup(
       createElement(

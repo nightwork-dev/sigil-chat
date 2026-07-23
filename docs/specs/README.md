@@ -8,6 +8,11 @@ product overview.
 
 Currently authoritative for this product's design/implementation.
 
+- [`EVE-AS-GONK-HOST-SPEC.md`](EVE-AS-GONK-HOST-SPEC.md) — Gonk's application
+  registry, authorization, approval, skills, and receipts are hosted natively
+  inside Eve; Sigil Chat operates web and Eve, not a third Gonk service.
+  Implemented architecture contract; release verification pending.
+
 - [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md) —
   canonical ownership remains singular while typed, ordered scope links enable
   shared workspaces, resource participation, default contribution, and
@@ -34,8 +39,8 @@ Currently authoritative for this product's design/implementation.
   `packages/canvas`) composes panels of content. Draft product spec.
 
 - [`AGENT-OUTPUT-PROJECTION-SPEC.md`](AGENT-OUTPUT-PROJECTION-SPEC.md) —
-  companion to `AGENT-CONTEXT-AWARENESS-SPEC.md` (the *output* half to that
-  spec's *input* half): how agent actions surface on the canvas, not just the
+  companion to `AGENT-CONTEXT-AWARENESS-SPEC.md` (the _output_ half to that
+  spec's _input_ half): how agent actions surface on the canvas, not just the
   transcript. A part-projection registry renders tool-calls as anchored
   overlays or ambient panels instead of transcript lines; agent annotation
   tools (`sigil-annotate`/`pin`/`highlight`) anchor to attention items. Draft
@@ -44,7 +49,7 @@ Currently authoritative for this product's design/implementation.
 - [`PRODUCT-CHROME-REWORK-SPEC.md`](PRODUCT-CHROME-REWORK-SPEC.md) —
   make Projects/Workspaces the visible organizing center of the app shell
   (two-level chrome: container context + feature surface); elevate the Cmd+K
-  omnibar to fluid project/workspace/session switching *and* as a direct agent
+  omnibar to fluid project/workspace/session switching _and_ as a direct agent
   input (message mode); and define a family of agent chat-panel variants
   (dock / sidecar / inline / omnibar / strip) so the one conversation can be
   presented where a surface needs it. Also closes the consistency gaps
@@ -54,13 +59,8 @@ Currently authoritative for this product's design/implementation.
 - [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md) —
   Better Auth username/password accounts, user settings, channel membership,
   owner-scoped application records, and trusted principal propagation from Web
-  through Eve to Gonk. Ratified architecture contract; implementation pending.
-
-- [`DEPLOYMENT-INVITE-DEMO-SPEC.md`](DEPLOYMENT-INVITE-DEMO-SPEC.md) —
-  disposable one-origin, invite-only deployment and teardown contract with a
-  secret-free Compose topology fixture. Specification only; public deployment
-  is blocked on membership, principal-propagation, retention, and credential
-  proofs.
+  into Eve-hosted Gonk policy. Ratified architecture contract; the transport
+  details are superseded by `EVE-AS-GONK-HOST-SPEC.md`.
 
 - [`AGENT-EMBEDDING-SPEC.md`](AGENT-EMBEDDING-SPEC.md) — `@workspace/agent`
   embeddable agent framework. Implemented and architect-approved; live-browser
@@ -83,11 +83,15 @@ Currently authoritative for this product's design/implementation.
   session retention, redaction, and resume-secret handling. Decision
   accepted, product projection implemented, deployment gates still open.
   Referenced directly from the README trust-model section.
+
+## Historical implementation records
+
 - [`GONK-MCP-AUTH-INTEGRATION-SPEC.md`](GONK-MCP-AUTH-INTEGRATION-SPEC.md) —
-  the proposal that shaped the current `GONK_MCP_KEY` bearer-auth
-  integration in `apps/gonk`. Gonk Core's review response (request-changes,
-  since acted on) is retained locally alongside the rest of the extraction
-  program's correspondence.
+  the former internal MCP bridge and bearer-auth design. Superseded by
+  `EVE-AS-GONK-HOST-SPEC.md`; retained as the security and migration record.
+- [`DEPLOYMENT-INVITE-DEMO-SPEC.md`](DEPLOYMENT-INVITE-DEMO-SPEC.md) — the
+  original three-service deployment contract. Current executable deployment
+  docs use the two-service topology; this file remains historical evidence.
 
 ## Proposed cross-repository contracts
 

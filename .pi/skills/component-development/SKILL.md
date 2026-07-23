@@ -265,7 +265,7 @@ Do not skip steps. Do not report completion after step 1 alone.
    component exists for.** "It renders" is not sufficient evidence of
    anything. A drag-to-conflict slider must be dragged into conflict and
    the conflict state checked. A scroll-spy shell needs real overflow and a
-   real scroll, not a static DOM snapshot. Run `pnpm dev` (starts all three
+   real scroll, not a static DOM snapshot. Run `pnpm dev` (starts both
    Portless services) and drive the component inside the REAL workspace
    that consumes it, using the app origin printed by THIS worktree's readiness
    summary, in the SAME change—not as a follow-up task. Only fall back to the

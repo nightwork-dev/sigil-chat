@@ -8,7 +8,7 @@ import test from "node:test";
 import { parseImageManifest } from "./verify-release.mjs";
 
 const digest = "a".repeat(64);
-const validManifest = ["EVE", "GONK", "MIGRATE", "WEB"]
+const validManifest = ["EVE", "MIGRATE", "WEB"]
   .map(
     (target) =>
       `SIGIL_${target}_IMAGE=123456789012.dkr.ecr.us-west-2.amazonaws.com/sigil-chat-${target.toLowerCase()}@sha256:${digest}`,
@@ -23,8 +23,8 @@ function verifyWithShell(source) {
   return spawnSync(shellVerifier, [manifest], { encoding: "utf8" });
 }
 
-test("accepts exactly four immutable production images", () => {
-  assert.equal(Object.keys(parseImageManifest(validManifest)).length, 4);
+test("accepts exactly three immutable production images", () => {
+  assert.equal(Object.keys(parseImageManifest(validManifest)).length, 3);
 });
 
 test("rejects tags, missing images, duplicates, and unknown keys", () => {

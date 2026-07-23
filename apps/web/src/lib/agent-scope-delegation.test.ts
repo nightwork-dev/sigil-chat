@@ -300,31 +300,22 @@ describe("agent scope authorization", () => {
     expect(() => assert("user-read-only", "tool")).toThrow("NOT_AUTHORIZED")
   })
 
-  it("preserves the unregistered evidence-room scope and rejects other legacy scopes", () => {
-    expect(() =>
-      assertAuthorizedScope(
-        "project:evidence-room",
-        "user-1",
-        () => undefined,
-        emptyRegistries(),
-      ),
-    ).not.toThrow()
-    expect(() =>
-      assertAuthorizedScope(
-        "project:other",
-        "user-1",
-        () => undefined,
-        emptyRegistries(),
-      ),
-    ).toThrow("not available")
-    expect(() =>
-      assertAuthorizedScope(
-        "persona:any",
-        "user-1",
-        () => undefined,
-        emptyRegistries(),
-      ),
-    ).toThrow("not available")
+  it("rejects every unregistered container and persona scope", () => {
+    for (const scope of [
+      "project:evidence-room",
+      "project:other",
+      "workspace:other",
+      "persona:any",
+    ]) {
+      expect(() =>
+        assertAuthorizedScope(
+          scope,
+          "user-1",
+          () => undefined,
+          emptyRegistries(),
+        ),
+      ).toThrow("not available")
+    }
   })
 })
 

@@ -46,8 +46,8 @@ export function DemosIndex() {
       <header className="mb-8 max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight">Demos</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Authenticated product demonstrations that exercise the agent, Gonk
-          tools, and durable workspace resources.
+          Authenticated product demonstrations that exercise the agent,
+          application tools, and durable workspace resources.
         </p>
       </header>
 

@@ -31,7 +31,7 @@ export interface BrandingSettings {
 
 const DEFAULT_NAME = "Sigil Chat"
 const DEFAULT_DESCRIPTION =
-  "An agentic chat workspace built with Sigil and Gonk."
+  "An agentic workspace for conversations, tools, and durable work."
 const DEFAULT_ORIGIN = "http://sigil-chat.localhost:1355"
 const DEFAULT_ACCENT = "#b58b35"
 

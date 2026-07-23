@@ -3,8 +3,9 @@ export const overlayPaths = Object.freeze([
   "sigil.doctor.json",
   "turbo.json",
   "apps/agent",
-  "apps/gonk",
   "packages/agent-contracts",
+  "packages/agent-tools",
+  "packages/artifact-store",
   "packages/blackboard-store",
   "packages/chat",
   "packages/data",
@@ -54,4 +55,4 @@ export const overlayPaths = Object.freeze([
   "apps/web/src/lib/passage-draft.ts",
   "apps/web/src/lib/passage-draft.test.ts",
   "apps/web/src/lib/review-document.ts",
-]);
+])

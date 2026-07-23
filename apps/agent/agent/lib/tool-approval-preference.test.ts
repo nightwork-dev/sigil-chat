@@ -6,20 +6,18 @@ import {
 } from "./tool-approval-preference"
 
 describe("tool approval preference", () => {
-  it("keeps legacy global values compatible", () => {
-    expect(toolApprovalModeFor("always", "gonk__sigil-read-file")).toBe(
-      "always",
-    )
-    expect(toolApprovalModeFor("ask", "gonk__sigil-read-file")).toBe("ask")
+  it("applies the global mode to native tool names", () => {
+    expect(toolApprovalModeFor("always", "sigil-read-file")).toBe("always")
+    expect(toolApprovalModeFor("ask", "sigil-read-file")).toBe("ask")
   })
 
   it("selects an exact per-tool override before the default", () => {
     const value = JSON.stringify({
       default: "ask",
-      tools: { "gonk__sigil-read-file": "always" },
+      tools: { "sigil-read-file": "always" },
     })
-    expect(toolApprovalModeFor(value, "gonk__sigil-read-file")).toBe("always")
-    expect(toolApprovalModeFor(value, "gonk__sigil-delete-file")).toBe("ask")
+    expect(toolApprovalModeFor(value, "sigil-read-file")).toBe("always")
+    expect(toolApprovalModeFor(value, "sigil-delete-file")).toBe("ask")
   })
 
   it("fails closed for malformed client preferences", () => {

@@ -9,8 +9,12 @@ import {
   readSigilEveAuthEnvironment,
 } from "../lib/eve-auth"
 import { ForbiddenError } from "eve/channels/auth"
-import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
-import { MirkEveSessionOwnerStore } from "../lib/eve-session-owners"
+import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
+import {
+  agentToolRegistry,
+  eveSessionOwnerStore,
+} from "../lib/application-services"
+import { createApplicationToolCatalogRoute } from "../lib/application-tool-catalog"
 import {
   EveSessionBindingVerificationError,
   requireVerifiedEveSessionBinding,
@@ -24,7 +28,6 @@ import {
 } from "../lib/memory"
 import { parseToolApprovalPreference } from "../lib/tool-approval-preference"
 import {
-  bindScopeDelegationToActorSession,
   canReadMemorySource,
   createScopeGrantPolicy,
   requireAuthorizedResourceScope,
@@ -32,14 +35,17 @@ import {
 import { createReadinessRoute } from "../lib/readiness"
 
 const authEnvironment = readSigilEveAuthEnvironment()
+const bindingSecret = readOptionalSecretFromFile(
+  process.env,
+  "SIGIL_AGENT_BINDING_SECRET",
+)
 const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
 const requiredSkillIds = readCsvEnv("SIGIL_CONTEXT_REQUIRED_SKILLS")
 const pinnedResourceKeys = readCsvEnv("SIGIL_CONTEXT_PINNED_RESOURCE_KEYS")
-const contextCompiler = createDefaultSigilContextCompiler({ requiredSkillIds })
-const eveSessionOwnerStore = new MirkEveSessionOwnerStore()
 const memorySourcePolicy = createScopeGrantPolicy()
 const compileMessage = createSigilEveOnMessage({
-  compiler: contextCompiler,
+  createCompiler: ({ binding }) =>
+    createDefaultSigilContextCompiler({ binding, requiredSkillIds }),
   pinnedResourceKeys,
   authorizeMemorySource: ({ principalId, source }) =>
     canReadMemorySource({
@@ -61,32 +67,6 @@ const compileMessage = createSigilEveOnMessage({
       query,
     }),
 })
-const onMessage: typeof compileMessage = async (context, message) => {
-  const result = await compileMessage(context, message)
-  if (!result?.auth || !context.eve.sessionId) return result
-  const resourceScope = result.auth.attributes.sigilResourceScope
-  const scopeProof = result.auth.attributes.sigilScopeProof
-  const delegatedProof = bindScopeDelegationToActorSession({
-    actorSessionId: context.eve.sessionId,
-    principalId: result.auth.principalId,
-    proof: typeof scopeProof === "string" ? scopeProof : undefined,
-    resourceScope:
-      typeof resourceScope === "string" ? resourceScope : undefined,
-    secret: process.env.GONK_MCP_KEY,
-  })
-  if (!delegatedProof) return result
-  return {
-    ...result,
-    auth: {
-      ...result.auth,
-      attributes: {
-        ...result.auth.attributes,
-        sigilScopeProof: delegatedProof,
-      },
-    },
-  }
-}
-
 const channel = createOwnedEveChannel({
   auth: async (request) => {
     const auth = await authenticatePrincipal(request)
@@ -97,12 +77,11 @@ const channel = createOwnedEveChannel({
     const rawToolApproval = request.headers.get("x-sigil-tool-approval")
     const toolApproval = parseToolApprovalPreference(rawToolApproval)
     let resourceScope: string | undefined
-    const scopeProof = request.headers.get(AGENT_SCOPE_PROOF_HEADER)?.trim()
     try {
       resourceScope = requireAuthorizedResourceScope({
         principalId: auth.principalId,
         request,
-        secret: process.env.GONK_MCP_KEY,
+        secret: bindingSecret,
       })
     } catch {
       throw new ForbiddenError({
@@ -117,7 +96,7 @@ const channel = createOwnedEveChannel({
       sessionBinding = requireVerifiedEveSessionBinding(
         request,
         auth.principalId,
-        process.env.GONK_MCP_KEY,
+        bindingSecret,
       )
     } catch (error) {
       if (!(error instanceof EveSessionBindingVerificationError)) throw error
@@ -168,26 +147,25 @@ const channel = createOwnedEveChannel({
         ...(resourceScope
           ? {
               sigilResourceScope: resourceScope,
-              // The browser never chooses this value: Eve just verified the
-              // HMAC against the authenticated principal above. Preserve it
-              // so Gonk can derive that same principal rather than reverting
-              // to the shared service identity.
-              ...(scopeProof ? { sigilScopeProof: scopeProof } : {}),
-              // Preserve the old attribute for hosts that still inspect it.
-              sigilSessionScope: resourceScope,
             }
           : {}),
       },
     }
   },
-  onMessage,
+  onMessage: compileMessage,
   defaultPersonaId: DEFAULT_PERSONA_ID,
   ownerStore: eveSessionOwnerStore,
 })
 
 export default {
   ...channel,
-  routes: [...channel.routes, createReadinessRoute(authenticatePrincipal)],
+  routes: [
+    ...channel.routes,
+    createApplicationToolCatalogRoute(authenticatePrincipal, agentToolRegistry),
+    createReadinessRoute(authenticatePrincipal, {
+      applicationToolCount: () => agentToolRegistry.list().length,
+    }),
+  ],
 }
 
 function readCsvEnv(name: string) {

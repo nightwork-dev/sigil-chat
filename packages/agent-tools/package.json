@@ -1,0 +1,43 @@
+{
+  "name": "@workspace/agent-tools",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gonk/auth": "0.3.1",
+    "@gonk/image-gen": "0.5.0",
+    "@gonk/skills": "0.3.1",
+    "@gonk/tool-registry": "0.3.1",
+    "@mirk/store": "^0.7.0",
+    "@workspace/agent-contracts": "workspace:*",
+    "@workspace/artifact-store": "workspace:*",
+    "@workspace/blackboard-store": "workspace:*",
+    "@workspace/graph": "workspace:*",
+    "@workspace/graph-store": "workspace:*",
+    "@workspace/review-store": "workspace:*",
+    "@workspace/runtime-env": "workspace:*",
+    "@workspace/work-items-store": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  },
+  "exports": {
+    "./approval": "./src/approval.ts",
+    "./containers": "./src/containers.ts",
+    "./files": "./src/files.ts",
+    "./feature-request": "./src/feature-request.ts",
+    "./registry": "./src/registry.ts",
+    "./request": "./src/request.ts",
+    "./schemas": "./src/schemas.ts",
+    "./skills": "./src/skills.ts",
+    "./spec": "./src/spec.ts",
+    "./story": "./src/story.ts"
+  }
+}

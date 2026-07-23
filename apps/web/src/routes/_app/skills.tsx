@@ -3,7 +3,7 @@
 //   apps/web/src/routes/__root.tsx       — HTML shell, ThemeProvider, QueryClientProvider (no visible chrome)
 //   apps/web/src/routes/_app.tsx         — default collapsible icon sidebar + breadcrumb bar + theme picker
 //   apps/web/src/routes/_app/skills.tsx  — THIS FILE
-// Content: SkillsManager — searchable managed-skill catalog with create/edit/delete via Gonk's skill registry
+// Content: SkillsManager — searchable managed-skill catalog with create/edit/delete lifecycle
 
 import { createFileRoute } from "@tanstack/react-router";
 

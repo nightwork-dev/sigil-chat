@@ -20,10 +20,14 @@ import type {
   ManagedSkillRegistry,
   ManagedSkillSummary,
 } from "@gonk/skills"
-import { FilesystemManagedSkillRegistry } from "@gonk/skills"
 import type { UserContent } from "ai"
 import type { EveMessageContext, EveMessageResult } from "eve/channels/eve"
+import {
+  createSkillRegistry,
+  type SkillRegistryBinding,
+} from "@workspace/agent-tools/skills"
 import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
+import { readDataEnvironment } from "@workspace/runtime-env/server"
 import type {
   ScopedMemoryAudienceLabel,
   ScopedMemoryRecallDelivery,
@@ -37,7 +41,10 @@ const SKILL_CONTEXT_CONTRIBUTOR_ID = "sigil.skills"
 
 export interface SigilContextOptions {
   compiler?: ContextCompiler
-  createCompiler?: (auth: AuthContext) => ContextCompiler
+  createCompiler?: (input: {
+    auth: AuthContext
+    binding: SkillRegistryBinding
+  }) => ContextCompiler
   maxTokens?: number
   model?: string
   requestedContributorIds?: readonly string[]
@@ -83,15 +90,19 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     ctx: EveMessageContext,
     message: string | UserContent,
   ): Promise<EveMessageResult> => {
-    const auth = toGonkAuthContext(ctx.eve.caller)
-    if (auth === null) return null
     const caller = ctx.eve.caller
     if (caller === null) return null
+    const auth = toGonkAuthContext(caller)
+    if (auth === null) return null
+    const binding = {
+      personaId: callerPersona(caller),
+      sessionId: readExecutionApplicationThreadId(caller),
+    }
 
     const compiler =
-      options.createCompiler?.(auth) ??
+      options.createCompiler?.({ auth, binding }) ??
       options.compiler ??
-      createDefaultSigilContextCompiler()
+      createDefaultSigilContextCompiler({ binding })
 
     const compiled = await compileSigilContextForMessage({
       auth,
@@ -376,23 +387,17 @@ export async function compileSigilContextForMessage(input: {
 }
 
 export function createDefaultSigilContextCompiler(options?: {
-  agentProjectRoot?: string
+  binding?: SkillRegistryBinding
   requiredSkillIds?: readonly string[]
+  skillsDataRoot?: string
   tokenCounter?: ContextTokenCounter
 }) {
   const registry = new ContextContributorRegistry()
-  const agentProjectRoot =
-    options?.agentProjectRoot ?? new URL("..", import.meta.url).pathname
+  const skillsDataRoot =
+    options?.skillsDataRoot ?? readDataEnvironment(process.env).skillsDir
   registry.register(
     createSkillContextContributor({
-      registry: new FilesystemManagedSkillRegistry({
-        env: {
-          cwd: agentProjectRoot,
-          projectRoot: agentProjectRoot,
-          homeRoot: `${agentProjectRoot}/.sigil-context-home`,
-          rootKinds: ["agents", ".agents", ".gonk"],
-        },
-      }),
+      registry: createSkillRegistry(skillsDataRoot, options?.binding),
       requiredSkillIds: options?.requiredSkillIds,
     }),
   )
@@ -401,6 +406,26 @@ export function createDefaultSigilContextCompiler(options?: {
     tokenCounter: options?.tokenCounter ?? fallbackTokenCounter,
     configVersion: "sigil-chat-agent-context-v1",
   })
+}
+
+function callerPersona(caller: EveSessionAuth): string | undefined {
+  const value = caller.attributes.sigilPersonaId
+  return typeof value === "string" ? nonBlank(value) : undefined
+}
+
+function readExecutionApplicationThreadId(
+  caller: EveMessageContext["eve"]["caller"],
+): string | undefined {
+  const raw = caller?.attributes.sigilExecutionBinding
+  if (typeof raw !== "string" || !raw.trim()) return undefined
+  try {
+    const binding = JSON.parse(raw) as Record<string, unknown>
+    return typeof binding.applicationThreadId === "string"
+      ? nonBlank(binding.applicationThreadId)
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function createSkillContextContributor(options: {

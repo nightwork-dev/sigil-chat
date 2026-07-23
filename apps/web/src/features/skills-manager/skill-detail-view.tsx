@@ -93,14 +93,6 @@ function SkillDetailForm({
   const upsert = useUpsertSkill();
   const del = useDeleteSkill();
 
-  // @gonk/skills 0.3.1's registry always reports `capabilities: ["read"]` on
-  // every summary/detail (verified against the installed dist — capability
-  // computation isn't wired yet), so it isn't a real authorization signal.
-  // Always offer edit/delete and let the write tools' own server-side
-  // authorization (patch/archive) fail with a toast if a skill genuinely
-  // can't be mutated, rather than hard-disabling every skill in the UI.
-  const canEdit = true;
-  const canDelete = true;
   const isDirty = body !== skill.body;
 
   function handleSave() {
@@ -198,46 +190,42 @@ function SkillDetailForm({
         <Textarea
           value={body}
           onChange={(event) => setBody(event.target.value)}
-          readOnly={!canEdit}
           className="min-h-64 font-mono text-xs"
         />
       </DetailPanel.Section>
 
       <div className="flex items-center justify-between gap-2">
-        {canDelete ? (
-          <AlertDialog>
-            <AlertDialogTrigger
-              render={
-                <Button variant="ghost" className="text-destructive" />
-              }
-            >
-              Delete
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete "{skill.name ?? skill.id}"?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This archives the skill rather than erasing it — it can be
-                  restored from the archive later. The agent will no longer
-                  see it as an active skill.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} disabled={del.isPending}>
-                  {del.isPending ? "Deleting…" : "Delete"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : (
-          <span />
-        )}
-        {canEdit && (
-          <Button onClick={handleSave} disabled={!isDirty || upsert.isPending}>
-            {upsert.isPending ? "Saving…" : "Save changes"}
-          </Button>
-        )}
+        <AlertDialog>
+          <AlertDialogTrigger
+            render={<Button variant="ghost" className="text-destructive" />}
+          >
+            Delete
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Delete "{skill.name ?? skill.id}"?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This archives the skill rather than erasing it — it can be
+                restored from the archive later. The agent will no longer see
+                it as an active skill.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={del.isPending}
+              >
+                {del.isPending ? "Deleting…" : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <Button onClick={handleSave} disabled={!isDirty || upsert.isPending}>
+          {upsert.isPending ? "Saving…" : "Save changes"}
+        </Button>
       </div>
     </>
   );

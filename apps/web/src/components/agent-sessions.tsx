@@ -12,21 +12,17 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import type {
-  EveAgentStoreSnapshot,
-  HandleMessageStreamEvent,
-  SessionState,
-} from "eve/client"
-import type { EveMessageData } from "eve/react"
-
 import { AgentRuntimeSessionProvider } from "@zigil/agent-react/session"
 import { AgentThreadControlsProvider } from "@zigil/agent-react/thread-controls"
+import {
+  useEveRuntimeSession,
+  type UseEveRuntimeSessionOptions,
+} from "@zigil/agent-eve"
 import type {
   AgentRuntimeSession,
   AgentSendInput,
   AgentThreadControls,
 } from "@zigil/agent-surface/contracts"
-import { useEveRuntimeSession } from "@zigil/agent-eve"
 import {
   addContextAttachment,
   removeTurnContextAttachment,
@@ -54,7 +50,10 @@ import {
   type AgentThreadSummary,
 } from "@/lib/agent-threads"
 import { getEveBearerToken } from "@/lib/auth/client"
-import { agentEventsForReplay } from "@/lib/agent-event-retention"
+import {
+  agentEventsForReplay,
+  type AgentRuntimeStreamEvent,
+} from "@/lib/agent-event-retention"
 import {
   AgentSessionPersistenceCoordinator,
   createSingleWriteSessionPersistence,
@@ -111,7 +110,7 @@ export function AppAgentSessions({
           <AlertDescription>
             {error instanceof Error
               ? error.message
-              : "The Gonk-backed session catalog could not be restored."}
+              : "The agent session catalog could not be restored."}
           </AlertDescription>
         </Alert>
       </div>
@@ -170,8 +169,8 @@ function ActiveAgentSession({
   const saveSnapshot = useSaveAgentThreadSnapshot()
   const consumeForkSeed = useConsumeAgentThreadForkSeed()
   const renameThread = useRenameAgentThread()
-  const eventsRef = useRef<HandleMessageStreamEvent[]>([
-    ...agentEventsForReplay(thread.eve.events),
+  const eventsRef = useRef<AgentRuntimeStreamEvent[]>([
+    ...agentEventsForReplay(thread.runtime.events),
   ])
   const persistence = useRef(
     new AgentSessionPersistenceCoordinator(thread.revision),
@@ -199,8 +198,8 @@ function ActiveAgentSession({
 
   const persistSnapshot = useCallback(
     (
-      session: SessionState,
-      events: readonly HandleMessageStreamEvent[] = eventsRef.current,
+      session: AgentThread["runtime"]["session"],
+      events: readonly AgentRuntimeStreamEvent[] = eventsRef.current,
     ) => {
       const operation = persistence.current.persist((expectedRevision) =>
         saveSnapshot.mutateAsync({
@@ -223,12 +222,12 @@ function ActiveAgentSession({
     [saveSnapshot, thread.id],
   )
 
-  const handleEvent = useCallback((event: HandleMessageStreamEvent) => {
+  const handleEvent = useCallback((event: AgentRuntimeStreamEvent) => {
     eventsRef.current = [...eventsRef.current, event]
   }, [])
 
   const handleFinish = useCallback(
-    (snapshot: EveAgentStoreSnapshot<EveMessageData>) => {
+    (snapshot: AgentAdapterSnapshot) => {
       eventsRef.current = [...snapshot.events]
       persistSnapshot(snapshot.session, snapshot.events)
     },
@@ -302,8 +301,8 @@ function ActiveAgentSession({
   const eveSession = useEveRuntimeSession({
     ...persistenceCallbacks,
     auth: { bearer: getEveBearerToken },
-    initialEvents: agentEventsForReplay(thread.eve.events),
-    initialSession: thread.eve.session,
+    initialEvents: agentEventsForReplay(thread.runtime.events),
+    initialSession: thread.runtime.session,
     onEvent: handleEvent,
   })
   const turnActive = useRef(false)
@@ -377,6 +376,10 @@ function ActiveAgentSession({
     </AgentThreadControlsProvider>
   )
 }
+
+type AgentAdapterSnapshot = Parameters<
+  NonNullable<UseEveRuntimeSessionOptions["onFinish"]>
+>[0]
 
 function formatForkSeed(seed: AgentThreadForkSeed): string {
   const transcript = seed.messages

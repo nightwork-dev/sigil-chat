@@ -1,95 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="380" viewBox="0 0 1060 380"
-     font-family="Avenir Next, Helvetica Neue, Arial, sans-serif" role="img"
-     aria-label="Sigil Chat runtime topology: the browser renders chat, studio, and review workspaces plus an agent HUD, served over SSR and server functions by apps/web. apps/web hands sessions to apps/agent, the Eve host that owns durable sessions, streaming, and interruption through a local Codex login. apps/agent calls apps/gonk, the authenticated Gonk MCP server, over Streamable HTTP with a GONK_MCP_KEY bearer token. apps/web persists to a file-backed .data store; apps/agent persists Eve snapshots under .eve. Three trust boundaries: the tool-approval header is a client display preference, not a security control; GONK_MCP_KEY authenticates only the MCP transport; and threads plus the active-session preference are deployment-global in local dev, with no per-user ownership.">
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="360" viewBox="0 0 1060 360" role="img"
+  aria-label="Sigil Chat two-service runtime: the browser talks to TanStack Start, TanStack authenticates users and calls Eve, Eve hosts Gonk application tools in-process, and both services use shared application repositories.">
+  <rect width="1060" height="360" rx="24" fill="#0b1020"/>
+  <style>
+    .title { font: 700 17px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #dce8ff }
+    .body { font: 12px system-ui, sans-serif; fill: #aabbd8 }
+    .small { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #7f95bb }
+    .box { fill: #121a30; stroke: #344769; stroke-width: 1.5 }
+    .accent { fill: #102b31; stroke: #48c7b7; stroke-width: 1.5 }
+    .arrow { stroke: #7f95bb; stroke-width: 2; fill: none; marker-end: url(#arrow) }
+  </style>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0a0e1a"/><stop offset="1" stop-color="#0c1322"/>
-    </linearGradient>
-    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="#5a6f96"/>
-    </marker>
-    <marker id="arc" markerWidth="11" markerHeight="11" refX="8" refY="3.2" orient="auto">
-      <path d="M0,0 L8,3.2 L0,6.4 Z" fill="#2bd4ff"/>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#7f95bb"/>
     </marker>
   </defs>
-  <rect x="0" y="0" width="1060" height="380" rx="14" fill="url(#bg)"/>
 
-  <text x="530" y="28" text-anchor="middle" font-size="13" fill="#6f84a8">Three services, each with a narrow, non-overlapping job.</text>
+  <rect class="box" x="35" y="68" width="210" height="118" rx="15"/>
+  <text class="title" x="140" y="100" text-anchor="middle">Browser</text>
+  <text class="body" x="140" y="127" text-anchor="middle">Chat · Studio · Review</text>
+  <text class="body" x="140" y="148" text-anchor="middle">neutral agent contracts</text>
+  <text class="small" x="140" y="171" text-anchor="middle">same-origin product UI</text>
 
-  <!-- main row: 4 cards w=160 h=120 y=70 ; x = 30, 310, 590, 870 -->
-  <g>
-    <rect x="30" y="70" width="160" height="120" rx="13" fill="#0e1626" stroke="#243250" stroke-width="1.5"/>
-    <rect x="30" y="70" width="160" height="4" rx="2" fill="#2bd4ff"/>
-    <text x="110" y="98" text-anchor="middle" font-size="18" font-weight="700" fill="#eaf1ff">Browser</text>
-    <text x="110" y="122" text-anchor="middle" font-size="11" fill="#8aa0c4">workspaces + agent HUD</text>
-  </g>
+  <rect class="box" x="320" y="48" width="300" height="158" rx="15"/>
+  <text class="title" x="470" y="82" text-anchor="middle">apps/web · TanStack Start</text>
+  <text class="body" x="470" y="112" text-anchor="middle">human auth · routes · uploads · artifacts</text>
+  <text class="body" x="470" y="134" text-anchor="middle">web-owned repository operations</text>
+  <text class="small" x="470" y="169" text-anchor="middle">sigil-chat.localhost</text>
 
-  <g>
-    <rect x="310" y="70" width="160" height="120" rx="13" fill="#0e1626" stroke="#243250" stroke-width="1.5"/>
-    <rect x="310" y="70" width="160" height="4" rx="2" fill="#2bd4ff"/>
-    <text x="390" y="98" text-anchor="middle" font-family="SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" fill="#9ce8ff">apps/web</text>
-    <text x="390" y="122" text-anchor="middle" font-size="11" fill="#8aa0c4">TanStack Start · SSR</text>
-    <text x="390" y="175" text-anchor="middle" font-family="SFMono-Regular, Menlo, monospace" font-size="9" fill="#6f84a8">sigil-chat.localhost</text>
-  </g>
+  <rect class="accent" x="695" y="48" width="330" height="158" rx="15"/>
+  <text class="title" x="860" y="82" text-anchor="middle">apps/agent · Eve host</text>
+  <text class="body" x="860" y="112" text-anchor="middle">sessions · streaming · model · interruption</text>
+  <text class="body" x="860" y="134" text-anchor="middle">Gonk registry hosted as native Eve tools</text>
+  <text class="small" x="860" y="169" text-anchor="middle">sigil-chat-agent.localhost</text>
 
-  <g>
-    <rect x="590" y="70" width="160" height="120" rx="13" fill="#0e1626" stroke="#3a2415" stroke-width="1.5"/>
-    <rect x="590" y="70" width="160" height="4" rx="2" fill="#ff7a18"/>
-    <text x="670" y="98" text-anchor="middle" font-family="SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" fill="#ffd9b8">apps/agent</text>
-    <text x="670" y="122" text-anchor="middle" font-size="11" fill="#caa183">Eve host · local Codex</text>
-    <text x="670" y="175" text-anchor="middle" font-family="SFMono-Regular, Menlo, monospace" font-size="8.5" fill="#6f84a8">sigil-chat-agent.localhost</text>
-  </g>
+  <rect class="box" x="320" y="260" width="705" height="66" rx="15"/>
+  <text class="title" x="672" y="288" text-anchor="middle">Shared application packages and stores</text>
+  <text class="body" x="672" y="311" text-anchor="middle">agent-tools · artifact-store · work-items · graph · review · blackboard</text>
 
-  <g>
-    <rect x="870" y="70" width="160" height="120" rx="13" fill="#0e1626" stroke="#243250" stroke-width="1.5"/>
-    <rect x="870" y="70" width="160" height="4" rx="2" fill="#2bd4ff"/>
-    <text x="950" y="98" text-anchor="middle" font-family="SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" fill="#9ce8ff">apps/gonk</text>
-    <text x="950" y="122" text-anchor="middle" font-size="11" fill="#8aa0c4">Gonk MCP registry</text>
-    <text x="950" y="175" text-anchor="middle" font-family="SFMono-Regular, Menlo, monospace" font-size="8" fill="#6f84a8">sigil-chat-gonk.localhost/mcp</text>
-  </g>
+  <path class="arrow" d="M245 127 H310"/>
+  <path class="arrow" d="M620 127 H685"/>
+  <path class="arrow" d="M470 206 V250"/>
+  <path class="arrow" d="M860 206 V250"/>
 
-  <!-- relationship chips between cards, w=100 h=64 y=98, centered in each 120px gap -->
-  <line x1="190" y1="130" x2="200" y2="130" stroke="#5a6f96" stroke-width="2"/>
-  <g>
-    <rect x="200" y="98" width="100" height="64" rx="12" fill="#0c1424" stroke="#2b3753" stroke-width="1.5" stroke-dasharray="5 4"/>
-    <text x="250" y="124" text-anchor="middle" font-size="11.5" font-weight="700" fill="#cdd9ee">SSR +</text>
-    <text x="250" y="142" text-anchor="middle" font-size="11.5" font-weight="700" fill="#cdd9ee">server fns</text>
-  </g>
-  <line x1="300" y1="130" x2="310" y2="130" stroke="#5a6f96" stroke-width="2" marker-end="url(#ar)"/>
-  <line x1="310" y1="150" x2="300" y2="150" stroke="#5a6f96" stroke-width="2" marker-end="url(#ar)"/>
-
-  <line x1="470" y1="130" x2="480" y2="130" stroke="#5a6f96" stroke-width="2" marker-end="url(#ar)"/>
-  <g>
-    <rect x="480" y="98" width="100" height="64" rx="12" fill="#0c1424" stroke="#2b3753" stroke-width="1.5" stroke-dasharray="5 4"/>
-    <text x="530" y="124" text-anchor="middle" font-size="11.5" font-weight="700" fill="#cdd9ee">session +</text>
-    <text x="530" y="142" text-anchor="middle" font-size="11.5" font-weight="700" fill="#cdd9ee">stream</text>
-  </g>
-  <line x1="580" y1="130" x2="590" y2="130" stroke="#5a6f96" stroke-width="2" marker-end="url(#ar)"/>
-
-  <line x1="750" y1="130" x2="760" y2="130" stroke="#2bd4ff" stroke-width="2" marker-end="url(#arc)"/>
-  <g>
-    <rect x="760" y="98" width="100" height="64" rx="12" fill="#102a3a" stroke="#2bd4ff" stroke-width="1.5"/>
-    <text x="810" y="124" text-anchor="middle" font-size="11.5" font-weight="700" fill="#9ce8ff">MCP ·</text>
-    <text x="810" y="142" text-anchor="middle" font-size="11.5" font-weight="700" fill="#9ce8ff">bearer-auth</text>
-  </g>
-  <line x1="860" y1="130" x2="870" y2="130" stroke="#2bd4ff" stroke-width="2" marker-end="url(#arc)"/>
-
-  <!-- file-backed stores under apps/web and apps/agent -->
-  <line x1="390" y1="190" x2="390" y2="212" stroke="#3a4a6a" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <g>
-    <rect x="320" y="212" width="140" height="38" rx="9" fill="#0c1424" stroke="#2b3753" stroke-width="1.5" stroke-dasharray="5 4"/>
-    <text x="390" y="235" text-anchor="middle" font-size="11" fill="#8aa0c4">.data (file-backed)</text>
-  </g>
-
-  <line x1="670" y1="190" x2="670" y2="212" stroke="#3a4a6a" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <g>
-    <rect x="600" y="212" width="140" height="38" rx="9" fill="#0c1424" stroke="#2b3753" stroke-width="1.5" stroke-dasharray="5 4"/>
-    <text x="670" y="235" text-anchor="middle" font-size="11" fill="#8aa0c4">.eve snapshots</text>
-  </g>
-
-  <!-- trust boundaries -->
-  <text x="30" y="286" font-size="11" font-weight="600" letter-spacing="1.5" fill="#6f84a8">TRUST BOUNDARIES</text>
-  <text x="30" y="308" font-size="12" fill="#8aa0c4">tool-approval header — client display preference, not a security control</text>
-  <text x="30" y="330" font-size="12" fill="#8aa0c4">GONK_MCP_KEY authenticates the MCP transport only — not routes, Eve inspection, or thread records</text>
-  <text x="30" y="352" font-size="12" fill="#8aa0c4">threads and the active-session preference are deployment-global in local dev — no per-user ownership yet</text>
+  <text class="small" x="652" y="104" text-anchor="middle">JWT + signed bindings</text>
+  <text class="small" x="35" y="232">No third Gonk process · no internal MCP hop · no shared service bearer</text>
 </svg>

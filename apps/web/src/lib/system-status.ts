@@ -2,7 +2,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query"
 import { createServerFn } from "@tanstack/react-start"
 
 export interface ServiceStatus {
-  id: "web" | "eve" | "gonk"
+  id: "web" | "eve"
   label: string
   status: "healthy" | "unhealthy"
   latencyMs: number

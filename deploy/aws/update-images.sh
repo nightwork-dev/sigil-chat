@@ -17,11 +17,34 @@ fi
 "$script_dir/verify-release.sh" "$manifest"
 test -f "$deploy_env"
 
+legacy_gonk_containers="$(
+  docker ps -aq \
+    --filter label=com.docker.compose.project=sigil-chat \
+    --filter label=com.docker.compose.service=gonk
+)"
+if [[ -n "$legacy_gonk_containers" ]] ||
+  grep -Eq '^(SIGIL_GONK_IMAGE|GONK_MCP_URL|GONK_MCP_KEY|GONK_MCP_KEY_FILE)=' "$deploy_env"; then
+  echo "Legacy Gonk service state detected; this updater will not migrate or remove it automatically." >&2
+  echo "Complete $script_dir/MIGRATING-FROM-GONK-SERVICE.md, then retry." >&2
+  exit 78
+fi
+
+secret_dir="$(
+  awk -F= '$1 == "SIGIL_SECRET_DIR" { print substr($0, length($1) + 2) }' \
+    "$deploy_env"
+)"
+if [[ -z "$secret_dir" || "$secret_dir" != /* ||
+  ! -s "$secret_dir/agent_binding_secret" ]]; then
+  echo "Missing required agent binding secret: SIGIL_SECRET_DIR/agent_binding_secret." >&2
+  echo "Provision it as documented in $script_dir/MIGRATING-FROM-GONK-SERVICE.md, then retry." >&2
+  exit 78
+fi
+
 cp "$deploy_env" "$rollback_env"
 cp "$deploy_env" "$candidate_env"
 chmod 0600 "$rollback_env" "$candidate_env"
-grep '^SIGIL_\(EVE\|GONK\|MIGRATE\|WEB\)_IMAGE=' "$deploy_env" > "$previous_images"
-for key in SIGIL_EVE_IMAGE SIGIL_GONK_IMAGE SIGIL_MIGRATE_IMAGE SIGIL_WEB_IMAGE; do
+grep '^SIGIL_\(EVE\|MIGRATE\|WEB\)_IMAGE=' "$deploy_env" > "$previous_images"
+for key in SIGIL_EVE_IMAGE SIGIL_MIGRATE_IMAGE SIGIL_WEB_IMAGE; do
   value="$(awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2) }' "$manifest")"
   if grep -q "^${key}=" "$candidate_env"; then
     sed -i.bak "s|^${key}=.*|${key}=${value}|" "$candidate_env"
@@ -41,7 +64,7 @@ compose_current() {
 
 restore_previous_release() {
   cp "$rollback_env" "$deploy_env"
-  compose_current up -d --wait --no-deps web gonk eve
+  compose_current up -d --wait --no-deps web eve
   compose_current up -d --wait --no-deps edge
 }
 
@@ -60,7 +83,7 @@ fi
 
 mv "$candidate_env" "$deploy_env"
 
-if ! compose_current up -d --wait --no-deps web gonk eve; then
+if ! compose_current up -d --wait --no-deps web eve; then
   echo "Private-service readiness failed; restoring the previous release." >&2
   restore_previous_release || true
   exit 1

@@ -68,11 +68,11 @@ projector ∈ { inline, overlay, ambient }
 A surface configures which projector a given tool-call name uses. The default
 stays `inline`; projection is opt-in per tool-name, never mandatory.
 
-### 3.2 Agent annotation tools (Gonk-owned)
+### 3.2 Agent annotation tools (application-owned; Eve-hosted through Gonk)
 
 Real tools the agent calls *while working* — `sigil-annotate`, `sigil-pin`,
 `sigil-highlight` — sibling to the existing `sigil-project-*` /
-`sigil-workspace-*` tools in `apps/gonk/src/registry/containers.ts`. Their
+`sigil-workspace-*` tools in `packages/agent-tools/src/containers.ts`. Their
 `output` is:
 
 ```
@@ -239,7 +239,7 @@ neither owns the other.
   `AttentionContext` construction (the reference surface for a bound subject).
 
 **Tools:**
-- `apps/gonk/src/registry/containers.ts` — sibling registry site for
+- `packages/agent-tools/src/annotations.ts` — registry site for
   `sigil-annotate` / `pin` / `highlight`.
 
 ## 9. Open questions

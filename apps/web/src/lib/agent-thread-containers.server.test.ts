@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  legacyContainerProjection,
   resolveScopePerspective,
   type ProjectWorkspaceNav,
 } from "./agent-thread-containers.server";
@@ -76,7 +75,7 @@ describe("resolveScopePerspective", () => {
     ).toBeUndefined();
   });
 
-  it("does not project a hidden canonical project into legacy selection fields", () => {
+  it("does not retain a hidden canonical project in the perspective", () => {
     const directlyGrantedNav: ProjectWorkspaceNav = {
       ...nav,
       projects: [nav.projects[0]],
@@ -96,8 +95,5 @@ describe("resolveScopePerspective", () => {
       perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
       diagnostic: "scope-perspective-fallback",
     });
-    expect(
-      legacyContainerProjection(resolved!.perspective, directlyGrantedNav),
-    ).toEqual({ workspaceId: "workspace-b" });
   });
 });

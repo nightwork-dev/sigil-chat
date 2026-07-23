@@ -42,7 +42,7 @@ cp "$script_dir/verify-release.sh" /opt/sigil-chat/deploy/verify-release.sh
 cp "$script_dir/verify-release.mjs" /opt/sigil-chat/deploy/verify-release.mjs
 chmod 0755 /opt/sigil-chat/deploy/update-images.sh /opt/sigil-chat/deploy/verify-release.sh
 
-for secret in better_auth_secret gonk_mcp_key invite_token_pepper; do
+for secret in agent_binding_secret better_auth_secret invite_token_pepper; do
   path="/srv/sigil-chat/secrets/$secret"
   if [[ ! -s $path ]]; then
     umask 077
@@ -59,7 +59,6 @@ SIGIL_SECRET_DIR=/srv/sigil-chat/secrets
 SIGIL_MIGRATE_IMAGE=replace-with-release-manifest
 SIGIL_WEB_IMAGE=replace-with-release-manifest
 SIGIL_EVE_IMAGE=replace-with-release-manifest
-SIGIL_GONK_IMAGE=replace-with-release-manifest
 EOF
 chmod 0600 /opt/sigil-chat/deploy/deploy.env.local
 echo "Prepared local deployment environment at /opt/sigil-chat/deploy"

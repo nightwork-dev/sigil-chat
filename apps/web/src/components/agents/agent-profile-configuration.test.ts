@@ -71,7 +71,7 @@ function catalogFixture(): AgentCatalog {
         id: "review-critic",
         name: "review-critic",
         description: "Provide an independent second reading.",
-        origin: "eve-declared",
+        origin: "host-declared",
         availability: "available",
         capabilities: ["read", "delegate"],
         runtimeStatus: "delegatable",
@@ -86,7 +86,7 @@ function catalogFixture(): AgentCatalog {
     runtimeTools: [],
     tools: [],
     management: {
-      source: "eve-inspection",
+      source: "agent-inspection",
       lifecycle: "unavailable",
       explanation: "Read-only inspection.",
     },

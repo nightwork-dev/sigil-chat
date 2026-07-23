@@ -15,14 +15,18 @@ function dependencies(
 ): SystemStatusDependencies {
   return {
     checkWeb: () => Promise.resolve(),
-    fetcher: () => Promise.resolve(new Response(null, { status: 200 })),
+    fetcher: () =>
+      Promise.resolve(
+        Response.json({
+          status: "ready",
+          applicationTools: { count: 24, status: "ready" },
+        }),
+      ),
     getEveToken: () => Promise.resolve("eve-token"),
     getSession: () => Promise.resolve(ownerSession),
     now: () => new Date("2026-07-20T12:00:00.000Z"),
     readEnvironment: () => ({
       eveOrigin: "https://agent.example.test",
-      gonkApiKey: "gonk-key",
-      gonkMcpUrl: "https://tools.example.test/mcp",
     }),
     ...overrides,
   }
@@ -60,7 +64,12 @@ describe("system status server boundary", () => {
             signal: init?.signal as AbortSignal,
             url: String(input),
           })
-          return Promise.resolve(new Response(null, { status: 200 }))
+          return Promise.resolve(
+            Response.json({
+              status: "ready",
+              applicationTools: { count: 24, status: "ready" },
+            }),
+          )
         },
       }),
     )
@@ -71,10 +80,6 @@ describe("system status server boundary", () => {
       {
         authorization: "Bearer eve-token",
         url: "https://agent.example.test/sigil/v1/readiness",
-      },
-      {
-        authorization: "Bearer gonk-key",
-        url: "https://tools.example.test/health",
       },
     ])
     expect(requests.every(({ signal }) => signal instanceof AbortSignal)).toBe(
@@ -90,9 +95,17 @@ describe("system status server boundary", () => {
       dependencies({
         fetcher: (input) =>
           Promise.resolve(
-            new Response(null, {
-              status: String(input).includes("/sigil/v1/readiness") ? 503 : 200,
-            }),
+            Response.json(
+              {
+                status: "ready",
+                applicationTools: { count: 24, status: "ready" },
+              },
+              {
+                status: String(input).includes("/sigil/v1/readiness")
+                  ? 503
+                  : 200,
+              },
+            ),
           ),
       }),
     )
@@ -107,26 +120,19 @@ describe("system status server boundary", () => {
     )
   })
 
-  it("reports missing Gonk service secret before probing the tool service", async () => {
-    const fetcher = vi.fn<typeof fetch>()
+  it("reports native application tools unavailable when Eve omits them", async () => {
     const result = await readSystemStatus(
       dependencies({
-        fetcher,
-        readEnvironment: () => ({
-          eveOrigin: "https://agent.example.test",
-          gonkApiKey: undefined,
-          gonkMcpUrl: "https://tools.example.test/mcp",
-        }),
+        fetcher: () => Promise.resolve(Response.json({ status: "ready" })),
       }),
     )
 
-    expect(fetcher).toHaveBeenCalledTimes(1)
     expect(
-      result.services.find((service) => service.id === "gonk"),
+      result.services.find((service) => service.id === "eve"),
     ).toMatchObject({
       status: "unhealthy",
       diagnostic:
-        "GONK_MCP_KEY is unavailable to the web server. Check the mounted service secret.",
+        "Eve is reachable, but its native application tools are unavailable. Check the agent build and logs.",
     })
   })
 })

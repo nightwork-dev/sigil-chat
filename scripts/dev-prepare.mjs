@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   devOwnerCredentialsPath,
   getOrCreateDevOwnerCredentials,
-  prepareDevServiceEnvironment,
+  prepareDevAgentBindingEnvironment,
 } from "./dev-instance.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -52,7 +52,7 @@ function prepareDevelopmentInstance() {
     { CI: "1" },
   );
 
-  prepareDevServiceEnvironment(repoRoot);
+  prepareDevAgentBindingEnvironment(repoRoot);
   const credentials = getOrCreateDevOwnerCredentials(credentialsPath);
   runStep("Database", ["auth:migrate"]);
   runStep(

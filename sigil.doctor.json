@@ -2,7 +2,7 @@
   "id": "sigil-chat",
   "requiredFiles": [
     { "path": "apps/agent/package.json" },
-    { "path": "apps/gonk/package.json" },
+    { "path": "packages/agent-tools/package.json" },
     { "path": "packages/agent-contracts/package.json" },
     { "path": "packages/runtime-env/package.json" },
     { "path": "fixtures/application/sigil-chat.yaml" },
@@ -15,12 +15,11 @@
       "requiredDependencies": ["eve", "@workspace/runtime-env"]
     },
     {
-      "path": "apps/gonk/package.json",
-      "requiredScripts": ["dev", "start", "typecheck"],
+      "path": "packages/agent-tools/package.json",
+      "requiredScripts": ["test", "typecheck"],
       "requiredDependencies": [
         "@gonk/tool-registry",
-        "@workspace/agent-contracts",
-        "@workspace/runtime-env"
+        "@workspace/artifact-store"
       ]
     }
   ],
@@ -31,26 +30,18 @@
         { "name": "SIGIL_PUBLIC_URL", "url": "http", "public": true },
         { "name": "SIGIL_DATA_DIR" },
         { "name": "EVE_ORIGIN", "url": "http", "public": true },
-        { "name": "GONK_MCP_URL", "url": "http", "public": true },
         { "name": "SIGIL_EVE_AUTH_JWKS_URL", "url": "http" },
-        { "name": "GONK_MCP_KEY" }
+        { "name": "SIGIL_AGENT_BINDING_SECRET" }
       ]
     }
   ],
   "serviceProbes": [
     {
       "name": "eve-agent",
-      "url": "http://sigil-chat-agent.localhost:1355/eve/v1/info",
+      "url": "http://sigil-chat-agent.localhost:1355/eve/v1/health",
       "expectedStatuses": [200],
       "timeoutMs": 2000,
       "remediation": "Start the Eve app with pnpm --filter sigil-chat-agent dev."
-    },
-    {
-      "name": "gonk",
-      "url": "http://sigil-chat-gonk.localhost:1355/live",
-      "expectedStatuses": [200],
-      "timeoutMs": 2000,
-      "remediation": "Start the complete development stack with pnpm dev."
     }
   ]
 }

@@ -1,77 +1,53 @@
-import { readGonkClientEnvironment } from "@workspace/runtime-env/server"
-
-import { AGENT_SCOPE_HEADER } from "./agent-session-scope"
-import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import type { SigilAuthSession } from "./auth/server"
 import type { ArtifactPreview, ArtifactRecord } from "./artifacts"
+import {
+  authorizeArtifactScope,
+  type WebArtifactStoreDependencies,
+} from "./artifact-repository.server"
 
 const MAX_PREVIEW_BYTES = 80_000
 
-export interface ArtifactAccessDependencies {
-  readonly fetcher: typeof fetch
+export interface ArtifactAccessDependencies
+  extends WebArtifactStoreDependencies {
   readonly getSession: () => Promise<SigilAuthSession | null>
   readonly ownedThreadHomeScope: (
     userId: string,
     threadId: string,
   ) => string | undefined
-  readonly readEnvironment: () => { apiKey?: string; gonkMcpUrl: string }
 }
 
 export async function listArtifacts(
   scope: string,
   dependencies: ArtifactAccessDependencies,
 ): Promise<ArtifactRecord[]> {
-  const { apiKey, artifactsUrl } = await authorizedArtifactRequest(
+  const { store, principal } = await authorizeArtifactScope(
     scope,
     dependencies,
   )
-  const response = await dependencies.fetcher(artifactsUrl, {
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      [AGENT_SCOPE_HEADER]: scope,
-    },
-  })
-  if (!response.ok) {
-    throw new Error(
-      `Artifact list failed (${response.status} ${response.statusText})`,
-    )
-  }
-  return (await response.json()) as ArtifactRecord[]
+  const artifacts = await store.listByScope(scope, principal)
+  return artifacts.map((artifact) => ({
+    id: artifact.id,
+    filename: artifact.filename,
+    mediaType: artifact.mediaType,
+    size: artifact.size,
+    createdAt: artifact.createdAt,
+  }))
 }
 
 export async function readArtifactPreview(
   input: { id: string; scope: string },
   dependencies: ArtifactAccessDependencies,
 ): Promise<ArtifactPreview> {
-  const { apiKey, gonkOrigin } = await authorizedArtifactRequest(
+  const { store, principal } = await authorizeArtifactScope(
     input.scope,
     dependencies,
   )
-  const response = await dependencies.fetcher(
-    `${gonkOrigin}/img/${encodeURIComponent(input.id)}`,
-    {
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        [AGENT_SCOPE_HEADER]: input.scope,
-      },
-    },
-  )
-  if (!response.ok) {
-    throw new Error(
-      `Artifact preview failed (${response.status} ${response.statusText})`,
-    )
-  }
-
-  const mediaType =
-    response.headers
-      .get("content-type")
-      ?.split(";", 1)[0]
-      ?.trim()
-      .toLowerCase() || "application/octet-stream"
+  const content = await store.readContent(input.id, input.scope, principal)
+  const mediaType = content.mediaType.toLowerCase()
   if (mediaType.startsWith("image/")) return { kind: "image", mediaType }
   if (!isTextualMediaType(mediaType)) return { kind: "binary", mediaType }
 
-  const bytes = new Uint8Array(await response.arrayBuffer())
+  const bytes = content.bytes
   const truncated = bytes.byteLength > MAX_PREVIEW_BYTES
   return {
     kind: "text",
@@ -96,42 +72,15 @@ export async function readArtifactPreviewFromRequest(input: {
   return readArtifactPreview(input, await artifactAccessDependencies())
 }
 
-async function authorizedArtifactRequest(
-  scope: string,
-  dependencies: ArtifactAccessDependencies,
-): Promise<{ apiKey: string; artifactsUrl: string; gonkOrigin: string }> {
-  const candidate = await dependencies.getSession()
-  const { requireSession } = await import("./auth/session")
-  const assertSession: (
-    value: SigilAuthSession | null,
-  ) => asserts value is SigilAuthSession = requireSession
-  assertSession(candidate)
-  assertAuthorizedScope(
-    scope,
-    candidate.user.id,
-    dependencies.ownedThreadHomeScope,
-  )
-  const { apiKey, gonkMcpUrl } = dependencies.readEnvironment()
-  if (!apiKey)
-    throw new Error("GONK_MCP_KEY is not configured for artifact access.")
-  return {
-    apiKey,
-    artifactsUrl: gonkMcpUrl.replace(/\/mcp\/?$/, "/artifacts"),
-    gonkOrigin: new URL(gonkMcpUrl).origin,
-  }
-}
-
 async function artifactAccessDependencies(): Promise<ArtifactAccessDependencies> {
   const [{ getSession }, { agentThreadRepository }] = await Promise.all([
     import("./auth/session"),
     import("./agent-threads.server"),
   ])
   return {
-    fetcher: fetch,
     getSession,
     ownedThreadHomeScope: (userId, threadId) =>
       agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
-    readEnvironment: () => readGonkClientEnvironment(process.env),
   }
 }
 

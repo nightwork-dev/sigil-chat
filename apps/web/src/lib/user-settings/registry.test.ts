@@ -21,16 +21,20 @@ describe("SETTINGS_REGISTRY", () => {
     expect(validateSettingValue("appearance.mode", "gamma-ray")).toBe(false)
     expect(validateSettingValue("appearance.reducedMotion", true)).toBe(true)
     expect(validateSettingValue("appearance.reducedMotion", "yes")).toBe(false)
-    expect(validateSettingValue("agent.toolApprovalDefault", "always")).toBe(true)
-    expect(validateSettingValue("agent.toolApprovalDefault", "sometimes")).toBe(false)
+    expect(validateSettingValue("agent.toolApprovalDefault", "always")).toBe(
+      true,
+    )
+    expect(validateSettingValue("agent.toolApprovalDefault", "sometimes")).toBe(
+      false,
+    )
     expect(
       validateSettingValue("agent.toolApprovalOverrides", {
-        "gonk__sigil-read-file": "always",
+        "sigil-read-file": "always",
       }),
     ).toBe(true)
     expect(
       validateSettingValue("agent.toolApprovalOverrides", {
-        "gonk__sigil-read-file": "sometimes",
+        "sigil-read-file": "sometimes",
       }),
     ).toBe(false)
   })

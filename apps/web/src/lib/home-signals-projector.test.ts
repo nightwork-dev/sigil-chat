@@ -47,7 +47,7 @@ function thread(
     updatedAt: "2026-07-21T00:02:00Z",
     status: "active",
     revision: 1,
-    eve: { session: {}, events, compaction: {} },
+    runtime: { schemaVersion: 1, session: {}, events, compaction: {} },
     ...(homeScopeId.startsWith("workspace:")
       ? { workspaceId: homeScopeId }
       : {}),
@@ -80,7 +80,7 @@ function tool(
         callId: `call-${toolName}`,
         kind: "tool-result",
         output,
-        toolName: `gonk__${toolName}`,
+        toolName,
       },
       sequence: 2,
       status,

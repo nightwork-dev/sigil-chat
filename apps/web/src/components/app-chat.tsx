@@ -1,4 +1,5 @@
-import { AgentChat, AgentChatHeader } from "@/components/agent/agent-chat"
+import { AgentChat } from "@/components/agent/agent-chat"
+import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { useRegisterAgentPresentation } from "@/lib/agent-surface-registry"
 import {
   setToolApprovalMode,
@@ -17,7 +18,7 @@ export function AppChat() {
       approvalMode={approvalMode}
       hideHeader
       onApprovalModeChange={setToolApprovalMode}
-      placeholder="Ask the agent, or tell it to use a Gonk tool…"
+      placeholder="Ask the agent, or tell it to use an application tool…"
     />
   )
 }

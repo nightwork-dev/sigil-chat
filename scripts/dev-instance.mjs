@@ -19,7 +19,6 @@ export const DEV_STATE_DIRECTORIES = [
   "apps/web/.data",
   "apps/agent/.data",
   "apps/agent/.eve",
-  "apps/gonk/.data",
 ];
 
 export function resolveGitCommonDirectory(repoRoot) {
@@ -40,8 +39,8 @@ export function devProcessMarkerPath(repoRoot) {
   return resolve(repoRoot, ".data", "dev-server.json");
 }
 
-export function devServiceKeyPath(repoRoot) {
-  return resolve(repoRoot, ".data", "dev", "gonk-mcp-key");
+export function devAgentBindingSecretPath(repoRoot) {
+  return resolve(repoRoot, ".data", "dev", "agent-binding-secret");
 }
 
 export function devResetRoot(repoRoot) {
@@ -94,14 +93,16 @@ export function readDevOwnerCredentials(path) {
   return value;
 }
 
-export function ensureDevServiceKey(
+export function ensureDevAgentBindingSecret(
   path,
   generateKey = () => randomBytes(24).toString("hex"),
 ) {
   if (existsSync(path)) {
     const key = readFileSync(path, "utf8").trim();
     if (key.length < 16) {
-      throw new Error(`Invalid Sigil Chat development service key at ${path}`);
+      throw new Error(
+        `Invalid Sigil Chat development agent binding secret at ${path}`,
+      );
     }
     chmodSync(path, 0o600);
     return { created: false, path };
@@ -110,7 +111,7 @@ export function ensureDevServiceKey(
   const key = generateKey();
   if (key.length < 16) {
     throw new Error(
-      "Generated Sigil Chat development service key is too short",
+      "Generated Sigil Chat development agent binding secret is too short",
     );
   }
   mkdirSync(dirname(path), { recursive: true });
@@ -123,38 +124,45 @@ export function ensureDevServiceKey(
   return { created: true, path };
 }
 
-export function prepareDevServiceEnvironment(repoRoot, env = process.env) {
+export function prepareDevAgentBindingEnvironment(repoRoot, env = process.env) {
   env.SIGIL_DATA_DIR ||= resolve(repoRoot, ".data");
 
-  if (env.GONK_MCP_KEY?.trim()) {
-    return { created: false, source: "GONK_MCP_KEY" };
+  if (env.SIGIL_AGENT_BINDING_SECRET?.trim()) {
+    return { created: false, source: "SIGIL_AGENT_BINDING_SECRET" };
   }
 
-  if (env.GONK_MCP_KEY_FILE?.trim()) {
-    const path = resolve(repoRoot, env.GONK_MCP_KEY_FILE.trim());
-    ensureDevServiceKey(path);
-    env.GONK_MCP_KEY_FILE = path;
-    env.GONK_MCP_KEY = readFileSync(path, "utf8").trim();
-    return { created: false, source: "GONK_MCP_KEY_FILE" };
+  if (env.SIGIL_AGENT_BINDING_SECRET_FILE?.trim()) {
+    const path = resolve(repoRoot, env.SIGIL_AGENT_BINDING_SECRET_FILE.trim());
+    ensureDevAgentBindingSecret(path);
+    env.SIGIL_AGENT_BINDING_SECRET_FILE = path;
+    env.SIGIL_AGENT_BINDING_SECRET = readFileSync(path, "utf8").trim();
+    return { created: false, source: "SIGIL_AGENT_BINDING_SECRET_FILE" };
   }
 
-  const serviceKey = ensureDevServiceKey(devServiceKeyPath(repoRoot));
-  env.GONK_MCP_KEY_FILE = serviceKey.path;
-  env.GONK_MCP_KEY = readFileSync(serviceKey.path, "utf8").trim();
+  const bindingSecret = ensureDevAgentBindingSecret(
+    devAgentBindingSecretPath(repoRoot),
+  );
+  env.SIGIL_AGENT_BINDING_SECRET_FILE = bindingSecret.path;
+  env.SIGIL_AGENT_BINDING_SECRET = readFileSync(
+    bindingSecret.path,
+    "utf8",
+  ).trim();
   return {
-    created: serviceKey.created,
+    created: bindingSecret.created,
     source: "generated worktree state",
   };
 }
 
-export function readDevServiceKey(env = process.env) {
-  const inline = env.GONK_MCP_KEY?.trim();
+export function readDevBindingSecret(env = process.env) {
+  const inline = env.SIGIL_AGENT_BINDING_SECRET?.trim();
   if (inline) return inline;
 
-  const path = env.GONK_MCP_KEY_FILE?.trim();
+  const path = env.SIGIL_AGENT_BINDING_SECRET_FILE?.trim();
   const key = path ? readFileSync(path, "utf8").trim() : "";
   if (key.length < 16) {
-    throw new Error("Sigil Chat development service key is unavailable");
+    throw new Error(
+      "Sigil Chat development agent binding secret is unavailable",
+    );
   }
   return key;
 }

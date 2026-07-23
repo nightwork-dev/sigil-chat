@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { HandleMessageStreamEvent } from "eve/client";
+import type { AgentRuntimeStreamEvent } from "./agent-event-retention";
 
 import {
   AgentThreadConflictError,
@@ -70,7 +70,8 @@ describe("AgentThreadRepository", () => {
       title: "Incident analysis",
     });
 
-    expect(first.eve).toEqual({
+    expect(first.runtime).toEqual({
+      schemaVersion: 1,
       session: { streamIndex: 0 },
       events: [],
       compaction: {
@@ -93,46 +94,46 @@ describe("AgentThreadRepository", () => {
     const repo = repository();
 
     // Default: no selection (resolves to the personal project upstream).
-    expect(repo.getActivePreference(USER_A).activeProjectId).toBeUndefined();
-    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activePerspective).toBeUndefined();
 
-    repo.setActiveContainer(USER_A, { projectId: "project-1" });
-    expect(repo.getActivePreference(USER_A).activeProjectId).toBe("project-1");
-    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+    repo.setActiveContainer(USER_A, {
+      perspective: { focusScopeId: "project-1", viaScopeIds: [] },
+    });
     expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
       focusScopeId: "project-1",
       viaScopeIds: [],
     });
 
     repo.setActiveContainer(USER_A, {
-      projectId: "project-1",
-      workspaceId: "workspace-1",
+      perspective: {
+        focusScopeId: "workspace-1",
+        viaScopeIds: ["project-1"],
+      },
     });
-    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBe(
-      "workspace-1",
-    );
     expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
       focusScopeId: "workspace-1",
       viaScopeIds: ["project-1"],
     });
 
     // Per-principal isolation: another principal's selection is untouched.
-    expect(repo.getActivePreference(USER_B).activeProjectId).toBeUndefined();
+    expect(repo.getActivePreference(USER_B).activePerspective).toBeUndefined();
 
     // Clearing returns to the default.
     repo.setActiveContainer(USER_A, {});
-    expect(repo.getActivePreference(USER_A).activeProjectId).toBeUndefined();
-    expect(repo.getActivePreference(USER_A).activeWorkspaceId).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activePerspective).toBeUndefined();
   });
 
   it("writes back a ScopePerspective for a legacy scalar container preference", () => {
     const preferences = new MemoryKv<AgentThreadPreference>();
-    preferences.set(`active-thread:${USER_A}`, {
-      members: [USER_A],
-      activeProjectId: "project-1",
-      activeWorkspaceId: "workspace-1",
-      updatedAt: "2026-07-16T10:00:00.000Z",
-    });
+    preferences.set(
+      `active-thread:${USER_A}`,
+      {
+        members: [USER_A],
+        activeProjectId: "project-1",
+        activeWorkspaceId: "workspace-1",
+        updatedAt: "2026-07-16T10:00:00.000Z",
+      } as AgentThreadPreference,
+    );
     const repo = new AgentThreadRepository({
       defaultPersonaId: "agent-a",
       threads: new MemoryKv(),
@@ -150,17 +151,26 @@ describe("AgentThreadRepository", () => {
       focusScopeId: "workspace-1",
       viaScopeIds: ["project-1"],
     });
+    expect(preferences.get(`active-thread:${USER_A}`)).not.toHaveProperty(
+      "activeProjectId",
+    );
+    expect(preferences.get(`active-thread:${USER_A}`)).not.toHaveProperty(
+      "activeWorkspaceId",
+    );
   });
 
   it("persists a direct workspace perspective without a hidden project projection", () => {
     const preferences = new MemoryKv<AgentThreadPreference>();
-    preferences.set(`active-thread:${USER_A}`, {
-      members: [USER_A],
-      activeProjectId: "project-hidden",
-      activeWorkspaceId: "workspace-b",
-      activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
-      updatedAt: "2026-07-21T00:00:00.000Z",
-    });
+    preferences.set(
+      `active-thread:${USER_A}`,
+      {
+        members: [USER_A],
+        activeProjectId: "project-hidden",
+        activeWorkspaceId: "workspace-b",
+        activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+        updatedAt: "2026-07-21T00:00:00.000Z",
+      } as AgentThreadPreference,
+    );
     const repo = new AgentThreadRepository({
       defaultPersonaId: "agent-a",
       threads: new MemoryKv(),
@@ -169,25 +179,26 @@ describe("AgentThreadRepository", () => {
     });
 
     const preference = repo.setActiveContainer(USER_A, {
-      workspaceId: "workspace-b",
       perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
     });
 
     expect(preference).toMatchObject({
-      activeWorkspaceId: "workspace-b",
       activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
     });
-    expect(preference.activeProjectId).toBeUndefined();
-    expect(
-      preferences.get(`active-thread:${USER_A}`)?.activeProjectId,
-    ).toBeUndefined();
+    expect(preference).not.toHaveProperty("activeProjectId");
+    expect(preference).not.toHaveProperty("activeWorkspaceId");
+    expect(preferences.get(`active-thread:${USER_A}`)).not.toHaveProperty(
+      "activeProjectId",
+    );
   });
 
   it("keeps the container selection when the active thread changes", () => {
     const repo = repository();
     repo.setActiveContainer(USER_A, {
-      projectId: "project-1",
-      workspaceId: "workspace-1",
+      perspective: {
+        focusScopeId: "workspace-1",
+        viaScopeIds: ["project-1"],
+      },
     });
     const thread = repo.create(USER_A, { title: "T" });
 
@@ -195,7 +206,7 @@ describe("AgentThreadRepository", () => {
 
     const preference = repo.getActivePreference(USER_A);
     expect(preference.activeThreadId).toBe(thread.id);
-    expect(preference.activeWorkspaceId).toBe("workspace-1");
+    expect(preference.activePerspective?.focusScopeId).toBe("workspace-1");
   });
 
   it("ensures one default active thread for first-load query paths", () => {
@@ -299,16 +310,16 @@ describe("AgentThreadRepository", () => {
     );
 
     expect(saved.revision).toBe(2);
-    expect(saved.eve.session).toEqual({
+    expect(saved.runtime.session).toEqual({
       continuationToken: "continue-secret",
       sessionId: "eve-session-1",
       streamIndex: 17,
     });
-    expect(saved.eve.events.map((event) => event.type)).toEqual([
+    expect(saved.runtime.events.map((event) => event.type)).toEqual([
       "message.received",
       "message.completed",
     ]);
-    expect(saved.eve.compaction).toEqual({
+    expect(saved.runtime.compaction).toEqual({
       policyVersion: "sigil-chat-event-retention-v2",
       firstRetainedStreamIndex: 0,
       omittedEventCount: 1,
@@ -372,12 +383,7 @@ describe("AgentThreadRepository", () => {
     const thread = repo.create(USER_A, { workspaceId: "workspace-1" });
 
     expect(() =>
-      repo.rebindWorkspace(
-        USER_A,
-        thread.id,
-        "workspace-2",
-        thread.revision,
-      ),
+      repo.rebindWorkspace(USER_A, thread.id, "workspace-2", thread.revision),
     ).toThrow("Bound agent thread home scope cannot be changed");
   });
 
@@ -508,7 +514,8 @@ describe("AgentThreadRepository", () => {
     expect(fork.forkedFrom).toBe(source.id);
     expect(fork.personaId).toBe(source.personaId);
     expect(fork.executionBinding).toEqual(source.executionBinding);
-    expect(fork.eve).toEqual({
+    expect(fork.runtime).toEqual({
+      schemaVersion: 1,
       session: { streamIndex: 0 },
       events: [],
       compaction: {
@@ -647,12 +654,23 @@ describe("AgentThreadRepository", () => {
     const preferences = new MemoryKv<AgentThreadPreference>();
     threads.set("thread:legacy", {
       id: "legacy",
+      personaId: "agent-a",
       title: "Legacy thread",
       createdAt: "2026-07-16T10:00:00.000Z",
       updatedAt: "2026-07-16T10:00:00.000Z",
       status: "active",
       revision: 1,
-      eve: { session: { streamIndex: 0 }, events: [], compaction: {} },
+      runtime: {
+        schemaVersion: 1,
+        session: { streamIndex: 0 },
+        events: [],
+        compaction: {
+          policyVersion: "sigil-chat-event-retention-v2",
+          omittedEventCount: 0,
+          omittedEventTypes: {},
+          omittedMessageChars: 0,
+        },
+      },
     } as unknown as AgentThread);
     preferences.set("active-thread", {
       activeThreadId: "legacy",
@@ -675,6 +693,7 @@ describe("AgentThreadRepository", () => {
       userId: USER_A,
     });
     expect(repo.get(USER_A, "legacy")?.members).toEqual([USER_A]);
+    expect(repo.get(USER_A, "legacy")?.runtime.schemaVersion).toBe(1);
     expect(repo.getActivePreference(USER_A).activeThreadId).toBe("legacy");
     expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
       claimedPreferences: 0,
@@ -683,7 +702,7 @@ describe("AgentThreadRepository", () => {
   });
 });
 
-function userEvent(message: string, turnId: string): HandleMessageStreamEvent {
+function userEvent(message: string, turnId: string): AgentRuntimeStreamEvent {
   return {
     type: "message.received",
     data: { message, sequence: 0, turnId },
@@ -693,7 +712,7 @@ function userEvent(message: string, turnId: string): HandleMessageStreamEvent {
 function assistantEvent(
   message: string,
   turnId: string,
-): HandleMessageStreamEvent {
+): AgentRuntimeStreamEvent {
   return {
     type: "message.completed",
     data: {

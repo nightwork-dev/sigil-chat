@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from "vitest"
+import { mkdtemp } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 
+import { describe, expect, it } from "vitest"
+
+import { createFileSessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { SigilAuthSession } from "./auth/server"
-import { AGENT_SCOPE_HEADER } from "./agent-session-scope"
 import {
   uploadAgentAttachment,
   type AttachmentUploadDependencies,
@@ -22,86 +26,72 @@ function dependencies(
   overrides: Partial<AttachmentUploadDependencies> = {},
 ): AttachmentUploadDependencies {
   return {
-    fetcher: vi.fn(() =>
-      Promise.resolve(
-        Response.json({
-          key: "artifact-key",
-          mediaType: "image/png",
-          size: 5,
-          url: "/api/media/artifact?key=artifact-key&scope=session%3Athread-1",
-        }),
-      ),
-    ),
     getSession: () => Promise.resolve(memberSession),
     ownedThreadHomeScope: (userId, threadId) =>
       userId === "user-1" && threadId === "thread-1"
         ? "personal-scope:user-1"
         : undefined,
-    readEnvironment: () => ({
-      apiKey: "service-key",
-      gonkMcpUrl: "https://tools.example.test/mcp",
-    }),
     ...overrides,
   }
 }
 
+async function uploadStore() {
+  return createFileSessionArtifactStore({
+    root: await mkdtemp(join(tmpdir(), "sigil-upload-artifacts-")),
+  })
+}
+
 describe("attachment upload authorization", () => {
-  it("denies anonymous uploads before contacting Gonk", async () => {
-    const fetcher = vi.fn<typeof fetch>()
+  it("denies anonymous uploads before writing artifacts", async () => {
+    const store = await uploadStore()
     await expect(
       uploadAgentAttachment(
         uploadData("session:thread-1"),
-        dependencies({ fetcher, getSession: () => Promise.resolve(null) }),
+        dependencies({ store, getSession: () => Promise.resolve(null) }),
       ),
     ).rejects.toMatchObject({ status: 401 })
-    expect(fetcher).not.toHaveBeenCalled()
+    await expect(store.listByScope("session:thread-1")).resolves.toHaveLength(0)
   })
 
   it("denies uploads into another user's session", async () => {
-    const fetcher = vi.fn<typeof fetch>()
+    const store = await uploadStore()
     await expect(
       uploadAgentAttachment(
         uploadData("session:thread-2"),
-        dependencies({ fetcher }),
+        dependencies({ store }),
       ),
     ).rejects.toThrow("not found")
-    expect(fetcher).not.toHaveBeenCalled()
+    await expect(store.listByScope("session:thread-2")).resolves.toHaveLength(0)
   })
 
   it("denies unavailable project and persona scopes", async () => {
-    const fetcher = vi.fn<typeof fetch>()
+    const store = await uploadStore()
     for (const scope of ["project:other", "persona:any"]) {
       await expect(
-        uploadAgentAttachment(uploadData(scope), dependencies({ fetcher })),
+        uploadAgentAttachment(uploadData(scope), dependencies({ store })),
       ).rejects.toThrow("not available")
     }
-    expect(fetcher).not.toHaveBeenCalled()
+    await expect(store.listByScope("project:other")).resolves.toHaveLength(0)
   })
 
-  it("uploads an owned session attachment with the service credential", async () => {
-    const fetcher = vi.fn<typeof fetch>(() =>
-      Promise.resolve(
-        Response.json({
-          key: "artifact-key",
-          mediaType: "image/png",
-          size: 5,
-          url: "/api/media/artifact?key=artifact-key&scope=session%3Athread-1",
-        }),
-      ),
+  it("uploads an owned session attachment through the shared artifact store", async () => {
+    const store = await uploadStore()
+    const uploaded = await uploadAgentAttachment(
+      uploadData("session:thread-1"),
+      dependencies({ store }),
+    )
+    expect(uploaded).toMatchObject({
+      mediaType: "image/png",
+      size: 5,
+      filename: "image.png",
+    })
+    expect(uploaded.url).toBe(
+      `/api/media/artifact?key=${encodeURIComponent(uploaded.key)}&scope=session%3Athread-1`,
     )
     await expect(
-      uploadAgentAttachment(
-        uploadData("session:thread-1"),
-        dependencies({ fetcher }),
-      ),
-    ).resolves.toMatchObject({ key: "artifact-key" })
-    expect(fetcher).toHaveBeenCalledOnce()
-    const [, init] = fetcher.mock.calls[0]!
-    expect(new Headers(init?.headers).get(AGENT_SCOPE_HEADER)).toBe(
-      "session:thread-1",
-    )
-    expect(new Headers(init?.headers).get("authorization")).toBe(
-      "Bearer service-key",
-    )
+      store.readContent(uploaded.key, "session:thread-1", { id: "user-1" }),
+    ).resolves.toMatchObject({
+      mediaType: "image/png",
+    })
   })
 })

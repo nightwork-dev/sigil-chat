@@ -11,7 +11,6 @@ export class DevelopmentReadinessError extends Error {
 export async function checkDevelopmentReadiness({
   credentials,
   fetcher = fetch,
-  gonkApiKey,
   topology,
 }) {
   await checkWebReadiness({ fetcher, topology });
@@ -22,7 +21,6 @@ export async function checkDevelopmentReadiness({
   });
   await checkAuthenticatedServices({
     fetcher,
-    gonkApiKey,
     session,
     topology,
   });
@@ -100,14 +98,9 @@ async function createDevelopmentAuthSession({
   return { eveToken };
 }
 
-async function checkAuthenticatedServices({
-  fetcher,
-  gonkApiKey,
-  session,
-  topology,
-}) {
+async function checkAuthenticatedServices({ fetcher, session, topology }) {
   const authorization = { authorization: `Bearer ${session.eveToken}` };
-  await expectOk(
+  const readinessResponse = await expectOk(
     fetcher(
       new URL("/sigil/v1/readiness", topology.eveOrigin),
       requestOptions({ headers: authorization }),
@@ -120,8 +113,19 @@ async function checkAuthenticatedServices({
       retryableStatus: isTransientHttpStatus,
     },
   );
+  const readiness = await readinessResponse.json();
+  if (
+    readiness?.applicationTools?.status !== "ready" ||
+    !Number.isInteger(readiness?.applicationTools?.count) ||
+    readiness.applicationTools.count < 1
+  ) {
+    throw new DevelopmentReadinessError(
+      "APPLICATION_TOOLS_MISSING",
+      "Eve is running but its native Sigil Chat tools are unavailable.",
+    );
+  }
 
-  const infoResponse = await expectOk(
+  await expectOk(
     fetcher(
       new URL("/eve/v1/info", topology.eveOrigin),
       requestOptions({ headers: authorization }),
@@ -130,28 +134,6 @@ async function checkAuthenticatedServices({
     "Eve could not return its authenticated capability catalog.",
     {
       remediation: "Inspect explicit Eve auth overrides in .env.",
-      retryableStatus: isTransientHttpStatus,
-    },
-  );
-  const info = await infoResponse.json();
-  if (!hasGonkConnection(info?.connections, topology.gonkOrigin)) {
-    throw new DevelopmentReadinessError(
-      "GONK_CONNECTION_MISSING",
-      "Eve is running but its Sigil Chat Gonk connection is unavailable.",
-    );
-  }
-
-  await expectOk(
-    fetcher(
-      new URL("/health", topology.gonkOrigin),
-      requestOptions({
-        headers: { authorization: `Bearer ${gonkApiKey}` },
-      }),
-    ),
-    "GONK_UNHEALTHY",
-    "Gonk authentication or artifact storage is not ready.",
-    {
-      remediation: "Remove stale GONK_MCP_KEY overrides or run pnpm dev:reset.",
       retryableStatus: isTransientHttpStatus,
     },
   );
@@ -249,17 +231,6 @@ function responseCookies(headers) {
   return (
     headers.getSetCookie?.() ??
     (headers.get("set-cookie") ? [headers.get("set-cookie")] : [])
-  );
-}
-
-function hasGonkConnection(connections, gonkOrigin) {
-  if (!Array.isArray(connections)) return false;
-  return connections.some(
-    (connection) =>
-      connection?.connectionName === "gonk" &&
-      connection.protocol === "mcp" &&
-      typeof connection.url === "string" &&
-      new URL(connection.url).origin === new URL(gonkOrigin).origin,
   );
 }
 

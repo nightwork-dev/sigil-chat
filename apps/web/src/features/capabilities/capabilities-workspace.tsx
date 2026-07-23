@@ -86,7 +86,7 @@ export function CapabilitiesWorkspace() {
         <Alert>
           <AlertTitle>Availability is not authorization</AlertTitle>
           <AlertDescription>
-            This is a live inventory. Gonk consent preferences decide whether
+            This is a live inventory. Tool consent preferences decide whether
             the chat asks before an application tool runs; they never grant
             access that the server has not authorized.
           </AlertDescription>

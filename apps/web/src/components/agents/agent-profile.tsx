@@ -23,7 +23,6 @@ import {
   UploadIcon,
 } from "lucide-react"
 import { toast } from "sonner"
-import type { MemoryRecord } from "@gonk/memory"
 
 import { cn } from "@workspace/ui/lib/utils"
 import { Badge } from "@workspace/ui/components/badge"
@@ -50,6 +49,7 @@ import {
   useAgentPublicProfile,
   useUpdateAgentPersona,
   useUploadAgentPortrait,
+  type AgentMemoryRecord,
   type AgentProfile as AgentProfileData,
 } from "@/lib/agent-profile"
 import { AgentPortrait } from "@/components/agents/agent-portrait"
@@ -280,9 +280,9 @@ function Skills({ className }: { className?: string }) {
       </CardHeader>
       <CardContent className="flex flex-wrap items-center justify-between gap-4 px-4">
         <p className="max-w-xl text-sm text-muted-foreground">
-          Gonk supports persona-scoped skills. The shared Skills workspace can
-          author and inspect them; binding a registry call to this selected
-          persona is the remaining host-context seam.
+          Eve binds persona-scoped skills from trusted session context. The
+          shared Skills workspace manages application-wide scopes; persona
+          skills are resolved when this agent runs.
         </p>
         <Button size="sm" variant="outline" render={<Link to="/skills" />}>
           Manage skills
@@ -483,7 +483,7 @@ function subagentCapabilitySummary(subagent: AgentSubagentCatalogItem) {
   ].join(" · ")
 }
 
-function ClaimRow({ record }: { record: MemoryRecord }) {
+function ClaimRow({ record }: { record: AgentMemoryRecord }) {
   const shape = shapeOfRecord(record)
   return (
     <div className="flex items-start gap-2 border-b border-border/50 pb-3 text-sm last:border-0 last:pb-0">
@@ -561,14 +561,14 @@ function Memory({ className }: { className?: string }) {
           )}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
             <p className="text-xs text-muted-foreground">
-              Candidate rejection and multi-record consolidation need lifecycle
-              operations that Gonk does not expose yet.
+              Candidate rejection and multi-record consolidation are not yet
+              available in the current memory lifecycle.
             </p>
             <Button
               size="sm"
               variant="ghost"
               disabled
-              title="Gonk does not currently expose record consolidation."
+              title="Record consolidation is not currently available."
             >
               Consolidate unavailable
             </Button>
@@ -622,7 +622,7 @@ function MemoryRow({
   onArchive,
   onCorrect,
 }: {
-  record: MemoryRecord
+  record: AgentMemoryRecord
   candidate?: boolean
   busy?: boolean
   onAccept?: () => void
@@ -795,7 +795,7 @@ function SessionRow({ thread }: { thread: AgentThreadSummary }) {
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
-function KindChip({ kind }: { kind: MemoryRecord["kind"] }) {
+function KindChip({ kind }: { kind: AgentMemoryRecord["kind"] }) {
   return (
     <Badge
       variant="outline"
@@ -813,7 +813,7 @@ function EmptyState({ children }: { children: ReactNode }) {
 /** Relationship-kind records never render their content — kind + subject
  *  class + relative time only. Returns null for every other kind (caller
  *  falls back to record.content). */
-function shapeOfRecord(record: MemoryRecord): string | null {
+function shapeOfRecord(record: AgentMemoryRecord): string | null {
   if (record.kind !== "relationship") return null
   return `Knows something about a ${record.subject.kind} — ${formatDistanceToNow(record.updatedAt, { addSuffix: true })}.`
 }
