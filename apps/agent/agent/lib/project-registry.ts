@@ -21,6 +21,8 @@ import type { KvStore } from "@gonk/store/types"
 const PROJECT_NAMESPACE = "sigil-chat.projects.v1"
 const LOCK_TIMEOUT_MS = 2_000
 const HARD_STALE_LOCK_MS = 60_000
+const MAX_SLUG_MINT_ATTEMPTS = 10
+const SLUG_SUFFIX_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 export type ProjectMemberRole = "owner" | "member"
 
@@ -39,6 +41,20 @@ export interface Project {
    * portrait pattern) is a documented follow-up when one is needed.
    */
   readonly icon?: string
+  /**
+   * Short, immutable, URL-friendly alias for `id` — kebab-case of `name` at
+   * mint time, suffixed with a short base36 tag only on collision. Globally
+   * unique across every project (the URL carries no further disambiguating
+   * prefix). Display/routing alias ONLY: `id` remains the scope key
+   * everywhere authorization, scope headers, and artifact scopes are
+   * concerned — nothing here changes `id` semantics. Minted once (on first
+   * creation) and never regenerated, INCLUDING across a rename — see
+   * `upsert()`'s immutability contract. Optional in the type (matches the
+   * existing `revision?` precedent in this file) because a pre-migration
+   * stored record may not have one yet; `normalize()` backfills it on every
+   * read, the same idiom that already backfills `revision`.
+   */
+  readonly slug?: string
   readonly members: readonly ProjectMember[]
   readonly settings: Record<string, unknown>
   readonly createdAt: string
@@ -136,6 +152,11 @@ export class ProjectRegistry {
       assertExpectedRevision(project.id, current, options.expectedRevision)
       const next = {
         ...project,
+        // Immutable once minted: an existing record's slug can never change
+        // via upsert, regardless of what the caller's payload carries —
+        // enforced here (registry level), not only by the tool-handler
+        // policy in containers.ts, so this holds for every caller.
+        ...(isNonEmptySlug(current?.slug) ? { slug: current.slug } : {}),
         revision:
           options.expectedRevision !== undefined
             ? (current?.revision ?? 0) + 1
@@ -171,12 +192,67 @@ export class ProjectRegistry {
     )
   }
 
+  /** Resolves a project by its immutable slug. Global across every project —
+   *  the URL carries no further disambiguating prefix for a project. */
+  getBySlug(slug: string): Project | undefined {
+    const normalizedSlug = slug.trim().toLowerCase()
+    if (!normalizedSlug) return undefined
+    for (const { key, value } of this.projects.entries()) {
+      if (!isStoredProject(value) || value.id !== key) continue
+      const project = this.normalize(value)
+      if (project.slug === normalizedSlug) return project
+    }
+    return undefined
+  }
+
+  /** The route-boundary resolver (container slugs): a URL segment is either
+   *  the canonical id or the short slug. Tries the exact id lookup first —
+   *  an id and a slug never collide as KV keys — then falls back to slug
+   *  resolution; this ordering (not a shape check) is what keeps synthetic
+   *  non-slug-shaped test ids resolving correctly too. Callers redirect to
+   *  `.slug` when it differs from what was requested. */
+  resolveByRouteParam(candidate: string): Project | undefined {
+    const trimmed = candidate.trim()
+    if (!trimmed) return undefined
+    return this.get(trimmed) ?? this.getBySlug(trimmed)
+  }
+
   private normalize(project: StoredProject): Project {
-    const normalized = { ...project, revision: project.revision ?? 1 }
-    if (project.revision === undefined) {
+    const needsSlug = !isNonEmptySlug(project.slug)
+    const normalized = {
+      ...project,
+      revision: project.revision ?? 1,
+      ...(needsSlug
+        ? { slug: this.mintUniqueSlug(project.name, project.id) }
+        : { slug: project.slug!.trim().toLowerCase() }),
+    }
+    if (project.revision === undefined || needsSlug) {
       this.projects.set(normalized.id, clone(normalized))
     }
     return clone(normalized)
+  }
+
+  /** Kebab-case of `name`, uniquified with a short base36 suffix only on
+   *  collision. `excludeId` skips the record being normalized itself, so a
+   *  re-normalize of the SAME record (e.g. a bare revision backfill on a
+   *  record that already has this exact slug) never collides with itself. */
+  private mintUniqueSlug(name: string, excludeId: string): string {
+    const base = kebabCase(name) || "project"
+    const existing = new Set(
+      this.projects
+        .entries()
+        .filter(({ key }) => key !== excludeId)
+        .map(({ value }) => (isStoredProject(value) ? value.slug : undefined))
+        .filter((slug): slug is string => isNonEmptySlug(slug)),
+    )
+    if (!existing.has(base)) return base
+    for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
+      const candidate = `${base}-${randomSlugSuffix()}`
+      if (!existing.has(candidate)) return candidate
+    }
+    throw new Error(
+      `Could not mint a unique slug for project ${excludeId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
+    )
   }
 }
 
@@ -237,6 +313,7 @@ function isStoredProject(value: unknown): value is StoredProject {
     isIdentifier(value.name) &&
     typeof value.description === "string" &&
     (value.icon === undefined || typeof value.icon === "string") &&
+    (value.slug === undefined || typeof value.slug === "string") &&
     Array.isArray(value.members) &&
     value.members.every(isProjectMember) &&
     hasUniquePrincipalIds(value.members) &&
@@ -253,6 +330,7 @@ const projectKeys = [
   "name",
   "description",
   "icon",
+  "slug",
   "members",
   "settings",
   "createdAt",
@@ -403,4 +481,28 @@ function waitForLock(): void {
 
 function clone<T>(value: T): T {
   return structuredClone(value)
+}
+
+// Exported so workspace-registry.ts reuses the exact same slug primitives
+// rather than a parallel copy (container slugs — both registries share one
+// mint/format contract, just different collision domains).
+export function isNonEmptySlug(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+export function kebabCase(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+export function randomSlugSuffix(length = 4): string {
+  let suffix = ""
+  for (let i = 0; i < length; i += 1) {
+    suffix +=
+      SLUG_SUFFIX_ALPHABET[Math.floor(Math.random() * SLUG_SUFFIX_ALPHABET.length)]
+  }
+  return suffix
 }

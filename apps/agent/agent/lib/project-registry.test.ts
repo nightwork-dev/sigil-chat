@@ -22,7 +22,8 @@ const project: Project = {
   createdBy: "user-owner",
 }
 
-const versionedProject = { ...project, revision: 1 }
+// Container slugs: normalize() backfills a kebab-of-name slug on first read.
+const versionedProject = { ...project, revision: 1, slug: "project-one" }
 
 afterEach(async () => {
   await Promise.all(
@@ -198,6 +199,63 @@ describe("ProjectRegistry", () => {
         project.id,
       ),
     ).toEqual(winners[0].value)
+  })
+
+  describe("container slugs", () => {
+    it("mints a kebab-of-name slug on create", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      const created = store.upsert(project)
+
+      expect(created.slug).toBe("project-one")
+    })
+
+    it("lazily backfills a slug for a pre-migration record on read, and persists it", () => {
+      const values = new Map<string, unknown>([
+        ["project-1", { ...project, revision: 1 }],
+      ])
+      const store = new ProjectRegistry({ store: memoryKv(values) })
+      expect(values.get("project-1")).not.toHaveProperty("slug")
+
+      const read = store.get("project-1")
+
+      expect(read?.slug).toBe("project-one")
+      expect(values.get("project-1")).toMatchObject({ slug: "project-one" })
+      // Second read is a cache hit on the persisted slug, not a re-mint.
+      expect(store.get("project-1")?.slug).toBe("project-one")
+    })
+
+    it("suffixes a colliding kebab slug and never regenerates it on update", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      const first = store.upsert(project)
+      const second = store.upsert({
+        ...project,
+        id: "project-2",
+        name: "Project One", // Same name — kebab collides with `first`.
+      })
+
+      expect(first.slug).toBe("project-one")
+      expect(second.slug).toMatch(/^project-one-[0-9a-z]{4}$/)
+      expect(second.slug).not.toBe(first.slug)
+
+      // Immutable across a rename, even if the caller's payload tries to
+      // change or drop it — the registry preserves the current slug.
+      const renamed = store.upsert(
+        { ...second, name: "Totally Different Name", slug: undefined },
+        { expectedRevision: second.revision },
+      )
+      expect(renamed.slug).toBe(second.slug)
+    })
+
+    it("resolves a project by slug, and by id-or-slug at the route boundary", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      const created = store.upsert(project)
+
+      expect(store.getBySlug("project-one")?.id).toBe(created.id)
+      expect(store.getBySlug("no-such-slug")).toBeUndefined()
+      expect(store.resolveByRouteParam(created.id)?.slug).toBe("project-one")
+      expect(store.resolveByRouteParam("project-one")?.id).toBe(created.id)
+      expect(store.resolveByRouteParam("nothing-here")).toBeUndefined()
+    })
   })
 })
 

@@ -8,6 +8,15 @@ export interface Project {
   readonly name: string
   readonly description: string
   readonly icon?: string
+  /**
+   * Short, immutable, URL-friendly alias for `id` — display/routing only,
+   * never authorization-bearing. Server-minted (kebab-of-name, collision-
+   * suffixed) and immutable once set; a caller-supplied value is accepted
+   * here only so a round-tripped inspect→upsert payload validates, and is
+   * ignored by the registry for any record that already has one (see
+   * project-registry.ts's upsert()).
+   */
+  readonly slug?: string
   readonly members: readonly {
     readonly principalId: string
     readonly role: "owner" | "member"
@@ -25,6 +34,8 @@ export interface Workspace {
   readonly name: string
   readonly description: string
   readonly icon?: string
+  /** Short, immutable, URL-friendly alias for `id` — see Project.slug. */
+  readonly slug?: string
   readonly status: "active" | "archived"
   readonly createdAt: string
   readonly createdBy: string
@@ -341,7 +352,13 @@ function createProject(
   if (expectedRevision !== undefined) {
     throw new Error("Project is not available.")
   }
-  const { revision: _revision, ...rest } = project
+  // Container slugs: never trust a caller-supplied slug at creation — an
+  // honest one is always server-minted (kebab-of-name, collision-checked)
+  // by the registry's own backfill-on-read, the same mechanism that mints
+  // one for a legacy pre-migration record. Dropping it here means the
+  // registry sees "no slug yet" for a brand-new record too, so create and
+  // backfill share one minting path with no bypass.
+  const { revision: _revision, slug: _slug, ...rest } = project
   return {
     ...rest,
     createdBy: principalId,
@@ -369,6 +386,10 @@ function updateProject(
     id: current.id,
     createdAt: current.createdAt,
     createdBy: current.createdBy,
+    // Immutable once minted — the registry's own upsert() also enforces
+    // this (belt and suspenders: this tool-handler layer never even hands
+    // it an alternative to consider).
+    ...(current.slug ? { slug: current.slug } : {}),
   }
 }
 
@@ -381,7 +402,8 @@ function createWorkspace(
   if (!containers.projects.hasMember(homeScopeId, principalId)) {
     throw new Error("Workspace is not available.")
   }
-  const { revision: _revision, ...rest } = workspace
+  // Container slugs: see createProject's identical rationale.
+  const { revision: _revision, slug: _slug, ...rest } = workspace
   return {
     ...rest,
     projectId: homeScopeId,
@@ -415,6 +437,8 @@ function updateWorkspace(
     homeScopeId: currentHome,
     createdAt: current.createdAt,
     createdBy: current.createdBy,
+    // Immutable once minted — see updateProject's identical rationale.
+    ...(current.slug ? { slug: current.slug } : {}),
   }
 }
 
@@ -501,11 +525,13 @@ function isProject(value: unknown): value is Project {
       "createdAt",
       "createdBy",
       "icon",
+      "slug",
       "revision",
     ]) &&
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.name) &&
     typeof value.description === "string" &&
+    (value.slug === undefined || typeof value.slug === "string") &&
     Array.isArray(value.members) &&
     value.members.every(isProjectMember) &&
     hasUniquePrincipalIds(value.members) &&
@@ -543,6 +569,7 @@ function isWorkspace(value: unknown): value is Workspace {
       "name",
       "description",
       "icon",
+      "slug",
       "status",
       "createdAt",
       "createdBy",
@@ -553,6 +580,7 @@ function isWorkspace(value: unknown): value is Workspace {
     (value.homeScopeId === undefined || isNonEmptyString(value.homeScopeId)) &&
     isNonEmptyString(value.name) &&
     typeof value.description === "string" &&
+    (value.slug === undefined || typeof value.slug === "string") &&
     (value.status === "active" || value.status === "archived") &&
     isNonEmptyString(value.createdAt) &&
     isNonEmptyString(value.createdBy) &&
@@ -595,6 +623,7 @@ function projectSchema(): Record<string, unknown> {
       name: { type: "string", minLength: 1 },
       description: { type: "string" },
       icon: { type: "string" },
+      slug: { type: "string" },
       members: {
         type: "array",
         items: objectSchema(
@@ -631,6 +660,7 @@ function workspaceSchema(): Record<string, unknown> {
       name: { type: "string", minLength: 1 },
       description: { type: "string" },
       icon: { type: "string" },
+      slug: { type: "string" },
       status: { type: "string", enum: ["active", "archived"] },
       createdAt: { type: "string", minLength: 1 },
       createdBy: { type: "string", minLength: 1 },
