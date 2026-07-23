@@ -89,6 +89,17 @@ Currently authoritative for this product's design/implementation.
   since acted on) is retained locally alongside the rest of the extraction
   program's correspondence.
 
+## Proposed cross-repository contracts
+
+Targets that Sigil Chat requires but whose upstream implementation ownership is
+not yet ratified.
+
+- [`APPLICATION-STORAGE-CONSOLIDATION-SPEC.md`](APPLICATION-STORAGE-CONSOLIDATION-SPEC.md) —
+  one host-configured transactional application database with logical store
+  namespaces, adjacent artifact bytes, and one ordinary `SIGIL_DATA_DIR`.
+  Defines the proof that will determine whether the enabling change belongs in
+  Mirk, Gonk, Sigil composition, or a narrow combination of them.
+
 ## Provenance notes
 
 Pointer-only stubs for contracts whose canonical content moved to another
