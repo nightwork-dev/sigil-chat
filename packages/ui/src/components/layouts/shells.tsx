@@ -132,6 +132,7 @@ export function SidebarShell({
   children,
   accountMenu,
   workspaceSwitcher,
+  sidebarSecondary,
   breadcrumbContext,
   breadcrumbPage,
   viewContent,
@@ -146,6 +147,13 @@ export function SidebarShell({
    * precedent). Hidden when the rail collapses to icons, like the brand label.
    */
   workspaceSwitcher?: ReactNode
+  /**
+   * App-owned persistent content below the primary nav items (e.g. a session
+   * or recents list) — rendered in its own scrollable group inside the same
+   * sidebar content area, growing to fill remaining height. Hidden when the
+   * rail collapses to icons, like `workspaceSwitcher`.
+   */
+  sidebarSecondary?: ReactNode
   /**
    * App-owned context segment rendered before the surface crumb in the
    * breadcrumb bar (e.g. `Project › Workspace`). Read-only; the shell adds
@@ -209,6 +217,13 @@ export function SidebarShell({
               <NavMenu items={nav.items} />
             </SidebarGroupContent>
           </SidebarGroup>
+          {sidebarSecondary ? (
+            <SidebarGroup className="min-h-0 flex-1 group-data-[collapsible=icon]:hidden">
+              <SidebarGroupContent className="flex min-h-0 flex-1 flex-col">
+                {sidebarSecondary}
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : null}
         </SidebarContent>
 
         {(nav.footer && nav.footer.length > 0) || accountMenu ? (

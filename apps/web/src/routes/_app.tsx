@@ -24,6 +24,7 @@ import {
   useContainerBreadcrumbPage,
 } from "@/components/agent/container-breadcrumb"
 import { AgentRailStatus } from "@/components/agent/agent-rail-status"
+import { SessionListPane } from "@/components/agent/session-list-pane"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
 import { ActiveContainerProvider } from "@/lib/active-container"
@@ -82,6 +83,7 @@ function AppLayout() {
             <AgentSurfaceProvider>
               <SidebarShell
                 nav={nav}
+                sidebarSecondary={<SessionListPane />}
                 accountMenu={
                   <>
                     <ThemePicker variant="compact" />
