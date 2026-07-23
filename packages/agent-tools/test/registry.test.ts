@@ -193,6 +193,16 @@ describe("Sigil Chat Gonk registry", () => {
     // snapshot; a hardcoded count is redundant and churns on every tool add.
   });
 
+  it("keeps native tool schemas within Eve's locally validated subset", async () => {
+    const { registry } = await makeRegistry();
+    const unsupported = registry
+      .list()
+      .filter((tool) => hasJsonSchemaKeyword(tool.inputJsonSchema, "not"))
+      .map((tool) => tool.name);
+
+    expect(unsupported).toEqual([]);
+  });
+
   it("runs an authenticated write through Sigil's registry approval provider", async () => {
     const { registry } = await makeRegistry();
     const auth: AuthContext = {
@@ -1801,4 +1811,15 @@ function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
     },
     set: (key, value) => void values.set(key, value),
   };
+}
+
+function hasJsonSchemaKeyword(value: unknown, keyword: string): boolean {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasJsonSchemaKeyword(entry, keyword));
+  }
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(
+    ([key, entry]) =>
+      key === keyword || hasJsonSchemaKeyword(entry, keyword),
+  );
 }

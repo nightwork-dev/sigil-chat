@@ -133,8 +133,8 @@ export function registerImageTools(
       },
       required: ["instruction"],
       oneOf: [
-        { required: ["sourceArtifactId"], not: { required: ["inlineImage"] } },
-        { required: ["inlineImage"], not: { required: ["sourceArtifactId"] } },
+        { required: ["sourceArtifactId"] },
+        { required: ["inlineImage"] },
       ],
       additionalProperties: false,
     },
