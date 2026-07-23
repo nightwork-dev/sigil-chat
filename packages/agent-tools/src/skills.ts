@@ -12,7 +12,7 @@ import {
   type ToolRegistry,
 } from "@gonk/tool-registry";
 
-import { readHints, writeHints } from "./schemas.js";
+import { readHints, writeHints } from "./domain-schemas.js";
 
 const SKILLS_RESOURCE_KIND = "skills-catalog";
 const SKILLS_RESOURCE_ID = "skills";

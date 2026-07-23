@@ -6,6 +6,16 @@ import { describe, expect, it } from "vitest"
 
 import { createSigilAgentToolRegistry } from "./registry.js"
 
+const hostDependencies = {
+  artifacts: {} as never,
+  containers: {
+    projects: {} as never,
+    workspaces: {} as never,
+  },
+  graph: {} as never,
+  reviews: {} as never,
+}
+
 const expectedWorkItemToolNames = [
   "sigil-story-list",
   "sigil-story-inspect",
@@ -28,13 +38,18 @@ const expectedWorkItemToolNames = [
 describe("Sigil agent tool registry", () => {
   it("preserves current work-item tool names, schemas, visibility, and approval tiers", () => {
     const registry = createSigilAgentToolRegistry({
+      ...hostDependencies,
       workItems: new MemoryWorkItemsRepository(),
       specs: new MemorySpecsRepository(),
     })
     const tools = registry.list()
 
-    expect(tools.map((tool) => tool.name)).toEqual(expectedWorkItemToolNames)
-    for (const tool of tools) {
+    expect(tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(expectedWorkItemToolNames),
+    )
+    for (const tool of tools.filter((candidate) =>
+      expectedWorkItemToolNames.includes(candidate.name),
+    )) {
       expect(tool.visibility).toBe("always")
       expect(tool.inputJsonSchema).toMatchObject({ type: "object" })
       expect(tool.handler).toEqual(expect.any(Function))
@@ -52,7 +67,10 @@ describe("Sigil agent tool registry", () => {
     const workItems = new MemoryWorkItemsRepository({
       now: () => "2026-07-22T12:00:00.000Z",
     })
-    const registry = createSigilAgentToolRegistry({ workItems })
+    const registry = createSigilAgentToolRegistry({
+      ...hostDependencies,
+      workItems,
+    })
     const result = await invokeResult(registry, "sigil-request-propose", {
       requestKind: "workflow",
       title: "Make native Eve tasking boring",
@@ -77,6 +95,7 @@ describe("Sigil agent tool registry", () => {
 
   it("rejects attempts to task another scope from untrusted tool input", async () => {
     const registry = createSigilAgentToolRegistry({
+      ...hostDependencies,
       workItems: new MemoryWorkItemsRepository(),
     })
 

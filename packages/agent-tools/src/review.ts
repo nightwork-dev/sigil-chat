@@ -10,7 +10,7 @@ import {
   readHints,
   reviewItemsSchema,
   writeHints,
-} from "./schemas.js";
+} from "./domain-schemas.js";
 import {
   type AddReviewAnnotationsInput,
   type ReviewItemsInput,

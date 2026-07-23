@@ -17,7 +17,7 @@ import {
   graphEditInputSchema,
   readHints,
   writeHints,
-} from "./schemas.js";
+} from "./domain-schemas.js";
 import {
   type AddNodeInput,
   type BatchInput,

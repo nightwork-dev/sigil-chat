@@ -5,7 +5,7 @@ import {
   type AgentUiHighlightInput,
 } from "@workspace/agent-contracts/ui-highlight";
 
-import { emptyObjectSchema, objectSchema, readHints } from "./schemas.js";
+import { emptyObjectSchema, objectSchema, readHints } from "./domain-schemas.js";
 import { isEmptyObject } from "./validators.js";
 
 export function registerRuntimeTools(registry: ToolRegistry): void {

@@ -10,15 +10,15 @@ import {
   getSessionArtifactStore,
   type SessionArtifactMetadata,
   type SessionArtifactStore,
-} from "../artifact-store.js";
-import type { ResourceScope } from "../artifact-scope.js";
+} from "@workspace/artifact-store/repository";
+import type { ResourceScope } from "@workspace/artifact-store/scope";
 import {
   isResourceScope,
   isTextualFile,
   requireResourceScope,
   resourceScopeSchema,
 } from "./files.js";
-import { objectSchema, readHints } from "./schemas.js";
+import { objectSchema, readHints } from "./domain-schemas.js";
 import { isRecord } from "./validators.js";
 
 const EVIDENCE_COLLECTION = "session-artifact-passages";

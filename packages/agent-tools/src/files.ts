@@ -9,14 +9,14 @@ import {
   getSessionArtifactStore,
   type SessionArtifactMetadata,
   type SessionArtifactStore,
-} from "../artifact-store.js";
+} from "@workspace/artifact-store/repository";
 import {
   normalizeScope,
   RESOURCE_SCOPE_TIERS,
   type ResourceScope,
   type ScopeInput,
-} from "../artifact-scope.js";
-import { objectSchema, readHints } from "./schemas.js";
+} from "@workspace/artifact-store/scope";
+import { objectSchema, readHints } from "./domain-schemas.js";
 import { isRecord } from "./validators.js";
 
 const MAX_TEXT_CHARS = 200_000;

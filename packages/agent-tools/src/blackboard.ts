@@ -16,8 +16,8 @@ import {
   normalizeScope,
   type ScopeInput,
   type ResourceScope,
-} from "../artifact-scope.js";
-import { emptyObjectSchema, readHints, writeHints } from "./schemas.js";
+} from "@workspace/artifact-store/scope";
+import { emptyObjectSchema, readHints, writeHints } from "./domain-schemas.js";
 import { hasOnlyKeys, isRecord, isEmptyObject } from "./validators.js";
 
 const BLACKBOARD_OUTCOME_KIND = "blackboard.changed";

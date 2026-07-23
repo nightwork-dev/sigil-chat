@@ -4,9 +4,9 @@ import { blackboardRepository } from "@workspace/blackboard-store";
 import {
   getSessionArtifactStore,
   type SessionArtifactStore,
-} from "../artifact-store.js";
+} from "@workspace/artifact-store/repository";
 import { requireResourceScope } from "./files.js";
-import { writeHints } from "./schemas.js";
+import { writeHints } from "./domain-schemas.js";
 import { hasOnlyKeys, isRecord } from "./validators.js";
 
 /** Media type that marks a stored artifact as a distilled card (so the chat UI

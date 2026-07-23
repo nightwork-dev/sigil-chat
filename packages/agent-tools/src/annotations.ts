@@ -15,7 +15,7 @@
 
 import { shape, type ToolRegistry } from "@gonk/tool-registry"
 
-import { writeHints, objectSchema } from "./schemas.js"
+import { writeHints, objectSchema } from "./domain-schemas.js"
 import { hasOnlyKeys, isRecord } from "./validators.js"
 
 // ─── Input shapes ──────────────────────────────────────────────────────────

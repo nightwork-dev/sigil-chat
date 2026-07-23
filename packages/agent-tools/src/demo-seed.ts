@@ -5,9 +5,9 @@ import { shape, type ToolRegistry } from "@gonk/tool-registry";
 import {
   getSessionArtifactStore,
   type SessionArtifactStore,
-} from "../artifact-store.js";
+} from "@workspace/artifact-store/repository";
 import { requireResourceScope } from "./files.js";
-import { emptyObjectSchema, writeHints } from "./schemas.js";
+import { emptyObjectSchema, writeHints } from "./domain-schemas.js";
 import { isEmptyObject } from "./validators.js";
 
 const DEMO_DOC_FILENAME = "cerebras-knowledge-base.md";

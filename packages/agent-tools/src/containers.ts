@@ -1,15 +1,35 @@
 import { shape, type ToolContext, type ToolRegistry } from "@gonk/tool-registry"
 
-import type {
-  Project,
-  ProjectRegistry,
-} from "../../../agent/agent/lib/project-registry.js"
-import type {
-  Workspace,
-  WorkspaceRegistry,
-} from "../../../agent/agent/lib/workspace-registry.js"
-import { readHints, writeHints } from "./schemas.js"
+import { readHints, writeHints } from "./domain-schemas.js"
 import { hasOnlyKeys, isRecord } from "./validators.js"
+
+export interface Project {
+  readonly id: string
+  readonly name: string
+  readonly description: string
+  readonly icon?: string
+  readonly members: readonly {
+    readonly principalId: string
+    readonly role: "owner" | "member"
+  }[]
+  readonly settings: Record<string, unknown>
+  readonly createdAt: string
+  readonly createdBy: string
+  readonly revision?: number
+}
+
+export interface Workspace {
+  readonly id: string
+  readonly projectId: string
+  readonly homeScopeId?: string
+  readonly name: string
+  readonly description: string
+  readonly icon?: string
+  readonly status: "active" | "archived"
+  readonly createdAt: string
+  readonly createdBy: string
+  readonly revision?: number
+}
 
 const CONTAINERS_OUTCOME_KIND = "containers.changed"
 const PROJECTS_RESOURCE_KIND = "project-registry"
@@ -40,8 +60,23 @@ type WorkspaceUpsertInput = {
 }
 
 export interface ContainerRegistries {
-  projects: Pick<ProjectRegistry, "get" | "hasMember" | "list" | "upsert">
-  workspaces: Pick<WorkspaceRegistry, "get" | "list" | "upsert">
+  projects: {
+    get(id: string): Project | undefined
+    hasMember(projectId: string, principalId: string): boolean
+    list(): Project[]
+    upsert(
+      project: Project,
+      options?: { readonly expectedRevision?: number },
+    ): Project
+  }
+  workspaces: {
+    get(id: string): Workspace | undefined
+    list(projectId?: string): Workspace[]
+    upsert(
+      workspace: Workspace,
+      options?: { readonly expectedRevision?: number },
+    ): Workspace
+  }
 }
 
 export function registerContainerTools(

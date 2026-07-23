@@ -3,14 +3,14 @@ import {
   artifactPublicUrl,
   getSessionArtifactStore,
   type SessionArtifactStore,
-} from "../artifact-store.js";
+} from "@workspace/artifact-store/repository";
 import { generateCodexImage } from "./image-provider.js";
 import {
   editImageThroughGateway,
   type ImageEditProvider,
 } from "./gateway-image-edit.js";
 import { requireResourceScope } from "./files.js";
-import { writeHints } from "./schemas.js";
+import { writeHints } from "./domain-schemas.js";
 import { hasOnlyKeys, isRecord } from "./validators.js";
 
 export interface GenerateImageInput {

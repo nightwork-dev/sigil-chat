@@ -1,5 +1,7 @@
 import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
 
+// The image provider is application-owned; the agent host only supplies it.
+
 export interface ImageEditRequest {
   readonly sourceBytes: Uint8Array
   readonly sourceMediaType: string
