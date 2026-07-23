@@ -15,7 +15,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@workspace/ui/components/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { Textarea } from "@workspace/ui/components/textarea"
@@ -46,12 +45,45 @@ const TIER_LABEL: Record<BlackboardTier, string> = {
   project: "Project",
 }
 
-export function SessionBlackboard({
+/** Self-contained: owns its own trigger button and open state. Used by the
+ *  non-session `AgentChatHeader` (§9.4's "future non-session AgentChat
+ *  caller" — untouched by §9.7/§9.8, additive). The session surface instead
+ *  drives {@link SessionBlackboardSheet} directly from the ＋ Add menu's
+ *  "Session note" entry (§9.8a) — one Sheet, two ways to open it. */
+export function SessionBlackboard(props: SessionBlackboardProps) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button
+        aria-label="Open blackboard"
+        className="max-sm:size-11"
+        onClick={() => setOpen(true)}
+        size="icon-xs"
+        title="Blackboard"
+        variant="ghost"
+      >
+        <BookOpenTextIcon />
+      </Button>
+      <SessionBlackboardSheet onOpenChange={setOpen} open={open} {...props} />
+    </>
+  )
+}
+
+export interface SessionBlackboardSheetProps extends SessionBlackboardProps {
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+}
+
+/** Controlled: the Sheet + its content, no built-in trigger. Lets a caller
+ *  outside this file own when it opens (the ＋ Add menu's "Session note"
+ *  item, SC.10 §9.8). */
+export function SessionBlackboardSheet({
   sessionId,
   workspaceId,
   projectId,
-}: SessionBlackboardProps) {
-  const [open, setOpen] = useState(false)
+  open,
+  onOpenChange,
+}: SessionBlackboardSheetProps) {
   const [tier, setTier] = useState<BlackboardTier>("session")
   const availableTiers: BlackboardTier[] = [
     "session",
@@ -104,20 +136,7 @@ export function SessionBlackboard({
   const writeState = activeTier === "session" ? writeBlackboard : writeContainerBlackboard
 
   return (
-    <Sheet onOpenChange={setOpen} open={open}>
-      <SheetTrigger
-        render={
-          <Button
-            aria-label="Open blackboard"
-            className="max-sm:size-11"
-            size="icon-xs"
-            title="Blackboard"
-            variant="ghost"
-          />
-        }
-      >
-        <BookOpenTextIcon />
-      </SheetTrigger>
+    <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-[min(30rem,calc(100vw-1rem))]" side="right">
         <SheetHeader className="border-b border-border px-4 py-4">
           <SheetTitle>Blackboard</SheetTitle>
