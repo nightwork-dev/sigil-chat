@@ -36,6 +36,10 @@ import { SessionChatSurface } from "@/components/agent/session-chat-surface"
 import { useSessionCommitments } from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/sessions/$threadId")({
+  // SC.10 §9.4 — same reduced chrome as the nested session leaves for the
+  // rare shallow-render case (no containing project visible): the session
+  // surface retires the bottom status rail entirely.
+  staticData: { rail: { hideStatusRail: true } },
   validateSearch: (search: Record<string, unknown>): { via?: string } => ({
     ...(typeof search.via === "string" ? { via: search.via } : {}),
   }),

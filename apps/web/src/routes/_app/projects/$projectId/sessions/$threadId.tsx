@@ -36,6 +36,10 @@ import {
 export const Route = createFileRoute(
   "/_app/projects/$projectId/sessions/$threadId",
 )({
+  // SC.10 §9.4 — the session surface retires the bottom status rail
+  // entirely; SessionChatSurface's own top bar + context rail already carry
+  // everything it would duplicate.
+  staticData: { rail: { hideStatusRail: true } },
   loader: async ({ context, params }) => {
     const principalId = context.user.id
     await context.queryClient

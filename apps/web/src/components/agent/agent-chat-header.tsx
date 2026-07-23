@@ -298,7 +298,10 @@ function PersonaPickerItem({
   )
 }
 
-function AgentSessionSwitcher({
+// Exported for session-chat-header.tsx (SC.10 §9.5 step 4): the session
+// surface's own reduced header reuses this Sheet trigger at compact/mobile
+// widths, where the persistent list pane (§9.2) isn't reachable.
+export function AgentSessionSwitcher({
   busy,
   controls,
   personaName,

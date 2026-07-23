@@ -26,6 +26,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@workspace/ui/components/empty"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
@@ -144,7 +151,7 @@ export function AgentChat({
   return (
     <div
       className={cn(
-        "flex h-full min-w-0 max-w-full flex-col overflow-hidden",
+        "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden",
         className,
       )}
     >
@@ -203,21 +210,52 @@ export function AgentChat({
         ))}
       </ChatList>
 
-      <ChatInput
-        actionClassName="max-sm:size-11"
-        attachments={attachments}
-        className="max-w-3xl"
-        disabled={session.status === "error" || attachmentsUploading}
-        isStreaming={busy}
-        onAttach={addFiles}
-        onAttachUrl={handleAttachUrl}
-        onChange={setInput}
-        onRemoveAttachment={removeAttachment}
-        onSend={handleSend}
-        onStop={session.stop}
-        placeholder={placeholder}
-        value={input}
-      />
+      <div className="max-w-3xl border-t border-border">
+        {/* §9.4 — approval mode has no header to live in when hideHeader is
+            set (the session surface's own reduced header, session-chat-header.tsx);
+            it moves to the composer instead, matching both reference apps.
+            A future non-session AgentChat caller keeps it in the header
+            (showApprovalMode there, untouched) — additive, not a second
+            copy, since the two never render for the same caller. */}
+        {hideHeader && showApprovalMode && approvalMode && onApprovalModeChange ? (
+          <div className="flex items-center gap-2 px-3 pt-1.5">
+            <Select
+              onValueChange={(value) => {
+                if (value) onApprovalModeChange(value as ToolApprovalMode)
+              }}
+              value={approvalMode}
+            >
+              <SelectTrigger
+                aria-label="Tool approval mode"
+                className="max-sm:h-11"
+                size="sm"
+                title="Tool approval mode"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start">
+                <SelectItem value="ask">Ask</SelectItem>
+                <SelectItem value="always">Always allow</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        <ChatInput
+          actionClassName="max-sm:size-11"
+          attachments={attachments}
+          className="border-t-0"
+          disabled={session.status === "error" || attachmentsUploading}
+          isStreaming={busy}
+          onAttach={addFiles}
+          onAttachUrl={handleAttachUrl}
+          onChange={setInput}
+          onRemoveAttachment={removeAttachment}
+          onSend={handleSend}
+          onStop={session.stop}
+          placeholder={placeholder}
+          value={input}
+        />
+      </div>
     </div>
   )
 }

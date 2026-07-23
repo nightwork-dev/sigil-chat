@@ -32,6 +32,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { AgentChat } from "@/components/agent/agent-chat"
 import { ContextTray, useContextTray } from "@/components/agent/context-tray"
+import { SessionChatHeader } from "@/components/agent/session-chat-header"
 import { useAttention } from "@/components/agent/workspace-attention"
 import { useRegisterAgentPresentation } from "@/lib/agent-surface-registry"
 import {
@@ -48,7 +49,7 @@ import type { HomeState, SessionHomeView } from "@/features/homes/types"
 export function SessionChatSurface({
   threadId,
   railState,
-  compact,
+  compact = false,
 }: {
   threadId: string
   railState: HomeState<SessionHomeView>
@@ -105,8 +106,10 @@ export function SessionChatSurface({
             reading measure stays capped without re-centering when this box's
             available width changes as the rail toggles. */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <SessionChatHeader compact={compact} />
           <AgentChat
             approvalMode={approvalMode}
+            hideHeader
             onApprovalModeChange={setToolApprovalMode}
             placeholder="Ask the agent, or tell it to use an application tool…"
             showNewSession={false}
