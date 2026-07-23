@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
-import { SheetClose } from "@workspace/ui/components/sheet"
 import { cn } from "@workspace/ui/lib/utils"
 
 import {
@@ -21,20 +20,29 @@ import { useActiveContainer } from "@/lib/active-container"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 
 /**
- * Project switcher + workspace-grouped thread nav for the conversation
- * sheet (AgentSessionSwitcher). Single render site today, so this stays a
- * plain component rather than a Root/Parts compound — see the repo's
- * compound-component rule ("single-use components that only render in one
- * place" are exempt).
+ * Project switcher + workspace-grouped thread nav — the SC.10 §9.2
+ * lateral-movement affordance. Two render sites now: a persistent pane
+ * (session-list-pane.tsx, no Dialog ancestor) and the compact/mobile Sheet
+ * form (AgentSessionSwitcher in agent-chat-header.tsx). Deliberately hook-free
+ * of any Dialog/Sheet primitive itself — `onDismiss` is a plain callback the
+ * Sheet caller wires to its own close, so this component never assumes a
+ * Dialog root exists (scar: SheetClose here previously crashed the moment
+ * ProjectWorkspaceNav was promoted out of the Sheet — "Cannot destructure
+ * property 'store' of useDialogRootContext(...)" — see ThreadGroup below and
+ * project-workspace-nav.test.tsx).
  */
 export function ProjectWorkspaceNav({
   activeThreadId,
   busy,
+  onDismiss,
   onSelectThread,
   threads,
 }: {
   activeThreadId?: string
   busy: boolean
+  /** Called after a thread is selected, in addition to onSelectThread — the
+   *  Sheet form uses this to close itself; the persistent pane omits it. */
+  onDismiss?: () => void
   onSelectThread: (threadId: string) => void
   threads: readonly AgentThreadSummary[]
 }) {
@@ -113,6 +121,7 @@ export function ProjectWorkspaceNav({
             busy={busy}
             key={workspace.id}
             label={workspace.name}
+            onDismiss={onDismiss}
             onSelectThread={onSelectThread}
             threads={grouped.get(workspace.id) ?? []}
           />
@@ -122,6 +131,7 @@ export function ProjectWorkspaceNav({
             activeThreadId={activeThreadId}
             busy={busy}
             label={workspacesInProject.length > 0 ? "Unfiled" : undefined}
+            onDismiss={onDismiss}
             onSelectThread={onSelectThread}
             threads={unfiled}
           />
@@ -131,16 +141,22 @@ export function ProjectWorkspaceNav({
   )
 }
 
-function ThreadGroup({
+/** Exported for project-workspace-nav.test.tsx — the narrowest regression
+ *  test for the Dialog-context crash: mount this with no Sheet/Dialog
+ *  ancestor at all and assert it renders. It takes no context hooks, only
+ *  props, so nothing here can ever depend on a Dialog root existing. */
+export function ThreadGroup({
   activeThreadId,
   busy,
   label,
+  onDismiss,
   onSelectThread,
   threads,
 }: {
   activeThreadId?: string
   busy: boolean
   label?: string
+  onDismiss?: () => void
   onSelectThread: (threadId: string) => void
   threads: readonly AgentThreadSummary[]
 }) {
@@ -156,7 +172,7 @@ function ThreadGroup({
       {threads.map((thread) => {
         const active = thread.id === activeThreadId
         return (
-          <SheetClose
+          <button
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex min-h-11 w-full items-start gap-2 rounded-md px-3 py-2 text-left text-sm leading-5 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
@@ -164,8 +180,11 @@ function ThreadGroup({
             )}
             disabled={busy}
             key={thread.id}
-            onClick={() => onSelectThread(thread.id)}
-            render={<button type="button" />}
+            onClick={() => {
+              onSelectThread(thread.id)
+              onDismiss?.()
+            }}
+            type="button"
           >
             <span className="min-w-0 flex-1 whitespace-normal break-words">
               {thread.title}
@@ -173,7 +192,7 @@ function ThreadGroup({
             {active ? (
               <CheckIcon className="mt-1 size-3.5 shrink-0 text-primary" />
             ) : null}
-          </SheetClose>
+          </button>
         )
       })}
     </div>
