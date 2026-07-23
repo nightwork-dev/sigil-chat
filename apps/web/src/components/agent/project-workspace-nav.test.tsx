@@ -62,6 +62,7 @@ afterEach(() => {
 
 const THREAD: AgentThreadSummary = {
   id: "thread-1",
+  slug: "abc12345",
   title: "Draft the launch email",
   personaId: "sigil-chat-eve",
   status: "active",

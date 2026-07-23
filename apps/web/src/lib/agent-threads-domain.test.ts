@@ -6,6 +6,7 @@ import {
   AgentThreadNotFoundError,
   AgentThreadRepository,
   LegacyAgentThreadClaimRefusedError,
+  isUuidShaped,
   projectAgentThreadSummary,
   type AgentThread,
   type AgentThreadPreference,
@@ -698,6 +699,106 @@ describe("AgentThreadRepository", () => {
     expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
       claimedPreferences: 0,
       claimedThreads: 0,
+    });
+  });
+
+  describe("session slugs (SC.10)", () => {
+    it("mints a short slug at creation, distinct from the id", () => {
+      const repo = repository();
+      const thread = repo.create(USER_A, { title: "Launch review" });
+
+      expect(thread.slug).toMatch(/^[0-9a-z]{8}$/);
+      expect(thread.slug).not.toBe(thread.id);
+      expect(projectAgentThreadSummary(thread).slug).toBe(thread.slug);
+    });
+
+    it("mints a slug on fork too", () => {
+      const repo = repository();
+      const source = repo.create(USER_A, { title: "Source" });
+      const fork = repo.fork(USER_A, { sourceThreadId: source.id });
+
+      expect(fork.slug).toMatch(/^[0-9a-z]{8}$/);
+      expect(fork.slug).not.toBe(source.slug);
+    });
+
+    it("lazily backfills a slug for a pre-migration record on read, and persists it", () => {
+      const threads = new MemoryKv<AgentThread>();
+      const preferences = new MemoryKv<AgentThreadPreference>();
+      const repo = new AgentThreadRepository({
+        defaultPersonaId: "agent-a",
+        threads,
+        preferences,
+        createId: () => "thread-pre-slug",
+        now: () => new Date("2026-07-23T00:00:00.000Z"),
+      });
+      // Simulate a record written before the slug migration landed.
+      const preSlug = repo.create(USER_A, { title: "Before slugs" });
+      const { slug: _slug, ...withoutSlug } = preSlug;
+      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread);
+      expect(threads.get(`thread:${preSlug.id}`)).not.toHaveProperty("slug");
+
+      const read = repo.get(USER_A, preSlug.id);
+
+      expect(read?.slug).toMatch(/^[0-9a-z]{8}$/);
+      // Backfill persisted — no migration script needed, the next read
+      // (or repo.list) sees the same slug without minting again.
+      expect(threads.get(`thread:${preSlug.id}`)?.slug).toBe(read?.slug);
+      expect(repo.list(USER_A)[0]?.slug).toBe(read?.slug);
+    });
+
+    it("regenerates on collision (per-principal collision scope)", () => {
+      const threads = new MemoryKv<AgentThread>();
+      const preferences = new MemoryKv<AgentThreadPreference>();
+      let call = 0;
+      // First two candidates collide with an existing thread's slug; the
+      // third is free.
+      const repo = new AgentThreadRepository({
+        defaultPersonaId: "agent-a",
+        threads,
+        preferences,
+        createId: () => `thread-${call}`,
+        createSlug: () => ["taken001", "taken001", "free0001"][call++] ?? "overflow",
+        now: () => new Date("2026-07-23T00:00:00.000Z"),
+      });
+      call = 0;
+      const first = repo.create(USER_A); // mints "taken001" (call 0)
+      expect(first.slug).toBe("taken001");
+
+      const second = repo.create(USER_A); // "taken001" collides, retries to "free0001"
+      expect(second.slug).toBe("free0001");
+      expect(second.slug).not.toBe(first.slug);
+    });
+
+    it("resolves a thread by slug, scoped to the requesting principal", () => {
+      const repo = repository();
+      const ownThread = repo.create(USER_A, { title: "Mine" });
+      const otherThread = repo.create(USER_B, { title: "Not mine" });
+
+      expect(repo.getBySlug(USER_A, ownThread.slug)?.id).toBe(ownThread.id);
+      expect(repo.getBySlug(USER_A, otherThread.slug)).toBeUndefined();
+      expect(repo.getBySlug(USER_A, "no-such-slug")).toBeUndefined();
+    });
+
+    it("resolveByRouteParam resolves both a UUID-shaped id and a slug, unambiguously", () => {
+      const repo = new AgentThreadRepository({
+        defaultPersonaId: "agent-a",
+        threads: new MemoryKv(),
+        preferences: new MemoryKv(),
+        now: () => new Date("2026-07-23T00:00:00.000Z"),
+        // A real UUID id, so isUuidShaped actually distinguishes it from the slug.
+      });
+      const thread = repo.create(USER_A, { title: "Route param" });
+      expect(isUuidShaped(thread.id)).toBe(true);
+      expect(isUuidShaped(thread.slug)).toBe(false);
+
+      expect(repo.resolveByRouteParam(USER_A, thread.id)?.id).toBe(thread.id);
+      expect(repo.resolveByRouteParam(USER_A, thread.slug)?.id).toBe(
+        thread.id,
+      );
+      expect(
+        repo.resolveByRouteParam(USER_A, "00000000-0000-0000-0000-000000000000"),
+      ).toBeUndefined();
+      expect(repo.resolveByRouteParam(USER_A, "nosuchslug")).toBeUndefined();
     });
   });
 });
