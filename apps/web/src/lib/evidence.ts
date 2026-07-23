@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
-import { AGENT_SCOPE_HEADER } from "./agent-session-scope";
 import { getSession, requireSession } from "./auth/session";
 import { type DistilledArtifact } from "@/components/agent/distilled-artifact-card";
 
@@ -15,11 +14,8 @@ const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json";
  * PROJECT-tier scope so it survives sessions and reloads, rather than using
  * the per-thread session scope reserved for ephemeral chat attachments.
  *
- * Every path is session-gated and proxied server-side: the browser never talks
- * to Gonk directly, never becomes
- * an MCP client, and never sees `GONK_MCP_KEY`. This web process holds the key
- * (via turbo `globalPassThroughEnv`) and forwards it to Gonk's authenticated
- * `/artifacts`, `/upload`, and `/img/<key>` routes.
+ * Every path is session-gated and handled server-side by the web app's shared
+ * artifact repository. The browser receives only same-origin resource URLs.
  */
 export const EVIDENCE_ROOM_SCOPE = "project:evidence-room";
 
@@ -46,87 +42,48 @@ export const evidenceKeys = {
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 
-async function gonkArtifactsEndpoint(): Promise<{
-  url: string;
-  apiKey: string;
-}> {
-  const { readGonkClientEnvironment } =
-    await import("@workspace/runtime-env/server");
-  const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
-  if (!apiKey) {
-    throw new Error(
-      "GONK_MCP_KEY is not configured for the web app's server process; the Evidence Room cannot reach Gonk.",
-    );
-  }
-  return { url: gonkMcpUrl.replace(/\/mcp\/?$/, "/artifacts"), apiKey };
-}
-
 const listEvidenceDocumentsFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<EvidenceDocument[]> => {
     requireSession(await getSession());
-    const { url, apiKey } = await gonkArtifactsEndpoint();
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
-        authorization: `Bearer ${apiKey}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Evidence document list failed (${response.status} ${response.statusText})`,
-      );
-    }
-    const artifacts = (await response.json()) as EvidenceDocument[];
+    const { getWebArtifactStore, artifactUrlForWeb } = await import(
+      "./artifact-repository.server"
+    );
+    const artifacts = await getWebArtifactStore().listByScope(
+      EVIDENCE_ROOM_SCOPE,
+    );
     // Distilled cards live in the same scope; the library lists documents only.
-    return artifacts.filter((doc) => doc.mediaType !== DISTILL_MEDIA_TYPE);
+    return artifacts
+      .filter((doc) => doc.mediaType !== DISTILL_MEDIA_TYPE)
+      .map((artifact) => ({
+        id: artifact.id,
+        filename: artifact.filename,
+        mediaType: artifact.mediaType,
+        size: artifact.size,
+        createdAt: artifact.createdAt,
+        url: artifactUrlForWeb(artifact),
+      }));
   },
 );
 
 const listEvidenceDistillsFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<EvidenceDistill[]> => {
     requireSession(await getSession());
-    const { readGonkClientEnvironment } =
-      await import("@workspace/runtime-env/server");
-    const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
-    if (!apiKey) {
-      throw new Error(
-        "GONK_MCP_KEY is not configured for the web app's server process; the Evidence Room cannot reach Gonk.",
-      );
-    }
-    const artifactsUrl = gonkMcpUrl.replace(/\/mcp\/?$/, "/artifacts");
-    const imgBase = gonkMcpUrl.replace(/\/mcp\/?$/, "");
-
-    const response = await fetch(artifactsUrl, {
-      method: "GET",
-      headers: {
-        [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
-        authorization: `Bearer ${apiKey}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Evidence distill list failed (${response.status} ${response.statusText})`,
-      );
-    }
-    const artifacts = (await response.json()) as EvidenceDocument[];
+    const { getWebArtifactStore } = await import(
+      "./artifact-repository.server"
+    );
+    const store = getWebArtifactStore();
+    const artifacts = await store.listByScope(EVIDENCE_ROOM_SCOPE);
     const distillMetas = artifacts.filter(
       (artifact) => artifact.mediaType === DISTILL_MEDIA_TYPE,
     );
 
-    // Each distill's bytes are DistilledArtifact JSON. This server-side read
-    // uses the same service bearer as every other Gonk artifact operation.
     const distills = await Promise.all(
       distillMetas.map(async (meta): Promise<EvidenceDistill | null> => {
-        const content = await fetch(`${imgBase}/img/${meta.id}`, {
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
-          },
-        });
-        if (!content.ok) return null;
         try {
-          const distilled = (await content.json()) as DistilledArtifact;
+          const content = await store.readContent(meta.id, EVIDENCE_ROOM_SCOPE);
+          const distilled = JSON.parse(
+            new TextDecoder().decode(content.bytes),
+          ) as DistilledArtifact;
           if (typeof distilled?.title !== "string") return null;
           return { artifactId: meta.id, distilled };
         } catch {
@@ -155,45 +112,23 @@ const uploadEvidenceDocumentFn = createServerFn({ method: "POST" })
       );
     }
 
-    const { readGonkClientEnvironment } =
-      await import("@workspace/runtime-env/server");
-    const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
-    if (!apiKey) {
-      throw new Error(
-        "GONK_MCP_KEY is not configured for the web app's server process; Evidence uploads cannot be authenticated against Gonk.",
-      );
-    }
-    const uploadUrl = gonkMcpUrl.replace(/\/mcp\/?$/, "/upload");
+    const { getWebArtifactStore, artifactUrlForWeb } = await import(
+      "./artifact-repository.server"
+    );
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        "content-type": file.type || "application/octet-stream",
-        "x-filename": file.name,
-        [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: bytes,
+    const uploaded = await getWebArtifactStore().putFile({
+      bytes,
+      filename: file.name,
+      mediaType: file.type || "application/octet-stream",
+      scope: EVIDENCE_ROOM_SCOPE,
     });
-    if (!response.ok) {
-      throw new Error(
-        `Evidence upload failed (${response.status} ${response.statusText})`,
-      );
-    }
-    const uploaded = (await response.json()) as {
-      key: string;
-      url: string;
-      mediaType: string;
-      size: number;
-      filename?: string;
-    };
     return {
-      id: uploaded.key,
-      filename: uploaded.filename ?? file.name,
+      id: uploaded.id,
+      filename: uploaded.filename,
       mediaType: uploaded.mediaType,
       size: uploaded.size,
-      createdAt: new Date().toISOString(),
-      url: uploaded.url,
+      createdAt: uploaded.createdAt,
+      url: artifactUrlForWeb(uploaded),
     };
   });
 
@@ -201,20 +136,14 @@ const deleteEvidenceDocumentFn = createServerFn({ method: "POST" })
   .validator((data: { id: string }) => data)
   .handler(async ({ data }): Promise<{ deleted: boolean; id: string }> => {
     requireSession(await getSession());
-    const { url, apiKey } = await gonkArtifactsEndpoint();
-    const response = await fetch(`${url}/${encodeURIComponent(data.id)}`, {
-      method: "DELETE",
-      headers: {
-        [AGENT_SCOPE_HEADER]: EVIDENCE_ROOM_SCOPE,
-        authorization: `Bearer ${apiKey}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Evidence delete failed (${response.status} ${response.statusText})`,
-      );
-    }
-    return (await response.json()) as { deleted: boolean; id: string };
+    const { getWebArtifactStore } = await import(
+      "./artifact-repository.server"
+    );
+    const deleted = await getWebArtifactStore().removeFromScope(
+      data.id,
+      EVIDENCE_ROOM_SCOPE,
+    );
+    return { deleted, id: data.id };
   });
 
 export function useEvidenceDocuments() {
