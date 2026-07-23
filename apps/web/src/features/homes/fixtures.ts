@@ -34,12 +34,14 @@ export const fixtureNav: ProjectWorkspaceNavSummary = {
   projects: [
     {
       id: NORTHSTAR.commerce,
+      slug: "commerce-platform",
       name: "Commerce Platform",
       description: "Storefront and checkout.",
       icon: "🛒",
     },
     {
       id: NORTHSTAR.brand,
+      slug: "brand",
       name: "Brand",
       description: "Brand systems and campaigns.",
       icon: "✦",
@@ -48,6 +50,7 @@ export const fixtureNav: ProjectWorkspaceNavSummary = {
   workspaces: [
     {
       id: NORTHSTAR.checkoutReliability,
+      slug: "checkout-reliability",
       projectId: NORTHSTAR.commerce,
       mountedProjectIds: [],
       name: "Checkout Reliability",
@@ -57,6 +60,7 @@ export const fixtureNav: ProjectWorkspaceNavSummary = {
     },
     {
       id: NORTHSTAR.holidayLaunch,
+      slug: "holiday-launch",
       projectId: NORTHSTAR.brand,
       mountedProjectIds: [NORTHSTAR.commerce],
       name: "Holiday Launch",

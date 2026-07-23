@@ -40,12 +40,13 @@ function threadWithUnrelatedSlug(
 const NAV: ProjectWorkspaceNavSummary = {
   personalProjectId: "project:personal",
   projects: [
-    { id: "project:personal", name: "Personal", description: "" },
-    { id: "project:brand", name: "Brand", description: "" },
+    { id: "project:personal", slug: "personal", name: "Personal", description: "" },
+    { id: "project:brand", slug: "brand", name: "Brand", description: "" },
   ],
   workspaces: [
     {
       id: "workspace:holiday",
+      slug: "holiday",
       projectId: "project:brand",
       mountedProjectIds: [],
       name: "Holiday",
