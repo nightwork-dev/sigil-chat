@@ -9,8 +9,8 @@ description: End-to-end "how to build a feature here" for Sigil Chat — the lay
 
 - [ ] From every fresh checkout or linked worktree, run `pnpm dev`.
 - [ ] Do NOT pre-run `pnpm install`, copy/symlink `.env`, migrate auth, seed an
-      owner, generate a Gonk key, or start apps separately. The launcher owns
-      all of it.
+      owner, generate service keys, or start Web and Eve separately. The
+      launcher owns all of it and proves Web → Eve → native-tools readiness.
 - [ ] Use the branch-namespaced app URL and private single-use sign-in URL
       printed after authenticated readiness. Do NOT assume the primary
       `sigil-chat.localhost` URL and do NOT reset the owner password.

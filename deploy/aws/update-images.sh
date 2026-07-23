@@ -17,6 +17,18 @@ fi
 "$script_dir/verify-release.sh" "$manifest"
 test -f "$deploy_env"
 
+legacy_gonk_containers="$(
+  docker ps -aq \
+    --filter label=com.docker.compose.project=sigil-chat \
+    --filter label=com.docker.compose.service=gonk
+)"
+if [[ -n "$legacy_gonk_containers" ]] ||
+  grep -Eq '^(SIGIL_GONK_IMAGE|GONK_MCP_URL|GONK_MCP_KEY|GONK_MCP_KEY_FILE)=' "$deploy_env"; then
+  echo "Legacy Gonk service state detected; this updater will not migrate or remove it automatically." >&2
+  echo "Complete $script_dir/MIGRATING-FROM-GONK-SERVICE.md, then retry." >&2
+  exit 78
+fi
+
 cp "$deploy_env" "$rollback_env"
 cp "$deploy_env" "$candidate_env"
 chmod 0600 "$rollback_env" "$candidate_env"

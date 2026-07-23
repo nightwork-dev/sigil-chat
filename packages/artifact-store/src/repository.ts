@@ -1,5 +1,15 @@
-import { createHash } from "node:crypto"
-import { mkdir, rm } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  utimes,
+  writeFile,
+} from "node:fs/promises"
+import { hostname } from "node:os"
 import { dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 
@@ -47,6 +57,8 @@ export interface ArtifactRepositoryOptions {
    */
   readonly lockRoot?: string
   readonly lockPollMs?: number
+  readonly lockHeartbeatMs?: number
+  readonly lockLeaseMs?: number
   readonly lockTimeoutMs?: number
 }
 
@@ -110,6 +122,8 @@ export class SessionArtifactStore {
   private readonly canAccessScope: CanAccessScope
   private readonly lockRoot: string | undefined
   private readonly lockPollMs: number
+  private readonly lockHeartbeatMs: number
+  private readonly lockLeaseMs: number
   private readonly lockTimeoutMs: number
 
   constructor(
@@ -119,7 +133,9 @@ export class SessionArtifactStore {
     this.canAccessScope = options.canAccessScope ?? canAccessScope
     this.lockRoot = options.lockRoot
     this.lockPollMs = options.lockPollMs ?? 5
-    this.lockTimeoutMs = options.lockTimeoutMs ?? 5_000
+    this.lockHeartbeatMs = options.lockHeartbeatMs ?? 2_000
+    this.lockLeaseMs = options.lockLeaseMs ?? 10_000
+    this.lockTimeoutMs = options.lockTimeoutMs ?? 15_000
   }
 
   async putFile(
@@ -285,14 +301,16 @@ export class SessionArtifactStore {
   ): Promise<T> {
     if (!this.lockRoot) return operation()
     const lockPath = join(this.lockRoot, `${scopeLockName(scope)}.lock`)
-    await acquireDirectoryLock(lockPath, scope, {
+    const lease = await acquireDirectoryLock(lockPath, scope, {
+      heartbeatMs: this.lockHeartbeatMs,
+      leaseMs: this.lockLeaseMs,
       pollMs: this.lockPollMs,
       timeoutMs: this.lockTimeoutMs,
     })
     try {
       return await operation()
     } finally {
-      await rm(lockPath, { force: true, recursive: true })
+      await lease.release()
     }
   }
 }
@@ -364,16 +382,40 @@ function scopeLockName(scope: ResourceScope): string {
 async function acquireDirectoryLock(
   lockPath: string,
   scope: ResourceScope,
-  options: { pollMs: number; timeoutMs: number },
-): Promise<void> {
+  options: {
+    heartbeatMs: number
+    leaseMs: number
+    pollMs: number
+    timeoutMs: number
+  },
+): Promise<DirectoryLockLease> {
   await mkdir(dirname(lockPath), { recursive: true })
   const startedAt = Date.now()
   while (true) {
+    const token = randomUUID()
+    const ownerName = `owner-${token}.json`
+    const ownerPath = join(lockPath, ownerName)
     try {
       await mkdir(lockPath)
-      return
+      try {
+        await writeFile(
+          ownerPath,
+          JSON.stringify({
+            acquiredAt: new Date().toISOString(),
+            hostname: hostname(),
+            pid: process.pid,
+            token,
+          } satisfies DirectoryLockOwner),
+          { flag: "wx" },
+        )
+      } catch (error) {
+        await rm(lockPath, { force: true, recursive: true })
+        throw error
+      }
+      return createDirectoryLockLease(lockPath, ownerPath, options.heartbeatMs)
     } catch (error) {
       if (!isAlreadyExistsError(error)) throw error
+      if (await recoverStaleDirectoryLock(lockPath, options.leaseMs)) continue
       if (Date.now() - startedAt > options.timeoutMs) {
         throw new ArtifactScopeLockTimeoutError(scope)
       }
@@ -382,11 +424,150 @@ async function acquireDirectoryLock(
   }
 }
 
+interface DirectoryLockOwner {
+  readonly acquiredAt: string
+  readonly hostname: string
+  readonly pid: number
+  readonly token: string
+}
+
+interface DirectoryLockLease {
+  release(): Promise<void>
+}
+
+function createDirectoryLockLease(
+  lockPath: string,
+  ownerPath: string,
+  heartbeatMs: number,
+): DirectoryLockLease {
+  const heartbeat = setInterval(() => {
+    const now = new Date()
+    void utimes(ownerPath, now, now).catch(() => undefined)
+  }, heartbeatMs)
+  heartbeat.unref()
+
+  return {
+    async release() {
+      clearInterval(heartbeat)
+      try {
+        await stat(ownerPath)
+      } catch {
+        return
+      }
+      const releasedPath = `${lockPath}.released-${randomUUID()}`
+      try {
+        await rename(lockPath, releasedPath)
+      } catch (error) {
+        if (isMissingError(error)) return
+        throw error
+      }
+      await rm(releasedPath, { force: true, recursive: true })
+    },
+  }
+}
+
+async function recoverStaleDirectoryLock(
+  lockPath: string,
+  leaseMs: number,
+): Promise<boolean> {
+  if (!(await directoryLockIsStale(lockPath, leaseMs))) return false
+  const recoveryPath = `${lockPath}.stale-${randomUUID()}`
+  try {
+    await rename(lockPath, recoveryPath)
+  } catch (error) {
+    if (isMissingError(error)) return true
+    throw error
+  }
+  await rm(recoveryPath, { force: true, recursive: true })
+  return true
+}
+
+async function directoryLockIsStale(
+  lockPath: string,
+  leaseMs: number,
+): Promise<boolean> {
+  let ownerPath: string | undefined
+  try {
+    const ownerName = (await readdir(lockPath)).find(
+      (name) => name.startsWith("owner-") && name.endsWith(".json"),
+    )
+    if (ownerName) ownerPath = join(lockPath, ownerName)
+  } catch (error) {
+    if (isMissingError(error)) return true
+    throw error
+  }
+
+  if (!ownerPath) {
+    return pathLeaseExpired(lockPath, leaseMs)
+  }
+
+  try {
+    const owner = parseDirectoryLockOwner(await readFile(ownerPath, "utf8"))
+    if (owner?.hostname === hostname() && !processIsAlive(owner.pid)) {
+      return true
+    }
+  } catch (error) {
+    if (!isMissingError(error)) {
+      return pathLeaseExpired(ownerPath, leaseMs)
+    }
+  }
+  return pathLeaseExpired(ownerPath, leaseMs)
+}
+
+async function pathLeaseExpired(path: string, leaseMs: number) {
+  try {
+    const metadata = await stat(path)
+    return metadata.mtimeMs + leaseMs <= Date.now()
+  } catch (error) {
+    if (isMissingError(error)) return true
+    throw error
+  }
+}
+
+function parseDirectoryLockOwner(value: string): DirectoryLockOwner | undefined {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      return undefined
+    }
+    const owner = parsed as Record<string, unknown>
+    return typeof owner.acquiredAt === "string" &&
+      typeof owner.hostname === "string" &&
+      Number.isSafeInteger(owner.pid) &&
+      typeof owner.token === "string"
+      ? (owner as unknown as DirectoryLockOwner)
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH"
+  }
+}
+
 function isAlreadyExistsError(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     (error as { code?: unknown }).code === "EEXIST"
+  )
+}
+
+function isMissingError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "ENOENT"
   )
 }
 

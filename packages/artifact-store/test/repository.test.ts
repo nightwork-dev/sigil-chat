@@ -1,6 +1,8 @@
-import { mkdtemp } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
+import { spawnSync } from "node:child_process"
+import { mkdir, mkdtemp, utimes, writeFile } from "node:fs/promises"
+import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
-import { tmpdir } from "node:os"
 
 import { describe, expect, it } from "vitest"
 
@@ -65,6 +67,86 @@ describe("SessionArtifactStore", () => {
     expect(new Set(listed.map((artifact) => artifact.id))).toEqual(
       new Set(written.map((artifact) => artifact.id)),
     )
+  })
+
+  it("recovers a directory lock whose owning process has exited", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-artifacts-"))
+    const scope = "workspace:crash-recovery"
+    const lockName = createHash("sha256").update(scope).digest("hex")
+    const lockPath = join(root, ".locks", `${lockName}.lock`)
+    const child = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+          const { randomUUID } = require("node:crypto");
+          const { mkdirSync, writeFileSync } = require("node:fs");
+          const { hostname } = require("node:os");
+          const { join } = require("node:path");
+          const lockPath = process.argv[1];
+          const token = randomUUID();
+          mkdirSync(lockPath, { recursive: true });
+          writeFileSync(join(lockPath, "owner-" + token + ".json"), JSON.stringify({
+            acquiredAt: new Date().toISOString(),
+            hostname: hostname(),
+            pid: process.pid,
+            token,
+          }));
+        `,
+        lockPath,
+      ],
+      { encoding: "utf8" },
+    )
+    expect(child.status).toBe(0)
+
+    const recovered = await createFileSessionArtifactStore({
+      root,
+      lockPollMs: 2,
+      lockTimeoutMs: 200,
+    }).putFile({
+      bytes: new TextEncoder().encode("after crash"),
+      filename: "recovered.txt",
+      mediaType: "text/plain",
+      scope,
+    })
+
+    expect(recovered.filename).toBe("recovered.txt")
+  })
+
+  it("recovers an expired lease even when the recorded pid still exists", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-artifacts-"))
+    const scope = "workspace:expired-lease"
+    const lockName = createHash("sha256").update(scope).digest("hex")
+    const lockPath = join(root, ".locks", `${lockName}.lock`)
+    const token = randomUUID()
+    const ownerPath = join(lockPath, `owner-${token}.json`)
+    await mkdir(lockPath, { recursive: true })
+    await writeFile(
+      ownerPath,
+      JSON.stringify({
+        acquiredAt: "2026-07-20T00:00:00.000Z",
+        hostname: hostname(),
+        pid: process.pid,
+        token,
+      }),
+    )
+    const expired = new Date(Date.now() - 1_000)
+    await utimes(ownerPath, expired, expired)
+
+    const recovered = await createFileSessionArtifactStore({
+      root,
+      lockHeartbeatMs: 5,
+      lockLeaseMs: 25,
+      lockPollMs: 2,
+      lockTimeoutMs: 200,
+    }).putFile({
+      bytes: new TextEncoder().encode("after expired lease"),
+      filename: "lease-recovered.txt",
+      mediaType: "text/plain",
+      scope,
+    })
+
+    expect(recovered.filename).toBe("lease-recovered.txt")
   })
 
   it("deduplicates identical bytes inside a scope", async () => {

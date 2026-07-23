@@ -60,9 +60,16 @@ handler, or copied Eve schema. If the agent cannot see a tool, debug the
 registry composition, live principal/scope, visibility, and Eve projection in
 that order.
 
-The authenticated catalog route, `/sigil/v1/application-tools`, exposes the
-same registry to the web app. The frontend consumes neutral application-tool
-metadata and must not import Eve or Gonk runtime types.
+The authenticated catalog route, `/sigil/v1/application-tools`, exposes a
+non-authoritative inventory of discoverable tools to the web app. The frontend
+consumes neutral application-tool metadata and must not import Eve or Gonk
+runtime types. Catalog presence is not a grant: Eve reconstructs the live
+principal and reauthorizes discovery and invocation for every request.
+
+If a TanStack server handler reads or mutates the same scoped repository, route
+it through the shared scope-authorization helper with the authenticated
+principal. Add denial tests that prove authorization runs before repository
+side effects.
 
 ## 4. Wire client reconciliation when needed
 

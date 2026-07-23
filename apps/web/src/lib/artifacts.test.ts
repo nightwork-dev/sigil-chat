@@ -24,7 +24,7 @@ async function storeWithArtifact() {
     bytes: new TextEncoder().encode("A useful source note"),
     filename: "notes.md",
     mediaType: "text/plain",
-    scope: "project:evidence-room",
+    scope: "session:thread-1",
   })
   return { store, artifact }
 }
@@ -77,7 +77,7 @@ describe("artifact workspace access", () => {
     const { store, artifact } = await storeWithArtifact()
     await expect(
       readArtifactPreview(
-        { scope: "project:evidence-room", id: artifact.id },
+        { scope: "session:thread-1", id: artifact.id },
         dependencies({ store }),
       ),
     ).resolves.toEqual({

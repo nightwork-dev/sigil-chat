@@ -54,9 +54,5 @@ export function toolApprovalModeFor(
   toolName: string,
 ): ToolApprovalMode {
   const preference = parseToolApprovalPreference(value)
-  return (
-    preference.tools[toolName] ??
-    preference.tools[`gonk__${toolName}`] ??
-    preference.default
-  )
+  return preference.tools[toolName] ?? preference.default
 }

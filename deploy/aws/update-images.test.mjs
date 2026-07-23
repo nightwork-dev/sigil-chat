@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -170,4 +171,84 @@ test("failed migration leaves the live manifest on the previous release", () => 
     oldLines,
   );
   assert.match(result.stderr, /Migration failed/);
+});
+
+test("legacy Gonk topology is rejected before any deployment mutation", async (t) => {
+  for (const scenario of [
+    { name: "running legacy container", legacyContainer: true },
+    { name: "stale legacy image setting", legacySetting: true },
+  ]) {
+    await t.test(scenario.name, () => {
+      const directory = mkdtempSync(join(tmpdir(), "sigil-update-legacy-"));
+      const binDirectory = join(directory, "bin");
+      const dockerLog = join(directory, "docker.log");
+      mkdirSync(binDirectory);
+
+      for (const name of [
+        "update-images.sh",
+        "verify-release.sh",
+        "verify-release.mjs",
+        "compose.yaml",
+        "MIGRATING-FROM-GONK-SERVICE.md",
+      ]) {
+        copyFileSync(join(sourceDir, name), join(directory, name));
+      }
+      chmodSync(join(directory, "update-images.sh"), 0o755);
+      chmodSync(join(directory, "verify-release.sh"), 0o755);
+      writeFileSync(
+        join(binDirectory, "docker"),
+        `#!/bin/sh
+printf "%s\\n" "$*" >> "$SIGIL_DOCKER_LOG"
+case "$*" in
+  "ps -aq --filter label=com.docker.compose.project=sigil-chat --filter label=com.docker.compose.service=gonk")
+    [ "\${SIGIL_LEGACY_GONK_CONTAINER:-0}" = 1 ] && printf '%s\\n' legacy-gonk
+    ;;
+esac
+exit 0
+`,
+        { mode: 0o755 },
+      );
+
+      const registry = "123456789012.dkr.ecr.us-west-2.amazonaws.com";
+      const targets = ["EVE", "MIGRATE", "WEB"];
+      const imageLines = targets.map(
+        (target) =>
+          `SIGIL_${target}_IMAGE=${registry}/sigil-chat-${target.toLowerCase()}@sha256:${digest}`,
+      );
+      const deployEnv = join(directory, "deploy.env.local");
+      const manifest = join(directory, "sigil-images.env");
+      writeFileSync(
+        deployEnv,
+        [
+          "PUBLIC_HOST=chat.example.test",
+          ...imageLines,
+          ...(scenario.legacySetting
+            ? [`SIGIL_GONK_IMAGE=${registry}/sigil-chat-gonk@sha256:${digest}`]
+            : []),
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(manifest, `${imageLines.join("\n")}\n`);
+
+      const result = spawnSync(join(directory, "update-images.sh"), [manifest], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DEPLOY_ENV: deployEnv,
+          PATH: `${binDirectory}:${process.env.PATH}`,
+          SIGIL_DOCKER_LOG: dockerLog,
+          SIGIL_LEGACY_GONK_CONTAINER: scenario.legacyContainer ? "1" : "0",
+        },
+      });
+
+      assert.equal(result.status, 78);
+      assert.match(result.stderr, /will not migrate or remove/);
+      assert.match(result.stderr, /MIGRATING-FROM-GONK-SERVICE\.md/);
+      assert.equal(existsSync(`${deployEnv}.rollback`), false);
+      assert.equal(existsSync(`${deployEnv}.candidate`), false);
+      assert.deepEqual(readFileSync(dockerLog, "utf8").trim().split("\n"), [
+        "ps -aq --filter label=com.docker.compose.project=sigil-chat --filter label=com.docker.compose.service=gonk",
+      ]);
+    });
+  }
 });

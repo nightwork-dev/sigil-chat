@@ -132,7 +132,7 @@ calls still use the native Eve/Gonk path.
 
 ## Compatibility and migration
 
-This is a deployment migration, not a permanent dual-runtime mode:
+This is a manual deployment cutover, not a permanent dual-runtime mode:
 
 - stop the old stack before deploying the new one;
 - copy retained Gonk artifact data into the shared application data volume if
@@ -141,14 +141,12 @@ This is a deployment migration, not a permanent dual-runtime mode:
   new shared skills root if an existing instance needs them;
 - remove obsolete Gonk URL/key configuration and secret files;
 - provide `SIGIL_AGENT_BINDING_SECRET` to web and Eve;
-- allow the thread repository to rewrite old `eve` snapshot fields once into
-  its schema-versioned `runtime` envelope;
 - install the released lockfile and start the two-service stack.
 
-New tool names are native registry names. Readers normalize legacy persisted
-`gonk__*` approval keys so users do not lose preferences; new writes use the
-neutral name. This is a bounded persisted-data migration seam, not a runtime
-fallback.
+The production updater fails closed while the old service or configuration is
+present and points the operator to
+`deploy/aws/MIGRATING-FROM-GONK-SERVICE.md`. The application does not translate
+legacy tool names, persisted approval keys, or Eve snapshot fields.
 
 ## Acceptance
 

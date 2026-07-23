@@ -7,6 +7,8 @@ import {
 } from "@workspace/artifact-store/repository"
 
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
+import type { ScopeAuthorizationRegistries } from "../../../agent/agent/lib/scope-authorization"
+import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization"
 import type { SigilAuthSession } from "./auth/server"
 
 export interface WebArtifactStoreDependencies {
@@ -15,6 +17,8 @@ export interface WebArtifactStoreDependencies {
     userId: string,
     threadId: string,
   ) => string | undefined
+  readonly policy?: ScopeAuthorizationPolicy
+  readonly registries?: ScopeAuthorizationRegistries
   readonly store?: SessionArtifactStore
 }
 
@@ -46,17 +50,30 @@ export async function authorizeArtifactScope(
     value: SigilAuthSession | null,
   ) => asserts value is SigilAuthSession = requireSession
   assertSession(candidate)
+  return authorizeArtifactScopeForSession(scope, candidate, dependencies, mode)
+}
+
+export function authorizeArtifactScopeForSession(
+  scope: string,
+  session: SigilAuthSession,
+  dependencies: WebArtifactStoreDependencies,
+  mode: "read" | "tool" = "read",
+): {
+  readonly session: SigilAuthSession
+  readonly store: SessionArtifactStore
+  readonly principal: ScopePrincipal
+} {
   assertAuthorizedScope(
     scope,
-    candidate.user.id,
+    session.user.id,
     dependencies.ownedThreadHomeScope,
-    undefined,
-    undefined,
+    dependencies.registries,
+    dependencies.policy,
     mode,
   )
   return {
-    session: candidate,
+    session,
     store: dependencies.store ?? getWebArtifactStore(),
-    principal: { id: candidate.user.id },
+    principal: { id: session.user.id },
   }
 }

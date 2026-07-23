@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { serializeToolApprovalPreference } from "./agent-tool-approval"
 
 describe("tool approval preference header", () => {
-  it("keeps legacy global-only header values compact", () => {
+  it("keeps global-only header values compact", () => {
     expect(serializeToolApprovalPreference("ask", {})).toBe("ask")
     expect(serializeToolApprovalPreference("always", {})).toBe("always")
   })

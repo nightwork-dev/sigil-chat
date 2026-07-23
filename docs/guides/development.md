@@ -12,10 +12,10 @@ The launcher:
 
 - checks Node, Portless, the local Codex login, and the package manager;
 - synchronizes the frozen install;
-- creates worktree-local data and service credentials;
+- creates worktree-local data and the Web/Eve binding secret;
 - applies idempotent auth migrations and seeds the development owner;
-- starts Web, Eve, and Gonk with one branch-derived Portless prefix;
-- proves the authenticated Web → Eve → Gonk path; and
+- starts Web and Eve with one branch-derived Portless prefix;
+- proves the authenticated Web → Eve → native-tools path; and
 - prints and opens a private single-use owner sign-in URL.
 
 Use the URLs in that readiness summary. The unprefixed
@@ -60,7 +60,7 @@ pnpm dev
 ```
 
 Do not symlink another checkout's `.env`, `.data`, `apps/agent/.eve`, owner
-credentials, or Gonk bearer. Each worktree owns those disposable values and
+credentials, or Web/Eve binding secret. Each worktree owns those disposable values and
 can run a complete stack alongside the others. The external roadmap repository
 is intentionally shared across worktrees; checked-in application behavior is
 intentionally shared through Git.

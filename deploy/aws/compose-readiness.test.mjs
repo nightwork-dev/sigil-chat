@@ -24,6 +24,14 @@ const provisionHost = readFileSync(
   "utf8",
 )
 const deploymentReadme = readFileSync(resolve(directory, "README.md"), "utf8")
+const migrationGuide = readFileSync(
+  resolve(directory, "MIGRATING-FROM-GONK-SERVICE.md"),
+  "utf8",
+)
+const updateScript = readFileSync(
+  resolve(directory, "update-images.sh"),
+  "utf8",
+)
 
 test("fresh deployment orders containers on Eve liveness, not model auth", () => {
   const eveService = compose.slice(
@@ -102,6 +110,10 @@ test("production image CI builds the three private ECR targets with OIDC", () =>
     /tags: \$\{\{ vars\.ECR_REGISTRY \}\}\/sigil-chat-\$\{\{ matrix\.target \}\}:\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/,
   )
   assert.match(productionWorkflow, /printf '%s=%s\/sigil-chat-%s@%s\\n'/)
+  assert.match(
+    productionWorkflow,
+    /test "\$\(wc -l < sigil-images\.env\)" -eq 3/,
+  )
   assert.doesNotMatch(
     productionWorkflow,
     /ghcr\.io|GITHUB_TOKEN|packages: write/,
@@ -124,10 +136,6 @@ test("production CI gates image builds with local smoke contracts", () => {
 })
 
 test("update command stops the public edge before replacing services", () => {
-  const updateScript = readFileSync(
-    resolve(directory, "update-images.sh"),
-    "utf8",
-  )
   assert.ok(
     updateScript.indexOf("stop edge web") <
       updateScript.indexOf(
@@ -140,6 +148,22 @@ test("update command stops the public edge before replacing services", () => {
     ) < updateScript.lastIndexOf("up -d --wait --no-deps web eve"),
   )
   assert.match(updateScript, /up -d --wait --no-deps edge/)
+})
+
+test("old Gonk topology fails closed before the updater mutates Docker state", () => {
+  const preflight = updateScript.indexOf("legacy_gonk_containers")
+  const firstMutation = updateScript.indexOf('cp "$deploy_env" "$rollback_env"')
+  assert.ok(preflight >= 0 && preflight < firstMutation)
+  assert.match(
+    updateScript,
+    /label=com\.docker\.compose\.service=gonk/,
+  )
+  assert.match(updateScript, /MIGRATING-FROM-GONK-SERVICE\.md/)
+  assert.doesNotMatch(updateScript, /--remove-orphans/)
+  assert.match(migrationGuide, /does not copy legacy data/)
+  assert.match(migrationGuide, /sigil-chat_gonk_data/)
+  assert.match(migrationGuide, /sigil-chat_web_data/)
+  assert.match(migrationGuide, /does not support automatic rollback/)
 })
 
 test("edge health uses a non-redirecting internal Caddy listener", () => {
@@ -253,17 +277,13 @@ test("only Eve receives the persistent Codex credential volume", () => {
   assert.doesNotMatch(web, /CODEX_HOME|CODEX_AUTH_FILE|codex_auth/)
 })
 
-test("storage initialization migrates a legacy Codex login once", () => {
+test("storage initialization does not carry legacy state into the new topology", () => {
   const storageInit = compose.slice(
     compose.indexOf("\n  storage-init:"),
     compose.indexOf("\n  migrate:"),
   )
-  assert.match(storageInit, /\[ ! -s \/var\/lib\/sigil-codex\/auth\.json \]/)
-  assert.match(
-    storageInit,
-    /\[ -s \/var\/lib\/sigil-eve\/codex-home\/auth\.json \]/,
-  )
-  assert.match(storageInit, /install -o 10000 -g 10000 -m 0600/)
+  assert.doesNotMatch(storageInit, /sigil-eve\/codex-home/)
+  assert.doesNotMatch(storageInit, /sigil-gonk|gonk_data|gonk_scope/)
 })
 
 test("host secrets are readable only by root and the runtime group", () => {

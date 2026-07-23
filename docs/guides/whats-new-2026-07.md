@@ -32,8 +32,7 @@ Sigil Chat now has one less service and one less conceptual tax.
 - Sigil Chat's direct `@zigil/agent-gonk` and `@gonk/tool-registry-mcp`
   dependencies (the remote adapter remains available upstream for real remote
   consumers)
-- qualified `gonk__*` names for new tool calls (legacy persisted names remain
-  readable during migration)
+- qualified `gonk__*` tool and approval names
 
 There is no runtime feature flag or fallback bridge. The old topology is gone.
 
@@ -59,13 +58,9 @@ cannot grant identity, scope, role, or persona access.
 
 ## Migration
 
-Existing installations remove the Gonk container and image, replace the old
-MCP secret with `SIGIL_AGENT_BINDING_SECRET`, and mount the ordinary
-`SIGIL_DATA_DIR` into both web and Eve. If an older deployment stored artifacts
-only under its Gonk volume, copy that `artifacts/` directory into the new shared
-data root before retiring the volume. Managed skills now live under
-`SIGIL_DATA_DIR/skills`; copy any authored skills out of a prior mutable agent
-source tree before retiring it. No browser migration is required; legacy
-`gonk__` approval keys are normalized on read. Existing thread records with an
-`eve` snapshot field are rewritten once into the schema-versioned neutral
-`runtime` envelope; new writes never recreate the old field.
+Fresh installations use the two-service topology directly. Existing
+four-image installations must complete the short operator-run
+[one-time deployment migration](../../deploy/aws/MIGRATING-FROM-GONK-SERVICE.md)
+before the updater will proceed. The application does not copy legacy volumes,
+remove the old container, translate old approval names, rewrite old Eve
+snapshots, or keep a fallback service alive.

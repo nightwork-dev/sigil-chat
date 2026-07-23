@@ -15,8 +15,13 @@ description: Hard rules for adding or debugging an application tool hosted nativ
 - [ ] Deny unauthorized calls before side effects.
 - [ ] Do not create an MCP service, connection file, URL, bearer, or copied Eve
       schema. `apps/agent/agent/tools/gonk.ts` is the only host projection.
-- [ ] Keep frontend contracts neutral. The web catalog comes from authenticated
-      `/sigil/v1/application-tools` and exposes application-tool metadata.
+- [ ] Keep frontend contracts neutral. The authenticated
+      `/sigil/v1/application-tools` catalog is non-authoritative discoverable
+      inventory, not a grant; live Eve discovery/invocation reauthorizes the
+      current principal.
+- [ ] Route TanStack handlers that share scoped repositories through the shared
+      scope-authorization helper. Add denial tests proving authorization runs
+      before repository side effects.
 - [ ] If the tool mutates state, return a domain outcome/client command and add
       the validated React Query invalidation handler.
 - [ ] Test the shared registry and native host:

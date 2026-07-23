@@ -20,6 +20,19 @@ The DNS A record for the chosen public hostname must point to the Elastic IP
 before Caddy starts. Caddy obtains and renews TLS certificates; only its
 `/data` and `/config` state live in `/srv/sigil-chat` on the host.
 
+## Existing pre-cutover installations
+
+The normal updater accepts only the current three-image, Web + Eve topology.
+If the host still has a Compose `gonk` service/container or Gonk image/key/URL
+settings, it exits before copying manifests, pruning images, or stopping
+services. Follow
+[One-time migration from the Gonk service](MIGRATING-FROM-GONK-SERVICE.md)
+first.
+
+That procedure is intentionally manual and removable. The application does not
+copy or merge legacy data, remove orphan containers, or retain a compatibility
+service. Back up the old volume before the cutover.
+
 ## Terraform review and apply
 
 Run this from `deploy/aws/terraform` using a locally copied `terraform.tfvars`.
@@ -127,6 +140,9 @@ gh workflow run prod-rollback.yml --ref prod -f release_sha=<full-release-sha>
 
 On the host, the immediately previous manifest is also retained for emergency
 operator rollback as `deploy.env.local.previous-images`.
+This rollback mechanism applies only after the host has entered the current
+three-image topology; crossing back to the former Gonk-service topology
+requires the manual backup/restore procedure in the migration guide.
 
 ## Teardown
 

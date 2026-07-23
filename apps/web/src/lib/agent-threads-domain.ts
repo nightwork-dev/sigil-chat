@@ -508,17 +508,16 @@ export class AgentThreadRepository {
     const stored = thread as StoredAgentThread;
     const hasPersonaId =
       typeof thread.personaId === "string" && thread.personaId.trim();
-    const { eve: legacyRuntime, ...withoutLegacy } = stored;
-    const runtime = stored.runtime ??
-      (legacyRuntime
-        ? { ...legacyRuntime, schemaVersion: 1 as const }
-        : freshRuntimeRecord(thread.updatedAt));
+    const runtime =
+      stored.runtime?.schemaVersion === 1
+        ? stored.runtime
+        : freshRuntimeRecord(thread.updatedAt);
     const normalized = cloneThread({
-      ...withoutLegacy,
+      ...stored,
       personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
       runtime,
     });
-    if (!hasPersonaId || legacyRuntime || stored.runtime?.schemaVersion !== 1) {
+    if (!hasPersonaId || stored.runtime?.schemaVersion !== 1) {
       this.threads.set(threadKey(thread.id), normalized);
     }
     return normalized;
@@ -847,7 +846,6 @@ function isMember(members: unknown, userId: string): boolean {
 
 type StoredAgentThread = Omit<AgentThread, "runtime"> & {
   runtime?: AgentThread["runtime"];
-  eve?: Omit<AgentThread["runtime"], "schemaVersion">;
 };
 
 function freshRuntimeSession(): AgentRuntimeSessionState {

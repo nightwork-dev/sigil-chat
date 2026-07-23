@@ -121,6 +121,11 @@ CDK, modules, or workspaces for DEP.2.
    validates all three ECR digests before Docker runs and does not replace the
    application services when migration fails. No Eve port is public.
 
+   Existing hosts from the former Gonk-service topology must first complete
+   [`MIGRATING-FROM-GONK-SERVICE.md`](MIGRATING-FROM-GONK-SERVICE.md).
+   The updater fails before any deployment mutation while that service,
+   container, or configuration remains; it does not automate the cutover.
+
 10. On the first deployment, complete device auth as the Eve service identity,
     prove model-aware readiness, then verify app login, model response, and a
     container restart from a phone. Docker uses Eve process liveness for startup

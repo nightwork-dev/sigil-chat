@@ -291,8 +291,9 @@ export function requireResourceScope(
   const hostScope = requestScope(ctx);
   const principalReach =
     isRecord(ctx.host) && ctx.host.agentReach === "principal";
-  // The app-controlled turn scope (x-sigil-scope, e.g. project:evidence-room in
-  // the Evidence Room) is AUTHORITATIVE and wins over any model-supplied scope.
+  // The app-controlled turn scope (x-sigil-scope, e.g. the Evidence Room's
+  // registered personal project) is AUTHORITATIVE and wins over any
+  // model-supplied scope.
   // The model routinely guesses a wrong scope (a focused doc's id, the route
   // name), which previously clobbered the correct corpus; letting the model
   // redirect a tool to a scope the workspace didn't authorize is also a

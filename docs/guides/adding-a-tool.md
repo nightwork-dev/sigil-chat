@@ -71,7 +71,13 @@ pnpm typecheck
 
 Then run `pnpm dev`. Startup is not considered ready until authenticated Eve
 readiness reports a non-empty native application-tool registry. Open `/skills`
-or `/chat` to prove the catalog and one real invocation through the product.
+or `/chat` to prove the non-authoritative discoverable inventory and one real
+invocation through the product. Catalog presence is not permission: the live
+principal and scope must still pass Eve's request-bound authorization.
+
+When a TanStack handler shares the tool's scoped repository, route the handler
+through the same scope-authorization policy with the authenticated principal.
+Add denial tests that prove it fails before repository side effects.
 
 For a new tool family, update `.agents/skills/adding-gonk-tools/SKILL.md` if the
 procedure itself changes. Do not add another adapter merely to make discovery

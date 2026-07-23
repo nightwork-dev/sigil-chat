@@ -654,12 +654,23 @@ describe("AgentThreadRepository", () => {
     const preferences = new MemoryKv<AgentThreadPreference>();
     threads.set("thread:legacy", {
       id: "legacy",
+      personaId: "agent-a",
       title: "Legacy thread",
       createdAt: "2026-07-16T10:00:00.000Z",
       updatedAt: "2026-07-16T10:00:00.000Z",
       status: "active",
       revision: 1,
-      eve: { session: { streamIndex: 0 }, events: [], compaction: {} },
+      runtime: {
+        schemaVersion: 1,
+        session: { streamIndex: 0 },
+        events: [],
+        compaction: {
+          policyVersion: "sigil-chat-event-retention-v2",
+          omittedEventCount: 0,
+          omittedEventTypes: {},
+          omittedMessageChars: 0,
+        },
+      },
     } as unknown as AgentThread);
     preferences.set("active-thread", {
       activeThreadId: "legacy",
@@ -683,7 +694,6 @@ describe("AgentThreadRepository", () => {
     });
     expect(repo.get(USER_A, "legacy")?.members).toEqual([USER_A]);
     expect(repo.get(USER_A, "legacy")?.runtime.schemaVersion).toBe(1);
-    expect(threads.get("thread:legacy")).not.toHaveProperty("eve");
     expect(repo.getActivePreference(USER_A).activeThreadId).toBe("legacy");
     expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
       claimedPreferences: 0,

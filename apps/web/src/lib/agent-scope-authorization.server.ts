@@ -73,8 +73,6 @@ export function assertAuthorizedScope(
       }
       return
     }
-    // Legacy unregistered scope ids stay possession-gated until migration.
-    if (match[1] === "project" && id === "evidence-room") return
   }
   throw new Error("Agent resource scope is not available to this application.")
 }

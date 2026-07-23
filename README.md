@@ -191,6 +191,9 @@ this README only points at:
 - [`whats-new-2026-07.md`](docs/guides/whats-new-2026-07.md) — a plain-language
   summary of the native Eve-hosted Gonk cutover, shared repositories, tasking,
   authorization, and migration.
+- [`MIGRATING-FROM-GONK-SERVICE.md`](deploy/aws/MIGRATING-FROM-GONK-SERVICE.md)
+  — the short, manual, one-time cutover for an existing production host. Fresh
+  installations do not use it, and the updater does not provide a legacy shim.
 
 - [`adding-a-tool.md`](docs/guides/adding-a-tool.md) — the end-to-end worked
   path for a new application tool, using the real `sigil-chat-status` tool as

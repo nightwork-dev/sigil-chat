@@ -34,8 +34,8 @@ type PublishFn = (context: AttentionContext | null) => void
 const PublishContext = createContext<PublishFn | null>(null)
 
 // A parallel channel for the OPTIONAL explicit resource scope a workspace wants
-// the agent's tools to act on. The Evidence Room
-// publishes `project:evidence-room` so "distill this" / "ask" reach the room's
+// the agent's tools to act on. The Evidence Room publishes the authenticated
+// principal's registered personal project so "distill this" / "ask" reach that
 // durable corpus, not the per-thread session scope AgentChat otherwise defaults
 // to. Workspaces that publish nothing leave this null and AgentChat falls back
 // to the session scope — this is the "what workspace am I in → which resources
@@ -110,8 +110,8 @@ export function usePublishWorkspaceAttention(
 
 /**
  * Publish the resource scope the agent's tools should act on for this workspace
- * (e.g. the Evidence Room's `project:evidence-room` corpus). Clears on unmount so
- * a left workspace never leaks its scope. Pass null to publish nothing.
+ * (e.g. the Evidence Room's personal-project corpus). Clears on unmount so a
+ * left workspace never leaks its scope. Pass null to publish nothing.
  */
 export function usePublishWorkspaceResourceScope(scope: string | null): void {
   const channel = useContext(ResourceScopeContext)

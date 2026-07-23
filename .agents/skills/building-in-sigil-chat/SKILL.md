@@ -20,10 +20,10 @@ pnpm dev
 ```
 
 Do not pre-run `pnpm install`, copy or symlink `.env`, migrate auth, seed an
-owner, generate a Gonk key, or start the three apps separately. The launcher
+owner, generate service keys, or start Web and Eve separately. The launcher
 owns that preparation and prints the correct branch-namespaced URLs after it
-proves the authenticated Web → Eve → Gonk path. Use its private single-use
-sign-in URL rather than resetting the owner's password.
+proves the authenticated Web → Eve → native-tools path. Use its private
+single-use sign-in URL rather than resetting the owner's password.
 
 Each worktree is an independent development instance with its own `.data`, Eve
 state, credentials, and Portless prefix. To rebuild only that instance, stop

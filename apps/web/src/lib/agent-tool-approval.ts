@@ -137,16 +137,9 @@ function parseOverrides(value: string | null): ToolApprovalOverrides {
             toolName.length > 0 &&
             toolName.length <= MAX_TOOL_NAME_LENGTH &&
             (mode === "ask" || mode === "always"),
-        )
-        .map(([toolName, mode]) => [legacyToolName(toolName), mode]),
+        ),
     )
   } catch {
     return {}
   }
-}
-
-function legacyToolName(toolName: string): string {
-  return toolName.startsWith("gonk__")
-    ? toolName.slice("gonk__".length)
-    : toolName
 }
