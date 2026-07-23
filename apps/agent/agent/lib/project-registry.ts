@@ -299,15 +299,58 @@ export class ProjectRegistry {
 // in that case; the outer acquisition already excludes every OTHER process.
 const heldLockKeys = new Set<string>()
 
+// Hardening (2026-07-23, Annika's re-review): `operation` MUST be
+// synchronous — the lock (both the file lock and the in-process
+// heldLockKeys entry) is released the instant `operation()` returns, not
+// when a returned Promise settles. An async operation would have its
+// actual work run AFTER the lock is already gone, unprotected — silently
+// reintroducing the exact race this whole file exists to close.
+//
+// Enforced at RUNTIME, not only in the type signature. A TypeScript-level
+// "T cannot be a Promise" constraint sounds cleaner but isn't reliable
+// here: TS has no true negation type, and the standard
+// `T extends Promise<unknown> ? never : T` trick only works when T is
+// actually inferred THROUGH the conditional — a parameter-position
+// conditional type is often not treated as an inference site, so an async
+// operation can still slip past the type checker in practice. A runtime
+// check on the actual returned value catches every real violation, typed
+// or not, and fails loudly and immediately instead of the lock silently
+// vanishing underneath in-flight async work.
+function assertSynchronousResult<T>(id: string, result: T): T {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    typeof (result as { then?: unknown }).then === "function"
+  ) {
+    throw new Error(
+      `withRegistryRecordLock's operation for ${id} returned a Promise — ` +
+        "this lock is synchronous-only; an async operation would run " +
+        "unprotected after the lock is already released.",
+    )
+  }
+  return result
+}
+
 export function withRegistryRecordLock<T>(
   lockDirectory: string | undefined,
   id: string,
   operation: () => T,
 ): T {
-  if (lockDirectory === undefined) return operation()
+  if (lockDirectory === undefined) return assertSynchronousResult(id, operation())
 
-  const lockKey = `${lockDirectory} ${id}`
-  if (heldLockKeys.has(lockKey)) return operation()
+  // The separator between lockDirectory and id MUST be a character that
+  // cannot appear in either: lockDirectory is a filesystem path (NUL is the
+  // one byte no path can contain) and id is caller-supplied and otherwise
+  // unconstrained (minLength:1 only) — it can contain a space or nearly any
+  // other printable character. A space separator lets a crafted id engineer
+  // a lockKey collision — `dir="/a", id="b c"` and `dir="/a b", id="c"` both
+  // collapse to "/a b c" — so heldLockKeys.has() would wrongly report the
+  // lock already held for a DIFFERENT (dir, id) pair and skip the real
+  // file-lock acquire: a mutual-exclusion break on exactly the
+  // caller-supplied-id surface finding 1 (2026-07-23, Annika) was about. Do
+  // NOT "clean up" this NUL — it is the deliberate, correct separator.
+  const lockKey = `${lockDirectory}\0${id}`
+  if (heldLockKeys.has(lockKey)) return assertSynchronousResult(id, operation())
 
   mkdirSync(lockDirectory, { recursive: true })
   const lockName = createHash("sha256").update(id).digest("hex")
@@ -332,7 +375,7 @@ export function withRegistryRecordLock<T>(
         JSON.stringify({ pid: process.pid, createdAt: Date.now() }),
         "utf8",
       )
-      return operation()
+      return assertSynchronousResult(id, operation())
     } finally {
       heldLockKeys.delete(lockKey)
       try {

@@ -338,6 +338,14 @@ export class AgentThreadRepository {
         .map(({ value }) => value.slug)
         .filter((slug): slug is string => Boolean(slug)),
     );
+    // Residual (documented, not fixed, per Annika's re-review): `existing`
+    // is read without a lock, so two processes racing to backfill DIFFERENT
+    // threads whose deterministic candidates happen to collide could still
+    // each observe the other's slug as free and both mint it — astronomically
+    // unlikely (would need two real thread ids to collide on the same FNV-1a
+    // digest at the same attempt index within the SAME race window), and
+    // strictly no worse than create()/fork()'s pre-existing random-mint
+    // collision window, which this repository has always accepted.
     for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
       const candidate = deterministicSlugCandidate(threadId, attempt);
       if (!existing.has(candidate)) return candidate;
