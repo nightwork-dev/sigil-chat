@@ -6,6 +6,14 @@ import {
   type WebArtifactStoreDependencies,
 } from "./artifact-repository.server"
 
+const SAFE_INLINE_ARTIFACT_MEDIA_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+])
+
 export interface ArtifactImageDependencies {
   getSession: (headers: Headers) => Promise<SigilAuthSession | null>
   ownedThreadHomeScope: (userId: string, threadId: string) => string | undefined
@@ -49,8 +57,14 @@ export async function readArtifactImage(
 
   const headers = new Headers({
     "cache-control": "private, max-age=31536000, immutable",
+    "content-disposition": SAFE_INLINE_ARTIFACT_MEDIA_TYPES.has(
+      content.mediaType.toLowerCase(),
+    )
+      ? "inline"
+      : "attachment",
     "content-type": content.mediaType,
     "content-length": String(content.bytes.byteLength),
+    "x-content-type-options": "nosniff",
   })
   const body = new ArrayBuffer(content.bytes.byteLength)
   new Uint8Array(body).set(content.bytes)
@@ -67,6 +81,7 @@ export async function readArtifactImageFromRequest(
   return readArtifactImage(request, {
     getSession,
     ownedThreadHomeScope: (userId, threadId) =>
-      agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
+      agentThreadRepository.get(userId, threadId)?.executionBinding
+        ?.homeScopeId,
   })
 }

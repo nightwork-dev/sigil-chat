@@ -1,10 +1,12 @@
 import {
   artifactPublicUrl,
   createFileSessionArtifactStore,
+  type CanAccessScope,
   type ScopePrincipal,
   type SessionArtifactStore,
   type SessionArtifactMetadata,
 } from "@workspace/artifact-store/repository"
+import { formatScopeHeader } from "@workspace/artifact-store/scope"
 
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import type { ScopeAuthorizationRegistries } from "../../../agent/agent/lib/scope-authorization"
@@ -25,8 +27,46 @@ export interface WebArtifactStoreDependencies {
 let webArtifactStore: SessionArtifactStore | undefined
 
 export function getWebArtifactStore(): SessionArtifactStore {
-  webArtifactStore ??= createFileSessionArtifactStore()
+  webArtifactStore ??= createFileSessionArtifactStore({
+    canAccessScope: createWebArtifactScopeAccessCheck(),
+  })
   return webArtifactStore
+}
+
+export function createWebArtifactScopeAccessCheck(
+  dependencies: Partial<
+    Pick<
+      WebArtifactStoreDependencies,
+      "ownedThreadHomeScope" | "policy" | "registries"
+    >
+  > = {},
+): CanAccessScope {
+  return async (principal, scope) => {
+    if (!principal?.id) return false
+    const resourceScope = formatScopeHeader(scope)
+    if (!resourceScope) return false
+
+    let ownedThreadHomeScope = dependencies.ownedThreadHomeScope
+    if (!ownedThreadHomeScope) {
+      const { agentThreadRepository } = await import("./agent-threads.server")
+      ownedThreadHomeScope = (userId, threadId) =>
+        agentThreadRepository.get(userId, threadId)?.executionBinding
+          ?.homeScopeId
+    }
+
+    try {
+      assertAuthorizedScope(
+        resourceScope,
+        principal.id,
+        ownedThreadHomeScope,
+        dependencies.registries,
+        dependencies.policy,
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
 }
 
 export function artifactUrlForWeb(

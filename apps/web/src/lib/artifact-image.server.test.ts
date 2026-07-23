@@ -84,7 +84,32 @@ describe("artifact image authorization", () => {
     )
     expect(response.status).toBe(200)
     expect(response.headers.get("cache-control")).toContain("private")
+    expect(response.headers.get("content-disposition")).toBe("inline")
     expect(response.headers.get("content-type")).toBe("image/png")
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff")
     expect(await response.text()).toBe("image")
+  })
+
+  it("forces executable media to download without MIME sniffing", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-web-artifacts-"))
+    const store = createFileSessionArtifactStore({ root })
+    const artifact = await store.putFile({
+      bytes: new TextEncoder().encode("<script>alert(1)</script>"),
+      filename: "unsafe.html",
+      mediaType: "text/html",
+      scope: "session:thread-1",
+    })
+
+    const response = await readArtifactImage(
+      new Request(
+        `https://chat.example.test/api/media/artifact?key=${encodeURIComponent(artifact.id)}&scope=session:thread-1`,
+      ),
+      dependencies({ store }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-disposition")).toBe("attachment")
+    expect(response.headers.get("content-type")).toBe("text/html")
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff")
   })
 })
