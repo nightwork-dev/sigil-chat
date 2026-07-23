@@ -34,6 +34,7 @@ export interface ThreadBindingRepository
     | "getActivePreference"
     | "getDefaultPersonaId"
     | "list"
+    | "resolveByRouteParam"
   > {}
 
 export interface ThreadBindingDependencies {
@@ -304,8 +305,18 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
       return active.map((thread) => bindLegacyThread(principalId, thread));
     },
 
+    // SC.10 session slugs — `threadId` here is a route param that may be
+    // either the canonical UUID id (an old link) or the short slug (the
+    // common case now); resolveByRouteParam picks the right lookup
+    // unambiguously (see isUuidShaped). The returned thread's own `.id`/
+    // `.slug` are always the canonical pair regardless of which form was
+    // requested — callers needing to canonicalize the URL compare against
+    // `.slug`, not against the raw `threadId` they passed in.
     resolveExecution(principalId: string, threadId: string): AgentThread {
-      const thread = dependencies.repository.get(principalId, threadId);
+      const thread = dependencies.repository.resolveByRouteParam(
+        principalId,
+        threadId,
+      );
       if (!thread) throw new Error(`Agent thread ${threadId} was not found.`);
       return bindLegacyThread(principalId, thread);
     },

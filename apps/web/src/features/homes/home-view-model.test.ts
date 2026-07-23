@@ -62,6 +62,7 @@ const nav: ProjectWorkspaceNavSummary = {
 
 function thread(partial: Partial<AgentThreadSummary> & { id: string }): AgentThreadSummary {
   return {
+    slug: partial.id,
     personaId: "neve",
     title: partial.id,
     createdAt: "2026-07-01T00:00:00Z",

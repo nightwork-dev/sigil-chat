@@ -70,6 +70,7 @@ export const fixtureNav: ProjectWorkspaceNavSummary = {
 export const fixtureThreads: readonly AgentThreadSummary[] = [
   {
     id: "session:checkout-triage",
+    slug: "chk01trg",
     personaId: "vesper",
     title: "Retry storm triage",
     createdAt: "2026-07-20T10:00:00Z",
@@ -80,6 +81,7 @@ export const fixtureThreads: readonly AgentThreadSummary[] = [
   },
   {
     id: NORTHSTAR.draftOffers,
+    slug: "drftoffr",
     personaId: "neve",
     title: "Draft Holiday Offers",
     createdAt: "2026-07-20T09:00:00Z",
