@@ -171,7 +171,14 @@ export function AgentChat({
         </Alert>
       ) : null}
 
-      <ChatList>
+      {/* SC.10 §9.3 — left-anchored, never centered: max-w-3xl caps the
+          reading measure but carries NO mx-auto, so the content hugs this
+          box's own left edge. The box itself stays flex-1 in the parent
+          (session-chat-surface.tsx), so its left edge is fixed by the
+          session list beside it, not by this width — toggling the context
+          rail changes how much empty space sits to the right, never the
+          left edge messages and the composer share. */}
+      <ChatList className="max-w-3xl">
         {session.data.messages.length === 0
           ? (emptyState ?? <DefaultEmptyConversation />)
           : null}
@@ -199,6 +206,7 @@ export function AgentChat({
       <ChatInput
         actionClassName="max-sm:size-11"
         attachments={attachments}
+        className="max-w-3xl"
         disabled={session.status === "error" || attachmentsUploading}
         isStreaming={busy}
         onAttach={addFiles}

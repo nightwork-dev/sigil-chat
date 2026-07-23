@@ -81,7 +81,13 @@ export function SessionChatSurface({
 
   return (
     <div className="flex h-full min-h-0 flex-1">
-      <div className="mx-auto flex min-w-0 w-full max-w-3xl flex-1 flex-col">
+      {/* SC.10 §9.3 — left-anchored, never centered: this box is flex-1, its
+          left edge fixed by the session list beside it (never by the rail on
+          the right, which can be zero-width when collapsed). AgentChat caps
+          its OWN message/composer width at max-w-3xl with no mx-auto, so the
+          reading measure stays capped without re-centering when this box's
+          available width changes as the rail toggles. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AgentChat
           approvalMode={approvalMode}
           onApprovalModeChange={setToolApprovalMode}
