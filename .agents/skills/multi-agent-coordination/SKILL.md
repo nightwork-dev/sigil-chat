@@ -40,8 +40,8 @@ agent's lane without coordinating through the roadmap.
 - Every story's frontmatter carries `worktree` (which workstream it belongs
   to) and `epic`. Filter to your own worktree/epic — don't act on another
   stream's stories, and don't be confused by them.
-- Three ways in, same store: the in-app board (`/_app/roadmap`), the
-  `sigil-story-*` MCP tools, or editing the `.md` files directly.
+- Three ways in, same store: the in-app board (`/_app/roadmap`), the native
+  `sigil-story-*` application tools, or editing the `.md` files directly.
 - Claim before you work. When you start a story set its `status`
   (`in-progress`) and `assignee`; when done, `verify`/`shipped`. That's how
   another agent knows not to pick it up.

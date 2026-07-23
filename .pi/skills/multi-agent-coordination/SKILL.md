@@ -42,8 +42,8 @@ work.
 - [ ] Every story's frontmatter carries `worktree` and `epic`. **Filter to
       your own worktree/epic.** Don't act on another stream's stories.
 - [ ] Three equivalent entry points to the same store: the in-app board
-      (`/_app/roadmap`), the `sigil-story-*` MCP tools, editing the `.md`
-      files directly. Pick any — they're the same data.
+      (`/_app/roadmap`), the native `sigil-story-*` application tools, or
+      editing the `.md` files directly. Pick any — they're the same data.
 - [ ] **Claim before you work.** Set `status: in-progress` + `assignee`
       before starting. Set `verify`/`shipped` when done. If you skip this,
       another agent WILL pick up the same story.
