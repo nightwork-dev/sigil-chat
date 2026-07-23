@@ -5,6 +5,9 @@
 //   apps/web/src/routes/_app/projects/$projectId/route.tsx — project layout, renders <Outlet/>
 //   apps/web/src/routes/_app/projects/$projectId/index.tsx — THIS FILE
 // Content: ProjectHome — permission-filtered project composition and scoped work
+// Loader: once the parent layout's access check resolves "readable", warms
+// the scoped work, artifacts, and home signals this view reads. Skips the
+// prefetch entirely otherwise — those queries stay disabled client-side too.
 
 import { createFileRoute } from "@tanstack/react-router"
 import { useMemo } from "react"
@@ -12,8 +15,8 @@ import { useMemo } from "react"
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
-import { useArtifacts } from "@/lib/artifacts"
-import { useHomeSignals } from "@/lib/home-signals"
+import { artifactsQueryOptions, useArtifacts } from "@/lib/artifacts"
+import { homeSignalsQueryOptions, useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import { buildProjectHome } from "@/features/homes/home-view-model"
 import {
@@ -24,9 +27,43 @@ import {
 } from "@/features/homes/live-sources"
 import { ProjectHome } from "@/features/homes/project-home"
 import type { HomeState, ProjectHomeView } from "@/features/homes/types"
-import { useScopeHomeAccess, useScopeWork } from "@/lib/work-items"
+import {
+  scopeHomeAccessQueryOptions,
+  scopeWorkQueryOptions,
+  useScopeHomeAccess,
+  useScopeWork,
+} from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/projects/$projectId/")({
+  loader: async ({ context, params }) => {
+    const principalId = context.user.id
+    const access = await context.queryClient
+      .ensureQueryData(
+        scopeHomeAccessQueryOptions(principalId, params.projectId),
+      )
+      .catch(() => undefined)
+    if (access !== "readable") return
+    const scope = artifactScopeForHome("project", params.projectId)
+    await Promise.all([
+      context.queryClient
+        .ensureQueryData(
+          scopeWorkQueryOptions(
+            principalId,
+            params.projectId,
+            "self-and-rollups",
+          ),
+        )
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(artifactsQueryOptions(scope))
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(
+          homeSignalsQueryOptions(principalId, "project", params.projectId),
+        )
+        .catch(() => undefined),
+    ])
+  },
   component: ProjectHomeRoute,
 })
 

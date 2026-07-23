@@ -7,7 +7,9 @@
 //   apps/web/src/routes/_app/projects/$projectId/workspaces/$workspaceId/index.tsx — THIS FILE
 // Content: WorkspaceHome — permission-filtered initiative composition. The
 // entered-via project is the `$projectId` path segment (containment moved
-// out of `?via=` and into the URL — SC.10 §2).
+// out of `?via=` and into the URL — SC.10 §2). Loader: once the parent
+// layout's access check resolves "readable", warms the scoped work,
+// artifacts, and home signals this view reads.
 
 import { createFileRoute } from "@tanstack/react-router"
 import { useMemo } from "react"
@@ -15,8 +17,8 @@ import { useMemo } from "react"
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
-import { useArtifacts } from "@/lib/artifacts"
-import { useHomeSignals } from "@/lib/home-signals"
+import { artifactsQueryOptions, useArtifacts } from "@/lib/artifacts"
+import { homeSignalsQueryOptions, useHomeSignals } from "@/lib/home-signals"
 import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 import {
   buildWorkspaceHome,
@@ -30,11 +32,45 @@ import {
 } from "@/features/homes/live-sources"
 import { WorkspaceHome } from "@/features/homes/workspace-home"
 import type { HomeState, WorkspaceHomeView } from "@/features/homes/types"
-import { useScopeHomeAccess, useScopeWork } from "@/lib/work-items"
+import {
+  scopeHomeAccessQueryOptions,
+  scopeWorkQueryOptions,
+  useScopeHomeAccess,
+  useScopeWork,
+} from "@/lib/work-items"
 
 export const Route = createFileRoute(
   "/_app/projects/$projectId/workspaces/$workspaceId/",
 )({
+  loader: async ({ context, params }) => {
+    const principalId = context.user.id
+    const access = await context.queryClient
+      .ensureQueryData(
+        scopeHomeAccessQueryOptions(principalId, params.workspaceId),
+      )
+      .catch(() => undefined)
+    if (access !== "readable") return
+    const scope = artifactScopeForHome("workspace", params.workspaceId)
+    await Promise.all([
+      context.queryClient
+        .ensureQueryData(
+          scopeWorkQueryOptions(principalId, params.workspaceId, "self"),
+        )
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(artifactsQueryOptions(scope))
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(
+          homeSignalsQueryOptions(
+            principalId,
+            "workspace",
+            params.workspaceId,
+          ),
+        )
+        .catch(() => undefined),
+    ])
+  },
   component: WorkspaceHomeRoute,
 })
 
