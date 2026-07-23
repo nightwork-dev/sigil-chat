@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
-import { useQuery, type QueryClient } from "@tanstack/react-query"
+import { queryOptions, useQuery, type QueryClient } from "@tanstack/react-query"
 
 import { useAgentPrincipalId } from "@/lib/agent-principal"
 
@@ -55,15 +55,24 @@ export function invalidateHomeSignals(
   })
 }
 
+export function homeSignalsQueryOptions(
+  principalId: string,
+  kind: HomeSignalScopeKind,
+  id: string,
+  enabled = true,
+) {
+  return queryOptions({
+    queryKey: homeSignalKeys.scope(principalId, kind, id),
+    queryFn: () => loadHomeSignalsFn({ data: { id, kind } }),
+    enabled,
+  })
+}
+
 export function useHomeSignals(
   kind: HomeSignalScopeKind,
   id: string,
   enabled = true,
 ) {
   const principalId = useAgentPrincipalId()
-  return useQuery({
-    queryKey: homeSignalKeys.scope(principalId, kind, id),
-    queryFn: () => loadHomeSignalsFn({ data: { id, kind } }),
-    enabled,
-  })
+  return useQuery(homeSignalsQueryOptions(principalId, kind, id, enabled))
 }

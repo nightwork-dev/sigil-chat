@@ -1,4 +1,5 @@
 import {
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -602,46 +603,71 @@ export function useBoardViewQuery(id: string | undefined) {
   });
 }
 
+export function scopeWorkQueryOptions(
+  principalId: string,
+  scopeId: string,
+  traversal: BoardTraversal,
+  enabled = true,
+) {
+  return queryOptions({
+    queryKey: workItemKeys.scopeQuery(principalId, scopeId, traversal),
+    queryFn: () => queryScopeWorkFn({ data: { scopeId, traversal } }),
+    enabled: enabled && scopeId.length > 0,
+    refetchOnMount: "always" as const,
+    refetchOnReconnect: "always" as const,
+    refetchOnWindowFocus: "always" as const,
+    refetchInterval: 15_000,
+  });
+}
+
 export function useScopeWork(
   scopeId: string,
   traversal: BoardTraversal,
   enabled = true,
 ) {
   const principalId = useAgentPrincipalId();
-  return useQuery({
-    queryKey: workItemKeys.scopeQuery(principalId, scopeId, traversal),
-    queryFn: () => queryScopeWorkFn({ data: { scopeId, traversal } }),
+  return useQuery(scopeWorkQueryOptions(principalId, scopeId, traversal, enabled));
+}
+
+export function scopeHomeAccessQueryOptions(
+  principalId: string,
+  scopeId: string,
+  enabled = true,
+) {
+  return queryOptions({
+    queryKey: ["scope-home-access", principalId, scopeId] as const,
+    queryFn: () => queryScopeHomeAccessFn({ data: scopeId }),
     enabled: enabled && scopeId.length > 0,
-    refetchOnMount: "always",
-    refetchOnReconnect: "always",
-    refetchOnWindowFocus: "always",
-    refetchInterval: 15_000,
+    refetchOnMount: "always" as const,
+    refetchOnReconnect: "always" as const,
+    refetchOnWindowFocus: "always" as const,
   });
 }
 
 export function useScopeHomeAccess(scopeId: string, enabled = true) {
   const principalId = useAgentPrincipalId();
-  return useQuery({
-    queryKey: ["scope-home-access", principalId, scopeId] as const,
-    queryFn: () => queryScopeHomeAccessFn({ data: scopeId }),
-    enabled: enabled && scopeId.length > 0,
-    refetchOnMount: "always",
-    refetchOnReconnect: "always",
-    refetchOnWindowFocus: "always",
+  return useQuery(scopeHomeAccessQueryOptions(principalId, scopeId, enabled));
+}
+
+export function sessionCommitmentsQueryOptions(
+  principalId: string,
+  threadId: string,
+  enabled = true,
+) {
+  return queryOptions({
+    queryKey: workItemKeys.sessionCommitments(principalId, threadId),
+    queryFn: () => listSessionCommitmentsFn({ data: { threadId } }),
+    enabled: enabled && threadId.length > 0,
+    refetchOnMount: "always" as const,
+    refetchOnReconnect: "always" as const,
+    refetchOnWindowFocus: "always" as const,
+    refetchInterval: 15_000,
   });
 }
 
 export function useSessionCommitments(threadId: string, enabled = true) {
   const principalId = useAgentPrincipalId();
-  return useQuery({
-    queryKey: workItemKeys.sessionCommitments(principalId, threadId),
-    queryFn: () => listSessionCommitmentsFn({ data: { threadId } }),
-    enabled: enabled && threadId.length > 0,
-    refetchOnMount: "always",
-    refetchOnReconnect: "always",
-    refetchOnWindowFocus: "always",
-    refetchInterval: 15_000,
-  });
+  return useQuery(sessionCommitmentsQueryOptions(principalId, threadId, enabled));
 }
 
 export function useUpsertStory() {

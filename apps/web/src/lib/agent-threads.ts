@@ -1,4 +1,5 @@
 import {
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -272,21 +273,36 @@ export const agentThreadKeys = {
     [...agentThreadKeys.all(principalId), "active-preference"] as const,
 };
 
-export function useAgentThreads(includeArchived = false) {
-  const principalId = useAgentPrincipalId();
-  return useQuery({
+export function agentThreadsQueryOptions(
+  principalId: string,
+  includeArchived = false,
+) {
+  return queryOptions({
     queryKey: agentThreadKeys.list(principalId, includeArchived),
     queryFn: () => listAgentThreadsFn({ data: { includeArchived } }),
   });
 }
 
-export function useAgentThread(id: string | undefined, enabled = true) {
-  const principalId = useAgentPrincipalId();
-  return useQuery({
+export function agentThreadQueryOptions(
+  principalId: string,
+  id: string | undefined,
+  enabled = true,
+) {
+  return queryOptions({
     queryKey: agentThreadKeys.detail(principalId, id ?? "none"),
     queryFn: () => getAgentThreadFn({ data: { id: id ?? "" } }),
     enabled: enabled && Boolean(id),
   });
+}
+
+export function useAgentThreads(includeArchived = false) {
+  const principalId = useAgentPrincipalId();
+  return useQuery(agentThreadsQueryOptions(principalId, includeArchived));
+}
+
+export function useAgentThread(id: string | undefined, enabled = true) {
+  const principalId = useAgentPrincipalId();
+  return useQuery(agentThreadQueryOptions(principalId, id, enabled));
 }
 
 export function useActiveAgentThreadPreference() {
