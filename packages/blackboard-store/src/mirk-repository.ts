@@ -1,16 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { MarkdownStore, type MarkdownMutation } from "@mirk/store-markdown";
+import { readDataEnvironment } from "@workspace/runtime-env/server";
 
 import type { BlackboardRepository } from "./repository.js";
 import type { BlackboardDoc } from "./types.js";
 import { assertBlackboardContent, BlackboardConflictError } from "./limits.js";
 
 const BLACKBOARD_COLLECTION = "blackboard";
-const DEFAULT_BLACKBOARD_DIR = ".data/blackboard";
 
 interface BlackboardRecord {
   id: string;
@@ -21,7 +20,7 @@ interface BlackboardRecord {
 }
 
 export interface MirkBlackboardRepositoryOptions {
-  /** Store directory. Defaults to SIGIL_BLACKBOARD_DIR or .data/blackboard. */
+  /** Store directory. Defaults to SIGIL_BLACKBOARD_DIR or SIGIL_DATA_DIR. */
   dir?: string;
   now?: () => string;
   /** Disable the MarkdownStore git commit created for each write. */
@@ -200,25 +199,7 @@ export function resolveBlackboardDir(
   if (override && override.trim()) return resolve(override);
   if (envDir && envDir.trim()) return resolve(envDir);
 
-  let directory = resolve(startDirectory);
-  while (true) {
-    const packagePath = join(directory, "package.json");
-    if (existsSync(packagePath)) {
-      try {
-        const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as {
-          name?: string;
-        };
-        if (packageJson.name === "sigil-chat")
-          return join(directory, DEFAULT_BLACKBOARD_DIR);
-      } catch {
-        // Keep walking; an unrelated malformed package file is not the root.
-      }
-    }
-    const parent = dirname(directory);
-    if (parent === directory)
-      return join(resolve(startDirectory), DEFAULT_BLACKBOARD_DIR);
-    directory = parent;
-  }
+  return readDataEnvironment(process.env, startDirectory).blackboardDir;
 }
 
 function emptyDocument(sessionId: string): BlackboardDoc {

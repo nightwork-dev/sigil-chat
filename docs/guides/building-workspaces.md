@@ -29,14 +29,14 @@ feature component owns providers, layout, and the agent HUD. Follow this
 split for a new workspace: create `apps/web/src/features/<name>/<name>.tsx`
 (or reuse an existing feature if you're extending one), then point a new
 `_app/<name>.tsx` route file at it. Demonstrations that require an account,
-agent session, Gonk tool, or durable remote resource belong under
+agent session, application tool, or durable remote resource belong under
 `_app/demos.<name>.tsx`, yielding `/demos/<name>`. Public `/labs/*` routes sit
 outside `_app` and must remain browser-local.
 
 ## The domain-outcome loop: a tool result becomes a cache update
 
 Walk one real path. `sigil-review-update-passages` in
-[`apps/gonk/src/registry.ts`](../../apps/gonk/src/registry.ts) mutates the
+[`packages/agent-tools/src/review.ts`](../../packages/agent-tools/src/review.ts) mutates the
 review document, then returns a `clientCommand` alongside its data:
 
 ```ts
@@ -122,11 +122,10 @@ These outcomes are refresh instructions, not authorization receipts. The tool
 must authorize the real resource before mutation; the browser then reconciles
 only after the mutation succeeds.
 
-(The `agentDomainOutcomeFromCommand` function in the same file also
-translates two legacy `clientCommand` shapes, `review.annotation.add` and
-`review.passage.update`, into the same outcome shape for backward
-compatibility — new tools should emit `agent.domain.outcome` directly rather
-than adding a third legacy shape.)
+The command boundary accepts only `agent.domain.outcome` for durable
+reconciliation. The pre-outcome `review.annotation.add` and
+`review.passage.update` compatibility shapes have been retired; new tools must
+emit `agent.domain.outcome` rather than extending the browser mutation bus.
 
 ## The attention/context tray: workspace state reaching the agent
 

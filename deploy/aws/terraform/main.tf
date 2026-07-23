@@ -107,7 +107,7 @@ resource "aws_instance" "sigil_chat" {
     http_endpoint = "enabled"
     http_tokens   = "required"
     # 2, not 1: containers sit one bridge-hop from IMDS; the instance role's
-    # credentials must be reachable from inside the gonk/eve containers.
+    # credentials must be reachable from inside the Eve container.
     http_put_response_hop_limit = 2
   }
 

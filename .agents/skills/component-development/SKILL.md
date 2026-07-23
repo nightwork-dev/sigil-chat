@@ -130,7 +130,7 @@ function Thing({ className, variant, size, ...props }: React.ComponentProps<"div
 ```
 
 **Compound Root/Parts + Context is mandatory for domain objects** rendered
-in more than one place — this is stated in the root `AGENTS.md` and is
+in more than one place — this is stated in the root `CLAUDE.md` and is
 non-negotiable, not a style preference. Context provides the shared value,
 each part reads what it needs via a `use<Thing>()` hook, and a
 `{ Root, PartA, PartB }` namespace object is the export:
@@ -217,7 +217,7 @@ polymorphism is the `render` prop, not `asChild`. Match it:
 ## Minimize `useEffect` / `useMemo`
 
 - **No `useEffect` for data fetching or derived state** — see root
-  `AGENTS.md`. Legitimate uses: event listeners, DOM measurement,
+  `CLAUDE.md`. Legitimate uses: event listeners, DOM measurement,
   third-party integration, `requestAnimationFrame`/`setInterval` loops,
   cleanup.
 - **Avoid `useMemo` by default.** It's not an organization tool. Compute
@@ -310,12 +310,12 @@ existing demo, but not where you wire a demo for new product work; see
    component exists for** — not just "it renders." A drag-to-conflict
    slider needs to actually be dragged into conflict and the conflict state
    checked; a scroll-spy shell needs actual overflow and an actual scroll,
-   not just a snapshot of the DOM at rest. Run `pnpm dev` (starts all three
+   not just a snapshot of the DOM at rest. Run `pnpm dev` (starts both
    Portless services) and drive the component inside the actual workspace
-   that consumes it — `http://sigil-chat.localhost:1355/chat`,
-   `/studio`, `/review`, etc. — as part of the same change, not as a
-   follow-up. If the component is genuinely shared/generic with no product
-   consumer yet, the inherited `/showcase/<category>` catalog is an
+   that consumes it, using the app origin printed by this worktree's readiness
+   summary, as part of the same change—not as a follow-up. If the component is
+   genuinely shared/generic with no product consumer yet, the inherited
+   `/showcase/<category>` catalog is an
    acceptable interim home, but note in the change that it still needs a
    real consumer.
 4. Check the browser console for errors/warnings, not just that the page

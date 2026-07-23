@@ -1,12 +1,19 @@
-# External-consumer contract
+# Historical external MCP consumer proof
 
-This is the release contract for a generated Sigil Chat application consumed outside this repository. The consumer owns tools, context contributors, persistence, and application policy. It consumes released contracts only.
+This records the 2026-07-20 clean-room proof for the former remote MCP
+composition. It does not describe Sigil Chat's current runtime, which hosts its
+Gonk registry natively in Eve. Keep this fixture as evidence for a future named
+remote consumer; do not use it to reintroduce a gateway into the product.
+
+The consumer owns tools, context contributors, persistence, and application
+policy. It consumes released contracts only.
 
 The companion [clean-room fixture](../fixtures/external-consumer/) is the executable proof. It must never gain `workspace:`, `file:`, `@workspace/*`, or Sigil Chat `apps/*` dependencies.
 
-## Current application train
+## Proof snapshot: 2026-07-20
 
-This matrix is derived from the application manifests and lockfile. “Public”
+This matrix was derived from the application manifests and lockfile on that
+date. It is intentionally not a current dependency inventory. “Public”
 means that the exact version resolves from `https://registry.npmjs.org` without
 a workspace link, file dependency, tarball, or private registry.
 
@@ -31,7 +38,7 @@ current train: Eve `0.25.2`, the Gonk Core `0.3.1` MCP/context boundary, and
 unpublished rows and does not claim the full application can yet install from
 public npm.
 
-## Supported boundary
+## Boundary proven by the snapshot
 
 - Use `sigil` only as the CLI command surface. The generated application and its Chat source remain consumer-owned source, not npm-installed Sigil Design material.
 - Add application-owned tools to its own `ToolRegistry` and mount them with `createAgentWebMcpHandler` from `@zigil/agent-gonk`.
@@ -40,7 +47,7 @@ public npm.
 
 Not supported: importing Sigil Chat's `apps/*`, `packages/*`, generated route tree, `@workspace/*` packages, or its session/auth/persistence policy. The reference checkout is not a starter kit.
 
-## Public release checklist
+## Historical public release checklist
 
 1. Publish only the exact missing runtime-contract versions shown above. Do
    not publish Sigil Design components or Chat application source as npm

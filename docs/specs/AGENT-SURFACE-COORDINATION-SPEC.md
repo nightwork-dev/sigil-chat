@@ -137,9 +137,10 @@ forbids), the lifecycle is fixed:
 Indication is read-only projection; it never auto-navigates. The user always
 chooses to follow.
 
-## 6. Agent navigation & tour tools (Gonk)
+## 6. Agent navigation & tour tools (application-owned; Eve-hosted through Gonk)
 
-Two sibling tools to the annotation tools, in `apps/gonk/src/registry/`:
+Two proposed sibling tools to the annotation tools in
+`packages/agent-tools/src/`:
 
 - **`sigil-navigate`** — proposes switching the user's view to a target route
   (+ optional workspace). Output: `{ route, workspaceId?, selectionId? }`. Per
@@ -239,8 +240,9 @@ live view embedded as a tile, a note pinned beside a chart. Built on sigil-desig
   model for cross-view indicators and route badges.
 
 **Navigation tools (sibling registry site):**
-- `apps/gonk/src/registry/containers.ts` — where `sigil-navigate` / `sigil-guide`
-  live alongside `sigil-annotate` / `sigil-project-*`.
+- `packages/agent-tools/src/annotations.ts` — the current sibling registry site
+  for `sigil-annotate`; `sigil-navigate` / `sigil-guide` should join the
+  application registry in their own focused module.
 
 **The canvas (eventual):**
 - sigil-design `packages/canvas/src/components/` — `registry-palette.tsx`,

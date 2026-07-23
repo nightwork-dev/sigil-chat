@@ -42,24 +42,23 @@ describe("system status measurement", () => {
   it("uses explicit public diagnostics without exposing raw error text", async () => {
     const times = [100, 112]
     const status = await measureService(
-      "gonk",
-      "Gonk",
+      "eve",
+      "Agent runtime",
       () =>
         Promise.reject(
           new ServiceDiagnosticError(
-            "Gonk readiness returned HTTP 503. Check artifact-store logs.",
+            "Eve readiness returned HTTP 503. Check agent logs.",
           ),
         ),
       () => times.shift()!,
     )
 
     expect(status).toEqual({
-      id: "gonk",
-      label: "Gonk",
+      id: "eve",
+      label: "Agent runtime",
       latencyMs: 12,
       status: "unhealthy",
-      diagnostic:
-        "Gonk readiness returned HTTP 503. Check artifact-store logs.",
+      diagnostic: "Eve readiness returned HTTP 503. Check agent logs.",
     })
   })
 })

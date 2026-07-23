@@ -30,7 +30,7 @@ export function projectHomeSignals(
   const activity: HomeActivityRecord[] = []
   const attention: HomeAttentionRecord[] = []
   for (const thread of threads) {
-    thread.eve.events.forEach((event) => {
+    thread.runtime.events.forEach((event) => {
       const occurredAt = event.meta?.at ?? thread.updatedAt
       const activityRecord = activityFromEvent(thread, event, occurredAt)
       if (activityRecord) activity.push(activityRecord)

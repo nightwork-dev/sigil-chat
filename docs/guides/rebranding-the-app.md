@@ -1,44 +1,40 @@
 # Rebranding the application
 
-Sigil Chat's public identity is resolved once when Vite starts. You can rename
-the product, set its browser/share metadata, and recolor its favicon without
-editing source files.
+Product identity is checked in as the Mirk fixture at
+`fixtures/application/sigil-chat.yaml`:
 
-```dotenv
-SIGIL_APP_NAME=Lantern
-SIGIL_APP_TITLE=Lantern — campaign room
-SIGIL_APP_DESCRIPTION=A collaborative campaign workspace.
-SIGIL_APP_ORIGIN=https://lantern.example
-SIGIL_BRAND_COLOR=#5f78ff
-SIGIL_SHARE_IMAGE_URL=/share/lantern.png
+```yaml
+branding:
+  name: Lantern
+  title: Lantern — campaign room
+  description: A collaborative campaign workspace.
+  accent: "#5f78ff"
+  shareImageUrl: /share/lantern.png
 ```
 
-`SIGIL_APP_NAME` is used in app chrome and authentication screens.
-`SIGIL_APP_TITLE` becomes the browser and share-card title. The description,
-canonical URL, Open Graph fields, Twitter card fields, PWA manifest, theme
-color, and share image all resolve from the same configuration.
+That one object drives authentication email copy, browser/share metadata, the
+PWA manifest, theme color, and the procedural favicon. Rebranding no longer
+requires copying seven environment variables into every shell and deployment.
+
+`shareImageUrl` accepts an absolute URL or a root-relative path. Use a PNG/JPEG
+image sized for link previews; the procedural favicon is an SVG data URL meant
+for browser tabs, not social cards.
+
+Set the deployment origin once with `SIGIL_PUBLIC_URL`. The same URL configures
+Better Auth, trusted-origin defaults, Eve's token issuer, JWKS discovery, and
+public metadata:
+
+```dotenv
+SIGIL_PUBLIC_URL=https://lantern.example
+```
 
 ## Worktree identity
 
-Development worktrees need no configuration. The dev scripts use Portless's
-worktree-aware `run` mode, so a branch such as `feature/chrome` receives one
-shared safe prefix across the web, Eve, and Gonk services. The browser title
-becomes `[feature-chrome] Sigil Chat — agentic conversations` and gets a
-deterministic accent-colored SVG favicon. The same prefix always receives the
-same color. `PORTLESS_URL` also becomes the canonical/share origin, and the
-runtime derives the sibling Eve/Gonk URLs from the same namespace.
+Development worktrees need no configuration. Portless gives both services
+one branch-derived namespace, and the browser title gains that label plus a
+stable generated accent. For example, `feature/chrome` becomes
+`[feature-chrome] Lantern — campaign room`.
 
-Override the automatic identity when useful:
-
-```dotenv
-SIGIL_INSTANCE_LABEL=review
-SIGIL_BRAND_COLOR=#e85d75
-```
-
-Set `SIGIL_INSTANCE_LABEL=` explicitly to keep the normal product title and
-favicon while developing in a worktree. Production builds do not infer a
-worktree label; only explicit branding is carried into them.
-
-`SIGIL_SHARE_IMAGE_URL` accepts an absolute URL or a root-relative path. Use a
-PNG/JPEG image sized for link previews; the procedural favicon is an SVG data
-URL intended for browser tabs, not social-card crawlers.
+To keep the normal product title in every development worktree, add
+`instanceLabel: false` to the fixture's `branding` object. To pin a specific
+label instead, set `instanceLabel` to a string.

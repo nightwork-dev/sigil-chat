@@ -27,7 +27,7 @@ import {
   usePublishWorkspaceAttention,
   usePublishWorkspaceResourceScope,
 } from "@/components/agent/workspace-attention"
-import { EVIDENCE_ROOM_SCOPE } from "@/lib/evidence"
+import { useEvidenceRoomScope } from "@/lib/evidence"
 import {
   artifactUrl,
   useArtifactPreview,
@@ -41,7 +41,7 @@ type ArtifactFilter = "all" | "files" | "images" | "distills"
 const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json"
 
 /**
- * A scope-aware index over artifacts that already exist in Gonk. It is not a
+ * A scope-aware index over artifacts in the application repository. It is not a
  * second library: Evidence remains the place to curate the shared corpus;
  * this workspace lets someone follow an artifact from a live session back to
  * that corpus, inspect its bytes, and see the provenance the store actually
@@ -50,13 +50,14 @@ const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json"
 export function ArtifactWorkspace() {
   const controls = useAgentThreadControls()
   const telemetry = useAttentionTelemetry()
+  const evidenceScope = useEvidenceRoomScope()
   const [scopeChoice, setScopeChoice] = useState<ScopeChoice>("evidence")
   const [filter, setFilter] = useState<ArtifactFilter>("all")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const sessionScope = controls?.activeThreadId
     ? `session:${controls.activeThreadId}`
     : null
-  const scope = scopeChoice === "evidence" ? EVIDENCE_ROOM_SCOPE : sessionScope
+  const scope = scopeChoice === "evidence" ? evidenceScope : sessionScope
   const artifactsQuery = useArtifacts(scope)
   const artifacts = artifactsQuery.data ?? []
   const visibleArtifacts = artifacts.filter((artifact) =>
@@ -94,7 +95,7 @@ export function ArtifactWorkspace() {
         <h1 className="text-sm font-semibold">Artifacts</h1>
         <span className="truncate text-xs text-muted-foreground">
           {scopeChoice === "evidence"
-            ? "Shared evidence corpus"
+            ? "Your evidence corpus"
             : "Current conversation"}
         </span>
       </header>

@@ -1,7 +1,7 @@
 // Route-side data sources for the homes.
 //
 // Scoped work comes from SC.5's permission-filtered server queries. Live
-// artifacts come from the existing authenticated Gonk artifact manifest. Agent
+// artifacts come from the authenticated application artifact manifest. Agent
 // Activity and attention project the durable retained session event stream.
 
 import { artifactUrl, type ArtifactRecord } from "@/lib/artifacts"

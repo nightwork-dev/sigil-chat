@@ -1,5 +1,4 @@
 import type { Client } from "@libsql/client"
-import { apiKey } from "@better-auth/api-key"
 import { betterAuth } from "better-auth"
 import type { BetterAuthOptions } from "better-auth"
 import {
@@ -11,6 +10,7 @@ import {
 } from "better-auth/plugins"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import type { Kysely } from "kysely"
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
 
 import { createAuthDatabase, type AuthDatabase } from "./db"
 import { readAuthEnvironment, type AuthEnvironment } from "./env"
@@ -28,6 +28,8 @@ import {
   type SigilRole,
 } from "./policy"
 import { authUserAdditionalFields } from "./schema"
+
+const { value: sigilConfig } = await loadSigilConfigFixture()
 
 export interface SigilAuthUser {
   displayUsername?: string | null
@@ -115,7 +117,7 @@ export function createSigilAuthOptions(
         sendPasswordResetEmail(
           environment.authEmail,
           { email: user.email, url },
-          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+          { siteName: sigilConfig.branding.name },
         ),
     },
     emailVerification: {
@@ -123,7 +125,7 @@ export function createSigilAuthOptions(
         sendVerificationEmail(
           environment.authEmail,
           { email: user.email, url },
-          { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+          { siteName: sigilConfig.branding.name },
         ),
     },
     rateLimit: {
@@ -180,31 +182,9 @@ export function createSigilAuthOptions(
           sendMagicLinkEmail(
             environment.authEmail,
             { email, url },
-            { siteName: process.env.SIGIL_APP_NAME?.trim() || "Sigil Chat" },
+            { siteName: sigilConfig.branding.name },
           ),
         storeToken: "hashed",
-      }),
-      apiKey({
-        defaultPrefix: "sigil_live_",
-        defaultKeyLength: 48,
-        enableMetadata: true,
-        enableSessionForAPIKeys: false,
-        keyExpiration: {
-          defaultExpiresIn: 90 * 24 * 60 * 60,
-          maxExpiresIn: 365,
-          minExpiresIn: 1,
-        },
-        maximumNameLength: 80,
-        rateLimit: {
-          enabled: true,
-          maxRequests: 120,
-          timeWindow: 60 * 1000,
-        },
-        requireName: true,
-        startingCharactersConfig: {
-          charactersLength: 16,
-          shouldStore: true,
-        },
       }),
       ...(oktaCredentials
         ? [
@@ -220,7 +200,7 @@ export function createSigilAuthOptions(
               ],
             }),
           ]
-         : []),
+        : []),
       tanstackStartCookies(),
     ],
   }

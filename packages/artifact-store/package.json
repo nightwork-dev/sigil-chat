@@ -1,0 +1,26 @@
+{
+  "name": "@workspace/artifact-store",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mirk/artifact": "^0.1.0",
+    "@workspace/runtime-env": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
+  },
+  "exports": {
+    "./repository": "./src/repository.ts",
+    "./scope": "./src/scope.ts",
+    "./types": "./src/types.ts",
+    "./urls": "./src/urls.ts"
+  }
+}

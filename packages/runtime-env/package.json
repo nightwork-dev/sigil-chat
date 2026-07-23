@@ -5,6 +5,10 @@
   "type": "module",
   "private": true,
   "sideEffects": false,
+  "dependencies": {
+    "@mirk/fixtures": "0.1.0",
+    "yaml": "^2.9.0"
+  },
   "files": [
     "src",
     "README.md"
@@ -19,6 +23,8 @@
     "vitest": "^3.2.6"
   },
   "exports": {
+    "./config": "./src/config.ts",
+    "./project-root": "./src/project-root.ts",
     "./topology": "./src/topology.ts",
     "./server": "./src/server.ts"
   }

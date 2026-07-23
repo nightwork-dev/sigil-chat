@@ -1,7 +1,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
-export type AgentCatalogOrigin = "eve-authored" | "eve-declared";
+export type AgentCatalogOrigin = "host-authored" | "host-declared";
 export type AgentCatalogCapability = "read" | "delegate";
 
 export interface AgentSkillCatalogItem {
@@ -36,16 +36,16 @@ export interface AgentToolCatalogItem {
   id: string;
   name: string;
   description: string;
-  origin: "gonk";
+  origin: "application";
   availability: "available";
-  runtimeStatus: "callable";
+  runtimeStatus: "discoverable";
 }
 
 export interface AgentRuntimeToolCatalogItem {
   id: string;
   name: string;
   description: string;
-  origin: "eve-framework" | "eve-authored";
+  origin: "host-framework" | "host-authored";
   availability: "available";
   runtimeStatus: "callable" | "discoverable";
   requiresApproval: boolean;
@@ -75,7 +75,7 @@ export interface AgentCatalog {
   runtimeTools: readonly AgentRuntimeToolCatalogItem[];
   tools: readonly AgentToolCatalogItem[];
   management: {
-    source: "eve-inspection";
+    source: "agent-inspection";
     lifecycle: "unavailable";
     explanation: string;
   };
@@ -159,7 +159,7 @@ async function loadAgentRuntimeCatalog(): Promise<AgentCatalog> {
   const { getEveBearerToken } = await import("./auth/session");
   const origin = readRuntimeTopology(process.env).eveOrigin;
 
-  return fetchAgentCatalogFromEve(
+  return fetchAgentRuntimeCatalogFromHost(
     joinRuntimeUrl(origin, "/eve/v1/info"),
     await getEveBearerToken(),
   );
@@ -171,130 +171,77 @@ const fetchAgentRuntimeCatalogFn = createServerFn({ method: "GET" }).handler(
 
 const fetchAgentCatalogFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<AgentCatalog> => {
-    const { readGonkClientEnvironment } =
-      await import("@workspace/runtime-env/server");
-    const { apiKey, gonkMcpUrl } = readGonkClientEnvironment(process.env);
-    if (!apiKey) {
-      throw new Error(
-        "GONK_MCP_KEY is not configured for the web app's server process; the tool catalog cannot authenticate against Gonk.",
-      );
-    }
+    const { joinRuntimeUrl, readRuntimeTopology } =
+      await import("@workspace/runtime-env/topology");
+    const { getEveBearerToken } = await import("./auth/session");
+    const origin = readRuntimeTopology(process.env).eveOrigin;
+    const bearer = await getEveBearerToken();
     const [catalog, tools] = await Promise.all([
-      loadAgentRuntimeCatalog(),
-      fetchGonkToolCatalog(gonkMcpUrl, apiKey),
+      fetchAgentRuntimeCatalogFromHost(
+        joinRuntimeUrl(origin, "/eve/v1/info"),
+        bearer,
+      ),
+      fetchApplicationToolCatalog(
+        joinRuntimeUrl(origin, "/sigil/v1/application-tools"),
+        bearer,
+      ),
     ]);
     return { ...catalog, tools };
   },
 );
 
-interface McpToolInfo {
+interface ApplicationToolInfo {
   name?: unknown;
   description?: unknown;
+  runtimeStatus?: unknown;
 }
 
-export async function fetchGonkToolCatalog(
+export async function fetchApplicationToolCatalog(
   url: string,
   bearer: string,
   fetcher: typeof fetch = fetch,
 ): Promise<AgentToolCatalogItem[]> {
-  const headers = {
-    accept: "application/json, text/event-stream",
-    authorization: `Bearer ${bearer}`,
-    "content-type": "application/json",
-  };
-  const initialized = await fetcher(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2025-03-26",
-        capabilities: {},
-        clientInfo: { name: "sigil-chat-web", version: "0.0.1" },
-      },
-    }),
+  const response = await fetcher(url, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${bearer}`,
+    },
   });
-  if (!initialized.ok) {
+  if (!response.ok) {
     throw new Error(
-      `Gonk tool catalog initialization failed (${initialized.status} ${initialized.statusText})`,
+      `Application tool catalog failed (${response.status} ${response.statusText})`,
     );
   }
-  const sessionId = initialized.headers.get("mcp-session-id");
-  if (!sessionId) throw new Error("Gonk did not return an MCP session id.");
-  const sessionHeaders = { ...headers, "mcp-session-id": sessionId };
-
-  try {
-    const notification = await fetcher(url, {
-      method: "POST",
-      headers: sessionHeaders,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "notifications/initialized",
-      }),
-    });
-    if (!notification.ok && notification.status !== 202) {
-      throw new Error(
-        `Gonk tool catalog session initialization failed (${notification.status} ${notification.statusText})`,
-      );
-    }
-    const response = await fetcher(url, {
-      method: "POST",
-      headers: sessionHeaders,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 2,
-        method: "tools/list",
-        params: {},
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Gonk tool catalog failed (${response.status} ${response.statusText})`,
-      );
-    }
-    const payload: unknown = await response.json();
-    if (typeof payload !== "object" || payload === null) {
-      throw new Error("Gonk returned an invalid MCP tool catalog response.");
-    }
-    if (typeof (payload as { error?: unknown }).error === "object") {
-      throw new Error("Gonk rejected the MCP tool catalog request.");
-    }
-    const result = (payload as { result?: unknown }).result;
-    if (typeof result !== "object" || result === null) {
-      throw new Error(
-        "Gonk returned an MCP tool catalog response without a result.",
-      );
-    }
-    const tools = (result as { tools?: unknown }).tools;
-    if (!Array.isArray(tools)) {
-      throw new Error("Gonk returned an invalid MCP tool list.");
-    }
-    return tools.flatMap((candidate) => {
-      if (typeof candidate !== "object" || candidate === null) return [];
-      const tool = candidate as McpToolInfo;
-      const name = stringValue(tool.name, "");
-      if (!name) return [];
-      return [
-        {
-          id: `gonk__${name}`,
-          name,
-          description: stringValue(tool.description, "Application tool"),
-          origin: "gonk" as const,
-          availability: "available" as const,
-          runtimeStatus: "callable" as const,
-        },
-      ];
-    });
-  } finally {
-    await fetcher(url, { method: "DELETE", headers: sessionHeaders }).catch(
-      () => undefined,
-    );
+  const payload: unknown = await response.json();
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error("The agent returned an invalid application tool catalog.");
   }
+  const tools = (payload as { tools?: unknown }).tools;
+  if (!Array.isArray(tools)) {
+    throw new Error("The agent returned an invalid application tool list.");
+  }
+  return tools.flatMap((candidate) => {
+    if (typeof candidate !== "object" || candidate === null) return [];
+    const tool = candidate as ApplicationToolInfo;
+    const name = stringValue(tool.name, "");
+    if (!name || tool.runtimeStatus !== "discoverable") return [];
+    return [
+      {
+        id: name,
+        name,
+        description: stringValue(tool.description, "Application tool"),
+        origin: "application" as const,
+        availability: "available" as const,
+        // Inventory is useful for explaining capabilities, but only Eve's
+        // request-bound resolver can decide whether this tool is callable now.
+        runtimeStatus: "discoverable" as const,
+      },
+    ];
+  });
 }
 
-export async function fetchAgentCatalogFromEve(
+export async function fetchAgentRuntimeCatalogFromHost(
   url: string,
   bearer: string,
   fetcher: typeof fetch = fetch,
@@ -309,7 +256,7 @@ export async function fetchAgentCatalogFromEve(
 
   if (!response.ok) {
     throw new Error(
-      `Eve agent inspection failed (${response.status} ${response.statusText})`,
+      `Agent runtime inspection failed (${response.status} ${response.statusText})`,
     );
   }
 
@@ -412,7 +359,7 @@ function projectSkills(value: EveAgentInfo["skills"]): AgentSkillCatalogItem[] {
           skill.description,
           "Authored procedure available to the root agent.",
         ),
-        origin: "eve-authored",
+        origin: "host-authored",
         availability: "available",
         capabilities: ["read"],
         runtimeStatus: "model-discoverable",
@@ -442,7 +389,7 @@ function projectSubagents(
           subagent.description,
           "Declared specialist available for delegated work.",
         ),
-        origin: "eve-declared",
+        origin: "host-declared",
         availability: "available",
         capabilities: ["read", "delegate"],
         runtimeStatus: "delegatable",
@@ -475,9 +422,10 @@ function projectRuntimeTools(
     const name = stringValue(tool.name, stringValue(tool.slug, ""));
     if (!name || known.has(name)) return null;
     known.add(name);
-    const origin = tool.origin === "authored" ? "eve-authored" : "eve-framework";
+    const origin =
+      tool.origin === "authored" ? "host-authored" : "host-framework";
     return {
-      id: `eve__${name || `runtime-tool-${index + 1}`}`,
+      id: `runtime__${name || `runtime-tool-${index + 1}`}`,
       name,
       description: stringValue(tool.description, "Runtime capability"),
       origin,
@@ -515,10 +463,10 @@ export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
     runtimeTools: projectRuntimeTools(info.tools),
     tools: [],
     management: {
-      source: "eve-inspection",
+      source: "agent-inspection",
       lifecycle: "unavailable",
       explanation:
-        "This catalog reflects Eve-authored runtime capabilities. Creating, editing, pinning, staging, and archiving remain unavailable until Gonk Core publishes the managed SkillRegistry contract.",
+        "This catalog reflects the active agent runtime. Creating, editing, pinning, staging, and archiving remain unavailable until the managed skill lifecycle is enabled.",
     },
     diagnostics: {
       errors: countValue(info.diagnostics?.discoveryErrors),
@@ -529,8 +477,8 @@ export function projectAgentCatalog(info: EveAgentInfo): AgentCatalog {
 
 export const agentCatalogKeys = {
   all: () => ["agent-catalog"] as const,
-  info: () => ["agent-catalog", "eve-info"] as const,
-  full: () => ["agent-catalog", "eve-info-and-gonk-tools"] as const,
+  info: () => ["agent-catalog", "runtime-info"] as const,
+  full: () => ["agent-catalog", "runtime-and-application-tools"] as const,
 };
 
 export function agentRuntimeCatalogQueryOptions() {

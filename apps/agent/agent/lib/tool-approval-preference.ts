@@ -17,7 +17,11 @@ export function parseToolApprovalPreference(
   }
   try {
     const parsed: unknown = JSON.parse(value)
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       return { default: "ask", tools: {} }
     }
     const candidate = parsed as { default?: unknown; tools?: unknown }

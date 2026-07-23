@@ -1,7 +1,9 @@
-import type { HandleMessageStreamEvent } from "eve/client"
+import type { BuildEveForkSeedInput } from "@zigil/agent-eve/session"
+
+export type AgentRuntimeStreamEvent = BuildEveForkSeedInput["events"][number]
 
 type AssistantFinishReason = Extract<
-  HandleMessageStreamEvent,
+  AgentRuntimeStreamEvent,
   { type: "message.completed" }
 >["data"]["finishReason"]
 
@@ -22,17 +24,17 @@ interface PersistedEventMeta {
 }
 
 type LiveActionRequest = Extract<
-  HandleMessageStreamEvent,
+  AgentRuntimeStreamEvent,
   { type: "actions.requested" }
 >["data"]["actions"][number]
 
 type LiveActionResult = Extract<
-  HandleMessageStreamEvent,
+  AgentRuntimeStreamEvent,
   { type: "action.result" }
 >["data"]["result"]
 
 type LiveInputRequest = Extract<
-  HandleMessageStreamEvent,
+  AgentRuntimeStreamEvent,
   { type: "input.requested" }
 >["data"]["requests"][number]
 
@@ -305,7 +307,7 @@ export interface AgentEventRetentionOptions {
 }
 
 export function sanitizeAndBoundAgentEvents(
-  events: readonly HandleMessageStreamEvent[],
+  events: readonly AgentRuntimeStreamEvent[],
   options: AgentEventRetentionOptions = {},
 ): PersistedAgentEventSnapshot {
   const sanitized = events.flatMap((item, sourceIndex) => {
@@ -343,7 +345,7 @@ export function sanitizeAndBoundAgentEvents(
 
 export function agentEventsForReplay(
   events: readonly PersistedAgentEvent[],
-): HandleMessageStreamEvent[] {
+): AgentRuntimeStreamEvent[] {
   return events.flatMap((event) => {
     const replay = replayAgentEvent(event)
     return replay ? [replay] : []
@@ -351,7 +353,7 @@ export function agentEventsForReplay(
 }
 
 function sanitizeAgentEvent(
-  event: HandleMessageStreamEvent,
+  event: AgentRuntimeStreamEvent,
 ): PersistedAgentEvent | null {
   const meta = event.meta ? { meta: { at: event.meta.at } } : {}
   switch (event.type) {
@@ -591,7 +593,7 @@ function sanitizeAgentEvent(
 
 function replayAgentEvent(
   event: PersistedAgentEvent,
-): HandleMessageStreamEvent | null {
+): AgentRuntimeStreamEvent | null {
   const meta = event.meta ? { meta: { at: event.meta.at } } : {}
   switch (event.type) {
     case "session.started":
@@ -620,7 +622,8 @@ function replayAgentEvent(
         type: event.type,
         data: {
           requests: event.data.requests.map(
-            (request) => structuredClone(request) as unknown as LiveInputRequest,
+            (request) =>
+              structuredClone(request) as unknown as LiveInputRequest,
           ),
           sequence: event.data.sequence,
           stepIndex: event.data.stepIndex,
@@ -832,7 +835,7 @@ function retainedEvent(value: PersistedAgentEvent): PersistedAgentEvent {
   return value
 }
 
-function rawEvent(value: HandleMessageStreamEvent): HandleMessageStreamEvent {
+function rawEvent(value: AgentRuntimeStreamEvent): AgentRuntimeStreamEvent {
   return value
 }
 

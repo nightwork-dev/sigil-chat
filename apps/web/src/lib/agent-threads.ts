@@ -205,11 +205,9 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
   const preference = agentThreadRepository.getActivePreference(session.user.id);
   if (!preference.activePerspective) return preference;
 
-  const {
-    legacyContainerProjection,
-    loadProjectWorkspaceNav,
-    resolveScopePerspective,
-  } = await import("@/lib/agent-thread-containers.server");
+  const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
+    "@/lib/agent-thread-containers.server"
+  );
   const nav = loadProjectWorkspaceNav(session.user.id);
   const resolved = resolveScopePerspective(preference.activePerspective, nav);
   if (!resolved) {
@@ -217,16 +215,8 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
     // or trying to infer another scope.
     return agentThreadRepository.setActiveContainer(session.user.id, {});
   }
-  const legacy = legacyContainerProjection(resolved.perspective, nav);
-  if (
-    !resolved.diagnostic &&
-    preference.activeProjectId === legacy.projectId &&
-    preference.activeWorkspaceId === legacy.workspaceId
-  ) {
-    return preference;
-  }
+  if (!resolved.diagnostic) return preference;
   return agentThreadRepository.setActiveContainer(session.user.id, {
-    ...legacy,
     perspective: resolved.perspective,
   });
 });
@@ -245,34 +235,17 @@ const setActiveAgentThreadFn = createServerFn({ method: "POST" })
 // write validates membership + containment against the registries before
 // persisting — the domain store deliberately does not know the registry.
 const setActiveContainerFn = createServerFn({ method: "POST" })
-  .validator(
-    (input: {
-      projectId?: string;
-      workspaceId?: string;
-      perspective?: ScopePerspective;
-    }) => input,
-  )
+  .validator((input: { perspective?: ScopePerspective }) => input)
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const {
-      legacyContainerProjection,
-      loadProjectWorkspaceNav,
-      resolveScopePerspective,
-    } = await import("@/lib/agent-thread-containers.server");
+    const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
+      "@/lib/agent-thread-containers.server"
+    );
     const session = await requireThreadSession();
     const nav = loadProjectWorkspaceNav(session.user.id);
 
-    const requestedPerspective =
-      data.perspective ??
-      (data.workspaceId
-        ? {
-            focusScopeId: data.workspaceId,
-            viaScopeIds: data.projectId ? [data.projectId] : [],
-          }
-        : data.projectId
-          ? { focusScopeId: data.projectId, viaScopeIds: [] }
-          : undefined);
+    const requestedPerspective = data.perspective;
     const resolved = requestedPerspective
       ? resolveScopePerspective(requestedPerspective, nav)
       : undefined;
@@ -280,12 +253,7 @@ const setActiveContainerFn = createServerFn({ method: "POST" })
       throw new Error("Requested scope is not visible to this principal.");
     }
     const perspective = resolved?.perspective;
-    const legacy = perspective
-      ? legacyContainerProjection(perspective, nav)
-      : {};
-
     return agentThreadRepository.setActiveContainer(session.user.id, {
-      ...legacy,
       perspective,
     });
   });
@@ -334,8 +302,6 @@ export function useSetActiveContainer() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: {
-      projectId?: string;
-      workspaceId?: string;
       perspective?: ScopePerspective;
     }) => setActiveContainerFn({ data: input }),
     onSuccess: (preference) => {

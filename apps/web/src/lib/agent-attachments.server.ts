@@ -1,21 +1,15 @@
-import { readGonkClientEnvironment } from "@workspace/runtime-env/server"
-
 import type { UploadedAttachment } from "./agent-attachments"
-import { AGENT_SCOPE_HEADER } from "./agent-session-scope"
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
+import { artifactUrlForWeb, getWebArtifactStore } from "./artifact-repository.server"
 import type { SigilAuthSession } from "./auth/server"
 import { requireSession } from "./auth/session"
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 export interface AttachmentUploadDependencies {
-  fetcher: typeof fetch
   getSession: () => Promise<SigilAuthSession | null>
   ownedThreadHomeScope: (userId: string, threadId: string) => string | undefined
-  readEnvironment: () => {
-    apiKey?: string
-    gonkMcpUrl: string
-  }
+  store?: ReturnType<typeof getWebArtifactStore>
 }
 
 export async function uploadAgentAttachment(
@@ -49,31 +43,23 @@ export async function uploadAgentAttachment(
     )
   }
 
-  const { apiKey, gonkMcpUrl } = dependencies.readEnvironment()
-  if (!apiKey) {
-    throw new Error(
-      "GONK_MCP_KEY is not configured for the web app's server process; attachment uploads cannot be authenticated against Gonk.",
-    )
-  }
-  const response = await dependencies.fetcher(
-    gonkMcpUrl.replace(/\/mcp\/?$/, "/upload"),
+  const store = dependencies.store ?? getWebArtifactStore()
+  const artifact = await store.putFile(
     {
-      method: "POST",
-      headers: {
-        "content-type": file.type || "application/octet-stream",
-        "x-filename": file.name,
-        [AGENT_SCOPE_HEADER]: scope,
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: new Uint8Array(await file.arrayBuffer()),
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      filename: file.name,
+      mediaType: file.type || "application/octet-stream",
+      scope,
     },
+    { id: session.user.id },
   )
-  if (!response.ok) {
-    throw new Error(
-      `Attachment upload failed (${response.status} ${response.statusText})`,
-    )
+  return {
+    url: artifactUrlForWeb(artifact),
+    key: artifact.id,
+    mediaType: artifact.mediaType,
+    size: artifact.size,
+    filename: artifact.filename,
   }
-  return (await response.json()) as UploadedAttachment
 }
 
 export async function uploadAgentAttachmentFromRequest(
@@ -84,10 +70,8 @@ export async function uploadAgentAttachmentFromRequest(
     import("./agent-threads.server"),
   ])
   return uploadAgentAttachment(data, {
-    fetcher: fetch,
     getSession,
     ownedThreadHomeScope: (userId, threadId) =>
       agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
-    readEnvironment: () => readGonkClientEnvironment(process.env),
   })
 }

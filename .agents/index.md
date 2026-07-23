@@ -16,11 +16,10 @@ project-instructions file is true here without checking this file first.
 - **Sigil** renders the TanStack Start chat client (`apps/web`).
 - **Local Codex** serves the model through the existing `codex login` session
   and ChatGPT subscription — not Vercel AI Gateway.
-- **Eve** (`apps/agent`) owns durable sessions, streaming, and interruption;
-  tool approval is a client-side UI preference, not a security control.
-- **Gonk** (`apps/gonk`) defines and dispatches application tools over
-  authenticated Streamable HTTP MCP; its metadata and host callbacks are not a
-  complete security boundary.
+- **Eve** (`apps/agent`) owns durable sessions, streaming, interruption, and
+  native application-tool hosting; tool approval is a client-side preference.
+- **Gonk** supplies the registry, authorization, skills, memory, and scope
+  contracts hosted in the Eve process. It is not a third runtime service.
 
 See `README.md` for the full trust-model writeup — it is accurate and this
 file does not repeat it.
@@ -41,21 +40,18 @@ file does not repeat it.
 │   │   └── vite.config.ts  → Vite + tanstackStart + Nitro + Tailwind
 │   ├── agent/               → Eve host (sigil-chat-agent)
 │   │   └── agent/
-│   │       ├── agent.ts               → defineAgent — experimental_chatgpt(CODEX_MODEL)
+│   │       ├── agent.ts               → defineAgent — model from the application fixture
 │   │       ├── channels/eve.ts        → Eve channel wiring
-│   │       ├── connections/gonk.ts    → MCP client connection to apps/gonk
+│   │       ├── tools/gonk.ts          → native Gonk registry projection
+│   │       ├── lib/application-services.ts → injected app repositories
 │   │       ├── instructions.md        → Agent system instructions
 │   │       ├── skills/editorial-readiness/SKILL.md
 │   │       └── subagents/review-critic/ → agent.ts + instructions.md
-│   └── gonk/                → Authenticated Gonk MCP server (sigil-chat-gonk)
-│       └── src/
-│           ├── server.ts       → HTTP server; refuses to start without GONK_MCP_KEY
-│           ├── auth.ts         → Bearer auth
-│           ├── mcp-handler.ts  → Streamable HTTP MCP handler
-│           └── registry.ts     → Application tool registry (add tools here)
 ├── packages/
 │   ├── ui/            → @workspace/ui — shared shadcn + custom components, tokens, hooks
 │   ├── agent-contracts/ → @workspace/agent-contracts — shared client command and semantic highlight contracts
+│   ├── agent-tools/     → @workspace/agent-tools — host-neutral application tool registry
+│   ├── artifact-store/  → @workspace/artifact-store — shared artifact repository
 │   ├── chat/           → @workspace/chat — ChatMessage, ChatInput, ChatList, markdown
 │   ├── data/           → @workspace/data — EntityBrowser, EntityTable, DetailPanel
 │   ├── graph/           → @workspace/graph — reducer graph engine (nodes, sockets, data-kinds, document, builtins)
@@ -63,7 +59,7 @@ file does not repeat it.
 │   ├── review/          → @workspace/review — review/annotation UI components
 │   ├── review-store/    → @workspace/review-store — review persistence repository, types
 │   ├── file-store-core/ → @workspace/file-store-core — local file-backed store primitive
-│   ├── runtime-env/     → @workspace/runtime-env — typed environment + topology readers all three apps bootstrap from
+│   ├── runtime-env/     → @workspace/runtime-env — typed environment + two-service topology
 │   ├── blackboard-store/ → @workspace/blackboard-store — shared blackboard doc store (wraps @mirk/store-markdown)
 │   ├── work-items-store/ → @workspace/work-items-store — roadmap/work-items store (wraps @mirk/store-markdown)
 │   └── chat-overlay/     → @sigil-design/chat-overlay — build-time overlay generator for `sigil create`, not a runtime dependency
@@ -129,7 +125,6 @@ directly:
 - `@zigil/agent-eve` — Eve host adapter
 - `@zigil/agent-react` — React integration surfaces
 - `@zigil/agent-react-query` — React Query hooks/state over agent contracts
-- `@zigil/agent-gonk` (consumed by `apps/gonk`) — Gonk registry adapter
 
 Plus registry-installed HUD source (owned, not published) and `@gonk/scope`,
 `@gonk/store` for local scoping/storage primitives.
@@ -138,16 +133,15 @@ The current ownership split is:
 
 - **Sigil Design** owns shared graph, review, chat, text-editor,
   SpotlightScrim, and FloatingDock surfaces.
-- **Gonk Core** owns context, skills, retrieval, auth, and MCP contracts.
-- **Sigil Agent** owns neutral agent contracts plus Eve, React Query, Gonk,
-  and registry adapters/components.
+- **Gonk Core** owns context, skills, retrieval, auth, registry, and host contracts.
+- **Sigil Agent** owns neutral agent contracts plus Eve and React Query adapters.
 - **Sigil Chat** (this repo) is the real product composition and retains app
   policy, domain reconciliation, attention projection, sessions, and
   persistence wiring.
 
-Add application tools in `apps/gonk/src/registry.ts`. Eve discovers that
-registry through `apps/agent/agent/connections/gonk.ts` — do not hand-copy
-tool definitions into Eve.
+Add application tools in `packages/agent-tools/src`. Eve hosts that registry
+through `apps/agent/agent/tools/gonk.ts` — do not hand-copy definitions into
+Eve or add another transport adapter.
 
 ## Dev workflow
 
@@ -155,65 +149,58 @@ Requires Node 24. All dependencies — including the `@gonk/*` and
 `@zigil/agent-*` packages — resolve from the public npm registry.
 
 ```bash
-pnpm install
-pnpm auth:migrate   # first run (and after any auth schema change)
 pnpm dev
 ```
 
-`pnpm dev` runs `turbo dev`, which starts three Portless services in
-parallel:
+`pnpm dev` prepares the current worktree and then runs the two Portless
+services through Turbo. It synchronizes the frozen install, generates
+worktree-local credentials, applies idempotent auth migrations, seeds the
+development owner, proves the authenticated web → Eve → native-tools path, and opens a
+private single-use URL that creates a normal owner session on `/chat`.
 
-| Service                | Portless name      | URL                                         |
-| ---------------------- | ------------------ | ------------------------------------------- |
-| Chat (`apps/web`)      | `sigil-chat`       | `http://sigil-chat.localhost:1355`          |
-| Eve (`apps/agent`)     | `sigil-chat-agent` | `http://sigil-chat-agent.localhost:1355`    |
-| Gonk MCP (`apps/gonk`) | `sigil-chat-gonk`  | `http://sigil-chat-gonk.localhost:1355/mcp` |
+`pnpm dev:reset` resets only the current worktree's documented disposable app
+state (`.data` at the root and under each app, plus `apps/agent/.eve`). It first
+moves that state into a recoverable backup under the Git common directory and
+leaves the worktree empty. The next `pnpm dev` runs the real first-start path.
+Reset prints the exact `pnpm dev:restore <backup>` command that restores the
+quarantined instance without overwriting current state.
+It never touches `.env`, the external roadmap repository, root
+`.agents`/`traces` tooling state, or another worktree. Stop `pnpm dev` before
+resetting.
+
+| Service            | Portless name      | URL                                      |
+| ------------------ | ------------------ | ---------------------------------------- |
+| Chat (`apps/web`)  | `sigil-chat`       | `http://sigil-chat.localhost:1355`       |
+| Eve (`apps/agent`) | `sigil-chat-agent` | `http://sigil-chat-agent.localhost:1355` |
 
 These are the primary-checkout names. The dev scripts use `portless run`, so a
-linked worktree receives one shared branch-derived prefix across all three
+linked worktree receives one shared branch-derived prefix across both
 services (for example `feature-auth.sigil-chat.localhost`). Runtime topology,
 the browser title, and the generated favicon follow that prefix automatically;
-explicit `EVE_ORIGIN`, `GONK_MCP_URL`, and branding variables still win.
+explicit `EVE_ORIGIN` still wins. Product behavior and
+branding live in `fixtures/application/sigil-chat.yaml` as a typed Mirk fixture.
 
 Prerequisites and required env:
 
 - [Portless](https://www.npmjs.com/package/portless) (`npm i -g portless`) —
-  provides the shared daemon behind the `.localhost` URLs above. `PORTLESS=0`
-  bypasses it and runs the three services on plain, unproxied ports.
-- `pnpm auth:migrate` — **required before first `pnpm dev`.** Better Auth
-  stores accounts/sessions in a local libsql DB (`apps/web/.data/sigil-chat.db`,
-  gitignored); the tables must be created first. Skipping it makes every route
-  (including `/login`) return a 500 that the dev server surfaces as a cryptic
-  `socket hang up` — the real error (`run pnpm auth:migrate`) is masked at the
-  server-fn RPC layer. Re-run after any change under `apps/web/src/lib/auth`
-  that adds a migration.
+  provides the shared daemon behind the `.localhost` URLs above.
 - Run `codex login` before starting the app — Eve's `experimental_chatgpt()`
   model reads that local login and calls the Codex backend directly.
-- `CODEX_MODEL` — optional, overrides Eve's default subscription-backed model
-  with a bare OpenAI model slug.
-- `GONK_MCP_KEY` — **required**. `apps/gonk/src/server.ts` calls
-  `process.exit(1)` at startup if it is unset (Portless exposes the endpoint
-  machine-wide; loopback binding alone is not isolation). Set the _same_
-  bearer token on both the Eve (`apps/agent`) and Gonk (`apps/gonk`)
-  processes — Eve's `connections/gonk.ts` reads it too. This has already
-  tripped people up: a missing/mismatched key means Eve can't reach the
-  Gonk tool registry, not a silent unauthenticated fallback.
-
-  **Where it lives:** a gitignored **root `.env`** is the single source of
-  truth. All three dev processes read that one file: `apps/agent/.env` is a
-  symlink to it (`eve dev` loads it natively); `apps/gonk/src/server.ts` and
-  `apps/web/vite.config.ts` each load it via `process.loadEnvFile` before
-  reading their environment (the web app needs it because the attachment-upload
-  server function proxies to Gonk's authenticated `/upload` route). Because
-  every process reads one file, the "same token on all three" invariant holds
-  by construction and survives a restart without exporting anything in your
-  shell. An explicit `export GONK_MCP_KEY=…`
-  still wins (parent-process env takes precedence over the file), matching
-  Eve's dev env-file behavior. Copy `.env.example` to `.env` and set the key on
-  a fresh checkout.
-
-- `GONK_MCP_URL` — optional, overrides the MCP endpoint Eve connects to
-  (defaults to the Portless Gonk URL above).
+- `agent.model` in `fixtures/application/sigil-chat.yaml` selects Eve's
+  subscription-backed model with a bare OpenAI model slug.
+- `SIGIL_PUBLIC_URL` — the one production origin for the web app, Better Auth,
+  Eve's JWT issuer, and public metadata. Local development derives it from
+  Portless. `SIGIL_EVE_AUTH_JWKS_URL` optionally routes Eve's key retrieval over
+  an internal service address without changing token identity.
+- `SIGIL_DATA_DIR` — optional root for ordinary application stores. `pnpm dev`
+  sets it to the worktree's `.data`; deployments can retain per-store overrides
+  where separate volume boundaries are intentional. Managed Gonk skills live
+  under its `skills/` subtree so web and Eve share one registry.
+- `SIGIL_AGENT_BINDING_SECRET` — authenticates the private web-to-Eve binding
+  route used to attach a verified web principal to an Eve session. `pnpm dev`
+  generates a worktree-local value under `.data/dev`; deployments mount the
+  same secret into web and Eve. It authenticates that internal handoff, not an
+  end user or an application-tool invocation.
 - `SIGIL_ROADMAP_DIR` — optional, configures the external Markdown roadmap
   store shared across worktrees, branches, and agents. Defaults to a
   `sigil-roadmap/` dir **co-located beside the sigil repos** (resolved portably
@@ -245,19 +232,18 @@ Verified against the actual code, not inherited by assumption:
 - **Route header comments are mandatory** — see "Routes" above.
 - **`routeTree.gen.ts` is never edited or committed** — gitignored under
   every app.
-- **Formatting**: `apps/web` and `apps/gonk` source is semicolon-free.
-  `apps/agent` is mixed (compare `agent/agent.ts`, no semicolons, against
-  `agent/connections/gonk.ts`, which has them) — match the file you're
-  editing rather than assuming a blanket rule for that app.
+- **Formatting**: `apps/web` source is semicolon-free. `apps/agent` is mixed;
+  match the file you're editing rather than assuming a blanket rule for that
+  app.
 
 ## Trust model
 
 See `README.md` "Trust model" — the tool-approval header is a client
-preference, not a security control; `GONK_MCP_KEY` authenticates the MCP
-transport but does not authorize Sigil Chat routes, Eve inspection, thread
-records, or continuation tokens; thread/session state is currently
-deployment-global with no per-user ownership. Do not weaken or restate this
-section elsewhere without updating the source of truth in `README.md`.
+preference, not a security control; Eve reconstructs the verified principal
+and rechecks Gonk scope/role/caller policy at discovery and invocation time;
+thread/session state is currently deployment-global with no per-user
+ownership. Do not weaken or restate this section elsewhere without updating
+the source of truth in `README.md`.
 
 ## Docs and specs
 

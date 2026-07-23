@@ -8,6 +8,25 @@ description: End-to-end "how to build a feature here" for Sigil Chat — the lay
 This is the map. Read it before starting a feature, then jump to the deeper
 skill for whichever layer you're actually touching.
 
+## Start the real development instance
+
+From any fresh checkout or linked worktree, run:
+
+```bash
+pnpm dev
+```
+
+Do not pre-run `pnpm install`, copy or symlink `.env`, migrate auth, seed an
+owner, generate service keys, or start Web and Eve separately. The launcher
+owns that preparation, proves the authenticated Web → Eve → native-tools path,
+and prints the correct branch-namespaced URLs plus a private single-use owner
+sign-in URL.
+
+Each worktree owns its `.data`, Eve state, credentials, and Portless prefix.
+For a clean first-start proof, stop the launcher and use `pnpm dev:reset`; use
+the printed `pnpm dev:restore` command to recover the previous instance. The
+complete edit and verification loop is in `docs/guides/development.md`.
+
 ## The layer stack
 
 The ecosystem layers, from lowest to highest, are:
@@ -41,11 +60,12 @@ not a lineage note. The loop has two mandatory checkpoints, and a story that
 skips either is not done:
 
 **Before authoring any component or hook (step 0 of every feature):**
+
 1. Grep this repo's `packages/ui` — does it already exist here?
 2. Check sigil-design's `/showcase` catalog and the registry
    (`pnpm dlx shadcn@latest add @sigil/<name>`) — if it exists there,
    **install it as owned source; do not re-author it.**
-3. Only if it exists nowhere: classify it *at creation time* —
+3. Only if it exists nowhere: classify it _at creation time_ —
    **generalizable** (any app could want this shape) → author it in
    sigil-design first (+ showcase example), then carry it here; or
    **app-domain** (encodes sigil-chat-specific meaning) → author it here and
@@ -55,6 +75,7 @@ skips either is not done:
 Every story whose diff touches components, hooks, or presentation records one
 of four verdicts on the story (frontmatter `extraction:` once S1.5 lands; in
 the story body until then):
+
 - `consumed` — reused existing registry/ui components; nothing new to extract.
 - `extracted` — the new primitive landed in sigil-design (+ showcase) and this
   repo consumes it.
@@ -81,12 +102,12 @@ the worked examples below rather than trusting a description alone.
    precedent, not the pattern**; they migrate to Mirk under consumer pull.
    If Mirk's contract can't express what you need, file a Mirk feature
    request — a gap in Mirk is never a justification for a bespoke store.
-   What remains app-owned: the domain *types* and a repository interface
+   What remains app-owned: the domain _types_ and a repository interface
    (explicit subpath exports, no barrel `export *`).
-2. **Gonk tool.** `apps/gonk/src/registry.ts` composes per-domain
-   registration functions from `apps/gonk/src/registry/*.ts` (e.g.
-   `registerReviewTools`, `registerStoryTools`, `registerSkillTools`) into
-   one `ToolRegistry`. A tool's handler returns `{ data }`, and if it needs
+2. **Application tool.** `packages/agent-tools/src/registry.ts` composes
+   per-domain registration functions into one Gonk `ToolRegistry`, hosted
+   natively by Eve through `apps/agent/agent/tools/gonk.ts`. A tool's handler
+   returns `{ data }`, and if it needs
    to update client UI it ALSO returns a `clientCommand` inside `data`. Full
    rules (tiering, visibility, approval, verification) live in the
    `adding-gonk-tools` skill — don't duplicate them here, just know this is
@@ -116,14 +137,15 @@ the worked examples below rather than trusting a description alone.
    concurrently with another agent.
 
 **Worked examples to read start-to-end, not just cite:**
-- Review/annotation: `packages/review-store` → `apps/gonk/src/registry/review.ts`
+
+- Review/annotation: `packages/review-store` → `packages/agent-tools/src/review.ts`
   → `apps/web/src/lib/review-document.ts` → `apps/web/src/routes/_app/review.tsx`
   → the `review.document.changed` handler in `agent-domain-outcomes.tsx`.
 - Work items: `packages/work-items-store` → `registerStoryTools` in
-  `apps/gonk/src/registry.ts` → `apps/web/src/lib/work-items.ts` → the
+  `packages/agent-tools/src/registry.ts` → `apps/web/src/lib/work-items.ts` → the
   in-app board.
 - Skills catalog: `@gonk/skills` (`FilesystemManagedSkillRegistry`) →
-  `registerSkillTools` in `apps/gonk/src/registry/skills.ts` →
+  `registerSkillTools` in `packages/agent-tools/src/skills.ts` →
   `apps/web/src/lib/skills.ts` → `apps/web/src/routes/_app/skills.tsx` →
   `"skills.changed"` handler.
 
@@ -148,27 +170,23 @@ the worked examples below rather than trusting a description alone.
   `package.json`. Consumers import the specific subpath
   (`@workspace/chat/components/chat-message`, not `@workspace/chat`).
 - **Single browser-facing origin — no direct browser→backend calls.** The
-  browser only ever talks to the web app's own origin. Eve and Gonk are
-  internal services, reached **server-side** — a Nitro `routeRules` proxy
-  (`/eve/**`, gonk's `/img/**` in `vite.config.ts`) or a `createServerFn`
-  (the authenticated `/upload` proxy) — never fetched directly from the
-  browser. **If you reach for a CORS header on gonk or eve, stop:** that's the
+  browser only ever talks to the web app's own origin. Eve is an internal
+  service, reached **server-side** through the existing same-origin proxy or
+  server functions — never fetched directly from the browser. **If you reach
+  for a CORS header on Eve, stop:** that's the
   smell of a browser crossing an origin. Proxy it same-origin instead. This is
   also the deployability posture — only the web app is browser-facing (one
-  exposed origin), and principal/authz propagate server-side. Cross-service
-  URLs the browser will load must be **same-origin relative paths** (e.g.
-  `imagePublicUrl` returns `/img/<key>`, not an absolute gonk URL).
+  exposed origin), and principal/authz propagate server-side.
 - **The registry loop.** Step 0 (consume-first check) before authoring any
   component/hook; an extraction verdict before the story closes. See "The
   registry loop" above — it is a gate, not a suggestion.
 - **Formatting matches the file you're editing**, not a blanket rule:
-  `apps/web`/`apps/gonk` are semicolon-free; `apps/agent` is mixed.
+  `apps/web` is semicolon-free; `apps/agent` is mixed.
 
 ## Where to go deeper
 
-- **Adding or changing a Gonk tool** → `adding-gonk-tools` skill (tier/
-  visibility/approval semantics, the Eve discovery path, `GONK_MCP_KEY`,
-  ask-mode consent vs. the `ApprovalProvider` boundary, verification steps).
+- **Adding or changing an application tool** → `adding-gonk-tools` skill
+  (native Eve hosting, Gonk policy, approval, and verification).
 - **Writing or extracting a component** → `component-development` skill
   (Root/Parts standard, CVA, decoupling from source-project domain types).
 - **Adding a route, layout, or top-level section** → `extending-this-template`

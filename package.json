@@ -8,11 +8,15 @@
     "auth:migrate": "pnpm --filter web auth:migrate",
     "seed:scope-composition": "pnpm --filter web seed:scope-composition",
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:reset": "node scripts/dev-reset.mjs",
+    "dev:restore": "node scripts/dev-restore.mjs",
     "lint": "turbo lint",
     "lint:design": "pnpm --filter @workspace/ui lint:design",
     "format": "turbo format",
+    "test": "node --test scripts/dev-*.test.mjs && pnpm -r --if-present test",
     "typecheck": "turbo typecheck",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
     "overlay:stage": "pnpm --filter @sigil-design/chat-overlay stage"
   },
   "devDependencies": {
@@ -35,9 +39,6 @@
       "esbuild",
       "eve",
       "unrs-resolver"
-    ],
-    "patchedDependencies": {
-      "eve@0.25.2": "patches/eve@0.25.2.patch"
-    }
+    ]
   }
 }

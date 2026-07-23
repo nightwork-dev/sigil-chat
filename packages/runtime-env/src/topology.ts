@@ -1,12 +1,10 @@
 export const DEFAULT_EVE_ORIGIN = "http://sigil-chat-agent.localhost:1355";
-export const DEFAULT_GONK_MCP_URL = "http://sigil-chat-gonk.localhost:1355/mcp";
 
 export type RuntimeEnvironment = Readonly<Record<string, string | undefined>>;
 
 export type RuntimeEnvironmentErrorCode =
   | "INVALID_HTTP_URL"
   | "INVALID_EMBEDDING_DIM"
-  | "INVALID_MODEL"
   | "INVALID_PATH_BASE"
   | "INVALID_PORT"
   | "INVALID_SECRET"
@@ -32,7 +30,6 @@ export class RuntimeEnvironmentError extends Error {
 
 export interface SigilRuntimeTopology {
   eveOrigin: string;
-  gonkMcpUrl: string;
 }
 
 export interface PublicWebEnvironment {
@@ -50,17 +47,11 @@ export function readRuntimeTopology(
         DEFAULT_EVE_ORIGIN,
       "EVE_ORIGIN",
     ),
-    gonkMcpUrl: parseHttpUrl(
-      env.GONK_MCP_URL,
-      portlessSiblingUrl(env.PORTLESS_URL, "sigil-chat-gonk", "/mcp") ??
-        DEFAULT_GONK_MCP_URL,
-      "GONK_MCP_URL",
-    ),
   };
 }
 
 /** Resolve another Sigil service inside the same Portless worktree namespace.
- * Explicit EVE_ORIGIN/GONK_MCP_URL values still win in readRuntimeTopology. */
+ * Explicit EVE_ORIGIN values still win in readRuntimeTopology. */
 export function portlessSiblingUrl(
   currentUrl: string | undefined,
   targetService: string,
@@ -78,7 +69,7 @@ export function portlessSiblingUrl(
   }
   const labels = parsed.hostname.split(".");
   const serviceIndex = labels.findIndex((label) =>
-    ["sigil-chat", "sigil-chat-agent", "sigil-chat-gonk"].includes(label),
+    ["sigil-chat", "sigil-chat-agent"].includes(label),
   );
   if (serviceIndex < 0) return undefined;
   labels[serviceIndex] = targetService;

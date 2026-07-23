@@ -24,7 +24,7 @@ import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 import { DistilledCard } from "@/components/agent/distilled-artifact-card"
 import {
-  EVIDENCE_ROOM_SCOPE,
+  useEvidenceRoomScope,
   useDeleteEvidenceDocument,
   useEvidenceDistills,
   useEvidenceDocuments,
@@ -53,10 +53,11 @@ const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
 export function EvidenceRoom() {
   const isMobile = useIsMobile()
   const telemetry = useAttentionTelemetry()
-  const documentsQuery = useEvidenceDocuments()
-  const uploadDocument = useUploadEvidenceDocument()
-  const deleteDocument = useDeleteEvidenceDocument()
-  const distillsQuery = useEvidenceDistills()
+  const evidenceScope = useEvidenceRoomScope()
+  const documentsQuery = useEvidenceDocuments(evidenceScope)
+  const uploadDocument = useUploadEvidenceDocument(evidenceScope)
+  const deleteDocument = useDeleteEvidenceDocument(evidenceScope)
+  const distillsQuery = useEvidenceDistills(evidenceScope)
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const [tab, setTab] = useState<MobileTab>("library")
 
@@ -92,8 +93,9 @@ export function EvidenceRoom() {
   // AttentionProvider; the persistent HUD in _app reads this.
   usePublishWorkspaceAttention(attention)
   // Pin the agent's tools to this room's durable corpus:
-  // "distill this" / "ask" operate on project:evidence-room, not the session scope.
-  usePublishWorkspaceResourceScope(EVIDENCE_ROOM_SCOPE)
+  // "distill this" / "ask" operate on the authenticated principal's registered
+  // personal project, never a deployment-global demo scope.
+  usePublishWorkspaceResourceScope(evidenceScope)
 
   const library = (
     <LibraryRegion

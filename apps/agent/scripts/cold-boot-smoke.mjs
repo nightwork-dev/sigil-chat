@@ -8,6 +8,7 @@ import { spawn } from "node:child_process"
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const appDirectory = resolve(scriptDirectory, "..")
+const projectDirectory = resolve(appDirectory, "../..")
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "sigil-eve-cold-boot-"))
 const output = []
 let child
@@ -28,6 +29,11 @@ try {
   cpSync(join(appDirectory, "scripts"), join(fixtureDirectory, "scripts"), {
     recursive: true,
   })
+  cpSync(
+    join(projectDirectory, "fixtures"),
+    join(fixtureDirectory, "fixtures"),
+    { recursive: true },
+  )
   symlinkSync(join(appDirectory, "node_modules"), join(fixtureDirectory, "node_modules"))
 
   const port = await reservePort()
@@ -54,7 +60,25 @@ try {
     )
   }
 
-  console.log("Eve cold-boot smoke passed: fresh snapshot served /eve/v1/info 200")
+  const frameworkTodo = body.tools?.framework?.find(
+    (tool) => tool.name === "todo",
+  )
+  const authoredTodo = body.tools?.authored?.find(
+    (tool) => tool.name === "todo",
+  )
+  if (
+    frameworkTodo?.status !== "active" ||
+    frameworkTodo.origin !== "framework" ||
+    authoredTodo !== undefined
+  ) {
+    throw new Error(
+      `Cold-boot agent did not expose Eve's native todo tool: ${JSON.stringify(body.tools)}`,
+    )
+  }
+
+  console.log(
+    "Eve cold-boot smoke passed: fresh snapshot served /eve/v1/info 200 with the native todo tool",
+  )
 } catch (error) {
   if (output.length > 0) {
     console.error(output.join("").slice(-20_000))
@@ -93,6 +117,7 @@ async function reservePort() {
 async function waitForInfoRoute(processHandle, port) {
   const deadline = Date.now() + Number(process.env.COLD_BOOT_TIMEOUT_MS ?? 60_000)
   const url = `http://127.0.0.1:${port}/eve/v1/info`
+  let lastProbeFailure = "no response received"
 
   while (Date.now() < deadline) {
     if (processHandle.exitCode !== null) {
@@ -103,19 +128,18 @@ async function waitForInfoRoute(processHandle, port) {
     try {
       const response = await fetch(url)
       if (response.status === 200) return response
-      if (response.status !== 503) {
-        throw new Error(`Cold-boot info route returned HTTP ${response.status}`)
-      }
+      lastProbeFailure = `HTTP ${response.status}`
+      // Eve 0.27 starts Nitro before its first compiler publication. During
+      // that narrow window /eve/v1/info can return 500 (missing manifest)
+      // rather than 503; cold boot is healthy if the compiler publishes and
+      // the same route becomes ready before the deadline.
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.startsWith("Cold-boot info route returned")
-      ) {
-        throw error
-      }
+      lastProbeFailure = error instanceof Error ? error.message : String(error)
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 250))
   }
 
-  throw new Error("Timed out waiting for Eve's cold-boot info route")
+  throw new Error(
+    `Timed out waiting for Eve's cold-boot info route (${lastProbeFailure})`,
+  )
 }

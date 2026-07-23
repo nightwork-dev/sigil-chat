@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import type { SkillScope } from "@gonk/skills";
+import type { SkillScope } from "@workspace/agent-tools/skills";
 import { useUpsertSkill } from "@/lib/skills";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -21,14 +21,11 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import { DetailPanel } from "@workspace/data/components/detail-panel";
 
-// "session" is deliberately excluded: it resolves against an active agent
-// session's runtime home, which this stateless admin UI's Gonk MCP calls
-// don't carry — creating with it fails server-side with "Cannot resolve
-// skill scope home: session" (verified against the running registry).
+// Persona and session scopes require trusted Eve request context. This
+// stateless owner workspace only exposes the application scopes it can bind.
 const SKILL_SCOPES: readonly SkillScope[] = [
   "project",
   "directory",
-  "persona",
   "global",
 ];
 
@@ -76,7 +73,7 @@ export function SkillCreateForm({
       <DetailPanel.Header>
         <h2 className="text-sm font-medium">New skill</h2>
         <p className="text-xs text-muted-foreground">
-          Authors a managed skill through Gonk's skill registry.
+          Authors a managed skill for the application agent.
         </p>
       </DetailPanel.Header>
 

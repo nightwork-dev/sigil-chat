@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from "vitest"
+import { mkdtemp } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 
+import { describe, expect, it } from "vitest"
+
+import { createFileSessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { SigilAuthSession } from "./auth/server"
 import {
   readArtifactImage,
@@ -10,52 +15,51 @@ const session = {
   user: { id: "user-1", role: "member" },
 } as SigilAuthSession
 
+async function imageStore() {
+  const store = createFileSessionArtifactStore({
+    root: await mkdtemp(join(tmpdir(), "sigil-web-artifacts-")),
+  })
+  const artifact = await store.putFile({
+    bytes: new TextEncoder().encode("image"),
+    filename: "image.png",
+    mediaType: "image/png",
+    scope: "session:thread-1",
+  })
+  return { store, artifact }
+}
+
 function dependencies(
   overrides: Partial<ArtifactImageDependencies> = {},
 ): ArtifactImageDependencies {
   return {
-    fetcher: () =>
-      Promise.resolve(
-        new Response("image", {
-          headers: { "content-type": "image/png" },
-        }),
-      ),
     getSession: () => Promise.resolve(session),
     ownedThreadHomeScope: (userId, threadId) =>
       userId === "user-1" && threadId === "thread-1"
         ? "personal-scope:user-1"
         : undefined,
-    readEnvironment: () => ({
-      apiKey: "service-key",
-      gonkMcpUrl: "https://tools.example.test/mcp",
-    }),
     ...overrides,
   }
 }
 
 describe("artifact image authorization", () => {
-  it("denies anonymous reads before contacting Gonk", async () => {
-    const fetcher = vi.fn<typeof fetch>()
+  it("denies anonymous reads before reading artifacts", async () => {
     const response = await readArtifactImage(
       new Request(
         "https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=session:thread-1",
       ),
-      dependencies({ fetcher, getSession: () => Promise.resolve(null) }),
+      dependencies({ getSession: () => Promise.resolve(null) }),
     )
     expect(response.status).toBe(401)
-    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it("hides artifacts from a session the user does not own", async () => {
-    const fetcher = vi.fn<typeof fetch>()
     const response = await readArtifactImage(
       new Request(
         "https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=session:thread-2",
       ),
-      dependencies({ fetcher }),
+      dependencies(),
     )
     expect(response.status).toBe(404)
-    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it("rejects unavailable project and persona scopes", async () => {
@@ -70,31 +74,42 @@ describe("artifact image authorization", () => {
     }
   })
 
-  it("proxies an authorized artifact with the service credential", async () => {
-    const fetcher = vi.fn<typeof fetch>(() =>
-      Promise.resolve(
-        new Response("image", {
-          headers: { "content-type": "image/png" },
-        }),
-      ),
-    )
+  it("serves an authorized artifact from the shared repository", async () => {
+    const { store, artifact } = await imageStore()
     const response = await readArtifactImage(
       new Request(
-        "https://chat.example.test/api/media/artifact?key=uploads%2Fimage.png&scope=session:thread-1",
+        `https://chat.example.test/api/media/artifact?key=${encodeURIComponent(artifact.id)}&scope=session:thread-1`,
       ),
-      dependencies({ fetcher }),
+      dependencies({ store }),
     )
     expect(response.status).toBe(200)
     expect(response.headers.get("cache-control")).toContain("private")
-    const [, init] = fetcher.mock.calls[0]!
-    expect(new Headers(init?.headers).get("authorization")).toBe(
-      "Bearer service-key",
+    expect(response.headers.get("content-disposition")).toBe("inline")
+    expect(response.headers.get("content-type")).toBe("image/png")
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff")
+    expect(await response.text()).toBe("image")
+  })
+
+  it("forces executable media to download without MIME sniffing", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-web-artifacts-"))
+    const store = createFileSessionArtifactStore({ root })
+    const artifact = await store.putFile({
+      bytes: new TextEncoder().encode("<script>alert(1)</script>"),
+      filename: "unsafe.html",
+      mediaType: "text/html",
+      scope: "session:thread-1",
+    })
+
+    const response = await readArtifactImage(
+      new Request(
+        `https://chat.example.test/api/media/artifact?key=${encodeURIComponent(artifact.id)}&scope=session:thread-1`,
+      ),
+      dependencies({ store }),
     )
-    expect(new Headers(init?.headers).get("x-sigil-scope")).toBe(
-      "session:thread-1",
-    )
-    expect(fetcher.mock.calls[0]?.[0]).toBe(
-      "https://tools.example.test/img/uploads/image.png",
-    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-disposition")).toBe("attachment")
+    expect(response.headers.get("content-type")).toBe("text/html")
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff")
   })
 })

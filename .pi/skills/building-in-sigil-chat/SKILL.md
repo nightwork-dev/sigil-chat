@@ -5,6 +5,21 @@ description: End-to-end "how to build a feature here" for Sigil Chat — the lay
 
 # Building in Sigil Chat — hard rules
 
+## RULE -1: One command owns development setup
+
+- [ ] From every fresh checkout or linked worktree, run `pnpm dev`.
+- [ ] Do NOT pre-run `pnpm install`, copy/symlink `.env`, migrate auth, seed an
+      owner, generate service keys, or start Web and Eve separately. The
+      launcher owns all of it and proves Web → Eve → native-tools readiness.
+- [ ] Use the branch-namespaced app URL and private single-use sign-in URL
+      printed after authenticated readiness. Do NOT assume the primary
+      `sigil-chat.localhost` URL and do NOT reset the owner password.
+- [ ] Each worktree owns `.data`, Eve state, credentials, and its Portless
+      prefix. For a clean instance, stop the launcher and run
+      `pnpm dev:reset`; recover only with the printed `pnpm dev:restore`
+      command. Never borrow or manually delete another worktree's state.
+- [ ] Follow `docs/guides/development.md` for the edit/verify loop.
+
 ## RULE 0: Know the layer stack before touching anything
 
 The ecosystem layers, from lowest to highest, are:
@@ -43,8 +58,9 @@ apps         products composing the layers above
       do NOT copy them. Mirk contract gap → file a Mirk feature request;
       never hand-roll. App owns only domain types + the repository
       interface (explicit subpath `exports`, NO barrel `export *`).
-- [ ] **Step 2 — Gonk tool.** `apps/gonk/src/registry.ts` composes
-      per-domain `register*Tools` functions from `apps/gonk/src/registry/*.ts`.
+- [ ] **Step 2 — application tool.** `packages/agent-tools/src/registry.ts`
+      composes per-domain `register*Tools` functions into the Gonk registry,
+      hosted natively by `apps/agent/agent/tools/gonk.ts`.
       Handler returns `{ data }`; if it mutates client-visible state, `data`
       ALSO carries a `clientCommand`. Full rules live in the
       `adding-gonk-tools` skill — go there for tier/visibility/approval,
@@ -70,13 +86,13 @@ apps         products composing the layers above
 
 ## RULE 2: Read a worked example start-to-end before building a new one
 
-- [ ] Review/annotation: `packages/review-store` → `apps/gonk/src/registry/review.ts`
+- [ ] Review/annotation: `packages/review-store` → `packages/agent-tools/src/review.ts`
       → `apps/web/src/lib/review-document.ts` → `apps/web/src/routes/_app/review.tsx`
       → `"review.document.changed"` in `agent-domain-outcomes.tsx`.
 - [ ] Work items: `packages/work-items-store` → `registerStoryTools` →
       `apps/web/src/lib/work-items.ts` → the in-app board.
 - [ ] Skills catalog: `@gonk/skills` → `registerSkillTools` in
-      `apps/gonk/src/registry/skills.ts` → `apps/web/src/lib/skills.ts` →
+      `packages/agent-tools/src/skills.ts` → `apps/web/src/lib/skills.ts` →
       `apps/web/src/routes/_app/skills.tsx` → `"skills.changed"` handler.
 
 ## RULE 3: Non-negotiable conventions — check every diff against these
@@ -94,14 +110,11 @@ apps         products composing the layers above
 - [ ] NO barrel files. Explicit subpath `exports` per package. Import the
       specific subpath, never the bare package name for internal modules.
 - [ ] SINGLE browser-facing origin. The browser talks ONLY to the web app's
-      origin. Eve + Gonk are internal — reached server-side via a Nitro
-      `routeRules` proxy (`/eve/**`, `/img/**` in `vite.config.ts`) or a
-      `createServerFn` (`/upload`), NEVER fetched directly from the browser.
-      If you add a CORS header to gonk/eve, STOP — proxy it same-origin
-      instead. Browser-loaded cross-service URLs are same-origin relative
-      paths (`imagePublicUrl` → `/img/<key>`, not an absolute gonk URL).
+      origin. Eve is internal and reached through the existing same-origin
+      server proxy or server functions, NEVER fetched directly from the
+      browser. If you add a CORS header to Eve, STOP — proxy it same-origin.
 - [ ] Formatting matches the FILE you're editing, not a blanket rule:
-      `apps/web`/`apps/gonk` are semicolon-free; `apps/agent` is mixed.
+      `apps/web` is semicolon-free; `apps/agent` is mixed.
 
 ## RULE 4: Where to go for depth — do not duplicate these here
 

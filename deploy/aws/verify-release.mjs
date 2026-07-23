@@ -2,13 +2,12 @@ import { readFileSync } from "node:fs";
 
 export const imageKeys = [
   "SIGIL_EVE_IMAGE",
-  "SIGIL_GONK_IMAGE",
   "SIGIL_MIGRATE_IMAGE",
   "SIGIL_WEB_IMAGE",
 ];
 
 const digestPattern =
-  /^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/sigil-chat-(eve|gonk|migrate|web)@sha256:[a-f0-9]{64}$/;
+  /^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/sigil-chat-(eve|migrate|web)@sha256:[a-f0-9]{64}$/;
 
 export function parseImageManifest(source) {
   const values = new Map();

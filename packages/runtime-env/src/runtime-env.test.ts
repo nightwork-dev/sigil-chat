@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_EVE_ORIGIN,
-  DEFAULT_GONK_MCP_URL,
   joinRuntimeUrl,
   portlessSiblingUrl,
   readPublicWebEnvironment,
@@ -12,20 +11,17 @@ import {
   RuntimeEnvironmentError,
 } from "./topology.js";
 import {
-  DEFAULT_CODEX_MODEL,
   parsePort,
-  readAgentEnvironment,
   readEmbeddingEnvironment,
-  readGonkClientEnvironment,
+  readDataEnvironment,
   readIdentityEnvironment,
   readOptionalSecretFromFile,
-  readGonkServerEnvironment,
   readStorageEnvironment,
 } from "./server.js";
 
-describe("runtime topology", () => {
-  const temporaryDirectories: string[] = [];
+const temporaryDirectories: string[] = [];
 
+describe("runtime topology", () => {
   afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) {
       rmSync(directory, { recursive: true, force: true });
@@ -35,9 +31,7 @@ describe("runtime topology", () => {
   it("provides the Portless development defaults", () => {
     expect(readRuntimeTopology({})).toEqual({
       eveOrigin: DEFAULT_EVE_ORIGIN,
-      gonkMcpUrl: DEFAULT_GONK_MCP_URL,
     });
-    expect(readGonkServerEnvironment({})).toMatchObject({ port: 8808 });
   });
 
   it("keeps sibling services inside the current Portless worktree namespace", () => {
@@ -47,13 +41,12 @@ describe("runtime topology", () => {
       }),
     ).toEqual({
       eveOrigin: "http://feature-auth.sigil-chat-agent.localhost:1355",
-      gonkMcpUrl: "http://feature-auth.sigil-chat-gonk.localhost:1355/mcp",
     });
     expect(
       readRuntimeTopology({
         PORTLESS_URL: "http://feature-auth.sigil-chat-agent.localhost:1355",
-      }).gonkMcpUrl,
-    ).toBe("http://feature-auth.sigil-chat-gonk.localhost:1355/mcp");
+      }).eveOrigin,
+    ).toBe("http://feature-auth.sigil-chat-agent.localhost:1355");
     expect(portlessSiblingUrl("not a URL", "sigil-chat-agent")).toBeUndefined();
   });
 
@@ -62,26 +55,18 @@ describe("runtime topology", () => {
       readRuntimeTopology({
         PORTLESS_URL: "http://feature.sigil-chat.localhost:1355",
         EVE_ORIGIN: "https://eve.example.test",
-        GONK_MCP_URL: "https://gonk.example.test/mcp",
       }),
     ).toEqual({
       eveOrigin: "https://eve.example.test",
-      gonkMcpUrl: "https://gonk.example.test/mcp",
     });
-  });
-
-  it("supports a plain numeric server port override", () => {
-    expect(readGonkServerEnvironment({ PORT: "9900" }).port).toBe(9900);
   });
 
   it("normalizes URL trailing slashes and joins root-relative paths", () => {
     const topology = readRuntimeTopology({
       EVE_ORIGIN: " https://agent.example.test/// ",
-      GONK_MCP_URL: "https://gonk.example.test/mcp/",
     });
     expect(topology).toEqual({
       eveOrigin: "https://agent.example.test",
-      gonkMcpUrl: "https://gonk.example.test/mcp",
     });
     expect(joinRuntimeUrl(topology.eveOrigin, "/eve/v1/info")).toBe(
       "https://agent.example.test/eve/v1/info",
@@ -104,11 +89,6 @@ describe("runtime topology", () => {
       "INVALID_PATH_BASE",
       "PAGES_BASE",
     );
-    expectRuntimeError(
-      () => readAgentEnvironment({ CODEX_MODEL: "bad model" }),
-      "INVALID_MODEL",
-      "CODEX_MODEL",
-    );
   });
 
   it("normalizes static path bases and optional public API URLs", () => {
@@ -129,29 +109,24 @@ describe("runtime topology", () => {
 
   it("keeps secrets out of public topology projections", () => {
     const env = {
-      GONK_MCP_KEY: " token ",
+      SIGIL_AGENT_BINDING_SECRET: " token ",
       VITE_API_BASE_URL: "https://api.example.test",
     };
     expect(readRuntimeTopology(env)).not.toHaveProperty("apiKey");
     expect(readPublicWebEnvironment(env)).not.toHaveProperty("apiKey");
-    expect(readGonkClientEnvironment(env)).toMatchObject({ apiKey: "token" });
-  });
-
-  it("uses the established model default and accepts an override", () => {
-    expect(readAgentEnvironment({})).toEqual({ model: DEFAULT_CODEX_MODEL });
-    expect(readAgentEnvironment({ CODEX_MODEL: "gpt-5.5" })).toEqual({
-      model: "gpt-5.5",
-    });
+    expect(readOptionalSecretFromFile(env, "SIGIL_AGENT_BINDING_SECRET")).toBe(
+      "token",
+    );
   });
 
   it("prefers inline secret value over _FILE", () => {
     expect(
       readOptionalSecretFromFile(
         {
-          GONK_MCP_KEY: "  inlined  ",
-          GONK_MCP_KEY_FILE: "ignored",
+          SIGIL_AGENT_BINDING_SECRET: "  inlined  ",
+          SIGIL_AGENT_BINDING_SECRET_FILE: "ignored",
         },
-        "GONK_MCP_KEY",
+        "SIGIL_AGENT_BINDING_SECRET",
       ),
     ).toBe("inlined");
   });
@@ -165,37 +140,65 @@ describe("runtime topology", () => {
     expect(
       readOptionalSecretFromFile(
         {
-          GONK_MCP_KEY_FILE: secretFile,
+          SIGIL_AGENT_BINDING_SECRET_FILE: secretFile,
         },
-        "GONK_MCP_KEY",
+        "SIGIL_AGENT_BINDING_SECRET",
       ),
     ).toBe("file-backed-secret");
   });
 
-  it("projects optional storage paths without inventing defaults", () => {
-    expect(readStorageEnvironment({})).toEqual({
-      graphPath: undefined,
-      reviewPath: undefined,
-    });
+  it("derives disposable stores from one data root", () => {
     expect(
-      readStorageEnvironment({
-        SIGIL_CHAT_GRAPH_PATH: " ./data/graph.json ",
-        SIGIL_CHAT_REVIEW_PATH: " data/review.json ",
-      }),
+      readDataEnvironment(
+        { SIGIL_DATA_DIR: " /srv/sigil " },
+        "/workspace/apps/web",
+      ),
     ).toEqual({
-      graphPath: "./data/graph.json",
-      reviewPath: "data/review.json",
+      artifactDir: "/srv/sigil/artifacts",
+      blackboardDir: "/srv/sigil/blackboard",
+      containerRegistryRoot: "/srv/sigil/containers",
+      graphPath: "/srv/sigil/graph",
+      identityDir: "/srv/sigil/identity",
+      memoryDir: "/srv/sigil/identity/memory",
+      personaDir: "/srv/sigil/identity/persona",
+      reviewPath: "/srv/sigil/review",
+      rootDir: "/srv/sigil",
+      skillsDir: "/srv/sigil/skills",
+    });
+  });
+
+  it("keeps specialist storage overrides available for isolated deployments", () => {
+    expect(
+      readStorageEnvironment(
+        {
+          SIGIL_DATA_DIR: "/srv/sigil",
+          SIGIL_CHAT_GRAPH_PATH: " ./data/graph.json ",
+          SIGIL_CHAT_REVIEW_PATH: " data/review.json ",
+        },
+        "/workspace/apps/agent",
+      ),
+    ).toEqual({
+      graphPath: "/workspace/apps/agent/data/graph.json",
+      reviewPath: "/workspace/apps/agent/data/review.json",
     });
   });
 
   it("resolves one shared identity store for sibling app packages", () => {
-    expect(readIdentityEnvironment({}, "/workspace/apps/web")).toEqual({
-      personaDir: "/workspace/.data/persona",
-      memoryDir: "/workspace/.data/memory",
+    const project = temporaryDirectory();
+    writeFileSync(
+      join(project, "package.json"),
+      JSON.stringify({ name: "sigil-chat" }),
+    );
+    const web = join(project, "apps", "web");
+
+    expect(readIdentityEnvironment({}, web)).toEqual({
+      personaDir: join(project, ".data", "identity", "persona"),
+      memoryDir: join(project, ".data", "identity", "memory"),
     });
     expect(
       readIdentityEnvironment(
         {
+          SIGIL_DATA_DIR: "/srv/sigil",
           SIGIL_PERSONA_DIR: "/var/lib/example/personas",
           SIGIL_MEMORY_DIR: "./private-memory",
         },
@@ -205,6 +208,14 @@ describe("runtime topology", () => {
       personaDir: "/var/lib/example/personas",
       memoryDir: "/workspace/apps/agent/private-memory",
     });
+  });
+
+  it("refuses to guess a data root outside a Sigil Chat project", () => {
+    const directory = temporaryDirectory();
+
+    expect(() => readDataEnvironment({}, directory)).toThrow(
+      /Could not find the Sigil Chat project root/,
+    );
   });
 
   it("enables the embedding provider when its configuration is complete", () => {
@@ -270,4 +281,10 @@ function expectRuntimeError(
       detail: expect.any(String),
     });
   }
+}
+
+function temporaryDirectory(): string {
+  const directory = mkdtempSync(join(tmpdir(), "runtime-env-test-"));
+  temporaryDirectories.push(directory);
+  return directory;
 }

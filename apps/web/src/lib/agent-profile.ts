@@ -1,5 +1,5 @@
 // Client-safe: types, the server-fn wrapper, and React Query hooks. All
-// server-only construction (PersonaRegistry, EveMemoryHost, the memory
+// server-only construction (PersonaRegistry and the memory
 // store — real filesystem access via @gonk/scope) lives in
 // agent-profile.server.ts and is imported dynamically, inside the handler
 // only, so none of it reaches the client bundle. See agent-threads.ts for
@@ -14,18 +14,41 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import type { MemoryRecord } from "@gonk/memory"
-import type { ResolvedPersona } from "@gonk/persona"
 import type { SigilAuthSession } from "./auth/server"
 import { useAgentPrincipalId } from "./agent-principal"
 
 export interface AgentMemoryPane {
-  accepted: MemoryRecord[]
-  candidates: MemoryRecord[]
+  accepted: AgentMemoryRecord[]
+  candidates: AgentMemoryRecord[]
+}
+
+export interface AgentMemoryRecord {
+  id: string
+  kind:
+    | "fact"
+    | "preference"
+    | "instruction"
+    | "decision"
+    | "relationship"
+    | "summary"
+  subject: { kind: "persona" | "principal" | "relationship"; id: string }
+  content: string
+  lifecycle: {
+    status: "candidate" | "accepted" | "rejected" | "superseded" | "archived"
+  }
+  createdAt: number
+  updatedAt: number
+}
+
+export interface AgentPersona {
+  id: string
+  name?: string
+  description?: string
+  systemPrompt?: string
 }
 
 export interface AgentProfile {
-  persona: ResolvedPersona
+  persona: AgentPersona
   /** The authored base this persona's identity floor is pinned to, and the
    *  floor policy revision it woke on this read — the lineage chip's two
    *  load-bearing fields. Derived-from/detached fields don't exist on
@@ -37,7 +60,7 @@ export interface AgentProfile {
    *  initial-glyph. */
   hasPortrait: boolean
   /** Accepted self-claims the persona holds about itself (the self-model). */
-  selfClaims: MemoryRecord[]
+  selfClaims: AgentMemoryRecord[]
   memory: AgentMemoryPane
 }
 

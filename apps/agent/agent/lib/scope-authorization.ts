@@ -6,11 +6,7 @@ import {
   type ScopeAuthorizationRequest,
   type ScopeGrant,
 } from "@workspace/agent-contracts/scope-authorization"
-import {
-  issueScopeDelegation,
-  readScopeDelegation,
-  verifyScopeDelegation,
-} from "@workspace/agent-contracts/scope-delegation.server"
+import { verifyScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import type { ProjectRegistry } from "./project-registry"
@@ -140,51 +136,6 @@ export function requireAuthorizedResourceScope(input: {
     throw new Error("EVE_RESOURCE_SCOPE_NOT_AUTHORIZED")
   }
   return scope
-}
-
-/**
- * Narrow a verified browser proof to Eve's immutable continuation session.
- * The browser cannot author this value; callers must supply the session id
- * from Eve's authenticated request context.
- */
-export function bindScopeDelegationToActorSession(input: {
-  actorSessionId: string | undefined
-  principalId: string
-  proof: string | undefined
-  resourceScope: string | undefined
-  secret: string | undefined
-}): string | undefined {
-  const actorSessionId = input.actorSessionId?.trim()
-  const principalId = input.principalId.trim()
-  const proof = input.proof?.trim()
-  const resourceScope = input.resourceScope?.trim()
-  const secret = input.secret?.trim()
-  if (!actorSessionId || !principalId || !proof || !resourceScope || !secret) {
-    return undefined
-  }
-  const delegation = readScopeDelegation(
-    proof,
-    Math.floor(Date.now() / 1_000),
-    secret,
-  )
-  if (
-    !delegation ||
-    delegation.subject !== principalId ||
-    delegation.scope !== resourceScope ||
-    (delegation.actorSessionId !== undefined &&
-      delegation.actorSessionId !== actorSessionId)
-  ) {
-    return undefined
-  }
-  return issueScopeDelegation(
-    {
-      actorSessionId,
-      expiresAt: delegation.expiresAt,
-      scope: delegation.scope,
-      subject: delegation.subject,
-    },
-    secret,
-  )
 }
 
 /**

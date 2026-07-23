@@ -4,52 +4,54 @@ import {
   agentCatalogKeys,
   agentCatalogQueryOptions,
   agentRuntimeCatalogQueryOptions,
-  fetchAgentCatalogFromEve,
-  fetchGonkToolCatalog,
+  fetchAgentRuntimeCatalogFromHost,
+  fetchApplicationToolCatalog,
   projectAgentCatalog,
 } from "./agent-catalog";
 
 describe("agent catalog projection", () => {
-  it("keeps Eve inspection on an independent query from the Gonk tool catalog", () => {
+  it("keeps runtime inspection on an independent query from the full catalog", () => {
     expect(agentRuntimeCatalogQueryOptions().queryKey).toEqual(
       agentCatalogKeys.info(),
     );
-    expect(agentCatalogQueryOptions().queryKey).toEqual(agentCatalogKeys.full());
+    expect(agentCatalogQueryOptions().queryKey).toEqual(
+      agentCatalogKeys.full(),
+    );
     expect(agentRuntimeCatalogQueryOptions().queryKey).not.toEqual(
       agentCatalogQueryOptions().queryKey,
     );
   });
 
-  it("authenticates Eve inspection with the verified session token", async () => {
+  it("authenticates runtime inspection with the verified session token", async () => {
     const fetcher = (_url: string | URL | Request, init?: RequestInit) => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
-        "Bearer verified-eve-token",
+        "Bearer verified-agent-token",
       );
       return Promise.resolve(Response.json({ agent: { name: "Sigil Chat" } }));
     };
 
     await expect(
-      fetchAgentCatalogFromEve(
+      fetchAgentRuntimeCatalogFromHost(
         "http://sigil-chat-agent.localhost:1355/eve/v1/info",
-        "verified-eve-token",
+        "verified-agent-token",
         fetcher as typeof fetch,
       ),
     ).resolves.toMatchObject({ agent: { name: "Sigil Chat" } });
   });
 
-  it("fails closed when Eve rejects inspection credentials", async () => {
+  it("fails closed when the runtime rejects inspection credentials", async () => {
     const fetcher = () =>
       Promise.resolve(
         new Response(null, { status: 401, statusText: "Unauthorized" }),
       );
 
     await expect(
-      fetchAgentCatalogFromEve(
+      fetchAgentRuntimeCatalogFromHost(
         "http://sigil-chat-agent.localhost:1355/eve/v1/info",
         "rejected-token",
         fetcher as typeof fetch,
       ),
-    ).rejects.toThrow("Eve agent inspection failed (401 Unauthorized)");
+    ).rejects.toThrow("Agent runtime inspection failed (401 Unauthorized)");
   });
 
   it("distinguishes model-discoverable skills from delegatable subagents", () => {
@@ -148,7 +150,7 @@ describe("agent catalog projection", () => {
     expect(catalog.runtimeTools).toEqual([
       expect.objectContaining({
         name: "web_search",
-        origin: "eve-framework",
+        origin: "host-framework",
         runtimeStatus: "callable",
       }),
       expect.objectContaining({
@@ -206,50 +208,59 @@ describe("agent catalog projection", () => {
     expect(catalog.runtimeTools).toEqual([]);
   });
 
-  it("lists authenticated Gonk tools under Eve's qualified runtime names", async () => {
-    let call = 0;
+  it("lists authenticated application tools under their native names", async () => {
     const fetcher = (_url: string | URL | Request, init?: RequestInit) => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
-        "Bearer gonk-service-token",
+        "Bearer agent-token",
       );
-      call += 1;
-      if (call === 1) {
-        return Promise.resolve(
-          Response.json({}, { headers: { "mcp-session-id": "session-1" } }),
-        );
-      }
-      if (call === 2)
-        return Promise.resolve(new Response(null, { status: 202 }));
-      if (call === 3) {
-        return Promise.resolve(
-          Response.json({
-            result: {
-              tools: [
-                {
-                  name: "sigil-read-file",
-                  description: "Read a session file.",
-                },
-              ],
+      return Promise.resolve(
+        Response.json({
+          tools: [
+            {
+              name: "sigil-read-file",
+              description: "Read a session file.",
+              runtimeStatus: "discoverable",
             },
-          }),
-        );
-      }
-      return Promise.resolve(new Response(null, { status: 200 }));
+          ],
+        }),
+      );
     };
 
     await expect(
-      fetchGonkToolCatalog(
-        "http://sigil-chat-gonk.localhost:1355/mcp",
-        "gonk-service-token",
+      fetchApplicationToolCatalog(
+        "http://sigil-chat-agent.localhost:1355/sigil/v1/application-tools",
+        "agent-token",
         fetcher as typeof fetch,
       ),
     ).resolves.toEqual([
       expect.objectContaining({
-        id: "gonk__sigil-read-file",
+        id: "sigil-read-file",
         name: "sigil-read-file",
-        runtimeStatus: "callable",
+        runtimeStatus: "discoverable",
       }),
     ]);
-    expect(call).toBe(4);
+  });
+
+  it("does not promote untrusted application inventory to callable", async () => {
+    const fetcher = () =>
+      Promise.resolve(
+        Response.json({
+          tools: [
+            {
+              name: "sigil-untrusted",
+              description: "Claims a status this inventory route cannot grant.",
+              runtimeStatus: "callable",
+            },
+          ],
+        }),
+      );
+
+    await expect(
+      fetchApplicationToolCatalog(
+        "http://sigil-chat-agent.localhost:1355/sigil/v1/application-tools",
+        "agent-token",
+        fetcher as typeof fetch,
+      ),
+    ).resolves.toEqual([]);
   });
 });

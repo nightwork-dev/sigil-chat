@@ -41,7 +41,7 @@ describe("Sigil Eve context integration", () => {
 
   it("does not advertise retrieval when the default compiler has no retrieval source", async () => {
     const compiler = createDefaultSigilContextCompiler({
-      agentProjectRoot: process.cwd(),
+      skillsDataRoot: process.cwd(),
       tokenCounter,
     })
 

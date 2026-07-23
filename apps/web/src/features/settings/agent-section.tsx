@@ -116,8 +116,8 @@ export function AgentSection({ userId }: { userId: string }) {
         <div className="flex flex-col gap-1">
           <SectionHeader>Tool permissions</SectionHeader>
           <p className="text-xs text-muted-foreground">
-            Per-tool consent defaults are convenience preferences. Gonk still
-            enforces authorization and always denies exec-tier tools.
+            Per-tool consent defaults are convenience preferences. Server
+            policy still enforces authorization and always denies exec-tier tools.
           </p>
         </div>
 

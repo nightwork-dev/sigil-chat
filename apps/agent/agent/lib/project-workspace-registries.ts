@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url"
+import { readDataEnvironment } from "@workspace/runtime-env/server"
 
 import { ProjectRegistry } from "./project-registry"
 import { ScopeLinkRegistry } from "./scope-link-registry"
@@ -8,7 +9,6 @@ import { PersonalScopeRegistry } from "./personal-scope"
 import { WorkspaceRegistry } from "./workspace-registry"
 
 const agentDirectory = fileURLToPath(new URL("..", import.meta.url))
-const localStorageRoot = fileURLToPath(new URL("../../.data", import.meta.url))
 
 export interface ProjectWorkspaceRegistries {
   projects: ProjectRegistry
@@ -36,9 +36,9 @@ export function getProjectWorkspaceRegistries(): ProjectWorkspaceRegistries {
     projectRoot: storageRoot,
   })
   const workspaces = new WorkspaceRegistry({
-      cwd: agentDirectory,
-      projectRoot: storageRoot,
-      projects,
+    cwd: agentDirectory,
+    projectRoot: storageRoot,
+    projects,
   })
   const personalScopes = new PersonalScopeRegistry({
     cwd: agentDirectory,
@@ -72,5 +72,5 @@ export function resolveProjectWorkspaceStorageRoot(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   const configured = env.SIGIL_CONTAINER_REGISTRY_ROOT?.trim()
-  return configured || localStorageRoot
+  return configured || readDataEnvironment(env).containerRegistryRoot
 }

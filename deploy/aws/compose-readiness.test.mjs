@@ -24,14 +24,37 @@ const provisionHost = readFileSync(
   "utf8",
 )
 const deploymentReadme = readFileSync(resolve(directory, "README.md"), "utf8")
+const migrationGuide = readFileSync(
+  resolve(directory, "MIGRATING-FROM-GONK-SERVICE.md"),
+  "utf8",
+)
+const updateScript = readFileSync(
+  resolve(directory, "update-images.sh"),
+  "utf8",
+)
 
 test("fresh deployment orders containers on Eve liveness, not model auth", () => {
   const eveService = compose.slice(
     compose.indexOf("\n  eve:"),
-    compose.indexOf("\n  gonk:"),
+    compose.indexOf("\n  edge:"),
   )
   assert.match(eveService, /\/eve\/v1\/health/)
   assert.doesNotMatch(eveService, /sigil-chat-agent[^\n]*healthcheck/)
+})
+
+test("Eve keeps public JWT identity separate from internal JWKS routing", () => {
+  const eveService = compose.slice(
+    compose.indexOf("\n  eve:"),
+    compose.indexOf("\n  edge:"),
+  )
+  assert.match(
+    eveService,
+    /SIGIL_PUBLIC_URL: https:\/\/\$\{PUBLIC_HOST:\?set PUBLIC_HOST\}/,
+  )
+  assert.match(
+    eveService,
+    /SIGIL_EVE_AUTH_JWKS_URL: http:\/\/web:3000\/api\/auth\/jwks/,
+  )
 })
 
 test("runbook proves model readiness only after device login", () => {
@@ -77,19 +100,20 @@ test("release workflows allow the host updater fifteen minutes", () => {
   }
 })
 
-test("production image CI builds the four private ECR targets with OIDC", () => {
+test("production image CI builds the three private ECR targets with OIDC", () => {
   assert.match(productionWorkflow, /id-token: write/)
   assert.match(productionWorkflow, /aws-actions\/configure-aws-credentials/)
   assert.match(productionWorkflow, /Log in to private ECR/)
-  assert.match(
-    productionWorkflow,
-    /matrix:\s+target: \[migrate, web, eve, gonk\]/,
-  )
+  assert.match(productionWorkflow, /matrix:\s+target: \[migrate, web, eve\]/)
   assert.match(
     productionWorkflow,
     /tags: \$\{\{ vars\.ECR_REGISTRY \}\}\/sigil-chat-\$\{\{ matrix\.target \}\}:\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}/,
   )
   assert.match(productionWorkflow, /printf '%s=%s\/sigil-chat-%s@%s\\n'/)
+  assert.match(
+    productionWorkflow,
+    /test "\$\(wc -l < sigil-images\.env\)" -eq 3/,
+  )
   assert.doesNotMatch(
     productionWorkflow,
     /ghcr\.io|GITHUB_TOKEN|packages: write/,
@@ -112,10 +136,6 @@ test("production CI gates image builds with local smoke contracts", () => {
 })
 
 test("update command stops the public edge before replacing services", () => {
-  const updateScript = readFileSync(
-    resolve(directory, "update-images.sh"),
-    "utf8",
-  )
   assert.ok(
     updateScript.indexOf("stop edge web") <
       updateScript.indexOf(
@@ -125,9 +145,33 @@ test("update command stops the public edge before replacing services", () => {
   assert.ok(
     updateScript.indexOf(
       "up --abort-on-container-exit --exit-code-from migrate migrate",
-    ) < updateScript.lastIndexOf("up -d --wait --no-deps web gonk eve"),
+    ) < updateScript.lastIndexOf("up -d --wait --no-deps web eve"),
   )
   assert.match(updateScript, /up -d --wait --no-deps edge/)
+})
+
+test("old Gonk topology fails closed before the updater mutates Docker state", () => {
+  const preflight = updateScript.indexOf("legacy_gonk_containers")
+  const bindingSecretPreflight = updateScript.indexOf('agent_binding_secret"')
+  const firstMutation = updateScript.indexOf('cp "$deploy_env" "$rollback_env"')
+  assert.ok(preflight >= 0 && preflight < firstMutation)
+  assert.ok(
+    bindingSecretPreflight > preflight &&
+      bindingSecretPreflight < firstMutation,
+  )
+  assert.match(updateScript, /label=com\.docker\.compose\.service=gonk/)
+  assert.match(updateScript, /MIGRATING-FROM-GONK-SERVICE\.md/)
+  assert.doesNotMatch(updateScript, /--remove-orphans/)
+  assert.match(migrationGuide, /does not copy legacy data/)
+  assert.match(migrationGuide, /sigil-chat_gonk_data/)
+  assert.match(migrationGuide, /sigil-chat_web_data/)
+  assert.match(migrationGuide, /openssl rand -base64 48/)
+  assert.match(migrationGuide, /agent_binding_secret/)
+  assert.match(migrationGuide, /aws ecr batch-delete-image/)
+  assert.match(migrationGuide, /terraform apply plan\.tfplan/)
+  assert.match(migrationGuide, /does not set `force_delete = true`/)
+  assert.doesNotMatch(releaseTerraform, /force_delete\s*=\s*true/)
+  assert.match(migrationGuide, /does not support automatic rollback/)
 })
 
 test("edge health uses a non-redirecting internal Caddy listener", () => {
@@ -136,7 +180,7 @@ test("edge health uses a non-redirecting internal Caddy listener", () => {
 })
 
 test("production services share writable blackboard storage", () => {
-  for (const serviceName of ["web", "eve", "gonk"]) {
+  for (const serviceName of ["web", "eve"]) {
     const start = compose.indexOf(`\n  ${serviceName}:`)
     const nextMatch = /\n  [a-z][a-z-]+:/g
     nextMatch.lastIndex = start + serviceName.length + 4
@@ -145,11 +189,14 @@ test("production services share writable blackboard storage", () => {
     assert.match(service, /SIGIL_BLACKBOARD_DIR: \/var\/lib\/sigil-blackboard/)
     assert.match(service, /blackboard_data:\/var\/lib\/sigil-blackboard/)
   }
-  assert.match(compose, /SIGIL_ARTIFACT_DIR: \/var\/lib\/sigil-gonk\/artifacts/)
+  assert.equal(
+    compose.match(/SIGIL_DATA_DIR: \/var\/lib\/sigil-web/g)?.length,
+    3,
+  )
 })
 
-test("web and Gonk share writable durable roadmap storage", () => {
-  for (const serviceName of ["web", "gonk"]) {
+test("web and Eve share writable durable roadmap storage", () => {
+  for (const serviceName of ["web", "eve"]) {
     const start = compose.indexOf(`\n  ${serviceName}:`)
     const nextMatch = /\n  [a-z][a-z-]+:/g
     nextMatch.lastIndex = start + serviceName.length + 4
@@ -166,8 +213,8 @@ test("web and Gonk share writable durable roadmap storage", () => {
   assert.match(storageInit, /\/var\/lib\/sigil-roadmap/)
 })
 
-test("web and Gonk share the authoritative container registry store", () => {
-  for (const serviceName of ["web", "gonk"]) {
+test("web and Eve share the authoritative container registry store", () => {
+  for (const serviceName of ["web", "eve"]) {
     const start = compose.indexOf(`\n  ${serviceName}:`)
     const nextMatch = /\n  [a-z][a-z-]+:/g
     nextMatch.lastIndex = start + serviceName.length + 4
@@ -198,7 +245,7 @@ test("shared stores are initialized for one runtime filesystem identity", () => 
     resolve(directory, "../../Dockerfile"),
     "utf8",
   )
-  assert.equal(dockerfile.match(/USER 10000:10000/g)?.length, 4)
+  assert.equal(dockerfile.match(/USER 10000:10000/g)?.length, 3)
   const storageInit = compose.slice(
     compose.indexOf("\n  storage-init:"),
     compose.indexOf("\n  migrate:"),
@@ -215,8 +262,6 @@ test("shared stores are initialized for one runtime filesystem identity", () => 
     "web_appdata",
     "eve_data",
     "eve_scope",
-    "gonk_data",
-    "gonk_scope",
     "blackboard_data",
     "roadmap_data",
     "container_registry_data",
@@ -229,27 +274,24 @@ test("shared stores are initialized for one runtime filesystem identity", () => 
 
 test("only Eve receives the persistent Codex credential volume", () => {
   const eveStart = compose.indexOf("\n  eve:")
-  const gonkStart = compose.indexOf("\n  gonk:")
-  const eve = compose.slice(eveStart, gonkStart)
-  const gonk = compose.slice(gonkStart, compose.indexOf("\n  edge:"))
+  const eve = compose.slice(eveStart, compose.indexOf("\n  edge:"))
+  const web = compose.slice(
+    compose.indexOf("\n  web:"),
+    compose.indexOf("\n  eve:"),
+  )
   assert.match(eve, /CODEX_HOME: \/var\/lib\/sigil-codex/)
   assert.match(eve, /codex_auth:\/var\/lib\/sigil-codex/)
   assert.doesNotMatch(eve, /eve_app:\/app\/apps\/agent/)
-  assert.doesNotMatch(gonk, /CODEX_HOME|CODEX_AUTH_FILE|codex_auth/)
-  assert.match(gonk, /SIGIL_LOCAL_CODEX_IMAGE_GENERATION: disabled/)
+  assert.doesNotMatch(web, /CODEX_HOME|CODEX_AUTH_FILE|codex_auth/)
 })
 
-test("storage initialization migrates a legacy Codex login once", () => {
+test("storage initialization does not carry legacy state into the new topology", () => {
   const storageInit = compose.slice(
     compose.indexOf("\n  storage-init:"),
     compose.indexOf("\n  migrate:"),
   )
-  assert.match(storageInit, /\[ ! -s \/var\/lib\/sigil-codex\/auth\.json \]/)
-  assert.match(
-    storageInit,
-    /\[ -s \/var\/lib\/sigil-eve\/codex-home\/auth\.json \]/,
-  )
-  assert.match(storageInit, /install -o 10000 -g 10000 -m 0600/)
+  assert.doesNotMatch(storageInit, /sigil-eve\/codex-home/)
+  assert.doesNotMatch(storageInit, /sigil-gonk|gonk_data|gonk_scope/)
 })
 
 test("host secrets are readable only by root and the runtime group", () => {

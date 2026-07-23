@@ -10,6 +10,10 @@ Multiple agents work this repo at once — Claude Code sessions, dispatched
 double-works, or ships unverified changes. Read it before starting
 non-trivial work.
 
+Re-read the current roadmap and repository instructions after every completed
+task. Include that requirement in every dispatch brief for a multi-task
+worker; finishing work against stale direction wastes it.
+
 ## Agent roles (stay in your lane)
 
 - **Strategist — strategic coordination.** Ecosystem-wide product direction
@@ -37,14 +41,27 @@ agent's lane without coordinating through the roadmap.
   story with YAML frontmatter + an index. It is NOT git-tracked and is
   shared across every worktree/branch/agent. Do not put stories in a
   worktree's tracked tree.
+- The roadmap store is its own local git repository. Its adapter commits each
+  mutation so shared work status has restorable history independent of every
+  product branch.
 - Every story's frontmatter carries `worktree` (which workstream it belongs
   to) and `epic`. Filter to your own worktree/epic — don't act on another
   stream's stories, and don't be confused by them.
-- Three ways in, same store: the in-app board (`/_app/roadmap`), the
-  `sigil-story-*` MCP tools, or editing the `.md` files directly.
+- Three ways in, same store: the in-app board (`/_app/roadmap`), the native
+  `sigil-story-*` application tools, or editing the `.md` files directly.
 - Claim before you work. When you start a story set its `status`
   (`in-progress`) and `assignee`; when done, `verify`/`shipped`. That's how
   another agent knows not to pick it up.
+
+## What belongs where
+
+- Product code and shipped documentation live in this repository.
+- Repo-internal working notes use the existing gitignored local notes home.
+- Roadmap stories live only in `SIGIL_ROADMAP_DIR`.
+- Ecosystem handoffs and strategy use the existing untracked workspace-level
+  notes home.
+- Never create a bespoke coordination directory. Local-only names use
+  `*.local` / `*.local.*` unless the repository is itself local-only.
 
 ## Worktrees + branches
 
@@ -63,7 +80,7 @@ agent's lane without coordinating through the roadmap.
   copy voice, layout, or aesthetic work to codex/pi/gpt — this applies
   regardless of which harness is coordinating.
 - Mechanical plumbing (stores, gonk tools, server fns, schema, docs) → `pi
-  gpt-5.6-luna` at high thinking, or codex doing the equivalent mechanical
+gpt-5.6-luna` at high thinking, or codex doing the equivalent mechanical
   pass.
 - Coordination / judgment / review → the session model actually doing the
   coordinating.
@@ -73,7 +90,7 @@ agent's lane without coordinating through the roadmap.
 - `pi` is serial: only one `pi` process at a time (its extensions share a
   SQLite db and will hit `database is locked` otherwise). Queue pi work.
 - Claude/codex agents run in parallel only on disjoint files.
-- Hot shared files — `apps/gonk/src/registry.ts`,
+- Hot shared files — `packages/agent-tools/src/registry.ts`,
   `apps/web/src/routes/_app.tsx`, `apps/web/src/lib/agent-domain-outcomes.tsx`,
   `packages/agent-contracts/src/client-command.ts` — are owned by the
   orchestrator. Feature agents add their own new files and report the nav
@@ -97,6 +114,11 @@ agent's lane without coordinating through the roadmap.
 
 - Commit verified work to `dev` as it lands; concern-grouped commits (one
   feature/concern per commit), not a mega-commit.
+- Any story touching components, hooks, or presentation must carry the
+  registry-loop extraction verdict from `building-in-sigil-chat`:
+  `consumed`, `extracted`, `candidate:<X#>` with a real roadmap story, or
+  `app-domain` with the reason. Missing verdict means the story is not ready
+  to merge.
 - One repo per shell call; anchor every call with an absolute `cd`/`git -C`
   (cwd drifts between calls, and this repo has sibling worktrees that are
   easy to confuse with each other).
@@ -109,12 +131,14 @@ agent's lane without coordinating through the roadmap.
 
 ## Where things live
 
-- Gonk application tools → `apps/gonk/src/registry.ts` (+ `registry/*.ts`).
-  Eve discovers them over MCP via `apps/agent/agent/connections/gonk.ts` —
-  never hand-copy tool defs into eve. `exec`-tier tools are denied by
-  policy.
+- Application tools → `packages/agent-tools/src` and the composition hub in
+  `registry.ts`. Eve hosts that one Gonk registry through
+  `apps/agent/agent/tools/gonk.ts`; never hand-copy definitions or add a second
+  transport path. `exec`-tier tools are denied by policy.
 - Sigil-first: generalizable UI belongs in sigil-design first (canonical) +
   a `/showcase` example, then carried into sigil-chat as owned source and
-  consumed. Don't build app-local what the design system should own.
-- `GONK_MCP_KEY` must match on the gonk + agent processes; it lives in the
-  root `.env` (single source, loaded by gonk + web; agent symlink).
+  consumed. Before authoring, check `packages/ui`, the Sigil Design showcase,
+  and the registry; before closing, record the extraction verdict. Don't build
+  app-local what the design system should own.
+- `SIGIL_AGENT_BINDING_SECRET` is shared only by web and Eve for the private
+  verified-principal binding route; it does not authorize tool calls.

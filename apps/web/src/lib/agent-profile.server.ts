@@ -1,4 +1,4 @@
-// Server-only: PersonaRegistry / EveMemoryHost / the memory store are all
+// Server-only: PersonaRegistry and the memory store are
 // constructed here, at module scope, over real filesystem paths (node:fs,
 // node:path via @gonk/scope). This file must NEVER be imported from
 // agent-profile.ts at module scope — only dynamically, inside a server-fn
@@ -6,19 +6,28 @@
 // bundle (node built-ins get externalized and the build fails). See
 // agent-threads.ts / agent-threads.server.ts for the established split.
 //
-// The persona registry is the identity source of truth. Hosts are derived
-// from its records on demand, matching the agent's per-persona host pattern.
+// The persona registry is the identity source of truth. Profile curation uses
+// Gonk's host-neutral memory actions directly; TanStack does not import Eve.
+
+import { randomUUID } from "node:crypto"
 
 import {
   StoreBackedMemoryRecordStore,
+  MemoryActions,
+  loadIdentityFloorAtSessionStart,
+  type IdentityFloorPolicy,
   type MemoryAuthorizedQueryResult,
   type MemoryDisclosureResult,
   type MemoryRecordDraft,
   type MemoryRecord,
   type TrustedTurnEnvelope,
 } from "@gonk/memory"
-import { EveMemoryHost, type TrustedMemoryTurn } from "@gonk/eve-host/guard"
-import { PORTRAIT_BLOB_KEY, PersonaRegistry } from "@gonk/persona"
+import {
+  createPersonaExecutionBinding,
+  PORTRAIT_BLOB_KEY,
+  PersonaRegistry,
+  type ResolvedPersona,
+} from "@gonk/persona"
 import { readIdentityEnvironment } from "@workspace/runtime-env/server"
 
 import type {
@@ -48,62 +57,27 @@ export const personaRegistry = new PersonaRegistry(
 // that Eve uses. Store writes are atomic rename operations; the agent can read
 // safely while the owner curates memory or updates an identity.
 const store = new StoreBackedMemoryRecordStore({ scopeEnv })
-
-const hosts = new Map<string, EveMemoryHost>()
-
-function profileHost(personaId: string): EveMemoryHost {
-  const cached = hosts.get(personaId)
-  if (cached) return cached
-
-  const record = personaRegistry.get(personaId)
-  if (!record) throw new Error(`persona ${personaId} not found`)
-
-  const host = new EveMemoryHost({
-    store,
-    persona: {
-      record,
-      authoredBaseId: `${record.id}-v1`,
-      identityFloor: {
-        revision: `${record.id}-v1`,
-        selectedRecordIds: [],
-        caps: {
-          maxRecords: 3,
-          maxContentCharsPerRecord: 300,
-          maxTotalContentChars: 600,
-        },
-        stableSummaryTokenBudget: 80,
-        selectedSelfRecordCap: 3,
-        dynamicTokenBudget: 240,
-        authoredBase: record.systemPrompt ?? "",
-        stableSummary: record.description ?? record.name ?? record.id,
-      },
-    },
-  })
-  hosts.set(personaId, host)
-  return host
-}
+const memoryActions = new MemoryActions(store, {
+  revision: "sigil-profile-memory-v1",
+  createId: randomUUID,
+  now: Date.now,
+})
 
 const READ_CHANNEL = "sigil-chat"
 
-/** A trusted turn for a read-only profile query. The session id is synthetic;
- * only the principalId is load-bearing for disclosure. */
-function readTurn(principalId: string): TrustedMemoryTurn {
-  return { eveSessionId: "profile-read", channelId: READ_CHANNEL, principalId }
-}
-
-// EveMemoryHost.queryAuthorized isn't on the public class surface; the store
-// takes a TrustedTurnEnvelope directly. Build one from a bound session.
 function readEnvelope(
   principalId: string,
-  personaId: string,
-  host: EveMemoryHost,
+  persona: ResolvedPersona,
 ): TrustedTurnEnvelope {
-  const binding = host.bindSession({
-    eveSessionId: "profile-read",
+  const binding = createPersonaExecutionBinding({
+    personaId: persona.id,
+    authoredBaseId: `${persona.id}-v1`,
     channelId: READ_CHANNEL,
+    executionSessionId: "profile-read",
+    boundAt: Date.now(),
   })
   return {
-    binding: binding as unknown as TrustedTurnEnvelope["binding"],
+    binding,
     principalId,
     presentPrincipalIds: [principalId],
     // queryAuthorized's isAuthorizedForRecall gates on
@@ -113,7 +87,24 @@ function readEnvelope(
     // The owner reading their own deployed persona's memory is exactly the
     // grant this profile exists to make: the persona-tier scope for the one
     // persona this view renders, nothing broader.
-    grantedScopeIds: [`persona:${personaId}`],
+    grantedScopeIds: [`persona:${persona.id}`],
+  }
+}
+
+function identityFloorPolicy(persona: ResolvedPersona): IdentityFloorPolicy {
+  return {
+    revision: `${persona.id}-v1`,
+    selectedRecordIds: [],
+    caps: {
+      maxRecords: 3,
+      maxContentCharsPerRecord: 300,
+      maxTotalContentChars: 600,
+    },
+    stableSummaryTokenBudget: 80,
+    selectedSelfRecordCap: 3,
+    dynamicTokenBudget: 240,
+    authoredBase: persona.systemPrompt ?? "",
+    stableSummary: persona.description ?? persona.name ?? persona.id,
   }
 }
 
@@ -157,23 +148,19 @@ export function loadAgentProfile(
 ): AgentProfile {
   const persona = personaRegistry.get(personaId)
   if (!persona) throw new Error(`persona ${personaId} not found`)
-  const host = profileHost(personaId)
-
-  // Self-model: the identity floor at session start — the SAME projection
-  // the agent itself wakes on (what you see IS what it is). Confirmed shape
-  // (EveIdentityContext, @gonk/eve-host/guard dist/guard.d.ts):
-  // { binding, markdown, policyRevision, selectedRecordIds: readonly string[] }.
-  // There is no `records` field — the floor selects record IDs, not bodies —
-  // so the accepted self-claims are read back through the store by id.
-  const identity = host.identityAtSessionStart(readTurn(principalId))
-  const selfClaims = identity.selectedRecordIds
+  const envelope = readEnvelope(principalId, persona)
+  const identity = loadIdentityFloorAtSessionStart(
+    store,
+    envelope,
+    identityFloorPolicy(persona),
+  )
+  const selfClaims = identity.identityFloor.promptOverlay
+    .map((record) => record.id)
     .map((id) => store.get(id))
     .filter((r): r is MemoryRecord => r !== undefined)
 
   // Authorized memory disclosure for this principal.
-  const authorized = store.queryAuthorized(
-    readEnvelope(principalId, personaId, host),
-  )
+  const authorized = store.queryAuthorized(envelope)
   const accepted = disclosedAccepted(authorized)
 
   // Candidates: queryAuthorized's disclosure list is built for the accepted
@@ -195,7 +182,7 @@ export function loadAgentProfile(
   return {
     persona,
     lineage: {
-      authoredBaseId: identity.binding.authoredBaseId,
+      authoredBaseId: envelope.binding.authoredBaseId,
       policyRevision: identity.policyRevision,
     },
     hasPortrait,
@@ -205,8 +192,7 @@ export function loadAgentProfile(
 }
 
 /** Owner-authenticated identity editing. The registry remains the source of
- * truth, and dropping the cached profile host ensures the next profile read
- * rebuilds its identity floor from the revised record. */
+ * truth and the next profile read rebuilds the floor from canonical state. */
 export function updateAgentPersonaProfile(
   principalId: string,
   input: AgentPersonaUpdateInput,
@@ -217,7 +203,6 @@ export function updateAgentPersonaProfile(
     description: input.description,
     systemPrompt: input.systemPrompt || undefined,
   })
-  hosts.delete(input.personaId)
   return loadAgentProfile(principalId, input.personaId)
 }
 
@@ -249,7 +234,7 @@ export function acceptAgentMemoryCandidate(
   return loadAgentProfile(principalId, personaId)
 }
 
-/** Archive is the reversible removal semantic the memory host exposes for an
+/** Archive is the reversible removal semantic the memory contract exposes for an
  * accepted record. It deliberately does not pretend candidates can be
  * rejected: that transition is not in the current Gonk record contract. */
 export function archiveAgentMemoryRecord(
@@ -258,12 +243,14 @@ export function archiveAgentMemoryRecord(
   recordId: string,
 ): AgentProfile {
   assertOwnedMemory(personaId, recordId, "accepted")
-  profileHost(personaId).forget(memoryTurnForOwner(principalId), recordId)
+  const persona = personaRegistry.get(personaId)
+  if (!persona) throw new Error(`persona ${personaId} not found`)
+  memoryActions.forget(readEnvelope(principalId, persona), recordId)
   return loadAgentProfile(principalId, personaId)
 }
 
 /** Correction creates a new accepted record and supersedes the old one via
- * EveMemoryHost, preserving the lifecycle/provenance semantics that direct
+ * Gonk MemoryActions, preserving the lifecycle/provenance semantics that direct
  * filesystem edits would lose. */
 export function correctAgentMemoryRecord(
   principalId: string,
@@ -278,8 +265,10 @@ export function correctAgentMemoryRecord(
     evidence: [{ kind: "tool", id: "sigil-agent-studio" }],
     author: { kind: "principal", id: principalId },
   }
-  profileHost(input.personaId).correct(
-    memoryTurnForOwner(principalId),
+  const persona = personaRegistry.get(input.personaId)
+  if (!persona) throw new Error(`persona ${input.personaId} not found`)
+  memoryActions.correct(
+    readEnvelope(principalId, persona),
     input.recordId,
     replacement,
   )
@@ -308,14 +297,4 @@ function assertOwnedMemory(
     )
   }
   return record
-}
-
-function memoryTurnForOwner(principalId: string): TrustedMemoryTurn {
-  return {
-    eveSessionId: "profile-curation",
-    channelId: READ_CHANNEL,
-    principalId,
-    presentPrincipalIds: [principalId],
-    grantedScopeIds: [],
-  }
 }

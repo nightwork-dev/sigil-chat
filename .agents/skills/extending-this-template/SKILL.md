@@ -40,15 +40,21 @@ items) and the `ThemePicker` action. Don't build a second shell unless you
 have a genuinely different chrome requirement; add a nav entry to the
 existing `nav` object in `_app.tsx` instead.
 
-Above `_app.tsx`, `routes/__root.tsx` mounts app-wide providers with no
-visible chrome: `ThemeProvider`, `QueryClientProvider`, and — critically —
-`AppAgentSessions` (`@/components/agent-sessions.tsx`), which wraps
-`AgentRuntimeSessionProvider` and `AgentThreadControlsProvider` from
-`@zigil/agent-surface`. This is what "the shared agent session mounts above router
-swaps" means concretely: the agent session survives navigating between
-`/chat`, `/studio`, `/review`, etc., because it's provided once at the root,
-not per-route. A new workspace under `_app/` gets the live agent session for
-free through context — it does not need to instantiate its own.
+Above `_app.tsx`, `routes/__root.tsx` mounts only app-wide providers with no
+visible chrome and no session/auth dependency: `ThemeProvider` and
+`QueryClientProvider`. `AppAgentSessions` (`@/components/agent-sessions.tsx`,
+wrapping `AgentRuntimeSessionProvider` and `AgentThreadControlsProvider` from
+`@zigil/agent-surface`) is mounted one level down, INSIDE `_app.tsx`'s
+`AppLayout` — deliberately below the protected-route boundary (`_app.tsx`'s
+`beforeLoad` resolves the Better Auth session server-side and redirects to
+`/login` first). `/login` and `/setup` are top-level routes that sit outside
+`_app` entirely, so they never mount `AppAgentSessions` and never create an
+Eve client or fetch channel data (S10.2). This is what "the shared agent
+session mounts above router swaps [within the product]" means concretely:
+the agent session survives navigating between `/chat`, `/studio`, `/review`,
+etc., because it's provided once inside `_app`, not per-route. A new
+workspace under `_app/` gets the live agent session for free through
+context — it does not need to instantiate its own.
 
 ## Route header comments — mandatory, and read them before editing
 
@@ -178,10 +184,10 @@ Always before calling a route/workspace change done:
    e.g. `apps/web/src/components/agent/agent-outcome-projector.test.ts` is
    the pattern for outcome-handling logic.
 3. Load it in a real browser against the running Portless services
-   (`pnpm dev` starts all three — see the README's service table) and check
+   (`pnpm dev` starts both — see the README's service table) and check
    the console for errors/warnings, not just that the page renders.
    Render-phase store conflicts and hydration mismatches only show up here,
    never as type errors. If the change touches the agent loop, drive it
-   through `http://sigil-chat.localhost:1355` with the Eve
-   (`sigil-chat-agent`) and Gonk (`sigil-chat-gonk`) services also running —
-   a route change alone won't exercise the tool-call path.
+   through the app origin printed by this worktree's readiness summary with
+   its correctly namespaced Eve service, and invoke a native application tool — a
+   route change alone won't exercise the tool-call path.

@@ -130,8 +130,8 @@ export function usePartProjection(): PartProjectionConfig {
 
 /**
  * The MCP server-prefix separator, matching `resolveToolRenderer`. A tool call
- * may arrive as `gonk__sigil-annotate`; a mode registered under the bare
- * `sigil-annotate` must still match.
+ * may arrive with a transport prefix such as `server__sigil-annotate`; a mode
+ * registered under the bare `sigil-annotate` must still match.
  */
 const MCP_PREFIX_SEP = "__";
 

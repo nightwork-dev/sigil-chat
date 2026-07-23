@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
+import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
 
 import type { SigilAuthSession } from "./auth/server"
 
@@ -33,7 +34,10 @@ const issueAgentSessionBindingFn = createServerFn({ method: "POST" })
     if (binding.principalId !== session.user.id) {
       throw new Error("Agent session binding principal changed.")
     }
-    const secret = process.env.GONK_MCP_KEY?.trim()
+    const secret = readOptionalSecretFromFile(
+      process.env,
+      "SIGIL_AGENT_BINDING_SECRET",
+    )
     if (!secret) throw new Error("Agent session binding is unavailable.")
     const expiresAt =
       Math.floor(Date.now() / 1_000) + SESSION_BINDING_LIFETIME_SECONDS

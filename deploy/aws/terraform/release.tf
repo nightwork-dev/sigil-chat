@@ -1,5 +1,5 @@
 locals {
-  release_image_targets = toset(["eve", "gonk", "migrate", "web"])
+  release_image_targets = toset(["eve", "migrate", "web"])
 }
 
 resource "aws_ecr_repository" "release" {

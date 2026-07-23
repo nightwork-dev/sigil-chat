@@ -21,11 +21,6 @@ export type AgentClientCommand =
         clearPrevious?: boolean
       }
     }
-  | {
-      /** Compatibility with pre-domain-outcome Gonk tool results. */
-      type: "review.annotation.add" | "review.passage.update"
-      payload?: unknown
-    }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -49,11 +44,6 @@ export function isAgentClientCommand(
   value: unknown,
 ): value is AgentClientCommand {
   if (!isRecord(value)) return false
-  if (
-    value.type === "review.annotation.add" ||
-    value.type === "review.passage.update"
-  )
-    return true
   if (value.type === "ui.highlight") return isUiHighlightPayload(value.payload)
   if (value.type !== "agent.domain.outcome") return false
   if (!isRecord(value.payload)) return false

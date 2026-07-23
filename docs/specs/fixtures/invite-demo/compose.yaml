@@ -31,6 +31,7 @@ services:
     command: ["sigil-admin", "migrate", "apply", "--fail-closed"]
     environment:
       NODE_ENV: production
+      SIGIL_DATA_DIR: /var/lib/sigil-web
       SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
     secrets:
@@ -51,9 +52,8 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3000"
-      BETTER_AUTH_URL: https://${PUBLIC_HOST:-invite-demo.invalid}
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:-invite-demo.invalid}
       SIGIL_AUTH_TRUSTED_ORIGINS: https://${PUBLIC_HOST:-invite-demo.invalid}
-      SIGIL_AUTH_REGISTRATION: closed
       SIGIL_INVITES_MODE: required
       SIGIL_EXEC_MODE: disabled
       SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
@@ -95,7 +95,7 @@ services:
       PORT: "3001"
       SIGIL_EXEC_MODE: disabled
       SIGIL_MODEL_AUTH_MODE: unconfigured
-      SIGIL_EVE_AUTH_ISSUER: https://${PUBLIC_HOST:-invite-demo.invalid}
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:-invite-demo.invalid}
       SIGIL_EVE_AUTH_JWKS_URL: http://web:3000/api/auth/jwks
       SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
       GONK_MCP_URL: http://gonk:8808/mcp
@@ -126,8 +126,7 @@ services:
       PORT: "8808"
       SIGIL_EXEC_MODE: disabled
       GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
-      SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
-      SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
+      SIGIL_DATA_DIR: /var/lib/sigil-gonk
       SIGIL_LOG_REDACTION: strict
     secrets:
       - gonk_mcp_key

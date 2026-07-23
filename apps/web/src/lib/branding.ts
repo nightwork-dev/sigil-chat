@@ -1,13 +1,6 @@
 export interface BrandingEnvironment {
-  readonly SIGIL_APP_NAME?: string
-  readonly SIGIL_APP_TITLE?: string
-  readonly SIGIL_APP_DESCRIPTION?: string
-  readonly SIGIL_APP_ORIGIN?: string
-  readonly SIGIL_BRAND_COLOR?: string
-  readonly SIGIL_INSTANCE_LABEL?: string
-  readonly SIGIL_SHARE_IMAGE_URL?: string
   readonly PORTLESS_URL?: string
-  readonly BETTER_AUTH_URL?: string
+  readonly SIGIL_PUBLIC_URL?: string
 }
 
 export interface BrandingContext {
@@ -27,34 +20,41 @@ export interface BrandingConfig {
   readonly manifestHref: string
 }
 
+export interface BrandingSettings {
+  readonly accent?: string
+  readonly description?: string
+  readonly instanceLabel?: string | false
+  readonly name?: string
+  readonly shareImageUrl?: string
+  readonly title?: string
+}
+
 const DEFAULT_NAME = "Sigil Chat"
-const DEFAULT_DESCRIPTION = "An agentic chat workspace built with Sigil and Gonk."
+const DEFAULT_DESCRIPTION =
+  "An agentic workspace for conversations, tools, and durable work."
 const DEFAULT_ORIGIN = "http://sigil-chat.localhost:1355"
 const DEFAULT_ACCENT = "#b58b35"
 
 export function resolveBranding(
   environment: BrandingEnvironment,
   context: BrandingContext,
+  settings: BrandingSettings = {},
 ): BrandingConfig {
-  const name = optionalText(environment.SIGIL_APP_NAME) ?? DEFAULT_NAME
+  const name = optionalText(settings.name) ?? DEFAULT_NAME
   const baseTitle =
-    optionalText(environment.SIGIL_APP_TITLE) ??
-    `${name} — agentic conversations`
-  const description =
-    optionalText(environment.SIGIL_APP_DESCRIPTION) ?? DEFAULT_DESCRIPTION
-  const instanceLabel = resolveInstanceLabel(environment, context)
+    optionalText(settings.title) ?? `${name} — agentic conversations`
+  const description = optionalText(settings.description) ?? DEFAULT_DESCRIPTION
+  const instanceLabel = resolveInstanceLabel(environment, context, settings)
   const title = instanceLabel ? `[${instanceLabel}] ${baseTitle}` : baseTitle
   const origin = parseOrigin(
-    environment.SIGIL_APP_ORIGIN ??
-      environment.PORTLESS_URL ??
-      environment.BETTER_AUTH_URL,
+    environment.SIGIL_PUBLIC_URL ?? environment.PORTLESS_URL,
   )
-  const accent = resolveAccent(environment.SIGIL_BRAND_COLOR, instanceLabel)
+  const accent = resolveAccent(settings.accent, instanceLabel)
   const shareImageUrl = resolvePublicUrl(
-    environment.SIGIL_SHARE_IMAGE_URL,
+    settings.shareImageUrl,
     origin,
     "/icon-512.png",
-    "SIGIL_SHARE_IMAGE_URL",
+    "application fixture branding.shareImageUrl",
   )
 
   const base = {
@@ -113,9 +113,12 @@ export function siteUrl(config: Pick<BrandingConfig, "origin">, path = "/") {
 function resolveInstanceLabel(
   environment: BrandingEnvironment,
   context: BrandingContext,
+  settings: BrandingSettings,
 ) {
-  if (Object.hasOwn(environment, "SIGIL_INSTANCE_LABEL")) {
-    return optionalText(environment.SIGIL_INSTANCE_LABEL)
+  if (Object.hasOwn(settings, "instanceLabel")) {
+    return settings.instanceLabel === false
+      ? undefined
+      : optionalText(settings.instanceLabel)
   }
   return context.development
     ? (inferPortlessInstanceLabel(environment.PORTLESS_URL) ??
@@ -140,7 +143,9 @@ function resolveAccent(value: string | undefined, instanceLabel?: string) {
   const explicit = optionalText(value)
   if (explicit) {
     if (!/^#[0-9a-f]{6}$/i.test(explicit)) {
-      throw new Error("SIGIL_BRAND_COLOR must be a six-digit hex color")
+      throw new Error(
+        "application fixture branding.accent must be a six-digit hex color",
+      )
     }
     return explicit.toLowerCase()
   }
@@ -153,10 +158,10 @@ function parseOrigin(value: string | undefined) {
   try {
     parsed = new URL(candidate)
   } catch {
-    throw new Error("SIGIL_APP_ORIGIN must be an absolute HTTP(S) URL")
+    throw new Error("SIGIL_PUBLIC_URL must be an absolute HTTP(S) URL")
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("SIGIL_APP_ORIGIN must be an absolute HTTP(S) URL")
+    throw new Error("SIGIL_PUBLIC_URL must be an absolute HTTP(S) URL")
   }
   parsed.pathname = "/"
   parsed.search = ""

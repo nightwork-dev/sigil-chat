@@ -1,0 +1,16 @@
+agent:
+  model: gpt-5.6-terra
+
+auth:
+  registration: closed
+
+branding:
+  name: Sigil Chat
+  title: Sigil Chat — agentic conversations
+  description: An agentic chat workspace built with Sigil and Gonk.
+  accent: "#b58b35"
+  shareImageUrl: /icon-512.png
+
+imageEdit:
+  preset: flux2klein4b
+  quality: fast

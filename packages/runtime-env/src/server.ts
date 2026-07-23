@@ -1,36 +1,30 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
-  readRuntimeTopology,
   parseHttpUrl,
   RuntimeEnvironmentError,
   type RuntimeEnvironment,
-  type SigilRuntimeTopology,
 } from "./topology.js";
-
-export const DEFAULT_CODEX_MODEL = "gpt-5.6-terra";
-
-export interface GonkServerEnvironment extends SigilRuntimeTopology {
-  apiKey: string | undefined;
-  port: number;
-}
-
-export interface GonkClientEnvironment extends SigilRuntimeTopology {
-  apiKey: string | undefined;
-}
-
-export interface AgentRuntimeEnvironment {
-  model: string;
-}
+import { resolveSigilProjectRoot } from "./project-root.js";
 
 export interface StorageRuntimeEnvironment {
-  graphPath: string | undefined;
-  reviewPath: string | undefined;
+  graphPath: string;
+  reviewPath: string;
 }
 
 export interface IdentityRuntimeEnvironment {
   personaDir: string;
   memoryDir: string;
+}
+
+export interface DataRuntimeEnvironment
+  extends StorageRuntimeEnvironment, IdentityRuntimeEnvironment {
+  artifactDir: string;
+  blackboardDir: string;
+  containerRegistryRoot: string;
+  identityDir: string;
+  rootDir: string;
+  skillsDir: string;
 }
 
 export interface DisabledEmbeddingRuntimeEnvironment {
@@ -46,8 +40,7 @@ export interface EnabledEmbeddingRuntimeEnvironment {
 }
 
 export type EmbeddingRuntimeEnvironment =
-  | DisabledEmbeddingRuntimeEnvironment
-  | EnabledEmbeddingRuntimeEnvironment;
+  DisabledEmbeddingRuntimeEnvironment | EnabledEmbeddingRuntimeEnvironment;
 
 export function readEmbeddingEnvironment(
   env: RuntimeEnvironment,
@@ -61,45 +54,61 @@ export function readEmbeddingEnvironment(
 
   return {
     enabled: true,
-    baseURL: parseHttpUrl(
-      baseURL,
-      baseURL,
-      "SIGIL_EMBEDDING_BASE_URL",
-    ),
+    baseURL: parseHttpUrl(baseURL, baseURL, "SIGIL_EMBEDDING_BASE_URL"),
     model,
     dim: parseOptionalEmbeddingDimension(env.SIGIL_EMBEDDING_DIM),
     apiKey: env.SIGIL_EMBEDDING_API_KEY?.trim() || undefined,
   };
 }
 
-export function readAgentEnvironment(
-  env: RuntimeEnvironment,
-): AgentRuntimeEnvironment {
-  const model = env.CODEX_MODEL;
-  if (model === undefined) return { model: DEFAULT_CODEX_MODEL };
-  const normalized = model.trim();
-  if (!normalized || /\s/.test(normalized)) {
-    throw new RuntimeEnvironmentError(
-      "INVALID_MODEL",
-      "CODEX_MODEL",
-      "must be a non-empty model slug without whitespace",
-    );
-  }
-  return { model: normalized };
-}
-
 export function readStorageEnvironment(
   env: RuntimeEnvironment,
+  cwd: string = process.cwd(),
 ): StorageRuntimeEnvironment {
+  const data = readDataEnvironment(env, cwd);
   return {
-    graphPath: parseOptionalStoragePath(
+    graphPath: resolveStoragePath(
       env.SIGIL_CHAT_GRAPH_PATH,
       "SIGIL_CHAT_GRAPH_PATH",
+      data.graphPath,
+      cwd,
     ),
-    reviewPath: parseOptionalStoragePath(
+    reviewPath: resolveStoragePath(
       env.SIGIL_CHAT_REVIEW_PATH,
       "SIGIL_CHAT_REVIEW_PATH",
+      data.reviewPath,
+      cwd,
     ),
+  };
+}
+
+/** Resolve disposable, local-first application state from one root. Individual
+ * store variables remain supported for deployments that isolate mounts per
+ * service, but ordinary development and small installations need only
+ * SIGIL_DATA_DIR (or no setting at all). */
+export function readDataEnvironment(
+  env: RuntimeEnvironment,
+  cwd: string = process.cwd(),
+): DataRuntimeEnvironment {
+  const configuredRoot = parseOptionalStoragePath(
+    env.SIGIL_DATA_DIR,
+    "SIGIL_DATA_DIR",
+  );
+  const rootDir = configuredRoot
+    ? resolve(cwd, configuredRoot)
+    : resolveProjectDataRoot(cwd);
+  const identityDir = join(rootDir, "identity");
+  return {
+    artifactDir: join(rootDir, "artifacts"),
+    blackboardDir: join(rootDir, "blackboard"),
+    containerRegistryRoot: join(rootDir, "containers"),
+    graphPath: join(rootDir, "graph"),
+    identityDir,
+    memoryDir: join(identityDir, "memory"),
+    personaDir: join(identityDir, "persona"),
+    reviewPath: join(rootDir, "review"),
+    rootDir,
+    skillsDir: join(rootDir, "skills"),
   };
 }
 
@@ -111,36 +120,20 @@ export function readIdentityEnvironment(
   env: RuntimeEnvironment,
   cwd: string = process.cwd(),
 ): IdentityRuntimeEnvironment {
-  const sharedDataDir = resolve(cwd, "../..", ".data");
+  const data = readDataEnvironment(env, cwd);
   return {
-    personaDir: resolve(
+    personaDir: resolveStoragePath(
+      env.SIGIL_PERSONA_DIR,
+      "SIGIL_PERSONA_DIR",
+      data.personaDir,
       cwd,
-      parseOptionalStoragePath(env.SIGIL_PERSONA_DIR, "SIGIL_PERSONA_DIR") ??
-        resolve(sharedDataDir, "persona"),
     ),
-    memoryDir: resolve(
+    memoryDir: resolveStoragePath(
+      env.SIGIL_MEMORY_DIR,
+      "SIGIL_MEMORY_DIR",
+      data.memoryDir,
       cwd,
-      parseOptionalStoragePath(env.SIGIL_MEMORY_DIR, "SIGIL_MEMORY_DIR") ??
-        resolve(sharedDataDir, "memory"),
     ),
-  };
-}
-
-export function readGonkClientEnvironment(
-  env: RuntimeEnvironment,
-): GonkClientEnvironment {
-  return {
-    ...readRuntimeTopology(env),
-    apiKey: readOptionalSecretFromFile(env, "GONK_MCP_KEY"),
-  };
-}
-
-export function readGonkServerEnvironment(
-  env: RuntimeEnvironment,
-): GonkServerEnvironment {
-  return {
-    ...readGonkClientEnvironment(env),
-    port: parsePort(env.PORT, 8808, "PORT"),
   };
 }
 
@@ -234,6 +227,20 @@ function parseOptionalStoragePath(
     );
   }
   return path;
+}
+
+function resolveStoragePath(
+  value: string | undefined,
+  name: string,
+  fallback: string,
+  cwd: string,
+): string {
+  const configured = parseOptionalStoragePath(value, name);
+  return configured ? resolve(cwd, configured) : fallback;
+}
+
+function resolveProjectDataRoot(startDirectory: string): string {
+  return join(resolveSigilProjectRoot(startDirectory), ".data");
 }
 
 function invalidPort(name: string): RuntimeEnvironmentError {

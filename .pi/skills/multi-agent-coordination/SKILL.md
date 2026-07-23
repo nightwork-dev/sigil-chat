@@ -42,8 +42,8 @@ work.
 - [ ] Every story's frontmatter carries `worktree` and `epic`. **Filter to
       your own worktree/epic.** Don't act on another stream's stories.
 - [ ] Three equivalent entry points to the same store: the in-app board
-      (`/_app/roadmap`), the `sigil-story-*` MCP tools, editing the `.md`
-      files directly. Pick any — they're the same data.
+      (`/_app/roadmap`), the native `sigil-story-*` application tools, or
+      editing the `.md` files directly. Pick any — they're the same data.
 - [ ] **Claim before you work.** Set `status: in-progress` + `assignee`
       before starting. Set `verify`/`shipped` when done. If you skip this,
       another agent WILL pick up the same story.
@@ -73,11 +73,7 @@ work.
       pi work; do not fan out multiple concurrent `pi` invocations.
 - [ ] Claude/codex agents may run in parallel ONLY on disjoint files.
 - [ ] **Hot shared files are owned by the orchestrator — do not let N
-      agents edit these in parallel:**
-      - `apps/gonk/src/registry.ts`
-      - `apps/web/src/routes/_app.tsx`
-      - `apps/web/src/lib/agent-domain-outcomes.tsx`
-      - `packages/agent-contracts/src/client-command.ts`
+      agents edit these in parallel:** - `packages/agent-tools/src/registry.ts` - `apps/web/src/routes/_app.tsx` - `apps/web/src/lib/agent-domain-outcomes.tsx` - `packages/agent-contracts/src/client-command.ts`
       Feature agents add their OWN new files and report the nav entry / tool
       registration back to the orchestrator, who batches the hub-file edit.
 - [ ] If two streams genuinely must edit the same file, isolate them in
@@ -118,16 +114,13 @@ work.
 
 ## RULE 7: Where things live
 
-- [ ] **Gonk application tools** → `apps/gonk/src/registry.ts` (+
-      `registry/*.ts`). Eve discovers them over MCP via
-      `apps/agent/agent/connections/gonk.ts` — NEVER hand-copy tool defs into
-      eve. `exec`-tier tools are denied by policy (see the
-      `adding-gonk-tools` skill).
+- [ ] **Application tools** → `packages/agent-tools/src` and its `registry.ts`
+      composition hub. Eve hosts that one Gonk registry through
+      `apps/agent/agent/tools/gonk.ts`; NEVER copy definitions or add a second
+      transport path. `exec`-tier tools are denied by policy.
 - [ ] **Sigil-first = the registry loop, enforced:** consume-first check
-      before authoring (grep `packages/ui` → check sigil-design `/showcase`
-      + registry → install, don't re-author) + an extraction verdict before
+      before authoring (grep `packages/ui` → check sigil-design `/showcase` + registry → install, don't re-author) + an extraction verdict before
       any UI-touching story closes. Full contract in `building-in-sigil-chat`
       RULE 0; verdict is checked at merge (RULE 6).
-- [ ] **`GONK_MCP_KEY`** must match on the gonk + agent processes; it lives
-      in the root `.env` (single source, loaded by gonk + web; agent
-      symlink). See the `adding-gonk-tools` skill for the full failure mode.
+- [ ] **`SIGIL_AGENT_BINDING_SECRET`** is shared only by web and Eve for the
+      private verified-principal binding route; it does not authorize tools.

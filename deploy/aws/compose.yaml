@@ -29,32 +29,24 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        if [ ! -s /var/lib/sigil-codex/auth.json ]
-        && [ -s /var/lib/sigil-eve/codex-home/auth.json ]; then
-        install -o 10000 -g 10000 -m 0600
-        /var/lib/sigil-eve/codex-home/auth.json
-        /var/lib/sigil-codex/auth.json;
-        fi
-        && chown -R 10000:10000
-        /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
+        chown -R 10000:10000
+        /var/lib/sigil-web /var/lib/sigil-eve
         /var/lib/sigil-containers
         /var/lib/sigil-blackboard /var/lib/sigil-roadmap
         /var/lib/sigil-codex /var/lib/sigil-identity
-        /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents
+        /app/web-agents /app/web-data /app/eve-agents
         && chmod 0700
-        /var/lib/sigil-web /var/lib/sigil-eve /var/lib/sigil-gonk
+        /var/lib/sigil-web /var/lib/sigil-eve
         /var/lib/sigil-containers
         /var/lib/sigil-blackboard /var/lib/sigil-roadmap
         /var/lib/sigil-codex /var/lib/sigil-identity
-        /app/web-agents /app/web-data /app/eve-agents /app/gonk-agents
+        /app/web-agents /app/web-data /app/eve-agents
     volumes:
       - web_data:/var/lib/sigil-web
       - web_scope:/app/web-agents
       - web_appdata:/app/web-data
       - eve_data:/var/lib/sigil-eve
       - eve_scope:/app/eve-agents
-      - gonk_data:/var/lib/sigil-gonk
-      - gonk_scope:/app/gonk-agents
       - container_registry_data:/var/lib/sigil-containers
       - blackboard_data:/var/lib/sigil-blackboard
       - roadmap_data:/var/lib/sigil-roadmap
@@ -75,11 +67,10 @@ services:
     tmpfs: [/tmp:size=64m, /home/sigil/.cache:size=64m]
     environment:
       NODE_ENV: production
-      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
-      BETTER_AUTH_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_DATA_DIR: /var/lib/sigil-web
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
-      SIGIL_AUTH_REGISTRATION: closed
     secrets: [better_auth_secret]
     volumes: [web_data:/var/lib/sigil-web]
     networks: [backend]
@@ -94,22 +85,20 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3000"
-      BETTER_AUTH_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_DATA_DIR: /var/lib/sigil-web
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
       BETTER_AUTH_SECRET_FILE: /run/secrets/better_auth_secret
       SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
       SIGIL_AUTH_TRUSTED_ORIGINS: https://${PUBLIC_HOST:?set PUBLIC_HOST}
-      SIGIL_AUTH_REGISTRATION: closed
-      SIGIL_DATABASE_URL: file:/var/lib/sigil-web/sigil-chat.db
-      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      SIGIL_AGENT_BINDING_SECRET_FILE: /run/secrets/agent_binding_secret
       EVE_ORIGIN: http://eve:3001
-      GONK_MCP_URL: http://gonk:8808/mcp
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
       SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
       SIGIL_ROADMAP_DIR: /var/lib/sigil-roadmap
       SIGIL_CONTAINER_REGISTRY_ROOT: /var/lib/sigil-containers
       SIGIL_INVITE_TOKEN_PEPPER_FILE: /run/secrets/invite_token_pepper
-    secrets: [better_auth_secret, gonk_mcp_key, invite_token_pepper]
+    secrets: [agent_binding_secret, better_auth_secret, invite_token_pepper]
     volumes:
       - web_data:/var/lib/sigil-web
       - web_scope:/app/.agents
@@ -161,24 +150,29 @@ services:
       HOST: 0.0.0.0
       PORT: "3001"
       SIGIL_INSTALLATION_ID: ${SIGIL_INSTALLATION_ID:?set a non-secret installation id}
-      SIGIL_EVE_AUTH_ISSUER: https://${PUBLIC_HOST:?set PUBLIC_HOST}
-      SIGIL_EVE_AUTH_JWKS_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}/api/auth/jwks
+      SIGIL_PUBLIC_URL: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      SIGIL_EVE_AUTH_JWKS_URL: http://web:3000/api/auth/jwks
       SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH: "0"
-      GONK_MCP_URL: http://gonk:8808/mcp
-      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
+      SIGIL_AGENT_BINDING_SECRET_FILE: /run/secrets/agent_binding_secret
+      SIGIL_DATA_DIR: /var/lib/sigil-web
       CODEX_HOME: /var/lib/sigil-codex
       SIGIL_PERSONA_DIR: /var/lib/sigil-identity/personas
       SIGIL_MEMORY_DIR: /var/lib/sigil-identity/memory
       SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
+      SIGIL_ROADMAP_DIR: /var/lib/sigil-roadmap
+      SIGIL_CONTAINER_REGISTRY_ROOT: /var/lib/sigil-containers
       SIGIL_SANDBOX_MODE: disabled
-    secrets: [gonk_mcp_key]
+    secrets: [agent_binding_secret]
     volumes:
       [
         eve_data:/var/lib/sigil-eve,
+        web_data:/var/lib/sigil-web,
         eve_scope:/app/.agents,
         eve_identity:/var/lib/sigil-identity,
         codex_auth:/var/lib/sigil-codex,
         blackboard_data:/var/lib/sigil-blackboard,
+        roadmap_data:/var/lib/sigil-roadmap,
+        container_registry_data:/var/lib/sigil-containers,
       ]
     expose: ["3001"]
     healthcheck:
@@ -196,48 +190,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 4
-    # edge too: eve needs egress for JWKS-over-HTTPS and model providers
+    # edge too: Eve needs egress for model providers
     networks: [edge, backend]
-
-  gonk:
-    <<: *service-hardening
-    image: ${SIGIL_GONK_IMAGE:?set SIGIL_GONK_IMAGE to an immutable digest}
-    depends_on:
-      storage-init:
-        condition: service_completed_successfully
-    environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
-      PORT: "8808"
-      GONK_MCP_KEY_FILE: /run/secrets/gonk_mcp_key
-      GONK_ALLOWED_HOSTS: gonk:8808
-      SIGIL_CHAT_GRAPH_PATH: /var/lib/sigil-gonk/graph
-      SIGIL_CHAT_REVIEW_PATH: /var/lib/sigil-gonk/review
-      SIGIL_ARTIFACT_DIR: /var/lib/sigil-gonk/artifacts
-      SIGIL_BLACKBOARD_DIR: /var/lib/sigil-blackboard
-      SIGIL_ROADMAP_DIR: /var/lib/sigil-roadmap
-      SIGIL_CONTAINER_REGISTRY_ROOT: /var/lib/sigil-containers
-      SIGIL_LOCAL_CODEX_IMAGE_GENERATION: disabled
-    secrets: [gonk_mcp_key]
-    volumes:
-      - gonk_data:/var/lib/sigil-gonk
-      - gonk_scope:/app/.agents
-      - blackboard_data:/var/lib/sigil-blackboard
-      - roadmap_data:/var/lib/sigil-roadmap
-      - container_registry_data:/var/lib/sigil-containers
-    expose: ["8808"]
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "const fs=require('node:fs');const key=fs.readFileSync('/run/secrets/gonk_mcp_key','utf8').trim();fetch('http://127.0.0.1:8808/health',{headers:{authorization:'Bearer '+key}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 4
-    networks: [backend]
 
   edge:
     <<: *service-hardening
@@ -250,7 +204,6 @@ services:
     depends_on:
       web: { condition: service_healthy }
       eve: { condition: service_healthy }
-      gonk: { condition: service_healthy }
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST}
     ports: ["80:8080", "443:8443"]
@@ -276,10 +229,8 @@ volumes:
   web_scope: {}
   web_appdata: {}
   eve_data: {}
-  gonk_scope: {}
   eve_scope: {}
   eve_identity: {}
-  gonk_data: {}
   blackboard_data: {}
   roadmap_data: {}
   container_registry_data: {}
@@ -288,7 +239,7 @@ volumes:
 secrets:
   better_auth_secret:
     file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/better_auth_secret
-  gonk_mcp_key:
-    file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/gonk_mcp_key
+  agent_binding_secret:
+    file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/agent_binding_secret
   invite_token_pepper:
     file: ${SIGIL_SECRET_DIR:?set SIGIL_SECRET_DIR}/invite_token_pepper

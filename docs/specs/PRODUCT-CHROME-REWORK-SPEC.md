@@ -385,8 +385,8 @@ genuinely multi-user (finding #2's release boundary).
 
 This spec is UI/UX, but one non-UI gate controls how much container-management
 UI is safe to ship: **registry-mutation authz is unresolved.** Per
-`PROJ2-NOTES.md` point 6 and PROJ.1's known issues, the Gonk container tools
-(`apps/gonk/src/registry/containers.ts`) expose global project listing,
+`PROJ2-NOTES.md` point 6 and PROJ.1's known issues, the application container
+tools (`packages/agent-tools/src/containers.ts`) expose global project listing,
 inspection, and replacement **without checking the current principal's
 membership.** `PROJ2-BUILD-BRIEF.md` is explicit: "do not build PROJ.2 to depend
 on registry-mutation authz guarantees that aren't yet enforced."
@@ -543,7 +543,7 @@ authorization seam as a release boundary, not a TODO to quietly exceed.
 ## 9. Verification (implementation must hit these)
 
 - `pnpm --filter web typecheck`, `--filter sigil-chat-agent typecheck`,
-  `--filter sigil-chat-gonk typecheck` — clean.
+  `--filter @workspace/agent-tools typecheck` — clean.
 - `pnpm --filter web exec vitest run` — existing suite green + new tests for
   criteria 1, 2, 4, 6, 8, 11, 12.
 - `pnpm --filter web exec eslint` on every touched `apps/web` file — clean.
@@ -598,5 +598,7 @@ authorization seam as a release boundary, not a TODO to quietly exceed.
   what the agent sees with what it annotates; one selection contract, shared
   with input (David, this turn). Coupling is deliberate.
 - **Q8 (§3.7) — resolved:** agent annotation tools (`sigil-annotate` / `pin` /
-  `highlight`) live in **Gonk** (`apps/gonk/src/registry/`), alongside the
-  existing `sigil-project-*` / `sigil-workspace-*` tools (David, this turn).
+  `highlight`) live in the application registry
+  (`packages/agent-tools/src/annotations.ts`) and are hosted natively by Eve
+  through Gonk, alongside the existing `sigil-project-*` /
+  `sigil-workspace-*` tools (David, this turn).
