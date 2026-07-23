@@ -39,6 +39,7 @@ import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
+import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import {
   AGENT_SCOPE_HEADER,
@@ -210,53 +211,93 @@ export function AgentChat({
         ))}
       </ChatList>
 
-      <div className="max-w-3xl border-t border-border">
-        {/* §9.4 — approval mode has no header to live in when hideHeader is
-            set (the session surface's own reduced header, session-chat-header.tsx);
-            it moves to the composer instead, matching both reference apps.
-            A future non-session AgentChat caller keeps it in the header
-            (showApprovalMode there, untouched) — additive, not a second
-            copy, since the two never render for the same caller. */}
-        {hideHeader && showApprovalMode && approvalMode && onApprovalModeChange ? (
-          <div className="flex items-center gap-2 px-3 pt-1.5">
-            <Select
-              onValueChange={(value) => {
-                if (value) onApprovalModeChange(value as ToolApprovalMode)
-              }}
-              value={approvalMode}
-            >
-              <SelectTrigger
-                aria-label="Tool approval mode"
-                className="max-sm:h-11"
-                size="sm"
-                title="Tool approval mode"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="start">
-                <SelectItem value="ask">Ask</SelectItem>
-                <SelectItem value="always">Always allow</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-        <ChatInput
-          actionClassName="max-sm:size-11"
-          attachments={attachments}
-          className="border-t-0"
-          disabled={session.status === "error" || attachmentsUploading}
-          isStreaming={busy}
-          onAttach={addFiles}
-          onAttachUrl={handleAttachUrl}
-          onChange={setInput}
-          onRemoveAttachment={removeAttachment}
-          onSend={handleSend}
-          onStop={session.stop}
-          placeholder={placeholder}
-          value={input}
-        />
-      </div>
+      {/* §9.7 — one contained box, one control row: ChatInput owns its own
+          border now (packages/chat restructure); this is just the same
+          left-anchored max-w-3xl cap ChatList uses, plus matching spacing so
+          the box's left edge lines up with the message content's own
+          padding. The orphaned approval-Select row that used to sit above
+          the input is gone — approval mode and the model label seat in
+          ChatInput's control row instead (session surface only; a future
+          non-session AgentChat caller keeps approval mode in its header,
+          showApprovalMode there, untouched — additive, not a second copy). */}
+      <ChatInput
+        actionClassName="max-sm:size-11"
+        attachments={attachments}
+        className="mx-4 mb-4 max-w-3xl"
+        disabled={session.status === "error" || attachmentsUploading}
+        isStreaming={busy}
+        leadingControls={
+          hideHeader && showApprovalMode && approvalMode && onApprovalModeChange
+            ? () => (
+                <ApprovalChip mode={approvalMode} onChange={onApprovalModeChange} />
+              )
+            : undefined
+        }
+        trailingControls={hideHeader ? <ModelLabel /> : undefined}
+        onAttach={addFiles}
+        onAttachUrl={handleAttachUrl}
+        onChange={setInput}
+        onRemoveAttachment={removeAttachment}
+        onSend={handleSend}
+        onStop={session.stop}
+        placeholder={placeholder}
+        value={input}
+      />
     </div>
+  )
+}
+
+/** §9.7 — the approval-mode chip, reclaiming the row it used to have alone.
+ *  Color means one thing (permission risk): muted for "ask", warning/amber
+ *  for "always allow" — echoing Codex's orange "Full access" chip. */
+function ApprovalChip({
+  mode,
+  onChange,
+}: {
+  mode: ToolApprovalMode
+  onChange: (mode: ToolApprovalMode) => void
+}) {
+  const alwaysAllow = mode === "always"
+  return (
+    <Select
+      onValueChange={(value) => {
+        if (value) onChange(value as ToolApprovalMode)
+      }}
+      value={mode}
+    >
+      <SelectTrigger
+        aria-label="Tool approval mode"
+        className={cn(
+          "h-6 gap-1 rounded-full border px-2 text-[11px] max-sm:h-11",
+          alwaysAllow
+            ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            : "border-border bg-muted/50 text-muted-foreground",
+        )}
+        size="sm"
+        title="Tool approval mode"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="start">
+        <SelectItem value="ask">Ask</SelectItem>
+        <SelectItem value="always">Always allow</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** §9.7 — a static model label, real data (agent runtime catalog), not a
+ *  placeholder: a picker-ready slot for the MODEL-ADMINISTRATION draft, but
+ *  today the model is fixed per-thread, so this just displays it. */
+function ModelLabel() {
+  const catalog = useAgentRuntimeCatalog()
+  const name = catalog.data?.agent.name ?? "Eve"
+  const model = catalog.data?.agent.model
+  return (
+    <span className="hidden shrink-0 truncate px-1.5 font-mono text-[10px] text-muted-foreground sm:inline">
+      {name}
+      {model ? ` · ${model}` : ""}
+    </span>
   )
 }
 
