@@ -1,13 +1,26 @@
 import { createHash, randomUUID } from "node:crypto"
 import { spawnSync } from "node:child_process"
-import { mkdir, mkdtemp, utimes, writeFile } from "node:fs/promises"
+import { channel } from "node:diagnostics_channel"
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  rename,
+  utimes,
+  writeFile,
+} from "node:fs/promises"
+import { utimesSync } from "node:fs"
 import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { describe, expect, it } from "vitest"
 
+import { InMemoryObjectStore, type ObjectStore } from "@mirk/artifact"
+
 import {
   ArtifactScopeAccessDeniedError,
+  ArtifactScopeLockLostError,
+  ArtifactScopeLockTimeoutError,
   createFileSessionArtifactStore,
   SessionArtifactStore,
 } from "../src/repository"
@@ -147,6 +160,132 @@ describe("SessionArtifactStore", () => {
     })
 
     expect(recovered.filename).toBe("lease-recovered.txt")
+  })
+
+  it("recovers an expired ownerless lock directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-artifacts-"))
+    const scope = "workspace:ownerless-lease"
+    const lockName = createHash("sha256").update(scope).digest("hex")
+    const lockPath = join(root, ".locks", `${lockName}.lock`)
+    await mkdir(lockPath, { recursive: true })
+    const expired = new Date(Date.now() - 1_000)
+    await utimes(lockPath, expired, expired)
+
+    const recovered = await createFileSessionArtifactStore({
+      root,
+      lockHeartbeatMs: 5,
+      lockLeaseMs: 25,
+      lockPollMs: 2,
+      lockTimeoutMs: 200,
+    }).putFile({
+      bytes: new TextEncoder().encode("after ownerless lease"),
+      filename: "ownerless-recovered.txt",
+      mediaType: "text/plain",
+      scope,
+    })
+
+    expect(recovered.filename).toBe("ownerless-recovered.txt")
+  })
+
+  it("does not recover an owner that heartbeats between observation and claim", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-artifacts-"))
+    const scope = "workspace:heartbeat-race"
+    const lockName = createHash("sha256").update(scope).digest("hex")
+    const lockPath = join(root, ".locks", `${lockName}.lock`)
+    const token = randomUUID()
+    const ownerPath = join(lockPath, `owner-${token}.json`)
+    await mkdir(lockPath, { recursive: true })
+    await writeFile(
+      ownerPath,
+      JSON.stringify({
+        acquiredAt: "2026-07-20T00:00:00.000Z",
+        hostname: hostname(),
+        pid: process.pid,
+        token,
+      }),
+    )
+    const expired = new Date(Date.now() - 1_000)
+    await utimes(ownerPath, expired, expired)
+
+    let heartbeatCount = 0
+    const claimChannel = channel(
+      "sigil-chat.artifact-store.lock.before-owner-claim",
+    )
+    const heartbeatBeforeClaim = (message: unknown) => {
+      if (
+        typeof message !== "object" ||
+        message === null ||
+        (message as { ownerPath?: unknown }).ownerPath !== ownerPath
+      ) {
+        return
+      }
+      const now = new Date()
+      utimesSync(ownerPath, now, now)
+      heartbeatCount += 1
+    }
+    claimChannel.subscribe(heartbeatBeforeClaim)
+
+    try {
+      await expect(
+        createFileSessionArtifactStore({
+          root,
+          lockLeaseMs: 10,
+          lockPollMs: 1,
+          lockTimeoutMs: 40,
+        }).putFile({
+          bytes: new TextEncoder().encode("must not be written"),
+          filename: "blocked.txt",
+          mediaType: "text/plain",
+          scope,
+        }),
+      ).rejects.toBeInstanceOf(ArtifactScopeLockTimeoutError)
+    } finally {
+      claimChannel.unsubscribe(heartbeatBeforeClaim)
+    }
+
+    expect(heartbeatCount).toBeGreaterThan(0)
+    await expect(readdir(lockPath)).resolves.toEqual([`owner-${token}.json`])
+  })
+
+  it("refuses to commit a manifest after ownership is revoked", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sigil-artifacts-"))
+    const scope = "workspace:revoked-writer"
+    const lockName = createHash("sha256").update(scope).digest("hex")
+    const lockPath = join(root, ".locks", `${lockName}.lock`)
+    const backing = new InMemoryObjectStore()
+    let revokeOnPut = true
+    const objects: ObjectStore = {
+      async put(key, source, options) {
+        const stored = await backing.put(key, source, options)
+        if (revokeOnPut) {
+          revokeOnPut = false
+          const ownerName = (await readdir(lockPath)).find((name) =>
+            name.startsWith("owner-"),
+          )!
+          await rename(
+            join(lockPath, ownerName),
+            join(lockPath, `claimed-${randomUUID()}.json`),
+          )
+        }
+        return stored
+      },
+      get: (key) => backing.get(key),
+      head: (key) => backing.head(key),
+      delete: (key) => backing.delete(key),
+    }
+    const store = new SessionArtifactStore(objects, {
+      lockRoot: join(root, ".locks"),
+    })
+
+    await expect(
+      store.putFile({
+        bytes: new TextEncoder().encode("must not be listed"),
+        filename: "revoked.txt",
+        mediaType: "text/plain",
+        scope,
+      }),
+    ).rejects.toBeInstanceOf(ArtifactScopeLockLostError)
+    await expect(store.listByScope(scope)).resolves.toEqual([])
   })
 
   it("deduplicates identical bytes inside a scope", async () => {
