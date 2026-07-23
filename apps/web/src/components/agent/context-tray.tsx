@@ -67,7 +67,11 @@ interface ContextTrayValue {
 
 const ContextTrayContext = createContext<ContextTrayValue | null>(null)
 
-function useContextTray(): ContextTrayValue {
+// Exported for SC.10 §9.4 — the collapsed context-rail toggle shows a count
+// badge (session-chat-surface.tsx) without mounting the popover itself; it
+// needs the same computed preview this hook already exposes to
+// Trigger/Content, so no separate computation is duplicated for it.
+export function useContextTray(): ContextTrayValue {
   const value = useContext(ContextTrayContext)
   if (!value)
     throw new Error("ContextTray parts must be used inside <ContextTray.Root>.")
