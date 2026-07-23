@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 
 import { describe, expect, it } from "vitest"
 
-import { createFileSessionArtifactStore } from "../../../../packages/artifact-store/src/repository"
+import { createFileSessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { SigilAuthSession } from "./auth/server"
 import {
   readArtifactImage,

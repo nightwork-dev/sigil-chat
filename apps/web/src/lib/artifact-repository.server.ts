@@ -4,7 +4,7 @@ import {
   type ScopePrincipal,
   type SessionArtifactStore,
   type SessionArtifactMetadata,
-} from "../../../../packages/artifact-store/src/repository"
+} from "@workspace/artifact-store/repository"
 
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
 import type { SigilAuthSession } from "./auth/server"

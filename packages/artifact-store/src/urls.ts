@@ -18,11 +18,9 @@ export function imageKeyFor(bytes: Uint8Array, mediaType: string): string {
 
 /** Same-origin path the browser fetches through the authenticated web route. */
 export function imagePublicUrl(key: string, scope: ScopeInput): string {
-  const base = process.env.GONK_PUBLIC_URL
   const scopeHeader = formatScopeHeader(scope)
   if (!scopeHeader) throw new Error("Artifact URL requires a valid scope")
-  const path = `/api/media/artifact?key=${encodeURIComponent(key)}&scope=${encodeURIComponent(scopeHeader)}`
-  return base ? `${base.replace(/\/$/, "")}${path}` : path
+  return `/api/media/artifact?key=${encodeURIComponent(key)}&scope=${encodeURIComponent(scopeHeader)}`
 }
 
 /** Same served URL scheme as {@link imagePublicUrl}, named for uploads. */
