@@ -18,7 +18,7 @@ export function AppChat() {
       approvalMode={approvalMode}
       hideHeader
       onApprovalModeChange={setToolApprovalMode}
-      placeholder="Ask the agent, or tell it to use a Gonk tool…"
+      placeholder="Ask the agent, or tell it to use an application tool…"
     />
   )
 }

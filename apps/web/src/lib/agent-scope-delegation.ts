@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
+import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
 
 import type { SigilAuthSession } from "./auth/server"
 
@@ -14,8 +15,7 @@ const issueAgentScopeProof = createServerFn({ method: "POST" })
   .validator((scope: string) => scope)
   .handler(async ({ data: scope }): Promise<ScopeProofReceipt> => {
     const { getSession, requireSession } = await import("./auth/session")
-    const { ownedAgentThreadHomeScope } =
-      await import("./agent-threads.server")
+    const { ownedAgentThreadHomeScope } = await import("./agent-threads.server")
     const { issueScopeDelegation } =
       await import("@workspace/agent-contracts/scope-delegation.server")
     const session = await getSession()
@@ -33,7 +33,10 @@ const issueAgentScopeProof = createServerFn({ method: "POST" })
       undefined,
       "tool",
     )
-    const secret = process.env.GONK_MCP_KEY?.trim()
+    const secret = readOptionalSecretFromFile(
+      process.env,
+      "SIGIL_AGENT_BINDING_SECRET",
+    )
     if (!secret) throw new Error("Agent scope delegation is unavailable.")
     const expiresAt =
       Math.floor(Date.now() / 1_000) + SCOPE_PROOF_LIFETIME_SECONDS

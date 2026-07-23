@@ -1,12 +1,17 @@
-import type { HandleMessageStreamEvent, SessionState } from "eve/client";
-
 import {
   sanitizeAndBoundAgentEvents,
   type AgentEventCompactionReceipt,
+  type AgentRuntimeStreamEvent,
   type PersistedAgentEvent,
 } from "./agent-event-retention";
 
 export type AgentThreadStatus = "active" | "archived";
+
+export interface AgentRuntimeSessionState {
+  continuationToken?: string;
+  sessionId?: string;
+  streamIndex: number;
+}
 
 export interface AgentThreadForkMessage {
   role: "user" | "assistant";
@@ -55,7 +60,7 @@ export interface AgentThread {
   status: AgentThreadStatus;
   revision: number;
   eve: {
-    session: SessionState;
+    session: AgentRuntimeSessionState;
     events: PersistedAgentEvent[];
     compaction: AgentEventCompactionReceipt;
   };
@@ -74,22 +79,7 @@ export interface AgentThread {
 export interface AgentThreadPreference {
   members: string[];
   activeThreadId?: string;
-  /**
-   * The principal's active container selection (PRODUCT-CHROME-REWORK-SPEC
-   * §3.1) — the global "where am I" every scoped surface reads. Both fields
-   * are optional: no selection resolves to the principal's personal project.
-   * A workspace selection always implies its containing project (derived via
-   * the registry, validated by the server fn — the domain store does not
-   * know the registry); a project-only selection means "project scope, no
-   * specific workspace."
-   */
-  activeProjectId?: string;
-  activeWorkspaceId?: string;
-  /**
-   * Replaces the scalar container preference. The server validates and
-   * canonicalizes it before write; the scalar fields remain as a temporary
-   * compatibility projection for callers not yet migrated to perspectives.
-   */
+  /** The principal's canonical active container path. */
   activePerspective?: ScopePerspective;
   updatedAt: string;
 }
@@ -123,8 +113,8 @@ export interface AgentThreadRepositoryOptions {
 }
 
 export interface AgentThreadSnapshot {
-  session: SessionState;
-  events: HandleMessageStreamEvent[];
+  session: AgentRuntimeSessionState;
+  events: AgentRuntimeStreamEvent[];
 }
 
 export interface ForkAgentThreadInput {
@@ -214,13 +204,12 @@ export class AgentThreadRepository {
       : undefined;
   }
 
-  create(
-    userId: string,
-    input: CreateAgentThreadInput = {},
-  ): AgentThread {
+  create(userId: string, input: CreateAgentThreadInput = {}): AgentThread {
     const timestamp = this.now().toISOString();
     const workspaceId = normalizeWorkspaceId(input.workspaceId);
-    const personaId = normalizePersonaId(input.personaId ?? this.defaultPersonaId);
+    const personaId = normalizePersonaId(
+      input.personaId ?? this.defaultPersonaId,
+    );
     const executionBinding = input.executionBinding
       ? normalizeExecutionBinding(input.executionBinding, {
           principalId: userId,
@@ -456,18 +445,13 @@ export class AgentThreadRepository {
 
   /**
    * Persist the principal's active container selection. Membership and
-   * containment are validated by the server fn (it has the registries);
-   * this layer only enforces shape — a workspace selection clears a stale
-   * project field is NOT done here, both are stored verbatim (see the
-   * preference interface for the derivation rule).
+   * containment are validated by the server fn (it has the registries). This
+   * layer stores only the canonical perspective and drops legacy scalar
+   * projections whenever it writes the record.
    */
   setActiveContainer(
     userId: string,
-    container: {
-      projectId?: string;
-      workspaceId?: string;
-      perspective?: ScopePerspective;
-    },
+    container: { perspective?: ScopePerspective },
     updatedAt = this.now().toISOString(),
   ): AgentThreadPreference {
     // Same raw-read rule as setActive (see the comment there).
@@ -477,20 +461,13 @@ export class AgentThreadRepository {
       activeProjectId: _activeProjectId,
       activeWorkspaceId: _activeWorkspaceId,
       ...retained
-    } = existing ?? { members: [userId] };
-    const perspective =
-      normalizeScopePerspective(container.perspective) ??
-      legacyContainerPerspective({
-        activeProjectId: container.projectId,
-        activeWorkspaceId: container.workspaceId,
-      });
+    } = (existing as StoredAgentThreadPreference | undefined) ?? {
+      members: [userId],
+    };
+    const perspective = normalizeScopePerspective(container.perspective);
     const preference: AgentThreadPreference = {
       ...retained,
       members: [userId],
-      ...(container.projectId ? { activeProjectId: container.projectId } : {}),
-      ...(container.workspaceId
-        ? { activeWorkspaceId: container.workspaceId }
-        : {}),
       ...(perspective ? { activePerspective: perspective } : {}),
       updatedAt,
     };
@@ -525,7 +502,7 @@ export class AgentThreadRepository {
 
   private normalizeThread(thread: AgentThread): AgentThread {
     const hasPersonaId =
-      typeof thread.personaId === "string" && thread.personaId.trim()
+      typeof thread.personaId === "string" && thread.personaId.trim();
     const normalized = cloneThread({
       ...thread,
       personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
@@ -665,7 +642,9 @@ function normalizePersonaId(personaId: string): string {
   return normalized;
 }
 
-function normalizeWorkspaceId(workspaceId: string | undefined): string | undefined {
+function normalizeWorkspaceId(
+  workspaceId: string | undefined,
+): string | undefined {
   const normalized = workspaceId?.trim();
   return normalized ? normalized : undefined;
 }
@@ -690,7 +669,9 @@ function normalizeExecutionBinding(
     initialPerspective:
       normalizeScopePerspective(binding.initialPerspective) ??
       failInvalidPerspective(),
-    additionalContextScopeIds: dedupeScopeIds(binding.additionalContextScopeIds),
+    additionalContextScopeIds: dedupeScopeIds(
+      binding.additionalContextScopeIds,
+    ),
   };
 }
 
@@ -776,26 +757,44 @@ function normalizeScopePerspective(
 function normalizePreferencePerspective(
   preference: AgentThreadPreference,
 ): AgentThreadPreference {
-  const perspective = normalizeScopePerspective(preference.activePerspective);
+  const stored = preference as StoredAgentThreadPreference;
+  const {
+    activeProjectId: _activeProjectId,
+    activeWorkspaceId: _activeWorkspaceId,
+    ...withoutLegacy
+  } = stored;
+  const perspective =
+    normalizeScopePerspective(preference.activePerspective) ??
+    legacyContainerPerspective(stored);
   if (perspective) {
     const unchanged =
+      !("activeProjectId" in stored) &&
+      !("activeWorkspaceId" in stored) &&
       preference.activePerspective?.focusScopeId === perspective.focusScopeId &&
       preference.activePerspective.viaScopeIds.every(
         (scopeId, index) => scopeId === perspective.viaScopeIds[index],
       );
-    return unchanged ? preference : { ...preference, activePerspective: perspective };
-  }
-  const legacy = legacyContainerPerspective(preference);
-  if (!legacy) {
-    return preference.activePerspective === undefined
+    return unchanged
       ? preference
-      : withoutActivePerspective(preference);
+      : { ...withoutLegacy, activePerspective: perspective };
   }
-  return { ...preference, activePerspective: legacy };
+  if (
+    preference.activePerspective === undefined &&
+    !("activeProjectId" in stored) &&
+    !("activeWorkspaceId" in stored)
+  ) {
+    return preference;
+  }
+  return withoutActivePerspective(withoutLegacy);
 }
 
+type StoredAgentThreadPreference = AgentThreadPreference & {
+  activeProjectId?: string;
+  activeWorkspaceId?: string;
+};
+
 function legacyContainerPerspective(
-  container: Pick<AgentThreadPreference, "activeProjectId" | "activeWorkspaceId">,
+  container: StoredAgentThreadPreference,
 ): ScopePerspective | undefined {
   if (container.activeWorkspaceId) {
     return {
@@ -833,7 +832,7 @@ function isMember(members: unknown, userId: string): boolean {
   return Array.isArray(members) && members.includes(userId);
 }
 
-function freshEveSession(): SessionState {
+function freshEveSession(): AgentRuntimeSessionState {
   return { streamIndex: 0 };
 }
 
@@ -843,7 +842,9 @@ function emptyCompaction(timestamp: string): AgentEventCompactionReceipt {
   }).compaction;
 }
 
-function cloneSession(session: SessionState): SessionState {
+function cloneSession(
+  session: AgentRuntimeSessionState,
+): AgentRuntimeSessionState {
   return {
     ...(session.continuationToken
       ? { continuationToken: session.continuationToken }

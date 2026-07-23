@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getSession, requireSession } from "./auth/session";
 import { type DistilledArtifact } from "@/components/agent/distilled-artifact-card";
 
-// Wire contract with apps/gonk `registry/distill.ts` DISTILL_MEDIA_TYPE: distilled
+// Wire contract with @workspace/agent-tools/distill: distilled
 // artifacts are stored at the turn's scope with this media type, so they land in
 // the room's corpus alongside documents and we split the two by media type.
 const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json";
@@ -45,12 +45,10 @@ const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 const listEvidenceDocumentsFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<EvidenceDocument[]> => {
     requireSession(await getSession());
-    const { getWebArtifactStore, artifactUrlForWeb } = await import(
-      "./artifact-repository.server"
-    );
-    const artifacts = await getWebArtifactStore().listByScope(
-      EVIDENCE_ROOM_SCOPE,
-    );
+    const { getWebArtifactStore, artifactUrlForWeb } =
+      await import("./artifact-repository.server");
+    const artifacts =
+      await getWebArtifactStore().listByScope(EVIDENCE_ROOM_SCOPE);
     // Distilled cards live in the same scope; the library lists documents only.
     return artifacts
       .filter((doc) => doc.mediaType !== DISTILL_MEDIA_TYPE)
@@ -68,9 +66,8 @@ const listEvidenceDocumentsFn = createServerFn({ method: "GET" }).handler(
 const listEvidenceDistillsFn = createServerFn({ method: "GET" }).handler(
   async (): Promise<EvidenceDistill[]> => {
     requireSession(await getSession());
-    const { getWebArtifactStore } = await import(
-      "./artifact-repository.server"
-    );
+    const { getWebArtifactStore } =
+      await import("./artifact-repository.server");
     const store = getWebArtifactStore();
     const artifacts = await store.listByScope(EVIDENCE_ROOM_SCOPE);
     const distillMetas = artifacts.filter(
@@ -112,9 +109,8 @@ const uploadEvidenceDocumentFn = createServerFn({ method: "POST" })
       );
     }
 
-    const { getWebArtifactStore, artifactUrlForWeb } = await import(
-      "./artifact-repository.server"
-    );
+    const { getWebArtifactStore, artifactUrlForWeb } =
+      await import("./artifact-repository.server");
     const bytes = new Uint8Array(await file.arrayBuffer());
     const uploaded = await getWebArtifactStore().putFile({
       bytes,
@@ -136,9 +132,8 @@ const deleteEvidenceDocumentFn = createServerFn({ method: "POST" })
   .validator((data: { id: string }) => data)
   .handler(async ({ data }): Promise<{ deleted: boolean; id: string }> => {
     requireSession(await getSession());
-    const { getWebArtifactStore } = await import(
-      "./artifact-repository.server"
-    );
+    const { getWebArtifactStore } =
+      await import("./artifact-repository.server");
     const deleted = await getWebArtifactStore().removeFromScope(
       data.id,
       EVIDENCE_ROOM_SCOPE,

@@ -9,8 +9,8 @@ import { nitro } from "nitro/vite"
 import { readRuntimeTopology } from "@workspace/runtime-env/topology"
 import { brandingDefine } from "./vite.branding"
 
-// Load the repo-root .env for all server-only configuration, including Gonk
-// transport auth and Better Auth. process.loadEnvFile preserves explicitly
+// Load the repo-root .env for server-only configuration such as Better Auth.
+// process.loadEnvFile preserves explicitly
 // exported values, so the root file remains the local default rather than an
 // override.
 const rootEnv = resolve(import.meta.dirname, "../../.env")

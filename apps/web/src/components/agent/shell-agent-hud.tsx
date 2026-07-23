@@ -51,7 +51,7 @@ export function ShellAgentHud() {
           // the full /chat view where there's room (and out of the narrow
           // toolbar, where it collided with the session switcher).
           showContextPrivacy: false,
-          placeholder: "Ask the agent, or tell it to use a Gonk tool…",
+          placeholder: "Ask the agent, or tell it to use an application tool…",
         }}
       />
     </AgentHud.Root>

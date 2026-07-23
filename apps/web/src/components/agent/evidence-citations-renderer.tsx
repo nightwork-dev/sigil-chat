@@ -7,7 +7,7 @@ import {
 } from "@workspace/ui/components/tool-renderer-registry"
 
 // Local view of the sigil-evidence-ask output. The web
-// renderer owns what it reads from the tool result — no dependency on apps/gonk.
+// renderer owns what it reads from the tool result — no dependency on the host.
 interface EvidenceLocator {
   startLine: number
   endLine: number
@@ -33,7 +33,8 @@ export interface EvidenceSearchResult {
  * ToolCall view during approval/executing. Mobile-clean: quotes wrap.
  */
 export function EvidenceCitationsRenderer(props: ToolRendererProps) {
-  const result = getToolOutputData(props.part) as EvidenceSearchResult | undefined
+  const result = getToolOutputData(props.part) as
+    EvidenceSearchResult | undefined
   if (!result || typeof result.grounding !== "string") {
     return <ToolCall {...props} />
   }
@@ -45,7 +46,11 @@ export function EvidenceCitationsRenderer(props: ToolRendererProps) {
  * the D4.4 Evidence Room ask region. Honest by construction: a no-evidence
  * result renders "no supporting evidence" rather than an empty panel.
  */
-export function EvidenceCitations({ result }: { result: EvidenceSearchResult }) {
+export function EvidenceCitations({
+  result,
+}: {
+  result: EvidenceSearchResult
+}) {
   if (result.grounding === "no-evidence" || result.citations.length === 0) {
     return (
       <div className="my-1.5 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">

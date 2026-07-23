@@ -1,9 +1,8 @@
 // Local-dev seed for exercising product homes through the same durable stores
 // and authorization paths used by the running application.
 
-import { fileURLToPath } from "node:url"
-
 import type { HandleMessageStreamEvent } from "eve/client"
+import { getSessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { BoardView, Story } from "@workspace/work-items-store/types"
 import { workItemsRepository } from "@workspace/work-items-store"
 
@@ -401,7 +400,7 @@ function completedAnnotation(
         callId: `call-${anchorId}`,
         kind: "tool-result",
         output: { structuredContent: { data: { anchorId, body, label } } },
-        toolName: "gonk__sigil-annotate",
+        toolName: "sigil-annotate",
       },
       sequence: 2,
       status: "completed",
@@ -484,13 +483,6 @@ async function ensureBoard(view: BoardView): Promise<void> {
 }
 
 async function seedArtifacts(sessionId: string): Promise<void> {
-  if (!process.env.SIGIL_ARTIFACT_DIR?.trim()) {
-    process.env.SIGIL_ARTIFACT_DIR = fileURLToPath(
-      new URL("../../gonk/.data/artifacts", import.meta.url),
-    )
-  }
-  const { getSessionArtifactStore } =
-    await import("../../gonk/src/artifact-store")
   const store = getSessionArtifactStore()
   const encoder = new TextEncoder()
   await store.putFile({

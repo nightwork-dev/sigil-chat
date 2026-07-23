@@ -1,7 +1,7 @@
 // Extract agent annotation tool-call outputs from a session, keyed by anchor.
 //
 // The surface-agnostic half of overlay projection: the agent calls
-// sigil-annotate / pin / highlight, Gonk returns { anchorId, body, kind, label },
+// sigil-annotate / pin / highlight returns { anchorId, body, kind, label },
 // and this hook collects those outputs from the session messages so any surface
 // can mount an AnnotationOverlay beside each resolved anchor (a Review passage,
 // a Studio graph node, etc.).
@@ -26,9 +26,15 @@ export interface AgentAnnotation {
   readonly toolCallId: string
 }
 
-const ANNOTATION_TOOLS = new Set(["sigil-annotate", "sigil-pin", "sigil-highlight"])
+const ANNOTATION_TOOLS = new Set([
+  "sigil-annotate",
+  "sigil-pin",
+  "sigil-highlight",
+])
 
-function isAnnotationOutput(value: unknown): value is Omit<AgentAnnotation, "toolCallId"> {
+function isAnnotationOutput(
+  value: unknown,
+): value is Omit<AgentAnnotation, "toolCallId"> {
   if (!value || typeof value !== "object") return false
   const v = value as Record<string, unknown>
   return (
@@ -49,8 +55,7 @@ export function extractAnnotations(
   const out: AgentAnnotation[] = []
   for (const part of parts) {
     if (part.state !== "output-available") continue
-    // Strip an MCP server prefix (gonk__sigil-annotate) the same way the
-    // projection registry and tool-renderer registry do.
+    // Accept legacy transport-prefixed names retained in persisted sessions.
     const sep = part.name.indexOf("__")
     const bareName = sep >= 0 ? part.name.slice(sep + 2) : part.name
     if (!ANNOTATION_TOOLS.has(bareName)) continue
@@ -66,13 +71,14 @@ export function extractAnnotations(
  * anchorId. A passage with id === anchorId is where the overlay mounts. Returns
  * an empty array when there's no session or no annotation tool-calls yet.
  */
-export function useAgentAnnotationsByAnchor(): ReadonlyMap<string, readonly AgentAnnotation[]> {
+export function useAgentAnnotationsByAnchor(): ReadonlyMap<
+  string,
+  readonly AgentAnnotation[]
+> {
   const session = useAgentRuntimeSession()
   return useMemo(() => {
     const toolCalls = session.data.messages.flatMap((m) =>
-      m.parts.filter(
-        (p): p is AgentToolCallPart => p.type === "tool-call",
-      ),
+      m.parts.filter((p): p is AgentToolCallPart => p.type === "tool-call"),
     )
     const annotations = extractAnnotations(toolCalls)
     const byAnchor = new Map<string, AgentAnnotation[]>()

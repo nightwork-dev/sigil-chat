@@ -161,7 +161,10 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
   ): ResolvedThreadBinding {
     const preference = dependencies.repository.getActivePreference(principalId);
     const explicitWorkspace = input.workspaceId?.trim();
-    const activeWorkspace = preference.activeWorkspaceId?.trim();
+    const activeFocus = preference.activePerspective?.focusScopeId.trim();
+    const activeWorkspace = activeFocus
+      ? dependencies.registries.workspaces.get(activeFocus)?.id
+      : undefined;
     const requiresWorkspace =
       input.sessionKind === "workspace" || explicitWorkspace !== undefined;
     const workspaceId = explicitWorkspace ?? activeWorkspace;

@@ -215,7 +215,6 @@ describe("agent thread binding service", () => {
     const { grants, repository, service } = fixture();
     grantWorkspace(grants);
     repository.setActiveContainer(PRINCIPAL, {
-      workspaceId: WORKSPACE,
       perspective: { focusScopeId: WORKSPACE, viaScopeIds: [PROJECT] },
     });
 
@@ -227,7 +226,9 @@ describe("agent thread binding service", () => {
 
   it("falls back to a materialized personal session and honors explicit personal", () => {
     const { personalScopes, repository, service } = fixture();
-    repository.setActiveContainer(PRINCIPAL, { workspaceId: WORKSPACE });
+    repository.setActiveContainer(PRINCIPAL, {
+      perspective: { focusScopeId: WORKSPACE, viaScopeIds: [] },
+    });
 
     const implicit = service.create(PRINCIPAL, { personaId: "sigil-chat-eve" });
     const explicit = service.create(PRINCIPAL, {
@@ -266,7 +267,9 @@ describe("agent thread binding service", () => {
   it("creates a bound first-load thread and migrates legacy workspace records", () => {
     const { grants, repository, service, threadStore } = fixture();
     grantWorkspace(grants);
-    repository.setActiveContainer(PRINCIPAL, { workspaceId: WORKSPACE });
+    repository.setActiveContainer(PRINCIPAL, {
+      perspective: { focusScopeId: WORKSPACE, viaScopeIds: [] },
+    });
 
     const firstLoad = service.ensureActive(PRINCIPAL);
     expect(firstLoad[0]?.executionBinding?.homeScopeId).toBe(WORKSPACE);

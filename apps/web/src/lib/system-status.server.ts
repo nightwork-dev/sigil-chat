@@ -6,7 +6,6 @@ import {
   measureService,
   type SystemStatus,
 } from "./system-status"
-import { readGonkClientEnvironment } from "@workspace/runtime-env/server"
 import {
   joinRuntimeUrl,
   readRuntimeTopology,
@@ -20,8 +19,6 @@ export interface SystemStatusDependencies {
   now: () => Date
   readEnvironment: () => {
     eveOrigin: string
-    gonkApiKey: string | undefined
-    gonkMcpUrl: string
   }
 }
 
@@ -61,27 +58,10 @@ export async function readSystemStatus(
           `Eve readiness returned HTTP ${response.status}. Run the model-aware Eve healthcheck inside the container.`,
         )
       }
-    }),
-    measureService("gonk", "Application tools and artifact store", async () => {
-      if (!environment.gonkApiKey)
+      const readiness: unknown = await response.json()
+      if (!hasReadyApplicationTools(readiness)) {
         throw new ServiceDiagnosticError(
-          "GONK_MCP_KEY is unavailable to the web server. Check the mounted service secret.",
-        )
-      const url = new URL("/health", environment.gonkMcpUrl)
-      let response: Response
-      try {
-        response = await dependencies.fetcher(url, {
-          headers: { authorization: `Bearer ${environment.gonkApiKey}` },
-          signal: AbortSignal.timeout(5_000),
-        })
-      } catch {
-        throw new ServiceDiagnosticError(
-          "Gonk readiness did not respond. Check the Gonk container and internal MCP URL.",
-        )
-      }
-      if (!response.ok) {
-        throw new ServiceDiagnosticError(
-          `Gonk readiness returned HTTP ${response.status}. Check Gonk artifact-store logs and the service bearer.`,
+          "Eve is reachable, but its native application tools are unavailable. Check the agent build and logs.",
         )
       }
     }),
@@ -103,12 +83,22 @@ function defaultDependencies(): SystemStatusDependencies {
     now: () => new Date(),
     readEnvironment: () => {
       const topology = readRuntimeTopology(process.env)
-      const gonk = readGonkClientEnvironment(process.env)
       return {
         eveOrigin: topology.eveOrigin,
-        gonkApiKey: gonk.apiKey,
-        gonkMcpUrl: gonk.gonkMcpUrl,
       }
     },
   }
+}
+
+function hasReadyApplicationTools(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false
+  const tools = (value as { applicationTools?: unknown }).applicationTools
+  if (typeof tools !== "object" || tools === null) return false
+  const state = tools as { count?: unknown; status?: unknown }
+  return (
+    state.status === "ready" &&
+    typeof state.count === "number" &&
+    Number.isInteger(state.count) &&
+    state.count > 0
+  )
 }

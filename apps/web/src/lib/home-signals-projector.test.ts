@@ -80,7 +80,7 @@ function tool(
         callId: `call-${toolName}`,
         kind: "tool-result",
         output,
-        toolName: `gonk__${toolName}`,
+        toolName,
       },
       sequence: 2,
       status,

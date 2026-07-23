@@ -41,7 +41,7 @@ type ArtifactFilter = "all" | "files" | "images" | "distills"
 const DISTILL_MEDIA_TYPE = "application/vnd.sigil.distill+json"
 
 /**
- * A scope-aware index over artifacts that already exist in Gonk. It is not a
+ * A scope-aware index over artifacts in the application repository. It is not a
  * second library: Evidence remains the place to curate the shared corpus;
  * this workspace lets someone follow an artifact from a live session back to
  * that corpus, inspect its bytes, and see the provenance the store actually

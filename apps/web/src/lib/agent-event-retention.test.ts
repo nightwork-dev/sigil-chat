@@ -1,14 +1,14 @@
-import type { HandleMessageStreamEvent } from "eve/client";
 import { describe, expect, it } from "vitest";
 
 import {
   AGENT_EVENT_RETENTION_POLICY,
   agentEventsForReplay,
   sanitizeAndBoundAgentEvents,
+  type AgentRuntimeStreamEvent,
 } from "./agent-event-retention";
 
-function event(value: unknown): HandleMessageStreamEvent {
-  return value as HandleMessageStreamEvent;
+function event(value: unknown): AgentRuntimeStreamEvent {
+  return value as AgentRuntimeStreamEvent;
 }
 
 describe("agent event retention", () => {

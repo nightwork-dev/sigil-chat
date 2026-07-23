@@ -8,16 +8,16 @@ describe("tool approval preference header", () => {
     expect(serializeToolApprovalPreference("always", {})).toBe("always")
   })
 
-  it("includes exact qualified tool-name overrides", () => {
+  it("includes exact native tool-name overrides", () => {
     expect(
       JSON.parse(
         serializeToolApprovalPreference("ask", {
-          "gonk__sigil-read-file": "always",
+          "sigil-read-file": "always",
         }),
       ),
     ).toEqual({
       default: "ask",
-      tools: { "gonk__sigil-read-file": "always" },
+      tools: { "sigil-read-file": "always" },
     })
   })
 })

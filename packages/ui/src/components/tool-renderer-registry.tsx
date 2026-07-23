@@ -51,7 +51,7 @@ export function setDefaultToolRenderer(renderer: ToolRenderer): void {
  * Resolve a part's renderer: exact `name` → name with an MCP server prefix
  * (`server__tool`) stripped → `kind:<kind>` → default. The prefix-stripping lets
  * a renderer register under the bare tool name (`"sigil-generate-image"`) and
- * still match the namespaced call the model makes (`"gonk__sigil-generate-image"`).
+ * still match a transport-namespaced call (`"server__sigil-generate-image"`).
  */
 export function resolveToolRenderer(
   part: AgentToolCallPart,

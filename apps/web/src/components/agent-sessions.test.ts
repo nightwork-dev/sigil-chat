@@ -4,8 +4,7 @@ import { act, createElement } from "react";
 import * as ReactRuntime from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EveAgentStoreSnapshot } from "eve/client";
-import type { EveMessageData } from "eve/react";
+import type { UseEveRuntimeSessionOptions } from "@zigil/agent-eve";
 import { useAgentRuntimeSession } from "@zigil/agent-react/session";
 import type {
   AgentRuntimeSession,
@@ -24,13 +23,17 @@ import {
 // apply the automatic JSX transform. The application build does not.
 Object.assign(globalThis, { React: ReactRuntime });
 
+type AgentAdapterSnapshot = Parameters<
+  NonNullable<UseEveRuntimeSessionOptions["onFinish"]>
+>[0];
+
 type EveCallbacks = {
-  onFinish?: (snapshot: EveAgentStoreSnapshot<EveMessageData>) => void;
+  onFinish?: (snapshot: AgentAdapterSnapshot) => void;
 };
 
 const harness = vi.hoisted(() => ({
   eveCallbacks: null as EveCallbacks | null,
-  nextSnapshot: null as EveAgentStoreSnapshot<EveMessageData> | null,
+  nextSnapshot: null as AgentAdapterSnapshot | null,
   session: null as AgentRuntimeSession | null,
   expectedRevisions: [] as Array<{
     operation: "consume" | "rename" | "snapshot";
@@ -161,7 +164,9 @@ vi.mock("@/lib/agent-threads", () => ({
 }));
 
 vi.mock("@/lib/agent-session-binding", () => ({
-  getAgentSessionBindingProof: vi.fn(async () => "signed-session-binding"),
+  getAgentSessionBindingProof: vi.fn(() =>
+    Promise.resolve("signed-session-binding"),
+  ),
 }));
 
 let container: HTMLDivElement;
@@ -362,7 +367,7 @@ function createForkedConversation(): AgentThread {
   });
 }
 
-function snapshot(streamIndex: number): EveAgentStoreSnapshot<EveMessageData> {
+function snapshot(streamIndex: number): AgentAdapterSnapshot {
   return {
     data: { messages: [] },
     error: undefined,

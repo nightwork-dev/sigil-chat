@@ -3,9 +3,12 @@ import type {
   AgentRuntimeToolCatalogItem,
   AgentToolCatalogItem,
 } from "./agent-catalog"
-import type { ToolApprovalMode, ToolApprovalOverrides } from "./agent-tool-approval"
+import type {
+  ToolApprovalMode,
+  ToolApprovalOverrides,
+} from "./agent-tool-approval"
 
-export type CapabilitySource = "Gonk application tool" | "Eve runtime"
+export type CapabilitySource = "Application tool" | "Agent runtime"
 
 export interface CapabilityItem {
   id: string
@@ -34,7 +37,8 @@ const GROUPS: Record<string, GroupDefinition> = {
   "agent-memory": {
     id: "agent-memory",
     title: "Memory",
-    description: "Recall and curate durable context within the authenticated relationship.",
+    description:
+      "Recall and curate durable context within the authenticated relationship.",
   },
   "app-guidance": {
     id: "app-guidance",
@@ -44,7 +48,8 @@ const GROUPS: Record<string, GroupDefinition> = {
   "connected-tools": {
     id: "connected-tools",
     title: "Connected application tools",
-    description: "Find the application capability that fits the current request.",
+    description:
+      "Find the application capability that fits the current request.",
   },
   conversation: {
     id: "conversation",
@@ -59,7 +64,8 @@ const GROUPS: Record<string, GroupDefinition> = {
   "files-evidence": {
     id: "files-evidence",
     title: "Files & evidence",
-    description: "Read scoped files, ground answers in sources, and preserve distills.",
+    description:
+      "Read scoped files, ground answers in sources, and preserve distills.",
   },
   graph: {
     id: "graph",
@@ -94,12 +100,14 @@ const GROUPS: Record<string, GroupDefinition> = {
   "workspace-shell": {
     id: "workspace-shell",
     title: "Workspace files & shell",
-    description: "Inspect and change files inside the agent's managed workspace.",
+    description:
+      "Inspect and change files inside the agent's managed workspace.",
   },
   other: {
     id: "other",
     title: "Other available tools",
-    description: "Live capabilities that do not yet have a more specific product grouping.",
+    description:
+      "Live capabilities that do not yet have a more specific product grouping.",
   },
 }
 
@@ -110,7 +118,7 @@ const MEMORY_RUNTIME_TOOLS = new Set([
   "forget-memory",
 ])
 
-function groupForGonkTool(name: string): string {
+function groupForApplicationTool(name: string): string {
   if (name.startsWith("sigil-graph-") || name === "sigil-reducer-catalog")
     return "graph"
   if (name.startsWith("sigil-review-")) return "review"
@@ -133,7 +141,7 @@ function groupForGonkTool(name: string): string {
   return "other"
 }
 
-function scopeForGonkTool(name: string): string {
+function scopeForApplicationTool(name: string): string {
   if (name.startsWith("sigil-graph-") || name === "sigil-reducer-catalog")
     return "Shared graph"
   if (name.startsWith("sigil-review-")) return "Review document"
@@ -188,7 +196,7 @@ function humanize(name: string): string {
     .replaceAll(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
-function consentForGonkTool(
+function consentForApplicationTool(
   tool: AgentToolCatalogItem,
   defaultMode: ToolApprovalMode,
   overrides: ToolApprovalOverrides,
@@ -202,7 +210,7 @@ function runtimeItem(tool: AgentRuntimeToolCatalogItem): CapabilityItem {
     id: tool.id,
     name: humanize(tool.name),
     description: tool.description,
-    source: "Eve runtime",
+    source: "Agent runtime",
     scope: scopeForRuntimeTool(tool.name),
     availability:
       tool.runtimeStatus === "discoverable" ? "Discoverable" : "Available",
@@ -210,7 +218,7 @@ function runtimeItem(tool: AgentRuntimeToolCatalogItem): CapabilityItem {
   }
 }
 
-function gonkItem(
+function applicationToolItem(
   tool: AgentToolCatalogItem,
   defaultMode: ToolApprovalMode,
   overrides: ToolApprovalOverrides,
@@ -219,16 +227,16 @@ function gonkItem(
     id: tool.id,
     name: humanize(tool.name),
     description: tool.description,
-    source: "Gonk application tool",
-    scope: scopeForGonkTool(tool.name),
+    source: "Application tool",
+    scope: scopeForApplicationTool(tool.name),
     availability: "Available",
-    consent: consentForGonkTool(tool, defaultMode, overrides),
+    consent: consentForApplicationTool(tool, defaultMode, overrides),
   }
 }
 
 /**
- * Product-only presentation selector. It projects the authenticated Eve +
- * Gonk inspection results; it never declares tools of its own.
+ * Product-only presentation selector. It projects the authenticated runtime
+ * and application-tool catalogs; it never declares tools of its own.
  */
 export function projectCapabilityGroups(
   catalog: AgentCatalog,
@@ -247,11 +255,11 @@ export function projectCapabilityGroups(
   )
   if (memoryTools.length > 0) {
     append("agent-memory", {
-      id: "eve__durable-memory",
+      id: "runtime__durable-memory",
       name: "Durable Memory",
       description:
         "Recall relevant context and manage accepted memories without crossing the authenticated relationship boundary.",
-      source: "Eve runtime",
+      source: "Agent runtime",
       scope: "Authorized memory scope",
       availability: memoryTools.some(
         (tool) => tool.runtimeStatus === "discoverable",
@@ -269,14 +277,17 @@ export function projectCapabilityGroups(
     append(groupForRuntimeTool(tool.name), runtimeItem(tool))
   }
   for (const tool of catalog.tools) {
-    append(groupForGonkTool(tool.name), gonkItem(tool, defaultMode, overrides))
+    append(
+      groupForApplicationTool(tool.name),
+      applicationToolItem(tool, defaultMode, overrides),
+    )
   }
   for (const skill of catalog.skills) {
     append("skills", {
       id: `skill__${skill.id}`,
       name: skill.name,
       description: skill.description,
-      source: "Eve runtime",
+      source: "Agent runtime",
       scope: "Current agent runtime",
       availability: "Available",
       consent: "Managed by runtime",
@@ -287,7 +298,7 @@ export function projectCapabilityGroups(
       id: `subagent__${subagent.id}`,
       name: subagent.name,
       description: subagent.description,
-      source: "Eve runtime",
+      source: "Agent runtime",
       scope: "Delegated task",
       availability: "Available",
       consent: "Managed by runtime",

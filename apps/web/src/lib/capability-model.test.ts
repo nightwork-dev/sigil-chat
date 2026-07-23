@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
 
 import type { AgentCatalog } from "./agent-catalog"
-import { filterCapabilityGroups, projectCapabilityGroups } from "./capability-model"
+import {
+  filterCapabilityGroups,
+  projectCapabilityGroups,
+} from "./capability-model"
 
 const catalog: AgentCatalog = {
   agent: {
@@ -14,7 +17,7 @@ const catalog: AgentCatalog = {
       id: "editorial-readiness",
       name: "editorial-readiness",
       description: "Review a launch.",
-      origin: "eve-authored",
+      origin: "host-authored",
       availability: "available",
       capabilities: ["read"],
       runtimeStatus: "model-discoverable",
@@ -23,37 +26,37 @@ const catalog: AgentCatalog = {
   subagents: [],
   runtimeTools: [
     {
-      id: "eve__recall_read",
+      id: "runtime__recall_read",
       name: "recall_read",
       description: "Recall accepted memories.",
-      origin: "eve-authored",
+      origin: "host-authored",
       availability: "available",
       runtimeStatus: "callable",
       requiresApproval: false,
     },
     {
-      id: "eve__remember",
+      id: "runtime__remember",
       name: "remember",
       description: "Remember an accepted fact.",
-      origin: "eve-authored",
+      origin: "host-authored",
       availability: "available",
       runtimeStatus: "callable",
       requiresApproval: false,
     },
     {
-      id: "eve__todo",
+      id: "runtime__todo",
       name: "todo",
       description: "Track current work.",
-      origin: "eve-framework",
+      origin: "host-framework",
       availability: "available",
       runtimeStatus: "callable",
       requiresApproval: false,
     },
     {
-      id: "eve__connection_search",
+      id: "runtime__connection_search",
       name: "connection_search",
       description: "Discover connected tools.",
-      origin: "eve-framework",
+      origin: "host-framework",
       availability: "available",
       runtimeStatus: "discoverable",
       requiresApproval: false,
@@ -61,24 +64,24 @@ const catalog: AgentCatalog = {
   ],
   tools: [
     {
-      id: "gonk__sigil-generate-image",
+      id: "sigil-generate-image",
       name: "sigil-generate-image",
       description: "Generate a new image.",
-      origin: "gonk",
+      origin: "application",
       availability: "available",
       runtimeStatus: "callable",
     },
     {
-      id: "gonk__sigil-review-inspect",
+      id: "sigil-review-inspect",
       name: "sigil-review-inspect",
       description: "Inspect a review document.",
-      origin: "gonk",
+      origin: "application",
       availability: "available",
       runtimeStatus: "callable",
     },
   ],
   management: {
-    source: "eve-inspection",
+    source: "agent-inspection",
     lifecycle: "unavailable",
     explanation: "Not relevant to this projection.",
   },
@@ -88,36 +91,36 @@ const catalog: AgentCatalog = {
 describe("capability presentation model", () => {
   it("groups live runtime and Gonk items by the outcome they support", () => {
     const groups = projectCapabilityGroups(catalog, "ask", {
-      "gonk__sigil-generate-image": "always",
+      "sigil-generate-image": "always",
     })
 
     expect(groups.find((group) => group.id === "planning")?.items).toEqual([
       expect.objectContaining({
         name: "Todo",
-        source: "Eve runtime",
+        source: "Agent runtime",
         scope: "Current session",
       }),
     ])
     expect(groups.find((group) => group.id === "images")?.items).toEqual([
       expect.objectContaining({
         name: "Generate Image",
-        source: "Gonk application tool",
+        source: "Application tool",
         consent: "Runs without a prompt",
       }),
     ])
-    expect(groups.find((group) => group.id === "connected-tools")?.items).toEqual([
-      expect.objectContaining({ availability: "Discoverable" }),
-    ])
+    expect(
+      groups.find((group) => group.id === "connected-tools")?.items,
+    ).toEqual([expect.objectContaining({ availability: "Discoverable" })])
     expect(groups.find((group) => group.id === "agent-memory")?.items).toEqual([
       expect.objectContaining({
-        id: "eve__durable-memory",
+        id: "runtime__durable-memory",
         name: "Durable Memory",
         scope: "Authorized memory scope",
       }),
     ])
     expect(
       groups.flatMap((group) => group.items.map((item) => item.id)),
-    ).not.toContain("eve__remember")
+    ).not.toContain("runtime__remember")
   })
 
   it("filters a grouped catalog without duplicating matching rows", () => {
