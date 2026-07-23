@@ -1,15 +1,24 @@
-// §3.1 — the ActiveContainerProvider, DEMOTED by SC.10 §6 step 7. It is no
-// longer "which project/workspace am I in" for anything that renders the
-// nested projects/workspaces/sessions tree — that tree reads containment
-// from the matched route chain only (container-breadcrumb.tsx), so chrome
-// and the URL can never disagree. This provider is now scoped to two
-// legitimate remaining consumers:
+// §3.1 — the ActiveContainerProvider, DEMOTED by SC.10 §6 step 7 (and
+// narrowed further once `/chat` folded into the session leaf in step 8). It
+// is no longer "which project/workspace am I in" for anything that renders
+// the nested projects/workspaces/sessions tree — that tree, INCLUDING the
+// session/chat surface now, reads containment from the matched route chain
+// or the active-thread preference directly (container-breadcrumb.tsx,
+// routes/_app/chat.tsx's resolver), never from this provider. This provider
+// is now scoped to two legitimate remaining consumers, neither of which
+// decides what a route renders:
 // - The `/home` redirect (routes/_app/home.tsx) — "remember where I was"
 //   read, the one place this selection is still authoritative.
-// - The `/chat` surface (shell-omnibar.tsx, the conversation-sheet
-//   ProjectWorkspaceNav) — /chat is not part of the SC.10 nested tree yet
-//   (folding it in is a separate, deferred step); it keeps using this as its
-//   active-attention context until that fold-in lands.
+// - shell-omnibar.tsx and the conversation-sheet ProjectWorkspaceNav
+//   (rendered inside AgentChatHeader, now mounted on every session leaf) —
+//   both use it only as a DEFAULT filter for their own project/workspace
+//   picker UI, never to choose a navigation target. Known gap: the omnibar's
+//   "switch workspace" action still calls `go("/chat")` after writing this
+//   provider, but `/chat` now resolves to the app-global ACTIVE THREAD
+//   (independent of this selection) rather than reflecting the just-picked
+//   workspace — selecting a workspace with no thread of its own yet no
+//   longer visibly "switches" via the omnibar. Flagged, not fixed, as part
+//   of the SC.10 step 8 batch; the omnibar's switcher itself is out of scope.
 // selectProject/selectWorkspace stay wired as a persist-on-navigate hook so
 // the next `/home` visit lands where the principal last was — writing here
 // is fine; reading it back to decide what a container-scoped route renders

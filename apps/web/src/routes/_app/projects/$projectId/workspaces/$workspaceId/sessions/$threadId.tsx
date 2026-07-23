@@ -5,11 +5,12 @@
 //   apps/web/src/routes/_app/projects/$projectId/route.tsx                                — project layout
 //   apps/web/src/routes/_app/projects/$projectId/workspaces/$workspaceId/route.tsx        — workspace layout, renders <Outlet/>
 //   apps/web/src/routes/_app/projects/$projectId/workspaces/$workspaceId/sessions/$threadId.tsx — THIS FILE
-// Content: SessionHome — owned session output and explicitly linked durable
-// commitments. The entered-via project is the `$projectId` path segment
-// (SC.10 §2); the "Shared from" ownership cue derives from it exactly as the
-// prior `?via=` param did. Loader: warms the thread, its commitments,
-// artifacts, and home signals.
+// Content: the session surface (SC.10 §3.1/§6 step 8) — a constrained
+// conversation column beside the SessionHome rail (produced artifacts,
+// linked commitments, live attention). The entered-via project is the
+// `$projectId` path segment (SC.10 §2); the "Shared from" ownership cue
+// derives from it exactly as the prior `?via=` param did. Loader: warms the
+// thread, its commitments, artifacts, and home signals.
 
 import { createFileRoute } from "@tanstack/react-router"
 import { useMemo } from "react"
@@ -26,8 +27,8 @@ import {
   liveWorkSource,
   routeSources,
 } from "@/features/homes/live-sources"
-import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
+import { SessionChatSurface } from "@/components/agent/session-chat-surface"
 import {
   sessionCommitmentsQueryOptions,
   useSessionCommitments,
@@ -144,5 +145,7 @@ function SessionHomeRoute() {
     via,
   ])
 
-  return <SessionHome state={state} compact={compact} />
+  return (
+    <SessionChatSurface compact={compact} railState={state} threadId={threadId} />
+  )
 }

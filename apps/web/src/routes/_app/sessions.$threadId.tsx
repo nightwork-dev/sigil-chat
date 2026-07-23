@@ -9,7 +9,8 @@
 // /projects/$projectId(/workspaces/$workspaceId)?/sessions/$threadId. A
 // workspace-less thread's only home is the personal project, always visible.
 // When the thread's workspace is visible but its owning project is not, this
-// renders SessionHome directly at this shallow depth — the honest home for
+// renders the session surface directly at this shallow depth (SC.10 §3.1/§6
+// step 8: conversation column + SessionHome rail) — the honest home for
 // that principal, not a placeholder.
 
 import { createFileRoute, redirect } from "@tanstack/react-router"
@@ -30,8 +31,8 @@ import {
   liveWorkSource,
   routeSources,
 } from "@/features/homes/live-sources"
-import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
+import { SessionChatSurface } from "@/components/agent/session-chat-surface"
 import { useSessionCommitments } from "@/lib/work-items"
 
 export const Route = createFileRoute("/_app/sessions/$threadId")({
@@ -168,5 +169,7 @@ function SessionHomeRoute() {
     via,
   ])
 
-  return <SessionHome state={state} compact={compact} />
+  return (
+    <SessionChatSurface compact={compact} railState={state} threadId={threadId} />
+  )
 }
