@@ -172,6 +172,12 @@ fast-follow candidate in §6.
 
 ### 3.1 The session surface: constrained chat column + context rail
 
+> **Superseded in part by §9** (owner verdict on the f9b3c16 build). The
+> **context rail survives**; the *centered* column and the deferral of the
+> session-list pane do **not** — §9 replaces them with a left-anchored column
+> against a persistent session list. Read §9 as the current session-surface
+> design; the rest of §3.1 stands for the context rail's rationale.
+
 David's mid-design input: `/chat` must not span full screen width — it looks
 bad, and the side space is usable. The decision is not "add a margin" but "give
 the side space real, non-duplicated content," per the design language (fill
@@ -401,3 +407,153 @@ previously-shared link alive.
    call for the demo, or say if the always-on session list is what "lateral
    movement" should mean here — it's the one genuinely product-shaped decision
    in this proposal, the rest is routing mechanics.
+   **→ Resolved by owner verdict (§9): the always-on session list is required.
+   This question is closed; the pane is in.**
+
+## 9. Addendum — session-surface revision (owner verdict on f9b3c16)
+
+David's browser verdict on the built session surface: "this UI doesn't make a
+ton of sense. There's a lot of repeated stuff, and the chat doesn't really
+look good centered." He supplied two reference apps he rates better and lives
+in daily — Codex and Claude Desktop. This addendum revises the session surface
+against that evidence. It **supersedes** two §3.1 calls — the viewport-centered
+column and §8's deferral of the session-list pane — and **keeps** the §3.1
+session-context rail, which both references corroborate.
+
+The build's three faults, read off the screenshots and confirmed in code:
+
+- **A centered column in a void.** The conversation is `mx-auto`-centered in a
+  full-bleed dark field; empty, it reads as unanchored dead space, not
+  restraint. Neither reference centers — both hard-anchor the conversation
+  against a left list.
+- **No persistent session list.** The session list exists only behind a Sheet
+  (`AgentSessionSwitcher` in `agent-chat-header.tsx` opens `ProjectWorkspaceNav`
+  in a left drawer). Both references keep it always visible as the primary left
+  surface. This is exactly the pane §8 deferred — the deferral is overturned.
+- **Duplicated chrome.** The context/token cluster and the run-status dot each
+  render **twice** — once in the top rail (`AgentChatHeader`) and again in the
+  bottom rail (`AgentRailStatus`, whose own comment says it was added "on every
+  route" without removing the header copy).
+
+### 9.1 What the references converge on
+
+Both apps are the same three-surface shape, and it is the answer:
+
+```
+┌──────────────┬────────────────────────────┬─────────────────┐
+│ session list │ conversation               │ context / output│
+│ (+ app nav)  │ (LEFT-ANCHORED, prose-capped) │ rail (optional)│
+│ pinned +     │                            │ Codex "Outputs" │
+│ recents      │ composer owns model + mode │ Claude artifact │
+└──────────────┴────────────────────────────┴─────────────────┘
+```
+
+- **Left:** a persistent list — pinned + recents — with app nav sharing the
+  same sidebar (Codex: New chat / Pull requests / … then Pinned / Recents;
+  Claude: Home/Code / New / Artifacts / … then Pinned / Recents). Account at the
+  bottom.
+- **Center:** the conversation, hard-anchored against the list — never centered.
+  Model selector and permission/mode control live at the **composer** (Codex
+  "Full access" + "5.6 Sol"; Claude "Accept edits" + "Fable 5 · High"), not in a
+  top rail. Top chrome is minimal: session title + a couple of actions.
+- **Right:** an **optional** panel for produced outputs / details (Codex
+  "Outputs" card + subagents; Claude artifact/diff pane). This is the §3.1
+  context rail — the references validate keeping it.
+
+### 9.2 Decision A — persistent session list pane (overturns §8)
+
+The list becomes a persistent left pane, **in the sidebar below the principal
+nav**, matching both references (nav + recents in one sidebar rather than a
+third column). It is populated by the active container layout from §3: the
+**workspace layout** (`workspaces/$workspaceId/route.tsx`) supplies its
+sessions; the **project layout** supplies project-level (workspace-less)
+sessions. This is the same surface §3 called the lateral-movement affordance —
+which is *why* §8's deferral was wrong: the list does double duty (browse +
+one-click sibling switch) and it is the visual anchor the conversation needs.
+Clicking a sibling swaps only the leaf `Outlet`; the workspace layout and its
+list stay mounted.
+
+The component already exists — `ProjectWorkspaceNav`, today rendered only
+inside the header's `AgentSessionSwitcher` Sheet. The work is **promotion, not
+authoring**: render it as a persistent pane on desktop, keep the Sheet as the
+mobile form behind the existing sidebar toggle (the `_app` sidebar is already a
+Sheet at 375px). The mobile-375px cost §3 feared is confirmed worth paying by
+owner taste.
+
+### 9.3 Decision B — anchoring geometry (left-anchored, never centered)
+
+Kill `mx-auto` on the conversation. The column is **left-anchored** against the
+session list and fills the space between it and the optional context rail. The
+reading measure is preserved not by centering the column but by capping the
+**message content** (prose/bubbles) at a readable width, left-aligned *within*
+the column. Geometry, both rail states:
+
+- **Context rail open:** `[ sidebar + list │ conversation (flex-1, prose
+  capped ~`max-w-3xl`, left-aligned) │ context rail (fixed ~`w-80`) ]`.
+- **Context rail closed:** `[ sidebar + list │ conversation (prose capped,
+  left-aligned; the freed width becomes breathing room on the RIGHT plus an
+  "open context" affordance where the rail docks) ]`.
+
+The invariant: **the conversation's left edge never moves** when the rail opens
+or closes, so toggling context never reflows the reading position, and the
+empty state sits in a column anchored against the list — not floating
+mid-viewport. This is the direct fix for both "doesn't look good centered" and
+the empty void.
+
+### 9.4 Decision C — chrome-dedupe inventory (one datum, one home)
+
+Every place session status / context / tokens renders today, and its single
+assigned home:
+
+| Datum | Renders today in | One home | Action |
+| --- | --- | --- | --- |
+| Run status (idle / streaming / error dot) | `AgentChatHeader` (top rail) **and** `AgentRailStatus` (bottom rail) | Top rail, beside the session title | Remove from `AgentRailStatus` on the session surface |
+| Context items + token estimate + focus mode (`ContextTray.Trigger` — "N · focused · ~M tokens") | `AgentChatHeader` (top) **and** `AgentRailStatus` (bottom) | The **context rail** (§3.1) header — it *is* the context surface | Remove from both rails; show a count badge on the collapsed rail toggle |
+| Attention subject / "no context" | `AgentRailStatus` (bottom) | The context rail (attention is its content) | Move into the rail |
+| Session identity (persona · title) | `AgentSessionSwitcher` Sheet trigger (top) | Active title in the top rail; the list shows all titles | Replace the Sheet trigger with the persistent list (§9.2) |
+| Approval mode ("Ask ⌄") + model | Top rail (`AgentChatHeader`) | The **composer**, matching both references | Move to the input bar |
+| ⌘K / ⌘B chord hints (`ViewRailChords`) | Bottom rail | Not session data — global, discoverable affordances | Drop from the session surface |
+
+**Net: the session surface retires its bottom status rail entirely.** Both its
+occupants either moved (run status → top; context/token/attention → context
+rail) or dropped (chord hints). This matches the references, which have no
+bottom rail. `AgentRailStatus` stays on **non-session** routes, where it is the
+*sole* copy and its "always-visible on every route" intent is honestly served —
+the session surface was the one place it was a duplicate.
+
+### 9.5 Implementation steps (dispatchable, §6 style)
+
+1. **Promote the list.** Render `ProjectWorkspaceNav` as a persistent pane in
+   the sidebar below the principal nav, fed by the active container layout
+   (workspace layout → its sessions; project layout → workspace-less sessions).
+   Keep `AgentSessionSwitcher`'s Sheet as the 375px form; drop it as the desktop
+   entry point.
+2. **Left-anchor the conversation.** Remove `mx-auto`/centering from the chat
+   column; cap message-content prose width, left-aligned; column is `flex-1`
+   between the list and the context rail. Hold the left edge fixed across rail
+   open/close.
+3. **Seat the context rail (§3.1).** Host the context/token/attention readout
+   (ContextTray content) as the rail's header; count badge on the collapsed
+   toggle.
+4. **Dedupe.** Remove `ContextTray.Trigger` + the status dot from
+   `AgentRailStatus` for the session surface; null out the session route's
+   `statusRailStart`/`statusRailEnd` so the bottom rail does not render there;
+   move approval-mode + model controls into the composer; reduce the top rail to
+   session title + run status.
+5. **Preserve `AgentRailStatus` elsewhere.** Confirm it still renders on
+   non-session routes (its sole-copy home) and that no route shows the context
+   cluster in two places.
+6. **Verify.** Browser at desktop and 375px: exactly one run-status voice, one
+   context/token readout, conversation anchored hard-left against the list with
+   the left edge fixed as the rail toggles, no centered void, list-click swaps
+   only the conversation. `pnpm --filter web typecheck` + `test`. Browser
+   verification is David's.
+
+### 9.6 What still stands from §1–§8
+
+Unchanged: the nested route tree (§2), layout ownership and mounted-ancestor
+lateral movement (§3), the loader/data strategy (§4), breadcrumb orientation
+(§5), and the migration spine (§6). §9 revises only the session leaf's internal
+layout and the chrome that surrounds it — the routing architecture that makes
+the persistent list a mounted, one-click lateral surface is exactly what §2–§4
+already specify.
