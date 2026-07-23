@@ -3,6 +3,7 @@ import {
   useRef,
   type ClipboardEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react"
 import { cn } from "@workspace/ui/lib/utils"
 import { Textarea } from "@workspace/ui/components/textarea"
@@ -50,20 +51,38 @@ export interface ChatInputAttachment {
   readonly errorMessage?: string
 }
 
+/** Context handed to `leadingControls` — the one thing an app-composed
+ *  control row needs from the built-in file-upload core it doesn't own:
+ *  a way to open the native file picker (SC.10 §9.7 step 2). */
+export interface ChatInputControlsContext {
+  openFilePicker: () => void
+}
+
 /**
- * Chat compose bar with textarea, send button, and an optional file-attach
- * affordance.
+ * Chat compose bar: one contained box, textarea on top, a single control row
+ * beneath (SC.10 §9.7) — left cluster (attach/app controls), right cluster
+ * (app controls, send/stop).
  *
  * Keyboard: Enter sends (unless Shift held). Shift+Enter adds newline.
- * When streaming, the send button becomes a stop button.
+ * When streaming, the send button becomes a stop button — this IS the
+ * run-status display (§9.4/§9.7 revision: there is no separate status dot
+ * here, the interrupt affordance and the status readout are one control).
  *
  * Uses @workspace/ui Textarea — the chat-specific overrides (no visible
  * border, minimal padding) are applied via className.
  *
- * Attachments are opt-in: pass `onAttach` to show the paperclip button and
- * `attachments` to render preview chips above the textarea. Callers that
- * don't need attachments (demo/showcase chat surfaces) can omit both and
- * get the previous plain compose bar.
+ * Attachments are opt-in: pass `onAttach` to enable the file-upload core
+ * (dropzone, paste, hidden input) and `attachments` to render preview chips
+ * above the textarea. Without `leadingControls`, a bare paperclip button
+ * exposes it directly — the plain compose bar callers (demo/showcase
+ * surfaces) had before. With `leadingControls`, the app renders its own
+ * left-cluster content (e.g. Sigil Chat's §9.8 Add menu) and reaches the
+ * same file-upload core via the `openFilePicker` callback in
+ * `ChatInputControlsContext` — one mechanism, one or the other trigger for
+ * it, never both at once.
+ *
+ * `trailingControls` renders additional app content in the right cluster,
+ * before the built-in send/stop button (e.g. a model label).
  *
  * Ingestion (drag-drop / paste / pick) is delegated to the `useFileUpload` and
  * `useClipboard` cores: when `onAttach`
@@ -88,6 +107,9 @@ export function ChatInput({
   onAttachUrl,
   onRemoveAttachment,
   accept,
+  leadingControls,
+  trailingControls,
+  onKeyDown,
 }: {
   value: string
   onChange: (value: string) => void
@@ -106,6 +128,20 @@ export function ChatInput({
   /** `accept` attribute for the file picker. Defaults to a broad set covering
    *  images, PDFs, and common document/data formats (md, csv, xlsx, …). */
   accept?: string
+  /** App-composed left-cluster content, rendered in place of the built-in
+   *  bare attach button (SC.10 §9.7/§9.8 — e.g. the `＋` Add menu). Receives
+   *  `openFilePicker` to trigger the same file-upload core the bare button
+   *  would have. */
+  leadingControls?: (context: ChatInputControlsContext) => ReactNode
+  /** App-composed right-cluster content, rendered before the built-in
+   *  send/stop button (SC.10 §9.7 — e.g. a model label). */
+  trailingControls?: ReactNode
+  /** Additional keydown handling layered UNDER the built-in Enter-to-send —
+   *  called first; if it calls `preventDefault()`, the built-in handler
+   *  still runs its own check but Enter's default textarea newline stays
+   *  suppressed either way (SC.10 §9.8 — the `@` mention trigger hooks in
+   *  here without forking the whole keydown pipeline). */
+  onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const acceptTypes = accept ?? DEFAULT_ATTACHMENT_ACCEPT
@@ -134,14 +170,15 @@ export function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      onKeyDown?.(e)
+      if (e.key === "Enter" && !e.shiftKey && !e.defaultPrevented) {
         e.preventDefault()
         if (!isStreaming && canSend) {
           onSend()
         }
       }
     },
-    [isStreaming, canSend, onSend],
+    [onKeyDown, isStreaming, canSend, onSend],
   )
 
   const handleSendClick = useCallback(() => {
@@ -163,9 +200,16 @@ export function ChatInput({
     [fileUpload, urlClipboard],
   )
 
+  const controlsContext: ChatInputControlsContext = {
+    openFilePicker: fileUpload.open,
+  }
+
   return (
     <div
-      className={cn("relative border-t border-border", className)}
+      className={cn(
+        "relative overflow-hidden rounded-lg border border-border bg-background",
+        className,
+      )}
       {...(attachEnabled ? fileUpload.getRootProps() : {})}
     >
       {attachEnabled ? <input {...fileUpload.getInputProps()} /> : null}
@@ -185,54 +229,65 @@ export function ChatInput({
           ))}
         </div>
       ) : null}
-      <div className="flex items-end gap-2 p-3">
-        {onAttach ? (
+
+      {/* Top region: textarea, full width. */}
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onPaste={onAttach || onAttachUrl ? handlePaste : undefined}
+        placeholder={placeholder}
+        disabled={disabled}
+        rows={1}
+        className="min-h-11 resize-none border-0 bg-transparent px-3 pt-3 pb-1 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+      />
+
+      {/* Bottom region: one control row, left/right clusters. */}
+      <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+        <div className="flex min-w-0 items-center gap-1">
+          {leadingControls ? (
+            leadingControls(controlsContext)
+          ) : onAttach ? (
+            <button
+              aria-label="Attach a file"
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary",
+                "disabled:opacity-30 disabled:cursor-default",
+                actionClassName,
+              )}
+              disabled={disabled}
+              onClick={fileUpload.open}
+              title="Attach a file"
+              type="button"
+            >
+              <PaperclipIcon className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {trailingControls}
           <button
-            aria-label="Attach a file"
+            aria-label={isStreaming ? "Stop response" : "Send message"}
+            type="button"
+            onClick={handleSendClick}
+            disabled={disabled || (!isStreaming && !canSend)}
             className={cn(
-              "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary",
+              "flex size-7 shrink-0 items-center justify-center rounded-md transition-colors",
+              isStreaming
+                ? "text-destructive hover:bg-destructive/10"
+                : "text-muted-foreground hover:text-primary hover:bg-primary/10",
               "disabled:opacity-30 disabled:cursor-default",
               actionClassName,
             )}
-            disabled={disabled}
-            onClick={fileUpload.open}
-            title="Attach a file"
-            type="button"
           >
-            <PaperclipIcon className="size-3.5" />
+            {isStreaming ? (
+              <SquareIcon className="size-3.5" />
+            ) : (
+              <SendIcon className="size-3.5" />
+            )}
           </button>
-        ) : null}
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={onAttach || onAttachUrl ? handlePaste : undefined}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={1}
-          className="min-h-0 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-0 focus-visible:ring-0 max-sm:min-h-11 dark:bg-transparent"
-        />
-        <button
-          aria-label={isStreaming ? "Stop response" : "Send message"}
-          type="button"
-          onClick={handleSendClick}
-          disabled={disabled || (!isStreaming && !canSend)}
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-md transition-colors",
-            isStreaming
-              ? "text-destructive hover:bg-destructive/10"
-              : "text-muted-foreground hover:text-primary hover:bg-primary/10",
-            "disabled:opacity-30 disabled:cursor-default",
-            actionClassName,
-          )}
-        >
-          {isStreaming ? (
-            <SquareIcon className="size-3.5" />
-          ) : (
-            <SendIcon className="size-3.5" />
-          )}
-        </button>
+        </div>
       </div>
     </div>
   )
