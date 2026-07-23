@@ -11,7 +11,9 @@
 // When the thread's workspace is visible but its owning project is not, this
 // renders the session surface directly at this shallow depth (SC.10 §3.1/§6
 // step 8: conversation column + SessionHome rail) — the honest home for
-// that principal, not a placeholder.
+// that principal, not a placeholder. $threadId is either a slug (canonical)
+// or a legacy UUID; every redirect below lands on the slug form, including
+// the shallow-render case (session slugs, SC.10).
 
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
@@ -60,12 +62,23 @@ export const Route = createFileRoute("/_app/sessions/$threadId")({
       // always visible to its own principal.
       throw redirect({
         to: "/projects/$projectId/sessions/$threadId",
-        params: { projectId: nav.personalProjectId, threadId: params.threadId },
+        params: { projectId: nav.personalProjectId, threadId: thread.slug },
       })
     }
 
     const workspace = nav.workspaces.find((w) => w.id === thread.workspaceId)
-    if (!workspace) return // Workspace itself not visible — render shallow.
+    if (!workspace) {
+      // Workspace itself not visible — render shallow, but still land on
+      // the canonical slug form.
+      if (thread.slug !== params.threadId) {
+        throw redirect({
+          to: "/sessions/$threadId",
+          params: { threadId: thread.slug },
+          search,
+        })
+      }
+      return
+    }
 
     const viaVisible =
       search.via &&
@@ -79,12 +92,19 @@ export const Route = createFileRoute("/_app/sessions/$threadId")({
         params: {
           projectId: targetProjectId,
           workspaceId: thread.workspaceId,
-          threadId: params.threadId,
+          threadId: thread.slug,
         },
       })
     }
     // Owning project not visible — render shallow (workspace only, no
-    // Project crumb).
+    // Project crumb), but still land on the canonical slug form.
+    if (thread.slug !== params.threadId) {
+      throw redirect({
+        to: "/sessions/$threadId",
+        params: { threadId: thread.slug },
+        search,
+      })
+    }
   },
   component: SessionHomeRoute,
 })
@@ -95,12 +115,17 @@ function SessionHomeRoute() {
   const thread = useAgentThread(threadId)
   const nav = useProjectWorkspaceNav()
   const compact = useMediaQuery("(max-width: 640px)")
-  const commitments = useSessionCommitments(threadId)
-  const artifactScope = thread.data
-    ? artifactScopeForHome("session", threadId)
+  // The route param may still be the slug that's about to redirect from a
+  // stale render, or (transiently) a legacy UUID — thread.data.id is always
+  // the canonical form once resolved; everything scope-keyed downstream
+  // must use it, never the raw param (session slugs, SC.10).
+  const canonicalId = thread.data?.id
+  const commitments = useSessionCommitments(canonicalId ?? "", Boolean(canonicalId))
+  const artifactScope = canonicalId
+    ? artifactScopeForHome("session", canonicalId)
     : null
   const artifacts = useArtifacts(artifactScope)
-  const signals = useHomeSignals("session", threadId, Boolean(thread.data))
+  const signals = useHomeSignals("session", canonicalId ?? "", Boolean(canonicalId))
 
   const state: HomeState<SessionHomeView> = useMemo(() => {
     const homeThread = thread.data
@@ -174,6 +199,6 @@ function SessionHomeRoute() {
   ])
 
   return (
-    <SessionChatSurface compact={compact} railState={state} threadId={threadId} />
+    <SessionChatSurface compact={compact} railState={state} threadId={canonicalId} />
   )
 }

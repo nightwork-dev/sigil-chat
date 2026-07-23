@@ -10,9 +10,12 @@
 // linked commitments, live attention). The entered-via project is the
 // `$projectId` path segment (SC.10 §2); the "Shared from" ownership cue
 // derives from it exactly as the prior `?via=` param did. Loader: warms the
-// thread, its commitments, artifacts, and home signals.
+// thread, its commitments, artifacts, and home signals; the $threadId param
+// is either a slug (canonical) or a legacy UUID — agentThreadQueryOptions
+// resolves either transparently (session slugs), and redirects to the
+// canonical slug URL when the two differ.
 
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
 
 import { agentThreadQueryOptions, useAgentThread } from "@/lib/agent-threads"
@@ -43,22 +46,31 @@ export const Route = createFileRoute(
   staticData: { rail: { hideStatusRail: true } },
   loader: async ({ context, params }) => {
     const principalId = context.user.id
-    await context.queryClient
+    const thread = await context.queryClient
       .ensureQueryData(agentThreadQueryOptions(principalId, params.threadId))
       .catch(() => undefined)
-    const scope = artifactScopeForHome("session", params.threadId)
+    if (!thread) return // Not found — the component's own hooks render that state.
+    if (thread.slug !== params.threadId) {
+      throw redirect({
+        to: "/projects/$projectId/workspaces/$workspaceId/sessions/$threadId",
+        params: {
+          projectId: params.projectId,
+          workspaceId: params.workspaceId,
+          threadId: thread.slug,
+        },
+      })
+    }
+    const scope = artifactScopeForHome("session", thread.id)
     await Promise.all([
       context.queryClient
-        .ensureQueryData(
-          sessionCommitmentsQueryOptions(principalId, params.threadId),
-        )
+        .ensureQueryData(sessionCommitmentsQueryOptions(principalId, thread.id))
         .catch(() => undefined),
       context.queryClient
         .ensureQueryData(artifactsQueryOptions(scope))
         .catch(() => undefined),
       context.queryClient
         .ensureQueryData(
-          homeSignalsQueryOptions(principalId, "session", params.threadId),
+          homeSignalsQueryOptions(principalId, "session", thread.id),
         )
         .catch(() => undefined),
     ])
@@ -71,12 +83,17 @@ function SessionHomeRoute() {
   const thread = useAgentThread(threadId)
   const nav = useProjectWorkspaceNav()
   const compact = useMediaQuery("(max-width: 640px)")
-  const commitments = useSessionCommitments(threadId)
-  const artifactScope = thread.data
-    ? artifactScopeForHome("session", threadId)
+  // The route param may still be the slug that's about to redirect from a
+  // stale render, or (transiently) a legacy UUID — thread.data.id is always
+  // the canonical form once resolved; everything scope-keyed downstream
+  // must use it, never the raw param (session slugs, SC.10).
+  const canonicalId = thread.data?.id
+  const commitments = useSessionCommitments(canonicalId ?? "", Boolean(canonicalId))
+  const artifactScope = canonicalId
+    ? artifactScopeForHome("session", canonicalId)
     : null
   const artifacts = useArtifacts(artifactScope)
-  const signals = useHomeSignals("session", threadId, Boolean(thread.data))
+  const signals = useHomeSignals("session", canonicalId ?? "", Boolean(canonicalId))
 
   const state: HomeState<SessionHomeView> = useMemo(() => {
     const homeThread = thread.data
@@ -150,6 +167,6 @@ function SessionHomeRoute() {
   ])
 
   return (
-    <SessionChatSurface compact={compact} railState={state} threadId={threadId} />
+    <SessionChatSurface compact={compact} railState={state} threadId={canonicalId} />
   )
 }
