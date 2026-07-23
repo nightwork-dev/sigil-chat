@@ -314,9 +314,14 @@ export function AgentSessionSwitcher({
     (thread) => thread.id === controls.activeThreadId,
   )
   const threads = useAgentThreads()
+  // Controlled so ProjectWorkspaceNav's onDismiss can close the Sheet after a
+  // selection — it no longer uses SheetClose internally (that crashed the
+  // moment it was promoted into the Dialog-less persistent pane; see
+  // project-workspace-nav.tsx).
+  const [open, setOpen] = useState(false)
 
   return (
-    <Sheet>
+    <Sheet onOpenChange={setOpen} open={open}>
       <SheetTrigger
         disabled={busy}
         render={
@@ -345,6 +350,7 @@ export function AgentSessionSwitcher({
         <ProjectWorkspaceNav
           activeThreadId={controls.activeThreadId}
           busy={busy}
+          onDismiss={() => setOpen(false)}
           onSelectThread={(threadId) => void controls.selectThread(threadId)}
           threads={threads.data ?? []}
         />
