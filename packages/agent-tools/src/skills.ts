@@ -1,11 +1,12 @@
-import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { createHash, randomUUID } from "node:crypto";
+import { join } from "node:path";
 import {
   FilesystemManagedSkillRegistry,
   type ManagedSkillRegistry,
   type SkillScope,
   type WritableManagedSkillRegistry,
 } from "@gonk/skills";
+import type { AuthContext } from "@gonk/auth";
 import {
   shape,
   type ToolContext,
@@ -13,6 +14,17 @@ import {
 } from "@gonk/tool-registry";
 
 import { readHints, writeHints } from "./domain-schemas.js";
+import { toHostContext } from "./types.js";
+
+export type {
+  ManagedSkillDetail,
+  ManagedSkillSummary,
+  SkillArchiveResult,
+  SkillGetResult,
+  SkillListResult,
+  SkillMutationResult,
+  SkillScope,
+} from "@gonk/skills";
 
 const SKILLS_RESOURCE_KIND = "skills-catalog";
 const SKILLS_RESOURCE_ID = "skills";
@@ -37,7 +49,7 @@ type SkillGetInput = {
   includeFreshness?: boolean;
 };
 
-type SkillUpsertInput = {
+export type SkillUpsertInput = {
   id: string;
   scope: SkillScope;
   body: string;
@@ -46,24 +58,50 @@ type SkillUpsertInput = {
   idempotencyKey?: string;
 };
 
-type SkillDeleteInput = {
+export type SkillDeleteInput = {
   id: string;
   expectedRevision: string;
   scope?: SkillScope;
   idempotencyKey?: string;
 };
 
+export type SkillRegistryBinding = {
+  personaId?: string;
+  sessionId?: string;
+};
+
+export type SkillRegistryResolver =
+  | WritableManagedSkillRegistry
+  | ((context: ToolContext) => WritableManagedSkillRegistry);
+
 export function createSkillRegistry(
-  agentProjectRoot = fileURLToPath(
-    new URL("../../../agent/agent/", import.meta.url),
-  ),
+  skillsDataRoot: string,
+  binding: SkillRegistryBinding = {},
 ): WritableManagedSkillRegistry {
-  const gonkProjectRoot = fileURLToPath(new URL("../../", import.meta.url));
   return new FilesystemManagedSkillRegistry({
     env: {
-      cwd: gonkProjectRoot,
-      projectRoot: agentProjectRoot,
-      homeRoot: `${agentProjectRoot}/.sigil-context-home`,
+      cwd: join(skillsDataRoot, "directory"),
+      projectRoot: join(skillsDataRoot, "project"),
+      homeRoot: join(skillsDataRoot, "global"),
+      ...(binding.personaId
+        ? {
+            personaHome: join(
+              skillsDataRoot,
+              "personas",
+              stableScopeSegment(binding.personaId),
+            ),
+          }
+        : {}),
+      ...(binding.sessionId
+        ? {
+            sessionHome: join(
+              skillsDataRoot,
+              "sessions",
+              stableScopeSegment(binding.sessionId),
+            ),
+            sessionId: binding.sessionId,
+          }
+        : {}),
       rootKinds: ["agents", ".agents", ".gonk"],
     },
   });
@@ -71,8 +109,7 @@ export function createSkillRegistry(
 
 export function registerSkillTools(
   registry: ToolRegistry,
-  skillRegistry: ManagedSkillRegistry &
-    Pick<WritableManagedSkillRegistry, "create" | "patch" | "archive">,
+  skillRegistry: SkillRegistryResolver,
 ): void {
   registry.register({
     name: "sigil-skill-list",
@@ -93,8 +130,8 @@ export function registerSkillTools(
       additionalProperties: false,
     },
     hints: readHints,
-    handler: async (input) => ({
-      data: await skillRegistry.list(input),
+    handler: async (input, ctx) => ({
+      data: await resolveSkillRegistry(skillRegistry, ctx).list(input),
     }),
   });
 
@@ -119,8 +156,8 @@ export function registerSkillTools(
       additionalProperties: false,
     },
     hints: readHints,
-    handler: async (input) => ({
-      data: await skillRegistry.get(input),
+    handler: async (input, ctx) => ({
+      data: await resolveSkillRegistry(skillRegistry, ctx).get(input),
     }),
   });
 
@@ -149,11 +186,15 @@ export function registerSkillTools(
     },
     hints: writeHints,
     handler: async (input, ctx) => {
-      const result = await upsertSkill(skillRegistry, input, ctx);
+      const result = await upsertManagedSkill(
+        resolveSkillRegistry(skillRegistry, ctx),
+        input,
+        requireSkillAuth(ctx),
+      );
       return {
         data:
           result.status === "ok"
-            ? withClientCommand(result, "skill.upsert", input.id)
+            ? withSkillClientCommand(result, "skill.upsert", input.id)
             : result,
       };
     },
@@ -182,31 +223,39 @@ export function registerSkillTools(
     },
     hints: writeHints,
     handler: async (input, ctx) => {
-      const auth = requireSkillAuth(ctx);
-      const result = await skillRegistry.archive({
-        auth,
-        id: input.id,
-        expectedRevision: input.expectedRevision,
-        idempotencyKey: input.idempotencyKey ?? randomUUID(),
-        ...(input.scope === undefined ? {} : { scope: input.scope }),
-      });
+      const result = await archiveManagedSkill(
+        resolveSkillRegistry(skillRegistry, ctx),
+        input,
+        requireSkillAuth(ctx),
+      );
       return {
         data:
           result.status === "ok"
-            ? withClientCommand(result, "skill.delete", input.id)
+            ? withSkillClientCommand(result, "skill.delete", input.id)
             : result,
       };
     },
   });
 }
 
-async function upsertSkill(
+export function createRequestBoundSkillRegistry(
+  skillsDataRoot: string,
+): (context: ToolContext) => WritableManagedSkillRegistry {
+  return (context) => {
+    const host = toHostContext(context.host);
+    return createSkillRegistry(skillsDataRoot, {
+      personaId: host?.personaId,
+      sessionId: host?.applicationThreadId,
+    });
+  };
+}
+
+export async function upsertManagedSkill(
   skillRegistry: ManagedSkillRegistry &
     Pick<WritableManagedSkillRegistry, "create" | "patch" | "archive">,
   input: SkillUpsertInput,
-  ctx: ToolContext,
+  auth: AuthContext,
 ) {
-  const auth = requireSkillAuth(ctx);
   const current = await skillRegistry.get({
     id: input.id,
     scope: input.scope,
@@ -255,15 +304,27 @@ async function upsertSkill(
   });
 }
 
-function withClientCommand(
-  result: {
+export async function archiveManagedSkill(
+  skillRegistry: Pick<WritableManagedSkillRegistry, "archive">,
+  input: SkillDeleteInput,
+  auth: AuthContext,
+) {
+  return skillRegistry.archive({
+    auth,
+    id: input.id,
+    expectedRevision: input.expectedRevision,
+    idempotencyKey: input.idempotencyKey ?? randomUUID(),
+    ...(input.scope === undefined ? {} : { scope: input.scope }),
+  });
+}
+
+export function withSkillClientCommand<
+  T extends {
     id: string;
     revision?: string;
     archiveId?: string;
   },
-  operation: string,
-  changedId: string,
-) {
+>(result: T, operation: string, changedId: string) {
   const marker = result.revision ?? result.archiveId ?? "changed";
   return {
     ...result,
@@ -279,7 +340,7 @@ function withClientCommand(
         operation,
         changedIds: [changedId],
       },
-    },
+    } as const,
   };
 }
 
@@ -288,6 +349,17 @@ function requireSkillAuth(ctx: ToolContext) {
     throw new Error("Skill tools require an authenticated caller.");
   }
   return ctx.auth;
+}
+
+function resolveSkillRegistry(
+  resolver: SkillRegistryResolver,
+  context: ToolContext,
+): WritableManagedSkillRegistry {
+  return typeof resolver === "function" ? resolver(context) : resolver;
+}
+
+function stableScopeSegment(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function isSkillListInput(value: unknown): value is SkillListInput {

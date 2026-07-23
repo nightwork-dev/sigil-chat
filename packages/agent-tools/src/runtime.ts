@@ -5,7 +5,11 @@ import {
   type AgentUiHighlightInput,
 } from "@workspace/agent-contracts/ui-highlight";
 
-import { emptyObjectSchema, objectSchema, readHints } from "./domain-schemas.js";
+import {
+  emptyObjectSchema,
+  objectSchema,
+  readHints,
+} from "./domain-schemas.js";
 import { isEmptyObject } from "./validators.js";
 
 export function registerRuntimeTools(registry: ToolRegistry): void {
@@ -27,7 +31,7 @@ export function registerRuntimeTools(registry: ToolRegistry): void {
         agentRuntime: "eve",
         toolRegistry: "gonk",
         graphModel: "typed-reducer-graph",
-        transport: "mcp-streamable-http",
+        transport: "in-process-eve-tools",
         serverTime: new Date().toISOString(),
       },
     }),

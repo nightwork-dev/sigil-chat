@@ -5,6 +5,7 @@ import { hasCodexModelAuth } from "./model-auth.mjs"
 
 export interface ReadinessRouteOptions {
   hasModelAuth?: () => Promise<boolean>
+  applicationToolCount?: () => number
 }
 
 export function createReadinessRoute(
@@ -16,14 +17,28 @@ export function createReadinessRoute(
     const principal = await authenticate(request)
     if (!principal) return readinessResponse(401, "unauthorized")
     return (await modelAuth())
-      ? readinessResponse(200, "ready")
+      ? readinessResponse(200, "ready", options.applicationToolCount?.())
       : readinessResponse(503, "unavailable")
   })
 }
 
-function readinessResponse(status: number, value: string): Response {
+function readinessResponse(
+  status: number,
+  value: string,
+  applicationToolCount?: number,
+): Response {
   return Response.json(
-    { status: value },
+    {
+      status: value,
+      ...(typeof applicationToolCount === "number"
+        ? {
+            applicationTools: {
+              count: applicationToolCount,
+              status: applicationToolCount > 0 ? "ready" : "unavailable",
+            },
+          }
+        : {}),
+    },
     {
       status,
       headers: { "cache-control": "no-store" },

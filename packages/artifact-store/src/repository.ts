@@ -194,13 +194,6 @@ export class SessionArtifactStore {
     }
   }
 
-  async listBySession(
-    input: ScopeInput,
-    principal?: ScopePrincipal,
-  ): Promise<SessionArtifactMetadata[]> {
-    return this.listByScope(input, principal)
-  }
-
   async readContent(
     id: string,
     input: ScopeInput,

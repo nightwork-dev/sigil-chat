@@ -261,7 +261,7 @@ export function registerStoryTools(
     {
       name: "sigil-story-comment",
       description:
-        "Add a comment to one roadmap story's thread — respond to owner feedback, ask a question, or flag a concern.",
+        "Add a comment to one roadmap story's thread — respond to the owner's in-app feedback, ask a question, or flag a concern. Inspect the story first to read existing feedback (and use its revision). Set `addressee` to direct the note at a teammate (coordinator / strategist / analysis) or omit it for a general comment.",
       visibility: "always",
       approval: "write",
       input: shape<StoryCommentInput>(
@@ -345,7 +345,8 @@ function isStoryFilter(value: unknown): value is StoryFilter {
     hasOnlyKeys(value, ["worktree", "epic", "status"]) &&
     isOptionalText(value.worktree) &&
     isOptionalText(value.epic) &&
-    (value.status === undefined || storyStatuses.includes(value.status as never))
+    (value.status === undefined ||
+      storyStatuses.includes(value.status as never))
   )
 }
 
@@ -367,9 +368,7 @@ function isStoryUpsertInput(value: unknown): value is StoryUpsertInput {
   )
 }
 
-function isStoryTransitionInput(
-  value: unknown,
-): value is StoryTransitionInput {
+function isStoryTransitionInput(value: unknown): value is StoryTransitionInput {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, ["id", "status", "expectedRevision"]) &&
@@ -384,7 +383,13 @@ function isStoryAssignReviewInput(
 ): value is StoryAssignReviewInput {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["id", "gate", "title", "summary", "expectedRevision"]) &&
+    hasOnlyKeys(value, [
+      "id",
+      "gate",
+      "title",
+      "summary",
+      "expectedRevision",
+    ]) &&
     isText(value.id) &&
     reviewGates.includes(value.gate as never) &&
     isOptionalText(value.title) &&

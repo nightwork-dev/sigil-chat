@@ -49,7 +49,10 @@ describe("authenticated agent readiness", () => {
           principalId: "user-1",
           principalType: "user",
         }),
-      { hasModelAuth: () => Promise.resolve(true) },
+      {
+        applicationToolCount: () => 17,
+        hasModelAuth: () => Promise.resolve(true),
+      },
     )
 
     const response = await route.handler(
@@ -58,5 +61,9 @@ describe("authenticated agent readiness", () => {
     )
     expect(response.status).toBe(200)
     expect(response.headers.get("cache-control")).toBe("no-store")
+    await expect(response.json()).resolves.toEqual({
+      status: "ready",
+      applicationTools: { count: 17, status: "ready" },
+    })
   })
 })

@@ -17,7 +17,11 @@ export function parseToolApprovalPreference(
   }
   try {
     const parsed: unknown = JSON.parse(value)
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       return { default: "ask", tools: {} }
     }
     const candidate = parsed as { default?: unknown; tools?: unknown }
@@ -50,5 +54,9 @@ export function toolApprovalModeFor(
   toolName: string,
 ): ToolApprovalMode {
   const preference = parseToolApprovalPreference(value)
-  return preference.tools[toolName] ?? preference.default
+  return (
+    preference.tools[toolName] ??
+    preference.tools[`gonk__${toolName}`] ??
+    preference.default
+  )
 }

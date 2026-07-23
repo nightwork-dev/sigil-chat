@@ -311,10 +311,7 @@ export function requireResourceScope(
 
 function requestScope(ctx: ToolContext): ResourceScope | undefined {
   if (!isRecord(ctx.host)) return undefined;
-  return (
-    normalizeScope(ctx.host.resourceScope as ScopeInput | undefined) ??
-    normalizeScope(ctx.host.sessionScope as string | undefined)
-  );
+  return normalizeScope(ctx.host.resourceScope as ScopeInput | undefined);
 }
 
 export function resourceScopeSchema(): Record<string, unknown> {

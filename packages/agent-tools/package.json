@@ -36,8 +36,8 @@
     "./registry": "./src/registry.ts",
     "./request": "./src/request.ts",
     "./schemas": "./src/schemas.ts",
+    "./skills": "./src/skills.ts",
     "./spec": "./src/spec.ts",
-    "./story": "./src/story.ts",
-    "./types": "./src/types.ts"
+    "./story": "./src/story.ts"
   }
 }

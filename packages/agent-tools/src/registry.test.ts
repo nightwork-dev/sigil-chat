@@ -14,6 +14,7 @@ const hostDependencies = {
   },
   graph: {} as never,
   reviews: {} as never,
+  skills: {} as never,
 }
 
 const expectedWorkItemToolNames = [

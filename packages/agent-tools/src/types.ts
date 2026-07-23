@@ -1,11 +1,4 @@
 import type { AuthContext, AuthenticatedPrincipal } from "@gonk/auth"
-import type { ToolRegistry } from "@gonk/tool-registry"
-import type {
-  SpecsRepository,
-} from "@workspace/work-items-store/specs"
-import type {
-  WorkItemsRepository,
-} from "@workspace/work-items-store/repository"
 
 export type SigilResourceScope = {
   tier: string
@@ -15,58 +8,9 @@ export type SigilResourceScope = {
 
 export type SigilToolHostContext = {
   resourceScope?: unknown
-  sessionScope?: unknown
   applicationThreadId?: string
   personaId?: string
 }
-
-export type SigilScopeAuthorization = {
-  authorize(input: {
-    action: "tool"
-    principalId: string
-    resourceScope: string
-  }): boolean | Promise<boolean>
-}
-
-export type SigilArtifactRecord = {
-  id: string
-  mimeType: string
-  bytes?: Uint8Array
-  text?: string
-  metadata?: Record<string, unknown>
-}
-
-export type SigilArtifactRepository = {
-  put(record: SigilArtifactRecord): Promise<SigilArtifactRecord>
-  get(id: string): Promise<SigilArtifactRecord | undefined>
-}
-
-export type SigilSessionLookup = {
-  getApplicationThreadId(sessionId: string): Promise<string | undefined>
-}
-
-export type SigilContainerRegistry = {
-  get(id: string): unknown
-}
-
-export type SigilContainerRegistries = {
-  projects: SigilContainerRegistry
-  workspaces: SigilContainerRegistry
-}
-
-export type SigilAgentToolDependencies = {
-  workItems: WorkItemsRepository
-  specs?: SpecsRepository
-  artifacts?: SigilArtifactRepository
-  containers?: SigilContainerRegistries
-  sessions?: SigilSessionLookup
-  scopeAuthorization?: SigilScopeAuthorization
-}
-
-export type SigilAgentToolModule = (
-  registry: ToolRegistry,
-  dependencies: SigilAgentToolDependencies,
-) => void
 
 export type DelegatedHumanPrincipal = AuthenticatedPrincipal & {
   kind: "human"
@@ -119,8 +63,7 @@ export function resolveTargetScope(
   host: SigilToolHostContext | undefined,
   toolFamily: string,
 ): SigilResourceScope {
-  const current =
-    parseScope(host?.resourceScope) ?? parseSessionScope(host?.sessionScope)
+  const current = parseScope(host?.resourceScope)
   if (!current) {
     throw new Error(
       `${toolFamily} tools require a trusted current resource or session scope.`,
@@ -209,16 +152,6 @@ function toAuthzScope(
   }
 }
 
-function parseSessionScope(value: unknown): SigilResourceScope | undefined {
-  return typeof value === "string" && value.trim().length > 0
-    ? {
-        tier: "session",
-        id: value.trim(),
-        resourceScope: `session:${value.trim()}`,
-      }
-    : undefined
-}
-
 function parseScope(value: unknown): SigilResourceScope | undefined {
   if (typeof value === "string") {
     const separator = value.indexOf(":")
@@ -227,11 +160,7 @@ function parseScope(value: unknown): SigilResourceScope | undefined {
     const id = value.slice(separator + 1)
     return { tier, id, resourceScope: value }
   }
-  if (
-    isRecord(value) &&
-    isText(value.tier) &&
-    isText(value.id)
-  ) {
+  if (isRecord(value) && isText(value.tier) && isText(value.id)) {
     return {
       tier: value.tier,
       id: value.id,

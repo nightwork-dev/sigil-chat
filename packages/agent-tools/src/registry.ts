@@ -16,19 +16,13 @@ import { registerDemoSeedTools } from "./demo-seed.js"
 import { registerDistillTools } from "./distill.js"
 import { registerEvidenceTools } from "./evidence.js"
 import { registerFeatureRequestTools } from "./feature-request.js"
-import {
-  registerFileTools,
-  type ResourceUniverseRegistries,
-} from "./files.js"
+import { registerFileTools, type ResourceUniverseRegistries } from "./files.js"
 import { registerGraphTools } from "./graph.js"
 import { registerImageTools } from "./image.js"
 import { registerRequestTools } from "./request.js"
 import { registerReviewTools } from "./review.js"
-import {
-  registerRuntimeTools,
-  registerUiCommandTools,
-} from "./runtime.js"
-import { createSkillRegistry, registerSkillTools } from "./skills.js"
+import { registerRuntimeTools, registerUiCommandTools } from "./runtime.js"
+import { registerSkillTools, type SkillRegistryResolver } from "./skills.js"
 import { registerSpecTools } from "./spec.js"
 import { registerStoryTools } from "./story.js"
 
@@ -40,7 +34,7 @@ export interface SigilAgentToolDependencies {
   workItems: WorkItemsRepository
   specs?: SpecsRepository
   sessions?: ResourceUniverseRegistries["sessions"]
-  skills?: ReturnType<typeof createSkillRegistry>
+  skills: SkillRegistryResolver
 }
 
 export function createSigilAgentToolRegistry(
@@ -50,19 +44,16 @@ export function createSigilAgentToolRegistry(
     security: { approvalProvider: sigilApprovalProvider },
   })
 
+  registerRuntimeTools(registry)
+  registerGraphTools(registry, dependencies.graph)
+  registerReviewTools(registry, dependencies.reviews)
   registerStoryTools(registry, dependencies.workItems)
   registerFeatureRequestTools(registry, dependencies.workItems)
   registerRequestTools(registry, dependencies.workItems)
   if (dependencies.specs) registerSpecTools(registry, dependencies.specs)
   registerContainerTools(registry, dependencies.containers)
   registerAnnotationTools(registry)
-  registerGraphTools(registry, dependencies.graph)
-  registerReviewTools(registry, dependencies.reviews)
-  registerSkillTools(
-    registry,
-    dependencies.skills ?? createSkillRegistry(),
-  )
-  registerRuntimeTools(registry)
+  registerSkillTools(registry, dependencies.skills)
   registerUiCommandTools(registry)
   registerImageTools(
     registry,

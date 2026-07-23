@@ -411,7 +411,6 @@ describe("owned Eve channel", () => {
         return {
           attributes: {
             sigilResourceScope: request.headers.get("x-sigil-scope") ?? "",
-            sigilScopeProof: "browser-proof",
             sigilExecutionBinding: JSON.stringify(
               executionBindingFor("agent-a"),
             ),
@@ -432,7 +431,7 @@ describe("owned Eve channel", () => {
           // must still carry the authoritative request scope into this turn.
           auth: {
             ...caller,
-            attributes: { sigilScopeProof: "eve-session-bound-proof" },
+            attributes: {},
           },
         }
       },
@@ -464,7 +463,6 @@ describe("owned Eve channel", () => {
         auth: expect.objectContaining({
           attributes: expect.objectContaining({
             sigilResourceScope: "project:evidence-room",
-            sigilScopeProof: "eve-session-bound-proof",
           }),
         }),
       }),
