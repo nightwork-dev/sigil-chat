@@ -86,7 +86,7 @@ CDK, modules, or workspaces for DEP.2.
    Expected: Docker Compose prints its version. Rsync must not list `.env`,
    `.data`, `node_modules`, `.output`, or `docs.local`.
 
-8. Download the four-image digest manifest from the successful `prod` workflow,
+8. Download the three-image digest manifest from the successful `prod` workflow,
    create host-only secret files, and install the deployment directory.
 
    ```bash
@@ -105,7 +105,7 @@ CDK, modules, or workspaces for DEP.2.
 
    No secret prints or enters the image manifest.
 
-9. Validate and pull all four immutable images, stop the public edge and web,
+9. Validate and pull all three immutable images, stop the public edge and web,
    run the candidate migration, then replace the private services. The live
    manifest changes only after migration succeeds. Readiness failure restores
    the previous manifest and services; edge starts only after the candidate
@@ -117,9 +117,9 @@ CDK, modules, or workspaces for DEP.2.
      "sudo /opt/sigil-chat/deploy/update-images.sh /opt/sigil-chat/deploy/sigil-images.env"
    ```
 
-   Expected: `web`, `eve`, `gonk`, and `edge` are healthy. The update command
-   validates all four ECR digests before Docker runs and does not replace the
-   application services when migration fails. No Eve or Gonk port is public.
+   Expected: `web`, `eve`, and `edge` are healthy. The update command
+   validates all three ECR digests before Docker runs and does not replace the
+   application services when migration fails. No Eve port is public.
 
 10. On the first deployment, complete device auth as the Eve service identity,
     prove model-aware readiness, then verify app login, model response, and a

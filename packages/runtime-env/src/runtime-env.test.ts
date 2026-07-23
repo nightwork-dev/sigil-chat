@@ -163,6 +163,7 @@ describe("runtime topology", () => {
       personaDir: "/srv/sigil/identity/persona",
       reviewPath: "/srv/sigil/review",
       rootDir: "/srv/sigil",
+      skillsDir: "/srv/sigil/skills",
     });
   });
 
@@ -174,11 +175,11 @@ describe("runtime topology", () => {
           SIGIL_CHAT_GRAPH_PATH: " ./data/graph.json ",
           SIGIL_CHAT_REVIEW_PATH: " data/review.json ",
         },
-        "/workspace/apps/gonk",
+        "/workspace/apps/agent",
       ),
     ).toEqual({
-      graphPath: "/workspace/apps/gonk/data/graph.json",
-      reviewPath: "/workspace/apps/gonk/data/review.json",
+      graphPath: "/workspace/apps/agent/data/graph.json",
+      reviewPath: "/workspace/apps/agent/data/review.json",
     });
   });
 

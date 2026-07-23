@@ -24,6 +24,7 @@ export interface DataRuntimeEnvironment
   containerRegistryRoot: string;
   identityDir: string;
   rootDir: string;
+  skillsDir: string;
 }
 
 export interface DisabledEmbeddingRuntimeEnvironment {
@@ -107,6 +108,7 @@ export function readDataEnvironment(
     personaDir: join(identityDir, "persona"),
     reviewPath: join(rootDir, "review"),
     rootDir,
+    skillsDir: join(rootDir, "skills"),
   };
 }
 

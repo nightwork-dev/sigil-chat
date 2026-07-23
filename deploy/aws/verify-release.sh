@@ -24,7 +24,6 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   value="${line#*=}"
   case "$key" in
     SIGIL_EVE_IMAGE) target="eve" ;;
-    SIGIL_GONK_IMAGE) target="gonk" ;;
     SIGIL_MIGRATE_IMAGE) target="migrate" ;;
     SIGIL_WEB_IMAGE) target="web" ;;
     *)
@@ -44,7 +43,7 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   seen[$key]=1
 done < "$manifest"
 
-for key in SIGIL_EVE_IMAGE SIGIL_GONK_IMAGE SIGIL_MIGRATE_IMAGE SIGIL_WEB_IMAGE; do
+for key in SIGIL_EVE_IMAGE SIGIL_MIGRATE_IMAGE SIGIL_WEB_IMAGE; do
   [[ -n "${seen[$key]:-}" ]] || {
     echo "Missing manifest key: $key" >&2
     exit 1

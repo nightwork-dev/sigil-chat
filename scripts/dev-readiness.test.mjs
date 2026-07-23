@@ -35,17 +35,13 @@ describe("development readiness", () => {
           return Response.json({ token: "eve-token" });
         }
         if (url.endsWith("/sigil/v1/readiness")) {
-          return Response.json({ status: "ready" });
+          return Response.json({
+            status: "ready",
+            applicationTools: { count: 24, status: "ready" },
+          });
         }
         if (url.endsWith("/eve/v1/info")) {
-          return Response.json({
-            dynamic: [
-              {
-                id: "sigil-gonk-tools",
-                trigger: "step.started",
-              },
-            ],
-          });
+          return Response.json({ name: "sigil-chat-agent" });
         }
         return new Response(null, { status: 404 });
       },

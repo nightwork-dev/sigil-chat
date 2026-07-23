@@ -16,9 +16,9 @@ import {
   assertDevServerStopped,
   DEV_OWNER_EMAIL,
   DEV_STATE_DIRECTORIES,
-  ensureDevServiceKey,
+  ensureDevAgentBindingSecret,
   getOrCreateDevOwnerCredentials,
-  prepareDevServiceEnvironment,
+  prepareDevAgentBindingEnvironment,
   quarantineDevState,
   readDevBindingSecret,
   restoreDevState,
@@ -49,8 +49,8 @@ describe("development instance preparation", () => {
     const directory = temporaryDirectory();
     const path = join(directory, ".data", "dev", "agent-binding-secret");
 
-    const first = ensureDevServiceKey(path, () => "generated-key-1234");
-    const second = ensureDevServiceKey(path, () => "replacement-key");
+    const first = ensureDevAgentBindingSecret(path, () => "generated-key-1234");
+    const second = ensureDevAgentBindingSecret(path, () => "replacement-key");
 
     assert.deepEqual(first, { created: true, path });
     assert.deepEqual(second, { created: false, path });
@@ -62,11 +62,8 @@ describe("development instance preparation", () => {
     );
 
     const environment = { SIGIL_AGENT_BINDING_SECRET_FILE: path };
-    prepareDevServiceEnvironment(directory, environment);
-    assert.equal(
-      environment.SIGIL_AGENT_BINDING_SECRET,
-      "generated-key-1234",
-    );
+    prepareDevAgentBindingEnvironment(directory, environment);
+    assert.equal(environment.SIGIL_AGENT_BINDING_SECRET, "generated-key-1234");
     assert.equal(environment.SIGIL_DATA_DIR, join(directory, ".data"));
   });
 
@@ -77,7 +74,7 @@ describe("development instance preparation", () => {
     writeFileSync(path, "short\n");
 
     assert.throws(
-      () => ensureDevServiceKey(path, () => "generated-key-1234"),
+      () => ensureDevAgentBindingSecret(path, () => "generated-key-1234"),
       /Invalid Sigil Chat development agent binding secret/,
     );
   });

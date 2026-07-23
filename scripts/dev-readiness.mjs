@@ -98,13 +98,9 @@ async function createDevelopmentAuthSession({
   return { eveToken };
 }
 
-async function checkAuthenticatedServices({
-  fetcher,
-  session,
-  topology,
-}) {
+async function checkAuthenticatedServices({ fetcher, session, topology }) {
   const authorization = { authorization: `Bearer ${session.eveToken}` };
-  await expectOk(
+  const readinessResponse = await expectOk(
     fetcher(
       new URL("/sigil/v1/readiness", topology.eveOrigin),
       requestOptions({ headers: authorization }),
@@ -117,8 +113,19 @@ async function checkAuthenticatedServices({
       retryableStatus: isTransientHttpStatus,
     },
   );
+  const readiness = await readinessResponse.json();
+  if (
+    readiness?.applicationTools?.status !== "ready" ||
+    !Number.isInteger(readiness?.applicationTools?.count) ||
+    readiness.applicationTools.count < 1
+  ) {
+    throw new DevelopmentReadinessError(
+      "APPLICATION_TOOLS_MISSING",
+      "Eve is running but its native Sigil Chat tools are unavailable.",
+    );
+  }
 
-  const infoResponse = await expectOk(
+  await expectOk(
     fetcher(
       new URL("/eve/v1/info", topology.eveOrigin),
       requestOptions({ headers: authorization }),
@@ -130,13 +137,6 @@ async function checkAuthenticatedServices({
       retryableStatus: isTransientHttpStatus,
     },
   );
-  const info = await infoResponse.json();
-  if (!hasNativeGonkTools(info?.dynamic)) {
-    throw new DevelopmentReadinessError(
-      "GONK_TOOLS_MISSING",
-      "Eve is running but its native Sigil Chat tools are unavailable.",
-    );
-  }
 }
 
 export async function waitForDevelopmentReadiness(
@@ -231,15 +231,6 @@ function responseCookies(headers) {
   return (
     headers.getSetCookie?.() ??
     (headers.get("set-cookie") ? [headers.get("set-cookie")] : [])
-  );
-}
-
-function hasNativeGonkTools(dynamicResolvers) {
-  if (!Array.isArray(dynamicResolvers)) return false;
-  return dynamicResolvers.some(
-    (resolver) =>
-      resolver?.id === "sigil-gonk-tools" &&
-      resolver.trigger === "step.started",
   );
 }
 

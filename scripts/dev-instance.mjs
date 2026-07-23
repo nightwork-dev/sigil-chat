@@ -39,7 +39,7 @@ export function devProcessMarkerPath(repoRoot) {
   return resolve(repoRoot, ".data", "dev-server.json");
 }
 
-export function devServiceKeyPath(repoRoot) {
+export function devAgentBindingSecretPath(repoRoot) {
   return resolve(repoRoot, ".data", "dev", "agent-binding-secret");
 }
 
@@ -93,7 +93,7 @@ export function readDevOwnerCredentials(path) {
   return value;
 }
 
-export function ensureDevServiceKey(
+export function ensureDevAgentBindingSecret(
   path,
   generateKey = () => randomBytes(24).toString("hex"),
 ) {
@@ -124,7 +124,7 @@ export function ensureDevServiceKey(
   return { created: true, path };
 }
 
-export function prepareDevServiceEnvironment(repoRoot, env = process.env) {
+export function prepareDevAgentBindingEnvironment(repoRoot, env = process.env) {
   env.SIGIL_DATA_DIR ||= resolve(repoRoot, ".data");
 
   if (env.SIGIL_AGENT_BINDING_SECRET?.trim()) {
@@ -133,17 +133,22 @@ export function prepareDevServiceEnvironment(repoRoot, env = process.env) {
 
   if (env.SIGIL_AGENT_BINDING_SECRET_FILE?.trim()) {
     const path = resolve(repoRoot, env.SIGIL_AGENT_BINDING_SECRET_FILE.trim());
-    ensureDevServiceKey(path);
+    ensureDevAgentBindingSecret(path);
     env.SIGIL_AGENT_BINDING_SECRET_FILE = path;
     env.SIGIL_AGENT_BINDING_SECRET = readFileSync(path, "utf8").trim();
     return { created: false, source: "SIGIL_AGENT_BINDING_SECRET_FILE" };
   }
 
-  const serviceKey = ensureDevServiceKey(devServiceKeyPath(repoRoot));
-  env.SIGIL_AGENT_BINDING_SECRET_FILE = serviceKey.path;
-  env.SIGIL_AGENT_BINDING_SECRET = readFileSync(serviceKey.path, "utf8").trim();
+  const bindingSecret = ensureDevAgentBindingSecret(
+    devAgentBindingSecretPath(repoRoot),
+  );
+  env.SIGIL_AGENT_BINDING_SECRET_FILE = bindingSecret.path;
+  env.SIGIL_AGENT_BINDING_SECRET = readFileSync(
+    bindingSecret.path,
+    "utf8",
+  ).trim();
   return {
-    created: serviceKey.created,
+    created: bindingSecret.created,
     source: "generated worktree state",
   };
 }

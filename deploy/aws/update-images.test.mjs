@@ -37,7 +37,7 @@ test("updates all image digests and preserves a rollback manifest", () => {
     { mode: 0o755 },
   );
 
-  const targets = ["EVE", "GONK", "MIGRATE", "WEB"];
+  const targets = ["EVE", "MIGRATE", "WEB"];
   const oldLines = targets.map(
     (target) =>
       `SIGIL_${target}_IMAGE=123456789012.dkr.ecr.us-west-2.amazonaws.com/sigil-chat-${target.toLowerCase()}@sha256:${"a".repeat(64)}`,
@@ -93,7 +93,7 @@ test("updates all image digests and preserves a rollback manifest", () => {
   assert.ok(containerPrune >= 0 && containerPrune < pull);
   assert.ok(imagePrune > containerPrune && imagePrune < pull);
   const replacePrivateServices = invocations.findIndex((line) =>
-    line.endsWith("up -d --wait --no-deps web gonk eve"),
+    line.endsWith("up -d --wait --no-deps web eve"),
   );
   assert.ok(stopEdge >= 0, "update must stop the public edge");
   assert.ok(
@@ -135,7 +135,7 @@ test("failed migration leaves the live manifest on the previous release", () => 
   );
 
   const registry = "123456789012.dkr.ecr.us-west-2.amazonaws.com";
-  const targets = ["EVE", "GONK", "MIGRATE", "WEB"];
+  const targets = ["EVE", "MIGRATE", "WEB"];
   const oldLines = targets.map(
     (target) =>
       `SIGIL_${target}_IMAGE=${registry}/sigil-chat-${target.toLowerCase()}@sha256:${"a".repeat(64)}`,

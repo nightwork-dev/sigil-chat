@@ -8,7 +8,7 @@ import {
   devOwnerCredentialsPath,
   devProcessMarkerPath,
   getOrCreateDevOwnerCredentials,
-  prepareDevServiceEnvironment,
+  prepareDevAgentBindingEnvironment,
 } from "./dev-instance.mjs";
 import { waitForDevelopmentReadiness } from "./dev-readiness.mjs";
 
@@ -20,7 +20,7 @@ if (existsSync(envPath)) process.loadEnvFile(envPath);
 const preparation = await runToExit("node", ["scripts/dev-prepare.mjs"]);
 if (preparation !== 0) process.exit(preparation);
 
-prepareDevServiceEnvironment(repoRoot);
+prepareDevAgentBindingEnvironment(repoRoot);
 const credentialsPath = devOwnerCredentialsPath(repoRoot);
 const credentials = getOrCreateDevOwnerCredentials(credentialsPath);
 process.env.SIGIL_DEV_OWNER_CREDENTIALS_FILE = credentialsPath;

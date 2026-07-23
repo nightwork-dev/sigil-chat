@@ -20,8 +20,8 @@ test -f "$deploy_env"
 cp "$deploy_env" "$rollback_env"
 cp "$deploy_env" "$candidate_env"
 chmod 0600 "$rollback_env" "$candidate_env"
-grep '^SIGIL_\(EVE\|GONK\|MIGRATE\|WEB\)_IMAGE=' "$deploy_env" > "$previous_images"
-for key in SIGIL_EVE_IMAGE SIGIL_GONK_IMAGE SIGIL_MIGRATE_IMAGE SIGIL_WEB_IMAGE; do
+grep '^SIGIL_\(EVE\|MIGRATE\|WEB\)_IMAGE=' "$deploy_env" > "$previous_images"
+for key in SIGIL_EVE_IMAGE SIGIL_MIGRATE_IMAGE SIGIL_WEB_IMAGE; do
   value="$(awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2) }' "$manifest")"
   if grep -q "^${key}=" "$candidate_env"; then
     sed -i.bak "s|^${key}=.*|${key}=${value}|" "$candidate_env"
@@ -41,7 +41,7 @@ compose_current() {
 
 restore_previous_release() {
   cp "$rollback_env" "$deploy_env"
-  compose_current up -d --wait --no-deps web gonk eve
+  compose_current up -d --wait --no-deps web eve
   compose_current up -d --wait --no-deps edge
 }
 
@@ -60,7 +60,7 @@ fi
 
 mv "$candidate_env" "$deploy_env"
 
-if ! compose_current up -d --wait --no-deps web gonk eve; then
+if ! compose_current up -d --wait --no-deps web eve; then
   echo "Private-service readiness failed; restoring the previous release." >&2
   restore_previous_release || true
   exit 1

@@ -33,13 +33,13 @@ describe("Sigil Chat overlay", () => {
       expect(statSync(staged).isDirectory()).toBe(
         statSync(source).isDirectory(),
       );
+    }
+    for (const staged of walk(filesRoot)) {
+      const sourceRelativePath = relative(filesRoot, staged);
+      for (const privateSegment of [".env", ".agents", ".data", ".omc"]) {
+        expect(sourceRelativePath.split("/")).not.toContain(privateSegment);
       }
-      for (const staged of walk(filesRoot)) {
-        const sourceRelativePath = relative(filesRoot, staged);
-        for (const privateSegment of [".env", ".agents", ".data", ".omc"]) {
-          expect(sourceRelativePath.split("/")).not.toContain(privateSegment);
-        }
-        const source = join(repositoryRoot, sourceRelativePath);
+      const source = join(repositoryRoot, sourceRelativePath);
       expect(readFileSync(staged)).toEqual(readFileSync(source));
     }
   }, 30_000);
@@ -70,9 +70,9 @@ describe("Sigil Chat overlay", () => {
     expect(statSync(join(target, "apps/agent/package.json")).isFile()).toBe(
       true,
     );
-    expect(statSync(join(target, "apps/gonk/package.json")).isFile()).toBe(
-      true,
-    );
+    expect(
+      statSync(join(target, "packages/agent-tools/package.json")).isFile(),
+    ).toBe(true);
     expect(
       statSync(join(target, "apps/web/src/routes/_app/chat.tsx")).isFile(),
     ).toBe(true);
