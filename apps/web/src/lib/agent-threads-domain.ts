@@ -167,6 +167,42 @@ function randomSlug(): string {
   return slug;
 }
 
+// Authz finding 2 (2026-07-23, Annika): the lazy slug backfill in
+// normalizeThread() below reads-then-writes outside any lock. Web and Eve
+// share SIGIL_DATA_DIR, so two processes racing to backfill the SAME
+// slug-less thread on their first read would previously each mint a
+// DIFFERENT random slug via randomSlug() and both `set()` it —
+// last-write-wins, silently breaking the "minted once, never regenerated"
+// immutability contract for whichever slug lost the race.
+// The fix is deterministic convergence, not a lock: this repository has no
+// cross-process lock primitive (unlike project-registry.ts's
+// withRegistryRecordLock, which is Eve/Node-fs-only — this file's import
+// chain is browser-reachable, so it can't pull in a Node `node:fs` lock
+// without becoming a canary violation). A backfill candidate derived from
+// the thread's own immutable `id` is IDENTICAL no matter which process
+// computes it, so a last-write-wins race between two backfills of the same
+// thread is harmless: both writers agree on the value, so it doesn't matter
+// which one's write survives. FNV-1a is a plain synchronous string hash —
+// no node:crypto, so this stays safe in a client-reachable import chain.
+function fnv1aHash(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function deterministicSlugCandidate(threadId: string, attempt: number): string {
+  let seed = fnv1aHash(`${threadId}:${attempt}`);
+  let slug = "";
+  for (let i = 0; i < SLUG_LENGTH; i += 1) {
+    slug += SLUG_ALPHABET[seed % SLUG_ALPHABET.length];
+    seed = Math.imul(seed ^ (seed >>> 15), 0x2545f491) >>> 0;
+  }
+  return slug;
+}
+
 /** 36-char UUID (crypto.randomUUID() form) vs an 8-char base36 slug — no
  *  ambiguity between the two shapes, so a route param resolves unambiguously
  *  without a heuristic guess. */
@@ -284,6 +320,30 @@ export class AgentThreadRepository {
     }
     throw new Error(
       `Could not mint a unique session slug for principal ${userId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
+    );
+  }
+
+  /** The lazy-backfill mint (finding 2 above) — deterministic from the
+   *  thread's own id, unlike mintUniqueSlug's random mint used by
+   *  create()/fork(), which never races (each writes a freshly-generated
+   *  id nothing else could be reading yet). */
+  private mintDeterministicBackfillSlug(userId: string, threadId: string): string {
+    const existing = new Set(
+      this.threads
+        .entries(THREAD_KEY_PREFIX)
+        .filter(
+          ({ key, value }) =>
+            key !== threadKey(threadId) && isMember(value.members, userId),
+        )
+        .map(({ value }) => value.slug)
+        .filter((slug): slug is string => Boolean(slug)),
+    );
+    for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
+      const candidate = deterministicSlugCandidate(threadId, attempt);
+      if (!existing.has(candidate)) return candidate;
+    }
+    throw new Error(
+      `Could not mint a deterministic backfill slug for thread ${threadId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
     );
   }
 
@@ -603,7 +663,9 @@ export class AgentThreadRepository {
         ? stored.runtime
         : freshRuntimeRecord(thread.updatedAt);
     const hasSlug = typeof thread.slug === "string" && thread.slug.trim();
-    const slug = hasSlug ? thread.slug.trim().toLowerCase() : this.mintUniqueSlug(userId);
+    const slug = hasSlug
+      ? thread.slug.trim().toLowerCase()
+      : this.mintDeterministicBackfillSlug(userId, thread.id);
     const normalized = cloneThread({
       ...stored,
       personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
