@@ -1,24 +1,27 @@
-// §3.1 — the ActiveContainerProvider, DEMOTED by SC.10 §6 step 7 (and
-// narrowed further once `/chat` folded into the session leaf in step 8). It
-// is no longer "which project/workspace am I in" for anything that renders
-// the nested projects/workspaces/sessions tree — that tree, INCLUDING the
-// session/chat surface now, reads containment from the matched route chain
-// or the active-thread preference directly (container-breadcrumb.tsx,
+// §3.1 — the ActiveContainerProvider, DEMOTED by SC.10 §6 step 7, narrowed
+// further once `/chat` folded into the session leaf in step 8, and narrowed
+// again by §9's session-surface revision. It is no longer "which
+// project/workspace am I in" for anything that renders the nested
+// projects/workspaces/sessions tree — that tree, INCLUDING the session/chat
+// surface now, reads containment from the matched route chain or the
+// active-thread preference directly (container-breadcrumb.tsx,
 // routes/_app/chat.tsx's resolver), never from this provider. This provider
-// is now scoped to two legitimate remaining consumers, neither of which
-// reads it back to decide what a route renders:
+// is now scoped to three legitimate remaining consumers, none of which reads
+// it back to decide what a route renders:
 // - The `/home` redirect (routes/_app/home.tsx) — "remember where I was"
 //   read, the one place this selection is still authoritative.
-// - shell-omnibar.tsx's project/workspace switcher and the conversation-sheet
-//   ProjectWorkspaceNav (rendered inside AgentChatHeader, now mounted on
-//   every session leaf). The omnibar's switcher WRITES this provider on
-//   selection (the persist-on-navigate hook below) and then navigates
+// - shell-omnibar.tsx's project/workspace switcher. It WRITES this provider
+//   on selection (the persist-on-navigate hook below) and then navigates
 //   directly to the picked container's own nested home
 //   (/projects/$projectId or /projects/$projectId/workspaces/$workspaceId —
 //   never through `/chat`, which would land on the app-global active thread
-//   instead of the just-picked container). The conversation-sheet
-//   ProjectWorkspaceNav only READS container.projectId, and only as a
-//   default filter for its own picker UI — never to choose a navigation
+//   instead of the just-picked container).
+// - `ProjectWorkspaceNav`, the session/thread switcher: promoted to a
+//   persistent sidebar pane by §9.2 (session-list-pane.tsx, always visible
+//   on desktop) and still reachable as a Sheet at compact widths
+//   (`AgentSessionSwitcher`, rendered from session-chat-header.tsx now, not
+//   AgentChatHeader). Both forms only READ container.projectId, and only as
+//   a default filter for their own picker UI — never to choose a navigation
 //   target.
 // selectProject/selectWorkspace stay wired as a persist-on-navigate hook so
 // the next `/home` visit lands where the principal last was — writing here

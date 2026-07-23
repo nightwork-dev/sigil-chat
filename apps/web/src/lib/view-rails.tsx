@@ -34,6 +34,14 @@ export interface ViewRailDeclaration {
   readonly statusStart?: ComponentType
   /** Chord hints for this view, appended after the global chords. */
   readonly chords?: readonly ViewChord[]
+  /**
+   * Retire the bottom status rail entirely for this view (SC.10 §9.4): no
+   * chord hints, no AgentRailStatus. For a view whose own chrome already
+   * carries everything the bottom rail would duplicate (the session
+   * surface's context rail + top bar) — not a generic "hide" switch, so
+   * reach for it only when every occupant genuinely moved elsewhere.
+   */
+  readonly hideStatusRail?: boolean
 }
 
 // Type the staticData slot once, app-wide (TanStack module augmentation).
@@ -62,6 +70,14 @@ export function ViewRailTop() {
 export function ViewRailStatusStart() {
   const Start = useViewRailDeclaration().statusStart
   return Start ? <Start /> : null
+}
+
+/** Whether the deepest matched route retired the bottom status rail
+ *  (SC.10 §9.4). _app.tsx reads this directly rather than through a
+ *  slot component, since its statusRailEnd composes app-local pieces
+ *  (AgentRailStatus) this router-generic module must not import. */
+export function useHideStatusRail(): boolean {
+  return useViewRailDeclaration().hideStatusRail ?? false
 }
 
 const GLOBAL_CHORDS: readonly ViewChord[] = [

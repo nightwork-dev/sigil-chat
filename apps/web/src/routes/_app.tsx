@@ -34,6 +34,7 @@ import {
   ViewRailChords,
   ViewRailStatusStart,
   ViewRailTop,
+  useHideStatusRail,
 } from "@/lib/view-rails"
 import "@/components/agent/agent-tool-renderer-bootstrap"
 
@@ -63,6 +64,7 @@ export const Route = createFileRoute("/_app")({
 function AppLayout() {
   const { user } = Route.useRouteContext()
   const breadcrumbPage = useContainerBreadcrumbPage()
+  const hideStatusRail = useHideStatusRail()
   const nav = buildAppNav({
     internalWorkspaces:
       import.meta.env.DEV ||
@@ -73,7 +75,10 @@ function AppLayout() {
   // One rail, one header: the top rail is breadcrumb (always) + the matched
   // route's viewContent (read from staticData via useMatches — SSR-native,
   // no provider). The bottom status rail carries view controls (left), chord
-  // hints + agent attention (right). The theme picker lives in the sidebar
+  // hints + agent attention (right) — EXCEPT on the session surface, which
+  // retires the bottom rail entirely (SC.10 §9.4: its own top bar + context
+  // rail already carry everything it would duplicate) via the route's
+  // `staticData.rail.hideStatusRail`. The theme picker lives in the sidebar
   // footer with the account menu, not the rail.
   return (
     <AgentPrincipalProvider principalId={user.id}>
@@ -95,10 +100,12 @@ function AppLayout() {
                 viewContent={<ViewRailTop />}
                 statusRailStart={<ViewRailStatusStart />}
                 statusRailEnd={
-                  <>
-                    <ViewRailChords />
-                    <AgentRailStatus />
-                  </>
+                  hideStatusRail ? null : (
+                    <>
+                      <ViewRailChords />
+                      <AgentRailStatus />
+                    </>
+                  )
                 }
               >
                 <Outlet />
