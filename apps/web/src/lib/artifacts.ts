@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { queryOptions, useQuery } from "@tanstack/react-query"
 import { createServerFn } from "@tanstack/react-start"
 
 /**
@@ -51,12 +51,16 @@ const readArtifactPreviewFn = createServerFn({ method: "GET" })
     return readArtifactPreviewFromRequest(data)
   })
 
-export function useArtifacts(scope: string | null) {
-  return useQuery({
+export function artifactsQueryOptions(scope: string | null) {
+  return queryOptions({
     queryKey: artifactKeys.scope(scope ?? "none"),
     queryFn: () => listArtifactsFn({ data: scope ?? "" }),
     enabled: Boolean(scope),
   })
+}
+
+export function useArtifacts(scope: string | null) {
+  return useQuery(artifactsQueryOptions(scope))
 }
 
 export function useArtifactPreview(scope: string | null, id: string | null) {

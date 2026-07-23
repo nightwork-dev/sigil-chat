@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 
 import { useAgentPrincipalId } from "@/lib/agent-principal";
@@ -62,14 +62,18 @@ export const projectWorkspaceNavKeys = {
   all: (principalId: string) => ["project-workspace-nav", principalId] as const,
 };
 
+export function projectWorkspaceNavQueryOptions(principalId: string) {
+  return queryOptions({
+    queryKey: projectWorkspaceNavKeys.all(principalId),
+    queryFn: () => loadProjectWorkspaceNavFn(),
+  });
+}
+
 /** Project switcher + workspace list data for the chat surface. Includes
  *  the caller's personal project, seeded on first request. */
 export function useProjectWorkspaceNav() {
   const principalId = useAgentPrincipalId();
-  return useQuery({
-    queryKey: projectWorkspaceNavKeys.all(principalId),
-    queryFn: () => loadProjectWorkspaceNavFn(),
-  });
+  return useQuery(projectWorkspaceNavQueryOptions(principalId));
 }
 
 async function requireNavSession(): Promise<SigilAuthSession> {
