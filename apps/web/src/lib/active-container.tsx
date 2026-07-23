@@ -1,7 +1,19 @@
-// §3.1 — the ActiveContainerProvider: the single app-level source for "which
-// project/workspace am I in." Every scoped surface reads the selection from
-// here instead of re-deriving it; the shell switcher and the omnibar write it
-// through the same mutation, so chrome and keyboard paths can never disagree.
+// §3.1 — the ActiveContainerProvider, DEMOTED by SC.10 §6 step 7. It is no
+// longer "which project/workspace am I in" for anything that renders the
+// nested projects/workspaces/sessions tree — that tree reads containment
+// from the matched route chain only (container-breadcrumb.tsx), so chrome
+// and the URL can never disagree. This provider is now scoped to two
+// legitimate remaining consumers:
+// - The `/home` redirect (routes/_app/home.tsx) — "remember where I was"
+//   read, the one place this selection is still authoritative.
+// - The `/chat` surface (shell-omnibar.tsx, the conversation-sheet
+//   ProjectWorkspaceNav) — /chat is not part of the SC.10 nested tree yet
+//   (folding it in is a separate, deferred step); it keeps using this as its
+//   active-attention context until that fold-in lands.
+// selectProject/selectWorkspace stay wired as a persist-on-navigate hook so
+// the next `/home` visit lands where the principal last was — writing here
+// is fine; reading it back to decide what a container-scoped route renders
+// is exactly the two-writer bug this demotion closes off.
 //
 // Selection semantics (mirrors the preference contract):
 // - no selection → the principal's personal project (project scope)
