@@ -5,7 +5,11 @@ import { join } from "node:path"
 import type { KvStore } from "@gonk/store/types"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { type Project, ProjectRegistry } from "./project-registry"
+import {
+  type Project,
+  ProjectRegistry,
+  withRegistryRecordLock,
+} from "./project-registry"
 
 const temporaryDirectories: string[] = []
 
@@ -79,6 +83,17 @@ describe("ProjectRegistry", () => {
     )
     expect(second.slug).toBe("project-one")
     expect(second.description).toBe("Updated description.")
+  })
+
+  // Hardening (2026-07-23, Annika's re-review): the lock is released the
+  // instant `operation()` RETURNS, not when a returned Promise settles — an
+  // async operation would run its real work unprotected after the lock is
+  // already gone. Both call sites (no lockDirectory, and the reentrant
+  // fast path) share the same runtime check, so this covers both.
+  it("rejects an async operation instead of silently releasing the lock early", () => {
+    expect(() =>
+      withRegistryRecordLock(undefined, "some-id", () => Promise.resolve(1)),
+    ).toThrow(/returned a Promise/)
   })
 
   it("fails closed for corrupt project records", () => {
