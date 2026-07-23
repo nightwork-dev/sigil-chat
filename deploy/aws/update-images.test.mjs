@@ -16,6 +16,13 @@ import test from "node:test";
 const sourceDir = new URL(".", import.meta.url).pathname;
 const digest = "b".repeat(64);
 
+function createAgentBindingSecret(directory) {
+  const secretDirectory = join(directory, "secrets");
+  mkdirSync(secretDirectory);
+  writeFileSync(join(secretDirectory, "agent_binding_secret"), "secret\n");
+  return secretDirectory;
+}
+
 test("updates all image digests and preserves a rollback manifest", () => {
   const directory = mkdtempSync(join(tmpdir(), "sigil-update-images-"));
   const binDirectory = join(directory, "bin");
@@ -49,9 +56,10 @@ test("updates all image digests and preserves a rollback manifest", () => {
   );
   const deployEnv = join(directory, "deploy.env.local");
   const manifest = join(directory, "sigil-images.env");
+  const secretDirectory = createAgentBindingSecret(directory);
   writeFileSync(
     deployEnv,
-    `PUBLIC_HOST=chat.example.test\n${oldLines.join("\n")}\n`,
+    `PUBLIC_HOST=chat.example.test\nSIGIL_SECRET_DIR=${secretDirectory}\n${oldLines.join("\n")}\n`,
   );
   writeFileSync(manifest, `${newLines.join("\n")}\n`);
 
@@ -147,9 +155,10 @@ test("failed migration leaves the live manifest on the previous release", () => 
   );
   const deployEnv = join(directory, "deploy.env.local");
   const manifest = join(directory, "sigil-images.env");
+  const secretDirectory = createAgentBindingSecret(directory);
   writeFileSync(
     deployEnv,
-    `PUBLIC_HOST=chat.example.test\n${oldLines.join("\n")}\n`,
+    `PUBLIC_HOST=chat.example.test\nSIGIL_SECRET_DIR=${secretDirectory}\n${oldLines.join("\n")}\n`,
   );
   writeFileSync(manifest, `${newLines.join("\n")}\n`);
 
@@ -167,10 +176,71 @@ test("failed migration leaves the live manifest on the previous release", () => 
   assert.deepEqual(
     readFileSync(deployEnv, "utf8")
       .split("\n")
-      .filter((line) => line.startsWith("SIGIL_")),
+      .filter((line) => /^SIGIL_(EVE|MIGRATE|WEB)_IMAGE=/.test(line)),
     oldLines,
   );
   assert.match(result.stderr, /Migration failed/);
+});
+
+test("missing agent binding secret is rejected before deployment mutation", () => {
+  const directory = mkdtempSync(join(tmpdir(), "sigil-update-secret-"));
+  const binDirectory = join(directory, "bin");
+  const dockerLog = join(directory, "docker.log");
+  mkdirSync(binDirectory);
+
+  for (const name of [
+    "update-images.sh",
+    "verify-release.sh",
+    "verify-release.mjs",
+    "compose.yaml",
+    "MIGRATING-FROM-GONK-SERVICE.md",
+  ]) {
+    copyFileSync(join(sourceDir, name), join(directory, name));
+  }
+  chmodSync(join(directory, "update-images.sh"), 0o755);
+  chmodSync(join(directory, "verify-release.sh"), 0o755);
+  writeFileSync(
+    join(binDirectory, "docker"),
+    '#!/bin/sh\nprintf "%s\\n" "$*" >> "$SIGIL_DOCKER_LOG"\nexit 0\n',
+    { mode: 0o755 },
+  );
+
+  const registry = "123456789012.dkr.ecr.us-west-2.amazonaws.com";
+  const imageLines = ["EVE", "MIGRATE", "WEB"].map(
+    (target) =>
+      `SIGIL_${target}_IMAGE=${registry}/sigil-chat-${target.toLowerCase()}@sha256:${digest}`,
+  );
+  const deployEnv = join(directory, "deploy.env.local");
+  const manifest = join(directory, "sigil-images.env");
+  writeFileSync(
+    deployEnv,
+    [
+      "PUBLIC_HOST=chat.example.test",
+      `SIGIL_SECRET_DIR=${join(directory, "missing-secrets")}`,
+      ...imageLines,
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(manifest, `${imageLines.join("\n")}\n`);
+
+  const result = spawnSync(join(directory, "update-images.sh"), [manifest], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      DEPLOY_ENV: deployEnv,
+      PATH: `${binDirectory}:${process.env.PATH}`,
+      SIGIL_DOCKER_LOG: dockerLog,
+    },
+  });
+
+  assert.equal(result.status, 78);
+  assert.match(result.stderr, /Missing required agent binding secret/);
+  assert.match(result.stderr, /MIGRATING-FROM-GONK-SERVICE\.md/);
+  assert.equal(existsSync(`${deployEnv}.rollback`), false);
+  assert.equal(existsSync(`${deployEnv}.candidate`), false);
+  assert.deepEqual(readFileSync(dockerLog, "utf8").trim().split("\n"), [
+    "ps -aq --filter label=com.docker.compose.project=sigil-chat --filter label=com.docker.compose.service=gonk",
+  ]);
 });
 
 test("legacy Gonk topology is rejected before any deployment mutation", async (t) => {

@@ -31,7 +31,10 @@ first.
 
 That procedure is intentionally manual and removable. The application does not
 copy or merge legacy data, remove orphan containers, or retain a compatibility
-service. Back up the old volume before the cutover.
+service. Back up the old volume before the cutover. The guide also provisions
+the new Web/Eve binding secret before the updater can mutate the deployment and
+defers emptying the obsolete Gonk ECR repository until the new topology has
+been accepted.
 
 ## Terraform review and apply
 

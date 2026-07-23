@@ -78,7 +78,43 @@ Retain the old `sigil-chat_gonk_data` volume and any old Gonk secret file until
 the new release is verified. Do not use `docker compose --remove-orphans` as a
 substitute for identifying and backing up the legacy service.
 
-## 4. Deploy and verify
+## 4. Provision the Web/Eve binding secret
+
+The old topology did not require `agent_binding_secret`. The current Compose
+file mounts it into both Web and Eve, and the updater refuses to mutate the
+deployment until the file exists.
+
+Read the configured secret directory from the deployment environment, then
+create only the missing secret:
+
+```bash
+if ! grep -q '^SIGIL_SECRET_DIR=/' deploy.env.local; then
+  echo 'Add SIGIL_SECRET_DIR=/absolute/host/path to deploy.env.local first.' >&2
+  exit 1
+fi
+secret_dir="$(
+  sed -n 's/^SIGIL_SECRET_DIR=//p' deploy.env.local
+)"
+case "$secret_dir" in
+  /*) ;;
+  *) echo "SIGIL_SECRET_DIR must be an absolute path" >&2; exit 1 ;;
+esac
+sudo install -d -m 0700 "$secret_dir"
+if ! sudo test -s "$secret_dir/agent_binding_secret"; then
+  sudo sh -euc '
+    umask 077
+    openssl rand -base64 48 >"$1"
+  ' sh "$secret_dir/agent_binding_secret"
+fi
+sudo chown root:10000 "$secret_dir/agent_binding_secret"
+sudo chmod 0440 "$secret_dir/agent_binding_secret"
+sudo test -s "$secret_dir/agent_binding_secret"
+```
+
+Do not reuse the former Gonk bearer as this secret. The binding secret proves
+the private Web-to-Eve principal handoff; it is not a tool authorization key.
+
+## 5. Deploy and verify
 
 Run the normal three-image updater, then verify Web, Eve, the public edge, and
 the application data:
@@ -100,8 +136,57 @@ boundary does not support automatic rollback to the old four-image deployment.
 Restore the saved manifest and volume backup manually if the cutover must be
 abandoned.
 
-After the new topology is accepted and its own backup has succeeded, the old
-volume and secret can be removed explicitly:
+## 6. Retire the old ECR repository, then apply Terraform
+
+Do not apply this revision's Terraform before the new topology is accepted.
+The plan removes `aws_ecr_repository.release["gonk"]`; AWS refuses to destroy a
+non-empty ECR repository, and emptying it removes the old image-digest rollback
+path.
+
+After the Web + Eve deployment is accepted and backed up, run the following
+from an operator checkout with the intended AWS account and region selected.
+The image inventory is a local recovery receipt under the gitignored
+`reports/` directory:
+
+```bash
+cd deploy/aws/terraform
+report_dir="$(git rev-parse --show-toplevel)/reports/eve-host-migration"
+mkdir -p "$report_dir"
+aws ecr list-images \
+  --repository-name sigil-chat-gonk \
+  --filter tagStatus=ANY \
+  --query imageIds \
+  --output json >"$report_dir/gonk-image-ids.json"
+image_count="$(
+  aws ecr list-images \
+    --repository-name sigil-chat-gonk \
+    --filter tagStatus=ANY \
+    --query 'length(imageIds)' \
+    --output text
+)"
+if [ "$image_count" -gt 0 ]; then
+  aws ecr batch-delete-image \
+    --repository-name sigil-chat-gonk \
+    --image-ids "file://$report_dir/gonk-image-ids.json"
+fi
+test "$(
+  aws ecr list-images \
+    --repository-name sigil-chat-gonk \
+    --filter tagStatus=ANY \
+    --query 'length(imageIds)' \
+    --output text
+)" = 0
+terraform plan -out=plan.tfplan
+terraform show -no-color plan.tfplan | tee plan.txt
+# Confirm the plan destroys only the obsolete Gonk release repository/policy
+# alongside the already-reviewed topology changes, then:
+terraform apply plan.tfplan
+```
+
+The repository intentionally does not set `force_delete = true`; this
+one-time destructive boundary remains visible and operator-controlled.
+
+After Terraform succeeds, the old volume and secret can be removed explicitly:
 
 ```bash
 sudo docker volume rm sigil-chat_gonk_data

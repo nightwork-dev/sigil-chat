@@ -29,6 +29,17 @@ if [[ -n "$legacy_gonk_containers" ]] ||
   exit 78
 fi
 
+secret_dir="$(
+  awk -F= '$1 == "SIGIL_SECRET_DIR" { print substr($0, length($1) + 2) }' \
+    "$deploy_env"
+)"
+if [[ -z "$secret_dir" || "$secret_dir" != /* ||
+  ! -s "$secret_dir/agent_binding_secret" ]]; then
+  echo "Missing required agent binding secret: SIGIL_SECRET_DIR/agent_binding_secret." >&2
+  echo "Provision it as documented in $script_dir/MIGRATING-FROM-GONK-SERVICE.md, then retry." >&2
+  exit 78
+fi
+
 cp "$deploy_env" "$rollback_env"
 cp "$deploy_env" "$candidate_env"
 chmod 0600 "$rollback_env" "$candidate_env"

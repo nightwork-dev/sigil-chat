@@ -152,17 +152,25 @@ test("update command stops the public edge before replacing services", () => {
 
 test("old Gonk topology fails closed before the updater mutates Docker state", () => {
   const preflight = updateScript.indexOf("legacy_gonk_containers")
+  const bindingSecretPreflight = updateScript.indexOf('agent_binding_secret"')
   const firstMutation = updateScript.indexOf('cp "$deploy_env" "$rollback_env"')
   assert.ok(preflight >= 0 && preflight < firstMutation)
-  assert.match(
-    updateScript,
-    /label=com\.docker\.compose\.service=gonk/,
+  assert.ok(
+    bindingSecretPreflight > preflight &&
+      bindingSecretPreflight < firstMutation,
   )
+  assert.match(updateScript, /label=com\.docker\.compose\.service=gonk/)
   assert.match(updateScript, /MIGRATING-FROM-GONK-SERVICE\.md/)
   assert.doesNotMatch(updateScript, /--remove-orphans/)
   assert.match(migrationGuide, /does not copy legacy data/)
   assert.match(migrationGuide, /sigil-chat_gonk_data/)
   assert.match(migrationGuide, /sigil-chat_web_data/)
+  assert.match(migrationGuide, /openssl rand -base64 48/)
+  assert.match(migrationGuide, /agent_binding_secret/)
+  assert.match(migrationGuide, /aws ecr batch-delete-image/)
+  assert.match(migrationGuide, /terraform apply plan\.tfplan/)
+  assert.match(migrationGuide, /does not set `force_delete = true`/)
+  assert.doesNotMatch(releaseTerraform, /force_delete\s*=\s*true/)
   assert.match(migrationGuide, /does not support automatic rollback/)
 })
 
