@@ -1,18 +1,28 @@
-// Route: /sessions/$threadId?via=<projectId>
+// Route: /sessions/$threadId?via=<projectId>  (RESOLVER)
 // Tree:
 //   apps/web/src/routes/__root.tsx                  — HTML shell, theme/query providers, shared agent session (no visible chrome)
-//   apps/web/src/routes/_app.tsx                    — one-rail product shell, breadcrumb via-path, theme picker
+//   apps/web/src/routes/_app.tsx                    — one-rail product shell, breadcrumb bar, theme picker
 //   apps/web/src/routes/_app/sessions.$threadId.tsx — THIS FILE
-// Content: SessionHome — owned session output and explicitly linked durable commitments
+// Content: keeps old links, directly-granted access, and workspace-less
+// sessions working (SC.10 §2). `beforeLoad` resolves the thread's canonical
+// containment from the permission-filtered nav and `throw redirect`s into
+// /projects/$projectId(/workspaces/$workspaceId)?/sessions/$threadId. A
+// workspace-less thread's only home is the personal project, always visible.
+// When the thread's workspace is visible but its owning project is not, this
+// renders SessionHome directly at this shallow depth — the honest home for
+// that principal, not a placeholder.
 
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
 
+import { agentThreadQueryOptions, useAgentThread } from "@/lib/agent-threads"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
-import { useAgentThread } from "@/lib/agent-threads"
 import { useArtifacts } from "@/lib/artifacts"
 import { useHomeSignals } from "@/lib/home-signals"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import {
+  projectWorkspaceNavQueryOptions,
+  useProjectWorkspaceNav,
+} from "@/lib/project-workspace-nav"
 import { resolveViaLabel } from "@/features/homes/home-view-model"
 import {
   artifactRowsFromRecords,
@@ -28,6 +38,49 @@ export const Route = createFileRoute("/_app/sessions/$threadId")({
   validateSearch: (search: Record<string, unknown>): { via?: string } => ({
     ...(typeof search.via === "string" ? { via: search.via } : {}),
   }),
+  beforeLoad: async ({ context, params, search }) => {
+    const principalId = context.user.id
+    const [nav, thread] = await Promise.all([
+      context.queryClient
+        .ensureQueryData(projectWorkspaceNavQueryOptions(principalId))
+        .catch(() => undefined),
+      context.queryClient
+        .ensureQueryData(agentThreadQueryOptions(principalId, params.threadId))
+        .catch(() => undefined),
+    ])
+    if (!nav || !thread) return
+
+    if (!thread.workspaceId) {
+      // Workspace-less: the only home is the personal project, which is
+      // always visible to its own principal.
+      throw redirect({
+        to: "/projects/$projectId/sessions/$threadId",
+        params: { projectId: nav.personalProjectId, threadId: params.threadId },
+      })
+    }
+
+    const workspace = nav.workspaces.find((w) => w.id === thread.workspaceId)
+    if (!workspace) return // Workspace itself not visible — render shallow.
+
+    const viaVisible =
+      search.via &&
+      nav.projects.some((p) => p.id === search.via) &&
+      (workspace.projectId === search.via ||
+        workspace.mountedProjectIds.includes(search.via))
+    const targetProjectId = viaVisible ? search.via : workspace.projectId
+    if (targetProjectId) {
+      throw redirect({
+        to: "/projects/$projectId/workspaces/$workspaceId/sessions/$threadId",
+        params: {
+          projectId: targetProjectId,
+          workspaceId: thread.workspaceId,
+          threadId: params.threadId,
+        },
+      })
+    }
+    // Owning project not visible — render shallow (workspace only, no
+    // Project crumb).
+  },
   component: SessionHomeRoute,
 })
 
