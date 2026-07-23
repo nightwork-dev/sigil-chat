@@ -507,7 +507,7 @@ assigned home:
 
 | Datum | Renders today in | One home | Action |
 | --- | --- | --- | --- |
-| Run status (idle / streaming / error dot) | `AgentChatHeader` (top rail) **and** `AgentRailStatus` (bottom rail) | Top rail, beside the session title | Remove from `AgentRailStatus` on the session surface |
+| Run status (idle / streaming / error dot) | `AgentChatHeader` (top rail) **and** `AgentRailStatus` (bottom rail) | The composer send/stop button (revised — see §9.7; top rail keeps only the session title) | Remove from `AgentRailStatus` on the session surface |
 | Context items + token estimate + focus mode (`ContextTray.Trigger` — "N · focused · ~M tokens") | `AgentChatHeader` (top) **and** `AgentRailStatus` (bottom) | The **context rail** (§3.1) header — it *is* the context surface | Remove from both rails; show a count badge on the collapsed rail toggle |
 | Attention subject / "no context" | `AgentRailStatus` (bottom) | The context rail (attention is its content) | Move into the rail |
 | Session identity (persona · title) | `AgentSessionSwitcher` Sheet trigger (top) | Active title in the top rail; the list shows all titles | Replace the Sheet trigger with the persistent list (§9.2) |
@@ -557,3 +557,198 @@ lateral movement (§3), the loader/data strategy (§4), breadcrumb orientation
 layout and the chrome that surrounds it — the routing architecture that makes
 the persistent list a mounted, one-click lateral surface is exactly what §2–§4
 already specify.
+
+### 9.7 The composer — one contained box, one control row
+
+Owner input on the built composer: the approval control is orphaned. With
+`hideHeader` set (the session surface), `agent-chat.tsx:220` renders the
+approval `Select` **alone** in its own `flex … px-3 pt-1.5` row above the input
+— the full-width 768×30 strip David inspected ("no reason for an entire empty
+row to be consumed by a single toggle"). The fix is not to shrink that row; it
+is to **delete it** and seat its one control in the composer's own control row.
+David prefers Codex's shape and wants our displays folded in: "I like Codex
+better, and we could better incorporate some of our displays / controls in
+there."
+
+**Reference read.** Both apps are one contained box, **textarea on top over a
+single control row split left/right**. Codex: `+` attach and a `Full access`
+approval chip left; run-spinner, model ("5.6 Sol"), mic, send/stop right.
+Claude: approval chip, `+`, mic left; model, effort right. Uniform pattern —
+one box, one control row, no stray rows.
+
+**Our `ChatInput` already carries the spine.** `packages/chat`'s `ChatInput`
+has attach (left) and a send button that already flips to a stop `SquareIcon`
+while streaming — so **run state is already expressed at the composer**. What it
+lacks is the two-region shape (textarea *over* a control row, not icons flanking
+it) and slots to seat app controls. Both are generalizable, so they land in the
+shared `ChatInput` (registry loop); Sigil Chat seats its app controls through
+the new slots.
+
+**The control row I land on** — one row, inside one box, textarea above:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Ask the agent, or tell it to use an application tool…  ↵ │  ← textarea, full width
+│                                                            │
+│  ＋   [ Ask ⌄ ]                        Eve · <model>   ➤   │  ← one control row
+└──────────────────────────────────────────────────────────┘
+     attach  approval                       model      send/stop
+     └── left cluster ──┘                   └── right cluster ──┘
+```
+
+Every occupant, one home, each traced to §9.4:
+
+| Slot | Control | Source | Notes |
+| --- | --- | --- | --- |
+| Left | `＋` Add menu (attach files · add from workspace · session note) | `ChatInput` built-in trigger, app-composed contents | the extensible attach entry point — **contents + contract in §9.8** |
+| Left | Approval-mode chip (`Ask` / `Always allow`) | §9.4 "approval mode → composer" | reclaims the orphaned row; **color = permission risk** (ask = muted; always-allow = warning/amber, echoing Codex's orange "Full access") — one datum, color means one thing |
+| Right | Model label (`Eve · <model>`) | §9.4 "model → composer" | **static label today** (per-thread-fixed model, CLAUDE.md); a **picker-ready slot** for the `MODEL-ADMINISTRATION` draft — leave the slot, don't build the picker |
+| Right | Send / Stop (`➤` ⇄ `◼`) | `ChatInput` built-in; **absorbs run status** | see the calls below |
+
+**Deliberate calls on the displays David asked about:**
+
+- **Run status → the send/stop button, not the top rail.** `ChatInput` already
+  turns send into a stop `SquareIcon` while streaming; that *is* the run-state
+  display, and it is where the interrupt action lives (both references do
+  exactly this). This **revises §9.4's run-status row**: its one home is the
+  composer send/stop button, and the session top rail drops to the session
+  title alone. The interrupt control and the status readout are the same
+  affordance — one datum, one home, not two.
+- **Collapsed-rail context badge → stays on the rail toggle, NOT the composer.**
+  A context count in the control row would duplicate the context rail's own
+  readout (§9.4) and crowd the row; neither reference seats context state at the
+  composer. Excluded deliberately.
+- **Mic → a reserved trailing slot, not an added control.** Both references show
+  a mic; we have no voice input today. The trailing cluster leaves room for one
+  when voice lands — a noted slot, not an invented control.
+
+**The `＋` is an Add menu, not a bare attach** — the one left-cluster control
+(besides the approval chip) that lets capabilities grow without growing the
+row. Its contents, the extension contract, and keyboard entry are designed in
+**§9.8** (the noun-bar refinement supersedes this section's earlier sketch).
+
+**Implementation steps (dispatchable):**
+
+1. **Restructure `ChatInput` (`packages/chat`) into two regions** — textarea on
+   top (full width), one control row beneath, the whole thing a single
+   contained rounded box. Keep attach (left) and send/stop (right) as built-ins.
+   Generalizable → land it in sigil-design's `ChatInput`; record the extraction
+   verdict.
+2. **Add control-row slots** to `ChatInput`: `leadingControls` /
+   `trailingControls` render regions, left and right of the built-ins, plus
+   expose the file-picker open handle (ref or render-prop) so an app-composed
+   `＋` menu can trigger attach. No app types leak into the shared component.
+3. **Delete the orphaned row.** Remove the `hideHeader && showApprovalMode`
+   block at `agent-chat.tsx:220`; pass the approval chip into `leadingControls`
+   and the model label into `trailingControls`.
+4. **Build the `＋` Add menu** (app-side, in `leadingControls`) per §9.8 —
+   contents, the attachable-noun contract, and the `@` keyboard entry are
+   specified there. The mechanical hook: the menu's Attach entry calls
+   `ChatInput`'s exposed file-picker handle (step 2).
+5. **Style the approval chip** with the risk-color rule (muted for ask, warning
+   for always-allow) — a chip, not a bare `Select` trigger, to match the
+   reference density.
+6. **Contain + left-anchor the box** at `max-w-3xl` per §9.3 (the composer box
+   shares the conversation's fixed left edge; toggling the context rail never
+   moves it). Replace the `border-t` bar treatment with the contained rounded
+   box.
+7. **Reduce the session top rail** to the session title only (run status now
+   lives on the send/stop button, per the revision above).
+8. **Verify:** browser desktop + 375px — no standalone approval row; the
+   composer is one box with one control row; send flips to stop while streaming;
+   approval-chip color tracks mode; model label present. `pnpm --filter web
+   typecheck` + `test`. Browser verification is David's.
+
+### 9.8 The `＋` Add menu — attachable nouns, one contract
+
+Owner reference: Codex's `＋` opens an **Add** popover (Files and folders,
+Attach, Goal, Plan mode, Record a skill, then a Plugins section: Documents, PDF,
+Spreadsheets…). The `＋` is how the composer stays one row while capabilities
+grow — a capability becomes a menu entry, not a new button. But the reference
+mixes two kinds of thing: **nouns you attach** (Files, Documents, PDF) and
+**verbs you invoke** (Goal, Plan mode, Record a skill). Sigil Chat's `＋` menu
+takes only the first kind. **The bar is a concrete noun you can attach to the
+conversation — not verb-soup.** This is what keeps the menu coherent: everything
+in it does the same thing (adds a noun to session context), so it reads as one
+menu, not a junk drawer.
+
+**(a) Initial contents** — attachable nouns only, sectioned like the reference,
+built only from surfaces we already have:
+
+- **Attach files** — images, PDFs, documents (the existing broad `onAttach`
+  accept set in `ChatInput`). Always first; the primary entry.
+- **Add from workspace** — a document, resource, or produced artifact from the
+  current scope into this session's context: the Evidence Room's documents
+  (`demos.evidence`), scoped resources, and artifacts (`artifact-store`). One
+  entry that opens a permission-scoped picker of *things visible here*. This is
+  the sharpest composer-shaped surface we own — "make the agent consider this
+  specific document" is exactly adding a noun to the conversation.
+- **Session note** — the per-session scratch note (`SessionBlackboard`, orphaned
+  out of the header in §9.4). A single durable document attached to this
+  session; the *action* to edit it lives here, its *content* shows in the
+  context rail (the attach/attachment-chip split).
+
+**Rejected, by name** (verbs, not attachable nouns — they stay in the
+capabilities workspace or the message text):
+
+- **Skill invocation** — REJECTED. "Run skill X" is a verb; the user doesn't
+  attach a skill, the agent invokes tools. Discover/read/manage skills in
+  `/skills`; to make the agent use one, ask in the message (or pin it later as a
+  first-class *prompt* affordance, which is not this menu).
+- **Application-tool quick actions** — REJECTED. Same reason: tools are agent
+  actions gated by Gonk policy, not nouns a person drops into the conversation.
+  A tool launcher in the composer is precisely the verb-soup the bar excludes.
+- **Compose modes (Goal / Plan mode / Record a skill, from the reference)** —
+  REJECTED for now. These are session-level *modes*, not attachments; if the
+  product ever wants them, they are a different control, not the Add menu.
+
+**(b) Extension contract — what earns a `＋` slot.** A candidate qualifies only
+when **all** hold:
+
+1. **It is a noun** — a concrete document/resource/artifact/note, not an action
+   the agent performs.
+2. **It attaches to session scope** — selecting it changes what the agent sees
+   for *this* session (adds to context), and it shows as an attachment.
+3. **It is visible to the principal** — the picker only offers what the caller
+   can already see (scope/permission filtered); attaching never widens access.
+4. **It is bounded** — resolves to a single attach or a scoped picker, never a
+   browsable/searchable capability catalog.
+
+So: **noun ∧ attaches-to-session ∧ principal-visible ∧ bounded → `＋` menu;
+everything else → `/skills` (browse/manage the verbs the agent can perform) or
+the message text ("please use X").** The line is clean: **the `＋` menu is where
+nouns meet the conversation; `/skills` is where you manage the verbs.** Growth
+is adding noun *types* (a new attachable resource kind), not tool launchers — so
+the menu can grow indefinitely without ever becoming a command palette.
+
+**(c) Keyboard entry — `@`, not `/`.** One trigger, chosen from the bar, not
+both. `@` conventionally *mentions/attaches an entity* (a document, a resource);
+`/` conventionally *runs a command* (a verb). Since this menu is nouns-only, `@`
+is the honest trigger and `/` would advertise a command palette we deliberately
+don't put in the composer. So: typing `@` in the textarea opens the **same** Add
+menu inline, filtered to attachable nouns (recent files, workspace
+documents/resources, the session note) — `＋` (click) and `@` (type) are two
+triggers for one menu, one home. We do **not** build `/`; command/verb affordances
+live in the Cmd+K omnibar, not the composer.
+
+**Implementation steps (dispatchable):**
+
+1. **Define the attach-source contract** (app-side): a small typed list of
+   `AddSource`s — `files` (built-in), `workspace-resource` (evidence / scoped
+   resource / artifact picker), `session-note` (blackboard). Each resolves to an
+   attachment the session context accepts. No verbs in the type.
+2. **Render the `＋` popover** in `ChatInput`'s `leadingControls` (§9.7 step 2):
+   Attach-files calls the exposed file-picker handle; Add-from-workspace opens
+   the permission-scoped picker; Session-note opens the blackboard editor.
+   Sections mirror §9.8(a).
+3. **Wire the `@` trigger** in the textarea: on `@` at a word boundary, open the
+   same menu in inline-filter mode over the `AddSource` results; selection
+   inserts the attachment (not literal text). Reuse the popover from step 2 —
+   one menu, two triggers. Do not implement `/`.
+4. **Enforce the contract in code**, not just docs: the picker's query is the
+   principal-visible, scoped set (reuse the homes' permission-filtered sources);
+   attaching resolves to a context attachment, never a capability invocation.
+5. **Verify:** the menu opens from both `＋` and `@`; only attachable nouns
+   appear (no tool/skill launchers); a workspace document attaches into session
+   context and shows as an attachment; `/` does nothing in the composer;
+   `pnpm --filter web typecheck` + `test`. Browser verification is David's.
