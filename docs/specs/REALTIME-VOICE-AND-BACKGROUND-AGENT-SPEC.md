@@ -1,4 +1,4 @@
-# Realtime Voice and Background Agent
+# Coordinator and Background Agent (with Realtime Voice)
 
 > Date: 2026-07-24
 > Status: Draft product and architecture contract
@@ -15,18 +15,117 @@
 
 ## Decision
 
-Sigil Chat will support a live speech-to-speech conversation attached to the
-currently selected application thread.
+Sigil Chat separates the **conversational surface** from the **agent that does
+the work**.
 
-The realtime voice model is the conversational front end. Eve remains the
-agent. When the voice model decides that work belongs with the agent, it emits
-a delegation event; Sigil Chat routes that event into the existing,
-authenticated Eve session. Eve performs the work with the same persona,
-context, tools, Gonk authorization, approvals, persistence, and output
-projection as a typed message.
+A **coordinator** holds the interaction: it is cheap, fast, and always
+responsive. It decides what is chat and what is real work. When work belongs
+with the agent it emits a delegation; Sigil Chat routes that into the existing,
+authenticated Eve session bound to the active thread. Eve performs the work with
+the same persona, context, tools, Gonk authorization, approvals, persistence,
+and output projection as a typed message, and keeps working in the background
+while the conversation stays live. Bounded progress projects back.
 
-This is not a second agent runtime and does not embed Codex app-server into
-Sigil Chat.
+**Realtime speech-to-speech voice is a committed deliverable** — it is the
+coordinator transport this product wants. It is sequenced second only because
+the coordinator contract is what makes voice safe and testable, and because
+voice alone carries a cross-repository credential dependency the coordinator
+does not.
+
+The coordinator is not a second agent runtime and holds no ambient authority.
+It is a **principal** whose authority is explicitly granted and revocable.
+
+### Coordinator transports
+
+1. **Text coordinator** — buildable today, no upstream dependency. The
+   falsification surface for delegation, queueing, steering, approval routing,
+   and delegated authority.
+2. **Realtime voice** — the target experience. Same coordinator contract, a
+   different transport. Blocked only on the credential seam in
+   §Subscription-backed provider boundary.
+
+Anything true of the coordinator is true of both. A rule that only holds for
+one is a bug in the rule.
+
+### Eve provides the runtime primitives (verified, eve 0.27.5)
+
+This spec previously deferred steering as "a later capability". It is not:
+
+- `session.cancel({ turnId? })` on channel and client sessions — cooperative,
+  turn-scoped cancellation; `turnId` limits the request to the turn the caller
+  observed, so a stale cancel cannot kill a newer turn. Confirmed by
+  `turn.cancelled` then `session.waiting`, **keeping session context**.
+- `cancelTurn()` + `deliver()` (follow-up into a parked session) — steering is
+  their composition, not a new API.
+- `cancel` / `reset` / `resolveActiveSession` on **authored custom channel
+  routes**: a coordinator can BE an Eve channel.
+- `getEventStream({ startIndex })` over durable streams that reconnect from
+  their last cursor — the bounded-progress seam, and it survives disconnects,
+  which is what a background agent actually requires.
+
+**The coordinator SHOULD be implemented as an Eve channel** rather than as
+bespoke controller code beside one. Eve already routes one agent across many
+channels (Slack, Teams, Discord, Telegram, Twilio, GitHub, chat-sdk); that
+existing multi-channel routing is what makes out-of-band approval composition
+rather than new infrastructure.
+
+## Authority and approvals
+
+Two rules, both owner decisions (David, 2026-07-24). They are the load-bearing
+security content of this spec.
+
+### 1. An approval is never granted on the coordinator surface
+
+The coordinator may _announce_ that an approval is needed. It may never carry
+the grant. A grant arrives by exactly one of:
+
+- **another channel** — the approval is requested and granted on a different
+  authenticated surface (the web UI, a Slack DM, any Eve channel), where the
+  human acts deliberately against a real affordance; or
+- **authority delegated in advance** — see below.
+
+This generalizes the existing rule that spoken cancellation must never be
+inferred from transcript text, and it matters more than cancellation did. A
+coordinator is a model emitting text. If saying the right words grants an
+approval, then one model authorizes the other model's tool calls and the human
+gate is decorative — a confused deputy with a microphone. The rule is
+structural: **no approval decision is ever derived from coordinator output**,
+however confident, however explicit the user's speech sounded.
+
+### 2. Authority may be delegated explicitly, narrowly, and revocably
+
+The user may grant the coordinator standing authority for a named class of
+work — "you can approve image generation requests" — without approving each
+instance.
+
+This is not a new mechanism. It is the existing scope-grant system with the
+coordinator as a first-class principal:
+
+```ts
+ScopeGrant {
+  principalId: string        // the coordinator, not the human
+  resourceScope: string      // where the authority applies
+  actions: ScopeAuthorizationAction[]   // discover | read | write | tool
+}
+```
+
+Requirements:
+
+- Grants are **narrow** (a named capability class, never "approvals"),
+  **revocable**, **enumerable** by the user, and **visible** while live.
+- The coordinator's principal is distinct from the human's. It cannot hold
+  authority the human does not have, and revoking the human's access revokes
+  the coordinator's.
+- A delegated approval is recorded with its granting scope-grant id, so every
+  auto-approved action is attributable after the fact.
+- Absent a matching grant, rule 1 applies with no fallback.
+
+**Precondition, already shipped (73c213d, 2026-07-24):** action-scoped
+authorization must actually be enforced before delegated authority is safe.
+Until that fix, grants matched on action but every artifact operation asked the
+policy for `"read"` — so a grant meaning "you may approve image generation"
+would have silently authorized everything. Narrow delegation is only narrow if
+the action is real.
 
 ## User experience
 
@@ -53,9 +152,21 @@ The user can:
 - end voice without ending or discarding the application thread; and
 - continue the same thread in text.
 
-Voice is globally attached to the active application thread, not to the
-currently visible route. Route changes must not create another call or another
-Eve session.
+The coordinator is globally attached to the active application thread, not to
+the currently visible route. Route changes must not create another call or
+another Eve session.
+
+That decoupling creates an orientation hazard, because SC.10 made containment
+authoritative in the URL: a user can be speaking into a thread in one project
+while looking at another, with nothing on screen saying so. Required:
+
+- a persistent indicator naming the thread the coordinator is bound to,
+  visible from every route while a session is live;
+- one action to jump back to that thread; and
+- opening a different session while live must either rebind explicitly (with
+  the user's confirmation) or state plainly that it did not. It must never
+  rebind silently — the delegation would land somewhere the user is not
+  looking.
 
 ## Goals
 
@@ -71,6 +182,8 @@ Eve session.
   conversation.
 - Isolate the experimental subscription-backed provider behind a replaceable
   adapter.
+- Keep every coordinator rule transport-independent, so the text coordinator is
+  a real proof of the voice one rather than a rehearsal.
 
 ## Non-goals
 
@@ -288,15 +401,21 @@ Delegations are idempotent by `(callHandle, delegation.id)`.
 Sigil Chat currently permits one active Eve turn per application thread.
 
 - If Eve is idle, dispatch the delegation immediately.
-- If Eve is busy, retain at most one ordered pending delegation queue for that
-  call and dispatch it as follow-up work when the current turn settles.
+- If Eve is busy, retain ONE ordered pending queue for that call, **capped at
+  5 delegations** (matching eve's own queue bound). On overflow, drop the
+  OLDEST pending delegation and have the coordinator say so — silently
+  discarding a request the user believes was heard is worse than refusing it.
+  Dispatch the queue as follow-up work when the current turn settles.
 - A repeated or superseding voice request may coalesce only when the realtime
   provider explicitly marks it as replacing the earlier request.
 - Spoken cancellation must never be inferred from arbitrary transcript text.
   The realtime provider may request cancellation, but the application presents
   or executes it through Eve's explicit interruption contract.
-- Adding true mid-turn steering requires a supported Eve steering API and is a
-  later capability. It must not be approximated by concurrent `send()` calls.
+- Steering IS available (eve 0.27.4+) and must use the supported path:
+  `cancel({ turnId })` on the observed turn, then `deliver()` the replacement.
+  Always pass `turnId` — an unqualified cancel races a turn that already
+  settled and will kill its successor. It must still never be approximated by
+  concurrent `send()` calls.
 
 The voice model may acknowledge queued work immediately: “I’ve passed that to
 the agent; it will pick it up after the current step.”
@@ -394,6 +513,9 @@ sanitized projection with retention rules compatible with
   size limits, and unknown-event tolerance.
 - Delegation text cannot choose a principal, persona, resource scope, approval
   mode, or tool policy.
+- Delegation text cannot GRANT an approval or mint authority — see
+  §Authority and approvals. Announcing that an approval is needed and granting
+  it are different acts on different surfaces.
 - Gonk authorization is re-evaluated normally for every tool discovery and
   invocation.
 - Voice activation is visible and reversible. There is no ambient or
@@ -414,38 +536,74 @@ sanitized projection with retention rules compatible with
 
 ## Delivery slices
 
-### Slice 1: provider proof
+Reordered (2026-07-24): the coordinator contract comes first because it is
+buildable now and is what makes voice safe. Voice remains a committed
+deliverable, not a someday.
 
-- Extract or add a supported Eve subscription credential/transport seam.
-- Create a hermetic fake-server proof of the call request, auth headers,
-  response SDP, `Location` call id, and sideband connection.
-- Normalize legacy handoff and current client-delegation events.
+### Slice 1: coordinator contract, text transport
 
-### Slice 2: bound Eve bridge
+No upstream dependency. Everything here is falsifiable without a microphone.
 
-- Add a server-side controller bound to the verified thread/session identity.
-- Dispatch idle delegations and queue busy delegations.
-- Subscribe to Eve progress/final output.
-- Prove cancellation, duplicate suppression, call close, and binding
-  revocation.
+- Implement the coordinator as an **Eve channel** with an authored custom
+  route (`cancel` / `reset` / `resolveActiveSession`).
+- Normalize delegation; enforce idempotency by `(callHandle, delegation.id)`.
+- Dispatch idle delegations; queue busy ones to the cap with oldest-drop.
+- Steer via `cancel({ turnId })` + `deliver()`.
+- Subscribe to `getEventStream` and project bounded progress back.
+- Prove: binding revocation, duplicate suppression, busy queueing, queue
+  overflow, steering, and stream reconnect from cursor mid-turn.
 
-### Slice 3: browser voice
+### Slice 2: authority and approvals
 
-- Implement the reserved mic control and WebRTC lifecycle.
-- Add mute, stop, connecting, permission-denied, degraded-delegation, and error
-  states.
-- Keep the call mounted across product route changes.
+- Coordinator as a distinct principal.
+- Approval requests announced on the coordinator, granted **only** out-of-band
+  on another authenticated channel.
+- Delegated authority via narrow, revocable, enumerable scope grants; every
+  auto-approved action records its granting grant id.
+- Prove by falsification: with the grant removed the action must require
+  out-of-band approval; **no coordinator utterance may ever produce a grant.**
 
-### Slice 4: product projection and hardening
+### Slice 3: realtime voice transport
 
-- Mirror bounded progress/final output.
-- Add retention receipts and redaction.
-- Add rate limits, reconnect bounds, diagnostics, and deployment capability
-  probes.
-- Run live human acceptance with microphone, interruption, navigation, one
-  delegated tool call, one approval, and one background completion.
+The target experience. Same coordinator contract, different transport.
+
+- Resolve the credential/transport seam (§Open upstream dependency) — the one
+  cross-repository blocker. Everything else in this slice is local.
+- Hermetic fake-server proof of call request, auth headers, answer SDP,
+  `Location` call id, and sideband connection.
+- Browser WebRTC lifecycle on the reserved mic control: mute, stop,
+  connecting, permission-denied, degraded-delegation, error.
+- Keep the call mounted across product route changes; render the bound-thread
+  indicator required in §User experience.
+
+### Slice 4: projection and hardening
+
+- Retention receipts and redaction.
+- Rate limits, reconnect bounds, diagnostics, deployment capability probes.
+- Live human acceptance: real microphone, interruption, navigation, one
+  delegated tool call, one out-of-band approval, one delegated-authority
+  auto-approval, and one background completion.
 
 ## Acceptance criteria
+
+Coordinator (transport-independent — must hold for text AND voice):
+
+- A delegation enters the active thread's existing Eve session with its
+  verified principal, persona, resource scope, and approval behavior.
+- The coordinator cannot invoke Gonk or application tools directly.
+- Eve continues work while the coordinator conversation stays responsive.
+- Busy-turn delegation queues to the cap without concurrent `send()` calls;
+  overflow drops the oldest and says so.
+- Steering cancels only the observed `turnId` and delivers its replacement
+  without losing session context.
+- A live session shows which thread it is bound to from every route.
+- **No coordinator output can grant an approval or mint authority.** Falsified
+  directly: a coordinator that emits the most explicit possible approval text
+  must still leave the action unapproved.
+- Delegated authority is narrow, revocable, enumerable, and attributable to a
+  grant id on every auto-approved action.
+
+Voice transport:
 
 - A user authenticated to Sigil Chat can start and end a voice call from the
   reserved microphone control.
