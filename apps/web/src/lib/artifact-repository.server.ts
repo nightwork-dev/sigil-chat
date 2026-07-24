@@ -41,7 +41,7 @@ export function createWebArtifactScopeAccessCheck(
     >
   > = {},
 ): CanAccessScope {
-  return async (principal, scope) => {
+  return async (principal, scope, action) => {
     if (!principal?.id) return false
     const resourceScope = formatScopeHeader(scope)
     if (!resourceScope) return false
@@ -61,6 +61,7 @@ export function createWebArtifactScopeAccessCheck(
         ownedThreadHomeScope,
         dependencies.registries,
         dependencies.policy,
+        action,
       )
       return true
     } catch {

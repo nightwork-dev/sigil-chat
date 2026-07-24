@@ -6,7 +6,14 @@
  * grant from membership inherited through that home. SC.2 will supply richer
  * scope records; this contract intentionally depends only on stable strings.
  */
-export type ScopeAuthorizationAction = "discover" | "read" | "tool";
+/**
+ * `write` is distinct from `read` on purpose: a grant that permits reading a
+ * container must not, by omission, permit mutating what lives in it. Before
+ * this existed every artifact mutation asked the policy for "read", so a
+ * read-only grant authorized writes (SC.9, 2026-07-24). Added while no
+ * issuance surface exists yet, so no persisted grant needs migrating.
+ */
+export type ScopeAuthorizationAction = "discover" | "read" | "write" | "tool";
 
 export interface ScopeAuthorizationTarget {
   readonly resourceScope: string;

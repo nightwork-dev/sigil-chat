@@ -41,7 +41,15 @@ export type ScopePrincipal = ArtifactPrincipal | undefined
  * Authorization is deliberately a separate seam from scope normalization.
  * Tier + id says where an artifact lives; it never says who may touch it.
  */
+/**
+ * The action is REQUIRED, not optional-defaulting-to-read: an implementation
+ * that silently treats every call as a read is exactly the defect this
+ * parameter exists to prevent.
+ */
+export type ArtifactScopeAction = "read" | "write"
+
 export type CanAccessScope = (
   principal: ScopePrincipal,
   scope: ResourceScope,
+  action: ArtifactScopeAction,
 ) => boolean | Promise<boolean>

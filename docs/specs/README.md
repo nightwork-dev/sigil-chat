@@ -19,6 +19,13 @@ Currently authoritative for this product's design/implementation.
   bindings, and append-only per-user usage metering without limits or BYOK.
   Draft product and architecture contract; depends on Eve 0.27+.
 
+- [`REALTIME-VOICE-AND-BACKGROUND-AGENT-SPEC.md`](REALTIME-VOICE-AND-BACKGROUND-AGENT-SPEC.md) —
+  subscription-backed live speech attached to the active Sigil Chat thread:
+  browser WebRTC, server-held Codex credentials and sideband, delegation into
+  the existing bound Eve session, and bounded agent progress/final output back
+  to voice. Draft product and architecture contract; depends on a supported Eve
+  subscription transport seam.
+
 - [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md) —
   canonical ownership remains singular while typed, ordered scope links enable
   shared workspaces, resource participation, default contribution, and
