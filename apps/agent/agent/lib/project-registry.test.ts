@@ -5,7 +5,11 @@ import { join } from "node:path"
 import type { KvStore } from "@gonk/store/types"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { type Project, ProjectRegistry } from "./project-registry"
+import {
+  type Project,
+  ProjectRegistry,
+  withRegistryRecordLock,
+} from "./project-registry"
 
 const temporaryDirectories: string[] = []
 
@@ -22,7 +26,8 @@ const project: Project = {
   createdBy: "user-owner",
 }
 
-const versionedProject = { ...project, revision: 1 }
+// Container slugs: normalize() backfills a kebab-of-name slug on first read.
+const versionedProject = { ...project, revision: 1, slug: "project-one" }
 
 afterEach(async () => {
   await Promise.all(
@@ -51,6 +56,44 @@ describe("ProjectRegistry", () => {
     expect(reopened.get("project-1")).toEqual(versionedProject)
     expect(reopened.hasMember("project-1", "user-member")).toBe(true)
     expect(reopened.hasMember("project-1", "user-outsider")).toBe(false)
+  })
+
+  // Authz finding 2 (2026-07-23, Annika): upsert() reads its own
+  // just-written record back (`persisted = this.get(project.id)`) to return
+  // it, from INSIDE its own withRegistryRecordLock — and that record still
+  // needs a slug backfilled on a fresh create, so this hits the locked
+  // backfill path for the SAME id, on a REAL file lock (this test uses
+  // cwd/projectRoot, not an injected store — `store:` disables locking
+  // entirely). Without the reentrancy guard, this self-deadlocks: the
+  // nested acquire spins on the lock file the outer call already holds
+  // until LOCK_TIMEOUT_MS, then throws. A second real upsert on the SAME
+  // id makes the read-back path unavoidable, so this fails loudly (timeout
+  // + throw) if the guard regresses, rather than silently.
+  it("does not self-deadlock when upsert's own read-back needs a locked backfill", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-projects-lock-"))
+    temporaryDirectories.push(directory)
+    const store = new ProjectRegistry({ cwd: directory, projectRoot: directory })
+
+    const first = store.upsert(project)
+    expect(first.slug).toBe("project-one")
+
+    const second = store.upsert(
+      { ...first, description: "Updated description." },
+      { expectedRevision: first.revision! },
+    )
+    expect(second.slug).toBe("project-one")
+    expect(second.description).toBe("Updated description.")
+  })
+
+  // Hardening (2026-07-23, Annika's re-review): the lock is released the
+  // instant `operation()` RETURNS, not when a returned Promise settles — an
+  // async operation would run its real work unprotected after the lock is
+  // already gone. Both call sites (no lockDirectory, and the reentrant
+  // fast path) share the same runtime check, so this covers both.
+  it("rejects an async operation instead of silently releasing the lock early", () => {
+    expect(() =>
+      withRegistryRecordLock(undefined, "some-id", () => Promise.resolve(1)),
+    ).toThrow(/returned a Promise/)
   })
 
   it("fails closed for corrupt project records", () => {
@@ -108,7 +151,7 @@ describe("ProjectRegistry", () => {
       cwd: directory,
       projectRoot: directory,
     })
-    const created = seed.upsert(project)
+    seed.upsert(project)
     const moduleUrl = new URL("./project-registry.ts", import.meta.url).href
     const contenderSource = `
       import { ProjectRegistry } from ${JSON.stringify(moduleUrl)}
@@ -198,6 +241,98 @@ describe("ProjectRegistry", () => {
         project.id,
       ),
     ).toEqual(winners[0].value)
+  })
+
+  describe("container slugs", () => {
+    it("mints a kebab-of-name slug on create", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      const created = store.upsert(project)
+
+      expect(created.slug).toBe("project-one")
+    })
+
+    it("lazily backfills a slug for a pre-migration record on read, and persists it", () => {
+      const values = new Map<string, unknown>([
+        ["project-1", { ...project, revision: 1 }],
+      ])
+      const store = new ProjectRegistry({ store: memoryKv(values) })
+      expect(values.get("project-1")).not.toHaveProperty("slug")
+
+      const read = store.get("project-1")
+
+      expect(read?.slug).toBe("project-one")
+      expect(values.get("project-1")).toMatchObject({ slug: "project-one" })
+      // Second read is a cache hit on the persisted slug, not a re-mint.
+      expect(store.get("project-1")?.slug).toBe("project-one")
+    })
+
+    it("suffixes a colliding kebab slug and never regenerates it on update", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      const first = store.upsert(project)
+      const second = store.upsert({
+        ...project,
+        id: "project-2",
+        name: "Project One", // Same name — kebab collides with `first`.
+      })
+
+      expect(first.slug).toBe("project-one")
+      expect(second.slug).toMatch(/^project-one-[0-9a-z]{4}$/)
+      expect(second.slug).not.toBe(first.slug)
+
+      // Immutable across a rename, even if the caller's payload tries to
+      // change or drop it — the registry preserves the current slug.
+      const renamed = store.upsert(
+        { ...second, name: "Totally Different Name", slug: undefined },
+        { expectedRevision: second.revision },
+      )
+      expect(renamed.slug).toBe(second.slug)
+    })
+
+    // Authz finding (2026-07-23, Annika): id and slug share one namespace,
+    // and a caller-supplied id is otherwise unconstrained. Without this
+    // guard, an attacker could create a project whose id equals an existing
+    // project's slug and shadow it at the route-resolution boundary.
+    it("rejects creating a project whose id collides with an existing project's slug", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      const victim = store.upsert(project)
+      expect(victim.slug).toBe("project-one")
+
+      expect(() =>
+        store.upsert({
+          id: "project-one", // the victim's slug, used as a NEW project's id
+          name: "Spoofing Project",
+          description: "",
+          members: [{ principalId: "attacker", role: "owner" }],
+          settings: {},
+          createdAt: "2026-07-21T00:00:00.000Z",
+          createdBy: "attacker",
+        }),
+      ).toThrow(/collides with an existing project's slug/)
+
+      // The victim is unaffected by the rejected attempt.
+      expect(store.get(victim.id)?.slug).toBe("project-one")
+      expect(store.get("project-one")).toBeUndefined()
+    })
+
+    // The reverse direction: a freshly minted slug must not shadow an
+    // EXISTING project's id either (mintUniqueSlug's half of the guard).
+    it("never mints a slug that collides with an existing project's id", () => {
+      const store = new ProjectRegistry({ store: memoryKv(new Map()) })
+      // This project's id happens to equal the kebab-case of the name the
+      // next project will mint a slug from.
+      store.upsert({
+        ...project,
+        id: "second-project",
+        name: "Placeholder",
+      })
+      const second = store.upsert({
+        ...project,
+        id: "project-2",
+        name: "Second Project", // kebab-cases to "second-project"
+      })
+      expect(second.slug).not.toBe("second-project")
+      expect(second.slug).toMatch(/^second-project-[0-9a-z]{4}$/)
+    })
   })
 })
 

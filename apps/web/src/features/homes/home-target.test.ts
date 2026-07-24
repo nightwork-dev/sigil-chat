@@ -9,13 +9,14 @@ import { homeTarget } from "./home-target"
 const nav: ProjectWorkspaceNavSummary = {
   personalProjectId: "personal:u1",
   projects: [
-    { id: "personal:u1", name: "Personal", description: "" },
-    { id: "project:brand", name: "Brand", description: "" },
-    { id: "project:commerce", name: "Commerce", description: "" },
+    { id: "personal:u1", slug: "personal", name: "Personal", description: "" },
+    { id: "project:brand", slug: "brand", name: "Brand", description: "" },
+    { id: "project:commerce", slug: "commerce", name: "Commerce", description: "" },
   ],
   workspaces: [
     {
       id: "workspace:holiday",
+      slug: "holiday",
       projectId: "project:brand",
       mountedProjectIds: ["project:commerce"],
       name: "Holiday Launch",
@@ -26,39 +27,37 @@ const nav: ProjectWorkspaceNavSummary = {
 }
 
 describe("homeTarget", () => {
-  it("no selection → the personal project home", () => {
+  it("no selection → the personal project home, as its slug", () => {
     expect(
       homeTarget({ projectId: undefined, workspaceId: undefined }, nav),
-    ).toBe("/projects/personal:u1")
+    ).toBe("/projects/personal")
   })
 
-  it("project only → that project home", () => {
+  it("project only → that project home, as its slug", () => {
     expect(
       homeTarget({ projectId: "project:brand", workspaceId: undefined }, nav),
-    ).toBe("/projects/project:brand")
+    ).toBe("/projects/brand")
   })
 
-  it("workspace in its canonical project → canonical workspace home, no via", () => {
+  it("workspace in its canonical project → nested canonical workspace home, both as slugs", () => {
     expect(
       homeTarget(
         { projectId: "project:brand", workspaceId: "workspace:holiday" },
         nav,
       ),
-    ).toBe("/workspaces/workspace:holiday")
+    ).toBe("/projects/brand/workspaces/holiday")
   })
 
-  it("workspace entered via a non-owner project → via preserved", () => {
+  it("workspace entered via a non-owner project → that project is the path prefix, as its slug", () => {
     expect(
       homeTarget(
         { projectId: "project:commerce", workspaceId: "workspace:holiday" },
         nav,
       ),
-    ).toBe(
-      `/workspaces/workspace:holiday?via=${encodeURIComponent("project:commerce")}`,
-    )
+    ).toBe("/projects/commerce/workspaces/holiday")
   })
 
-  it("workspace whose canonical home is hidden → via preserved, never substituted", () => {
+  it("workspace whose canonical home is hidden → entered-via project still the path prefix", () => {
     const hiddenNav: ProjectWorkspaceNavSummary = {
       ...nav,
       workspaces: nav.workspaces.map((w) => ({ ...w, projectId: undefined })),
@@ -68,7 +67,7 @@ describe("homeTarget", () => {
         { projectId: "project:commerce", workspaceId: "workspace:holiday" },
         hiddenNav,
       ),
-    ).toContain("via=")
+    ).toBe("/projects/commerce/workspaces/holiday")
   })
 
   it("a workspace that vanished from the visible nav falls back to the project home", () => {
@@ -77,6 +76,6 @@ describe("homeTarget", () => {
         { projectId: "project:brand", workspaceId: "workspace:gone" },
         nav,
       ),
-    ).toBe("/projects/project:brand")
+    ).toBe("/projects/brand")
   })
 })

@@ -15,6 +15,7 @@ const nav: ProjectWorkspaceNavSummary = {
   projects: [
     {
       id: "project-1",
+      slug: "commerce-platform",
       name: "Commerce Platform",
       description: "Storefront and checkout.",
     },
@@ -22,6 +23,7 @@ const nav: ProjectWorkspaceNavSummary = {
   workspaces: [
     {
       id: "workspace-1",
+      slug: "checkout-reliability",
       projectId: "project-1",
       name: "Checkout Reliability",
       description: "Error budget work.",

@@ -1,15 +1,22 @@
 "use client"
 
 // The container segment of the shell breadcrumb — and the container SWITCHER
-// itself (§3.1, revised): the project and workspace crumbs are dropdown menus,
-// so the "where am I" chain is also the "switch where I am" affordance. One
-// control, no separate sidebar block. Read-only on principal-level routes
-// (the segment omits itself there — those surfaces aren't container-scoped).
+// itself (§3.1, revised): the project, workspace, and session crumbs are
+// dropdown menus, so the "where am I" chain is also the "switch where I am"
+// affordance. One control, no separate sidebar block. Read-only on
+// principal-level routes (the segment omits itself there — those surfaces
+// aren't container-scoped).
 //
-// Selection goes through useActiveContainer — shared with the omnibar, so
-// chrome and keyboard paths can never disagree.
+// SC.10 §4/§5: the chain is derived from the matched ROUTE, not from a
+// client-reconstructed via-path or a persisted preference. A route only
+// renders here if it actually matches the nested
+// projects/$projectId(/workspaces/$workspaceId)?(/sessions/$threadId)? tree —
+// containment lives in the URL, full stop. `container.selectProject` /
+// `selectWorkspace` are still called on selection, but only to persist
+// "where I last was" for the /home redirect (SC.10 §6 step 7) — nothing here
+// reads that preference back to decide what to render.
 
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router"
+import { Link, useMatches, useNavigate } from "@tanstack/react-router"
 import { CheckIcon, ChevronDownIcon, FolderIcon } from "lucide-react"
 
 import {
@@ -24,181 +31,158 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 
 import { useActiveContainer } from "@/lib/active-container"
-import { useAgentThread } from "@/lib/agent-threads"
+import { useAgentThread, useAgentThreads } from "@/lib/agent-threads"
 import {
-  useProjectWorkspaceNav,
-  type ProjectWorkspaceNavSummary,
-} from "@/lib/project-workspace-nav"
+  resolveProjectRouteParam,
+  resolveWorkspaceRouteParam,
+} from "@/lib/container-route-target"
+import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
 
-const PRINCIPAL_LEVEL_PREFIXES = [
-  "/agents",
-  "/capabilities",
-  "/skills",
-  "/demos",
-]
-
-type HomeRoute =
-  | { kind: "project"; projectId: string }
-  | { kind: "workspace"; workspaceId: string }
-  | { kind: "session"; threadId: string }
-
-function decodedSegment(value: string): string {
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    return value
-  }
-}
-
-export function parseHomeRoute(pathname: string): HomeRoute | undefined {
-  const match = pathname.match(/^\/(projects|workspaces|sessions)\/([^/]+)\/?$/)
-  if (!match) return undefined
-  const id = decodedSegment(match[2])
-  if (match[1] === "projects") return { kind: "project", projectId: id }
-  if (match[1] === "workspaces") return { kind: "workspace", workspaceId: id }
-  return { kind: "session", threadId: id }
-}
-
-export function resolveHomeBreadcrumbSelection({
-  route,
-  nav,
-  viaProjectId,
-  sessionWorkspaceId,
-}: {
-  route: HomeRoute
-  nav: ProjectWorkspaceNavSummary
-  viaProjectId?: string
-  sessionWorkspaceId?: string
-}): { projectId?: string; workspaceId?: string } | undefined {
-  if (route.kind === "project") {
-    return nav.projects.some((project) => project.id === route.projectId)
-      ? { projectId: route.projectId }
-      : undefined
-  }
-
-  const workspaceId =
-    route.kind === "workspace" ? route.workspaceId : sessionWorkspaceId
-  const workspace = nav.workspaces.find((entry) => entry.id === workspaceId)
-  if (!workspace) return undefined
-
-  const visibleVia =
-    viaProjectId &&
-    nav.projects.some((project) => project.id === viaProjectId) &&
-    (workspace.projectId === viaProjectId ||
-      workspace.mountedProjectIds.includes(viaProjectId))
-      ? viaProjectId
-      : undefined
-
-  return {
-    projectId: visibleVia ?? workspace.projectId,
-    workspaceId: workspace.id,
-  }
-}
+const PROJECT_ROUTE_ID = "/_app/projects/$projectId"
+const WORKSPACE_ROUTE_ID = "/_app/projects/$projectId/workspaces/$workspaceId"
+const PROJECT_SESSION_ROUTE_ID = "/_app/projects/$projectId/sessions/$threadId"
+const WORKSPACE_SESSION_ROUTE_ID =
+  "/_app/projects/$projectId/workspaces/$workspaceId/sessions/$threadId"
 
 export function ContainerBreadcrumb() {
+  const matches = useMatches()
+  const navigate = useNavigate()
   const container = useActiveContainer()
   const liveNav = useProjectWorkspaceNav()
-  const navigate = useNavigate()
-  const location = useRouterState({ select: (s) => s.location })
-  const homeRoute = parseHomeRoute(location.pathname)
-  const searchParams = new URLSearchParams(location.href.split("?", 2)[1] ?? "")
-  const liveSession = useAgentThread(
-    homeRoute?.kind === "session" ? homeRoute.threadId : undefined,
-    homeRoute?.kind === "session",
-  )
-  const nav = liveNav.data
-  const sessionWorkspaceId =
-    homeRoute?.kind === "session" ? liveSession.data?.workspaceId : undefined
-  const viaProjectId = searchParams.get("via") ?? undefined
-  const homeSelection =
-    homeRoute && nav
-      ? resolveHomeBreadcrumbSelection({
-          route: homeRoute,
-          nav,
-          viaProjectId,
-          sessionWorkspaceId,
-        })
-      : undefined
-  const projectId = homeRoute ? homeSelection?.projectId : container.projectId
-  const workspaceId = homeRoute
-    ? homeSelection?.workspaceId
-    : container.workspaceId
+  const threads = useAgentThreads()
 
-  if ((!homeRoute && !container.isReady) || !nav) return null
-  if (PRINCIPAL_LEVEL_PREFIXES.some((p) => location.pathname.startsWith(p)))
-    return null
-  // A home route must never fall back to a different persisted container while
-  // its own permission-filtered record is loading or unavailable.
-  if (homeRoute && !homeSelection) return null
+  const projectMatch = matches.find((m) => m.routeId === PROJECT_ROUTE_ID)
+  const workspaceMatch = matches.find((m) => m.routeId === WORKSPACE_ROUTE_ID)
+  const sessionMatch = matches.find(
+    (m) =>
+      m.routeId === PROJECT_SESSION_ROUTE_ID ||
+      m.routeId === WORKSPACE_SESSION_ROUTE_ID,
+  )
+  // §5.1 — at a container's OWN home (no deeper match), that container's
+  // crumb is the terminal one: current-page styling, switcher chevron kept.
+  const projectIsTerminal = !workspaceMatch && !sessionMatch
+  const workspaceIsTerminal = Boolean(workspaceMatch) && !sessionMatch
+
+  const nav = liveNav.data
+  // The route param — canonically a slug now (session slugs, SC.10); may be
+  // a legacy UUID transiently, right before the route's own redirect fires.
+  // useAgentThread resolves either transparently.
+  const sessionRouteParam = sessionMatch
+    ? (sessionMatch.params as { threadId: string }).threadId
+    : undefined
+  const liveSession = useAgentThread(sessionRouteParam, Boolean(sessionMatch))
+  const sessionSlug = liveSession.data?.slug ?? sessionRouteParam
+
+  // Not a container-scoped route at all (principal-level surfaces, /chat,
+  // /home) — the segment omits itself.
+  if (!projectMatch || !nav) return null
+
+  // Route params are canonically slugs now (container slugs, SC.10); may be
+  // legacy/UUID ids transiently, right before the route's own redirect
+  // fires. Resolve to the canonical {id, slug} pair once: `id` for every
+  // internal comparison/filter below (nav records are keyed by id, never by
+  // slug), `slug` for every href/navigate target.
+  const routeProjectId = (projectMatch.params as { projectId: string })
+    .projectId
+  const routeWorkspaceId = workspaceMatch
+    ? (workspaceMatch.params as { workspaceId: string }).workspaceId
+    : undefined
+  const resolvedProject = resolveProjectRouteParam(nav, routeProjectId)
+  const projectId = resolvedProject?.id ?? routeProjectId
+  const projectSlug = resolvedProject?.slug ?? routeProjectId
+  const resolvedWorkspace = routeWorkspaceId
+    ? resolveWorkspaceRouteParam(nav, routeWorkspaceId)
+    : undefined
+  const workspaceId = resolvedWorkspace?.id ?? routeWorkspaceId
+  const workspaceSlug = resolvedWorkspace?.slug ?? routeWorkspaceId
+
+  const activeProject = nav.projects.find((p) => p.id === projectId)
+  const activeWorkspace = workspaceId
+    ? nav.workspaces.find((w) => w.id === workspaceId)
+    : undefined
 
   const ownedWorkspaces = nav.workspaces.filter(
     (w) => w.projectId === projectId,
   )
   // Workspaces mounted into the current project: switchable here, labelled
-  // as shared — entering one keeps this project as the via perspective.
+  // as shared — entering one keeps this project as the entered-via prefix.
   const mountedWorkspaces = nav.workspaces.filter(
-    (w) =>
-      w.projectId !== projectId &&
-      w.mountedProjectIds.includes(projectId ?? ""),
+    (w) => w.projectId !== projectId && w.mountedProjectIds.includes(projectId),
   )
-  const activeWorkspace = nav.workspaces.find((w) => w.id === workspaceId)
-  // The workspace home link carries the entered-via perspective only when
-  // the current project is not the workspace's canonical home (or that home
-  // is hidden — projectId absent). Canonical entries carry no via.
-  const workspaceHomeHref =
-    workspaceId && projectId
-      ? activeWorkspace?.projectId === projectId
-        ? `/workspaces/${workspaceId}`
-        : `/workspaces/${workspaceId}?via=${encodeURIComponent(projectId)}`
-      : undefined
-  const projectHomeHref = projectId ? `/projects/${projectId}` : undefined
 
-  const selectProject = (nextProjectId: string) => {
+  const projectHomeHref = `/projects/${projectSlug}`
+  const workspaceHomeHref = workspaceSlug
+    ? `/projects/${projectSlug}/workspaces/${workspaceSlug}`
+    : undefined
+  const sessionHomeHref = sessionSlug
+    ? workspaceSlug
+      ? `/projects/${projectSlug}/workspaces/${workspaceSlug}/sessions/${sessionSlug}`
+      : `/projects/${projectSlug}/sessions/${sessionSlug}`
+    : undefined
+
+  // Sibling sessions for the session switcher: within a workspace, other
+  // threads homed in that same workspace; at project depth (workspace-less),
+  // only the personal project homes workspace-less threads (mirrors
+  // buildProjectHome's session predicate in home-view-model.ts).
+  const siblingSessions = (threads.data ?? [])
+    .filter((thread) =>
+      workspaceId
+        ? thread.workspaceId === workspaceId
+        : !thread.workspaceId && projectId === nav.personalProjectId,
+    )
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+
+  const selectProject = (nextProjectId: string, nextProjectSlug: string) => {
     container.selectProject(nextProjectId)
-    if (homeRoute) {
-      void navigate({
-        to: "/projects/$projectId",
-        params: { projectId: nextProjectId },
-        search: {},
-      })
-    }
+    void navigate({
+      to: "/projects/$projectId",
+      params: { projectId: nextProjectSlug },
+    })
   }
 
-  const selectWorkspace = (nextWorkspaceId: string) => {
+  const selectWorkspace = (
+    nextWorkspaceId: string,
+    nextWorkspaceSlug: string,
+  ) => {
     container.selectWorkspace(nextWorkspaceId)
-    if (!homeRoute) return
-    const nextWorkspace = nav.workspaces.find(
-      (workspace) => workspace.id === nextWorkspaceId,
-    )
-    const nextVia =
-      projectId && nextWorkspace?.projectId !== projectId
-        ? projectId
-        : undefined
     void navigate({
-      to: "/workspaces/$workspaceId",
-      params: { workspaceId: nextWorkspaceId },
-      search: {
-        ...(nextVia ? { via: nextVia } : {}),
-      },
+      to: "/projects/$projectId/workspaces/$workspaceId",
+      params: { projectId: projectSlug, workspaceId: nextWorkspaceSlug },
     })
+  }
+
+  const selectSession = (nextSlug: string) => {
+    if (workspaceSlug) {
+      void navigate({
+        to: "/projects/$projectId/workspaces/$workspaceId/sessions/$threadId",
+        params: {
+          projectId: projectSlug,
+          workspaceId: workspaceSlug,
+          threadId: nextSlug,
+        },
+      })
+    } else {
+      void navigate({
+        to: "/projects/$projectId/sessions/$threadId",
+        params: { projectId: projectSlug, threadId: nextSlug },
+      })
+    }
   }
 
   return (
     <>
       <BreadcrumbItem>
         <ContainerMenu
-          icon={nav.projects.find((p) => p.id === projectId)?.icon}
-          label={
-            nav.projects.find((project) => project.id === projectId)?.name ??
-            "Personal"
-          }
+          current={projectIsTerminal}
+          icon={activeProject?.icon}
+          label={activeProject?.name ?? "Personal"}
           href={projectHomeHref}
           items={nav.projects.map((project) => ({
             id: project.id,
             label: project.name,
             icon: project.icon,
-            active: project.id === projectId && !workspaceId,
-            onSelect: () => selectProject(project.id),
+            active: project.id === projectId,
+            onSelect: () => selectProject(project.id, project.slug),
           }))}
         />
       </BreadcrumbItem>
@@ -208,6 +192,7 @@ export function ContainerBreadcrumb() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <ContainerMenu
+              current={workspaceIsTerminal}
               icon={activeWorkspace?.icon}
               label={activeWorkspace?.name ?? "Workspace"}
               href={workspaceHomeHref}
@@ -217,14 +202,14 @@ export function ContainerBreadcrumb() {
                   label: workspace.name,
                   icon: workspace.icon,
                   active: workspace.id === workspaceId,
-                  onSelect: () => selectWorkspace(workspace.id),
+                  onSelect: () => selectWorkspace(workspace.id, workspace.slug),
                 })),
                 ...mountedWorkspaces.map((workspace) => ({
                   id: workspace.id,
                   label: `${workspace.name} · Shared`,
                   icon: workspace.icon,
                   active: workspace.id === workspaceId,
-                  onSelect: () => selectWorkspace(workspace.id),
+                  onSelect: () => selectWorkspace(workspace.id, workspace.slug),
                 })),
               ]}
             />
@@ -232,20 +217,43 @@ export function ContainerBreadcrumb() {
         </>
       ) : null}
 
-      <BreadcrumbSeparator />
+      {sessionMatch && sessionSlug ? (
+        <>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <ContainerMenu
+              current
+              label={liveSession.data?.title ?? "Session"}
+              href={sessionHomeHref}
+              items={siblingSessions.map((thread) => ({
+                id: thread.id,
+                label: thread.title,
+                active: thread.slug === sessionSlug,
+                onSelect: () => selectSession(thread.slug),
+              }))}
+            />
+          </BreadcrumbItem>
+        </>
+      ) : null}
     </>
   )
 }
 
-export function useContainerBreadcrumbPage(): string | undefined {
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
-  const route = parseHomeRoute(pathname)
-  if (route?.kind === "project") return "Project Home"
-  if (route?.kind === "workspace") return "Workspace Home"
-  if (route?.kind === "session") return "Session"
-  return undefined
+/** §5.1 — on EVERY container-scoped route the deepest container crumb is
+ *  already the current location, so the shell must not append a leaf naming
+ *  the surface type. "Project Home"/"Workspace Home"/"Session" were all the
+ *  same defect: a tautological label restating what the crumb beside it
+ *  already said (David, 2026-07-23 and 2026-07-24). Non-container routes
+ *  return false and keep the shell's nav-label fallback. */
+export function useHideBreadcrumbPage(): boolean {
+  const matches = useMatches()
+  return matches.some(
+    (m) =>
+      m.routeId === PROJECT_ROUTE_ID ||
+      m.routeId === WORKSPACE_ROUTE_ID ||
+      m.routeId === PROJECT_SESSION_ROUTE_ID ||
+      m.routeId === WORKSPACE_SESSION_ROUTE_ID,
+  )
 }
 
 /** Split control: the crumb LABEL navigates to the container's home (SC.7 —
@@ -257,6 +265,7 @@ export function ContainerMenu({
   label,
   href,
   items,
+  current = false,
 }: {
   icon?: string
   label: string
@@ -269,10 +278,26 @@ export function ContainerMenu({
     active: boolean
     onSelect: () => void
   }>
+  /** §5.1 — this crumb IS the current location (a container's own home, no
+   *  deeper match) — render it like `BreadcrumbPage` (current-page styling,
+   *  non-navigable) instead of a link to itself, while keeping the switcher
+   *  chevron below untouched: "where I am" and "switch siblings" stay on
+   *  one control either way. */
+  current?: boolean
 }) {
   return (
     <span className="flex items-center">
-      {href ? (
+      {current ? (
+        <span
+          aria-current="page"
+          aria-disabled="true"
+          role="link"
+          className="flex min-h-11 items-center gap-1 px-1 text-xs font-normal text-foreground md:min-h-0"
+        >
+          {icon ? <span aria-hidden>{icon}</span> : null}
+          <span className="max-w-36 truncate">{label}</span>
+        </span>
+      ) : href ? (
         <Link
           to={href}
           data-testid="crumb-home-link"

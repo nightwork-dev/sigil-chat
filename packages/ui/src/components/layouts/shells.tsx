@@ -132,8 +132,10 @@ export function SidebarShell({
   children,
   accountMenu,
   workspaceSwitcher,
+  sidebarSecondary,
   breadcrumbContext,
   breadcrumbPage,
+  hideBreadcrumbPage,
   viewContent,
   statusRailStart,
   statusRailEnd,
@@ -147,6 +149,13 @@ export function SidebarShell({
    */
   workspaceSwitcher?: ReactNode
   /**
+   * App-owned persistent content below the primary nav items (e.g. a session
+   * or recents list) — rendered in its own scrollable group inside the same
+   * sidebar content area, growing to fill remaining height. Hidden when the
+   * rail collapses to icons, like `workspaceSwitcher`.
+   */
+  sidebarSecondary?: ReactNode
+  /**
    * App-owned context segment rendered before the surface crumb in the
    * breadcrumb bar (e.g. `Project › Workspace`). Read-only; the shell adds
    * the separators.
@@ -158,6 +167,15 @@ export function SidebarShell({
    * their current surface.
    */
   breadcrumbPage?: ReactNode
+  /**
+   * Suppress the trailing page crumb entirely instead of falling back to the
+   * active navigation label — distinct from omitting `breadcrumbPage`, which
+   * still renders the fallback. For a location whose `breadcrumbContext`
+   * already ends in a current-page-styled crumb (SC.10 §5.1's
+   * container-own-home case: the last container crumb IS the page, so a
+   * second trailing label would be a tautological duplicate).
+   */
+  hideBreadcrumbPage?: boolean
   /**
    * View-owned content filling the top rail between the breadcrumb and the
    * header actions (e.g. the chat surface's status + session switcher). One
@@ -209,6 +227,13 @@ export function SidebarShell({
               <NavMenu items={nav.items} />
             </SidebarGroupContent>
           </SidebarGroup>
+          {sidebarSecondary ? (
+            <SidebarGroup className="min-h-0 flex-1 group-data-[collapsible=icon]:hidden">
+              <SidebarGroupContent className="flex min-h-0 flex-1 flex-col">
+                {sidebarSecondary}
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : null}
         </SidebarContent>
 
         {(nav.footer && nav.footer.length > 0) || accountMenu ? (
@@ -230,14 +255,16 @@ export function SidebarShell({
           <Breadcrumb>
             <BreadcrumbList>
               {breadcrumbContext}
-              <BreadcrumbItem>
-                <BreadcrumbPage className="text-xs">
-                  {breadcrumbPage ??
-                    active?.label ??
-                    nav.brand?.label ??
-                    "Home"}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
+              {hideBreadcrumbPage ? null : (
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-xs">
+                    {breadcrumbPage ??
+                      active?.label ??
+                      nav.brand?.label ??
+                      "Home"}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              )}
             </BreadcrumbList>
           </Breadcrumb>
           {viewContent ? (

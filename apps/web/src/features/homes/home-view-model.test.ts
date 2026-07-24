@@ -24,15 +24,23 @@ import { fixtureWorkSource, NORTHSTAR } from "./fixtures"
 const nav: ProjectWorkspaceNavSummary = {
   personalProjectId: "project:personal",
   projects: [
-    { id: "project:personal", name: "Personal", description: "", icon: "🏠" },
+    {
+      id: "project:personal",
+      slug: "personal",
+      name: "Personal",
+      description: "",
+      icon: "🏠",
+    },
     {
       id: NORTHSTAR.commerce,
+      slug: "commerce-platform",
       name: "Commerce Platform",
       description: "Storefront and checkout.",
       icon: "🛒",
     },
     {
       id: NORTHSTAR.brand,
+      slug: "brand",
       name: "Brand",
       description: "Campaigns and identity.",
       icon: "✦",
@@ -41,6 +49,7 @@ const nav: ProjectWorkspaceNavSummary = {
   workspaces: [
     {
       id: NORTHSTAR.checkoutReliability,
+      slug: "checkout-reliability",
       projectId: NORTHSTAR.commerce,
       mountedProjectIds: [],
       name: "Checkout Reliability",
@@ -50,6 +59,7 @@ const nav: ProjectWorkspaceNavSummary = {
     },
     {
       id: NORTHSTAR.holidayLaunch,
+      slug: "holiday-launch",
       projectId: NORTHSTAR.brand,
       mountedProjectIds: [NORTHSTAR.commerce],
       name: "Holiday Launch",
@@ -62,6 +72,7 @@ const nav: ProjectWorkspaceNavSummary = {
 
 function thread(partial: Partial<AgentThreadSummary> & { id: string }): AgentThreadSummary {
   return {
+    slug: partial.id,
     personaId: "neve",
     title: partial.id,
     createdAt: "2026-07-01T00:00:00Z",

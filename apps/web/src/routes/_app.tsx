@@ -21,17 +21,20 @@ import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
 import {
   ContainerBreadcrumb,
-  useContainerBreadcrumbPage,
+  useHideBreadcrumbPage,
 } from "@/components/agent/container-breadcrumb"
 import { AgentRailStatus } from "@/components/agent/agent-rail-status"
+import { SessionListPane } from "@/components/agent/session-list-pane"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
 import { ActiveContainerProvider } from "@/lib/active-container"
+import { projectWorkspaceNavQueryOptions } from "@/lib/project-workspace-nav"
 import { AgentSurfaceProvider } from "@/lib/agent-surface-registry"
 import {
   ViewRailChords,
   ViewRailStatusStart,
   ViewRailTop,
+  useHideStatusRail,
 } from "@/lib/view-rails"
 import "@/components/agent/agent-tool-renderer-bootstrap"
 
@@ -46,12 +49,22 @@ export const Route = createFileRoute("/_app")({
     }
     return { user }
   },
+  // Principal-wide: loaded once here, shared by the breadcrumb and every
+  // project/workspace/session home below via the same query key. A loader
+  // failure must never break navigation — it only means the component-level
+  // hook falls back to fetching client-side, so swallow it.
+  loader: async ({ context }) => {
+    await context.queryClient
+      .ensureQueryData(projectWorkspaceNavQueryOptions(context.user.id))
+      .catch(() => undefined)
+  },
   component: AppLayout,
 })
 
 function AppLayout() {
   const { user } = Route.useRouteContext()
-  const breadcrumbPage = useContainerBreadcrumbPage()
+  const hideBreadcrumbPage = useHideBreadcrumbPage()
+  const hideStatusRail = useHideStatusRail()
   const nav = buildAppNav({
     internalWorkspaces:
       import.meta.env.DEV ||
@@ -62,7 +75,10 @@ function AppLayout() {
   // One rail, one header: the top rail is breadcrumb (always) + the matched
   // route's viewContent (read from staticData via useMatches — SSR-native,
   // no provider). The bottom status rail carries view controls (left), chord
-  // hints + agent attention (right). The theme picker lives in the sidebar
+  // hints + agent attention (right) — EXCEPT on the session surface, which
+  // retires the bottom rail entirely (SC.10 §9.4: its own top bar + context
+  // rail already carry everything it would duplicate) via the route's
+  // `staticData.rail.hideStatusRail`. The theme picker lives in the sidebar
   // footer with the account menu, not the rail.
   return (
     <AgentPrincipalProvider principalId={user.id}>
@@ -72,6 +88,7 @@ function AppLayout() {
             <AgentSurfaceProvider>
               <SidebarShell
                 nav={nav}
+                sidebarSecondary={<SessionListPane />}
                 accountMenu={
                   <>
                     <ThemePicker variant="compact" />
@@ -79,14 +96,16 @@ function AppLayout() {
                   </>
                 }
                 breadcrumbContext={<ContainerBreadcrumb />}
-                breadcrumbPage={breadcrumbPage}
+                hideBreadcrumbPage={hideBreadcrumbPage}
                 viewContent={<ViewRailTop />}
                 statusRailStart={<ViewRailStatusStart />}
                 statusRailEnd={
-                  <>
-                    <ViewRailChords />
-                    <AgentRailStatus />
-                  </>
+                  hideStatusRail ? null : (
+                    <>
+                      <ViewRailChords />
+                      <AgentRailStatus />
+                    </>
+                  )
                 }
               >
                 <Outlet />

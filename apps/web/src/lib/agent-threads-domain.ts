@@ -52,6 +52,15 @@ export interface AgentThreadExecutionBinding {
 export interface AgentThread {
   members: string[];
   id: string;
+  /**
+   * Short, immutable, URL-friendly alias for `id` — 8-char lowercase base36,
+   * minted once at creation (or lazily backfilled the first time a
+   * pre-slug record is read) and never regenerated. NOT derived from the
+   * title: titles mutate, links must not. This is a display/routing alias
+   * only — every domain lookup, scope, and persistence key in this file
+   * still keys on `id`.
+   */
+  slug: string;
   personaId: string;
   executionBinding?: AgentThreadExecutionBinding;
   title: string;
@@ -87,6 +96,7 @@ export interface AgentThreadPreference {
 
 export interface AgentThreadSummary {
   id: string;
+  slug: string;
   personaId: string;
   executionBinding?: AgentThreadExecutionBinding;
   title: string;
@@ -111,6 +121,9 @@ export interface AgentThreadRepositoryOptions {
   defaultPersonaId: string;
   now?: () => Date;
   createId?: () => string;
+  /** Injectable for tests (mint-on-create, collision regeneration). Defaults
+   *  to a random 8-char lowercase base36 string. */
+  createSlug?: () => string;
 }
 
 export interface AgentThreadSnapshot {
@@ -140,6 +153,63 @@ const MAX_FORK_TOTAL_CHARS = 12_000;
 const FORK_PACKET_HEADING = "# Forked conversation context";
 const NEW_BRANCH_MARKER = "\n\n## New branch request\n\n";
 
+const SLUG_LENGTH = 8;
+const SLUG_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+const MAX_SLUG_MINT_ATTEMPTS = 10;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function randomSlug(): string {
+  let slug = "";
+  for (let i = 0; i < SLUG_LENGTH; i += 1) {
+    slug += SLUG_ALPHABET[Math.floor(Math.random() * SLUG_ALPHABET.length)];
+  }
+  return slug;
+}
+
+// Authz finding 2 (2026-07-23, Annika): the lazy slug backfill in
+// normalizeThread() below reads-then-writes outside any lock. Web and Eve
+// share SIGIL_DATA_DIR, so two processes racing to backfill the SAME
+// slug-less thread on their first read would previously each mint a
+// DIFFERENT random slug via randomSlug() and both `set()` it —
+// last-write-wins, silently breaking the "minted once, never regenerated"
+// immutability contract for whichever slug lost the race.
+// The fix is deterministic convergence, not a lock: this repository has no
+// cross-process lock primitive (unlike project-registry.ts's
+// withRegistryRecordLock, which is Eve/Node-fs-only — this file's import
+// chain is browser-reachable, so it can't pull in a Node `node:fs` lock
+// without becoming a canary violation). A backfill candidate derived from
+// the thread's own immutable `id` is IDENTICAL no matter which process
+// computes it, so a last-write-wins race between two backfills of the same
+// thread is harmless: both writers agree on the value, so it doesn't matter
+// which one's write survives. FNV-1a is a plain synchronous string hash —
+// no node:crypto, so this stays safe in a client-reachable import chain.
+function fnv1aHash(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function deterministicSlugCandidate(threadId: string, attempt: number): string {
+  let seed = fnv1aHash(`${threadId}:${attempt}`);
+  let slug = "";
+  for (let i = 0; i < SLUG_LENGTH; i += 1) {
+    slug += SLUG_ALPHABET[seed % SLUG_ALPHABET.length];
+    seed = Math.imul(seed ^ (seed >>> 15), 0x2545f491) >>> 0;
+  }
+  return slug;
+}
+
+/** 36-char UUID (crypto.randomUUID() form) vs an 8-char base36 slug — no
+ *  ambiguity between the two shapes, so a route param resolves unambiguously
+ *  without a heuristic guess. */
+export function isUuidShaped(candidate: string): boolean {
+  return UUID_PATTERN.test(candidate);
+}
+
 export class AgentThreadConflictError extends Error {
   constructor(
     readonly threadId: string,
@@ -166,6 +236,7 @@ export class AgentThreadRepository {
   private readonly defaultPersonaId: string;
   private readonly now: () => Date;
   private readonly createId: () => string;
+  private readonly createSlug: () => string;
 
   constructor(options: AgentThreadRepositoryOptions) {
     this.threads = options.threads;
@@ -173,12 +244,13 @@ export class AgentThreadRepository {
     this.defaultPersonaId = normalizePersonaId(options.defaultPersonaId);
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? (() => crypto.randomUUID());
+    this.createSlug = options.createSlug ?? randomSlug;
   }
 
   list(userId: string, includeArchived = false): AgentThread[] {
     return this.threads
       .entries(THREAD_KEY_PREFIX)
-      .map(({ value }) => this.normalizeThread(value))
+      .map(({ value }) => this.normalizeThread(value, userId))
       .filter((thread) => isMember(thread.members, userId))
       .filter((thread) => includeArchived || thread.status === "active")
       .sort(
@@ -199,10 +271,88 @@ export class AgentThreadRepository {
 
   get(userId: string, id: string): AgentThread | undefined {
     const stored = this.threads.get(threadKey(id));
-    const thread = stored ? this.normalizeThread(stored) : undefined;
+    const thread = stored ? this.normalizeThread(stored, userId) : undefined;
     return thread && isMember(thread.members, userId)
       ? cloneThread(thread)
       : undefined;
+  }
+
+  /** Resolves a thread by its immutable slug, scoped to this principal's own
+   *  threads (mirrors the mint-time collision scope — see mintUniqueSlug).
+   *  Lazily backfills any pre-slug record it scans past, same as list/get. */
+  getBySlug(userId: string, slug: string): AgentThread | undefined {
+    const normalizedSlug = slug.trim().toLowerCase();
+    if (!normalizedSlug) return undefined;
+    for (const { value } of this.threads.entries(THREAD_KEY_PREFIX)) {
+      if (!isMember(value.members, userId)) continue;
+      const thread = this.normalizeThread(value, userId);
+      if (thread.slug === normalizedSlug) return cloneThread(thread);
+    }
+    return undefined;
+  }
+
+  /** The route-boundary resolver (SC.10 session slugs): a URL segment is
+   *  either a slug (the canonical, common case) or a legacy UUID (an old
+   *  link). Tries the exact id lookup first (a real id and a slug never
+   *  collide — ids are KV keys, slugs never are), then falls back to slug
+   *  resolution. Callers redirect to `.slug` when it differs from what was
+   *  requested — that comparison is what actually distinguishes "was a
+   *  UUID" from "was already canonical", not isUuidShaped (kept, and
+   *  exported, purely as a documented/tested shape fact — id and slug
+   *  formats truly never overlap; it isn't load-bearing for dispatch here,
+   *  precisely so synthetic non-UUID ids in tests keep resolving by id). */
+  resolveByRouteParam(userId: string, candidate: string): AgentThread | undefined {
+    const trimmed = candidate.trim();
+    return this.get(userId, trimmed) ?? this.getBySlug(userId, trimmed);
+  }
+
+  private mintUniqueSlug(userId: string): string {
+    const existing = new Set(
+      this.threads
+        .entries(THREAD_KEY_PREFIX)
+        .filter(({ value }) => isMember(value.members, userId))
+        .map(({ value }) => value.slug)
+        .filter((slug): slug is string => Boolean(slug)),
+    );
+    for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
+      const candidate = this.createSlug();
+      if (!existing.has(candidate)) return candidate;
+    }
+    throw new Error(
+      `Could not mint a unique session slug for principal ${userId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
+    );
+  }
+
+  /** The lazy-backfill mint (finding 2 above) — deterministic from the
+   *  thread's own id, unlike mintUniqueSlug's random mint used by
+   *  create()/fork(), which never races (each writes a freshly-generated
+   *  id nothing else could be reading yet). */
+  private mintDeterministicBackfillSlug(userId: string, threadId: string): string {
+    const existing = new Set(
+      this.threads
+        .entries(THREAD_KEY_PREFIX)
+        .filter(
+          ({ key, value }) =>
+            key !== threadKey(threadId) && isMember(value.members, userId),
+        )
+        .map(({ value }) => value.slug)
+        .filter((slug): slug is string => Boolean(slug)),
+    );
+    // Residual (documented, not fixed, per Annika's re-review): `existing`
+    // is read without a lock, so two processes racing to backfill DIFFERENT
+    // threads whose deterministic candidates happen to collide could still
+    // each observe the other's slug as free and both mint it — astronomically
+    // unlikely (would need two real thread ids to collide on the same FNV-1a
+    // digest at the same attempt index within the SAME race window), and
+    // strictly no worse than create()/fork()'s pre-existing random-mint
+    // collision window, which this repository has always accepted.
+    for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
+      const candidate = deterministicSlugCandidate(threadId, attempt);
+      if (!existing.has(candidate)) return candidate;
+    }
+    throw new Error(
+      `Could not mint a deterministic backfill slug for thread ${threadId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
+    );
   }
 
   create(userId: string, input: CreateAgentThreadInput = {}): AgentThread {
@@ -222,6 +372,7 @@ export class AgentThreadRepository {
     const thread: AgentThread = {
       members: [userId],
       id: this.createId(),
+      slug: this.mintUniqueSlug(userId),
       personaId,
       ...(executionBinding ? { executionBinding } : {}),
       title: normalizeTitle(input.title),
@@ -372,6 +523,7 @@ export class AgentThreadRepository {
     const fork: AgentThread = {
       members: [...source.members],
       id: this.createId(),
+      slug: this.mintUniqueSlug(userId),
       personaId: source.personaId,
       ...(executionBinding ? { executionBinding } : {}),
       title: normalizeTitle(input.title ?? `${source.title} — fork`),
@@ -494,7 +646,7 @@ export class AgentThreadRepository {
 
   private require(userId: string, id: string): AgentThread {
     const stored = this.threads.get(threadKey(id));
-    const thread = stored ? this.normalizeThread(stored) : undefined;
+    const thread = stored ? this.normalizeThread(stored, userId) : undefined;
     if (!thread || !isMember(thread.members, userId))
       throw new AgentThreadNotFoundError(id);
     return cloneThread(thread);
@@ -504,7 +656,13 @@ export class AgentThreadRepository {
     this.threads.set(threadKey(thread.id), cloneThread(thread));
   }
 
-  private normalizeThread(thread: AgentThread): AgentThread {
+  /** Lazy backfill (SC.10 session slugs): any thread read without a slug
+   *  (created before this migration) gets one minted and persisted here, the
+   *  same idiom already used for personaId/runtime-schema backfill below —
+   *  no migration script, the first read heals the record. `userId` scopes
+   *  the mint's collision check to this principal's OTHER threads, matching
+   *  mintUniqueSlug's own scope. */
+  private normalizeThread(thread: AgentThread, userId: string): AgentThread {
     const stored = thread as StoredAgentThread;
     const hasPersonaId =
       typeof thread.personaId === "string" && thread.personaId.trim();
@@ -512,12 +670,17 @@ export class AgentThreadRepository {
       stored.runtime?.schemaVersion === 1
         ? stored.runtime
         : freshRuntimeRecord(thread.updatedAt);
+    const hasSlug = typeof thread.slug === "string" && thread.slug.trim();
+    const slug = hasSlug
+      ? thread.slug.trim().toLowerCase()
+      : this.mintDeterministicBackfillSlug(userId, thread.id);
     const normalized = cloneThread({
       ...stored,
       personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
       runtime,
+      slug,
     });
-    if (!hasPersonaId || stored.runtime?.schemaVersion !== 1) {
+    if (!hasPersonaId || stored.runtime?.schemaVersion !== 1 || !hasSlug) {
       this.threads.set(threadKey(thread.id), normalized);
     }
     return normalized;
@@ -569,6 +732,7 @@ export function projectAgentThreadSummary(
 ): AgentThreadSummary {
   return {
     id: thread.id,
+    slug: thread.slug,
     personaId: thread.personaId,
     ...(thread.executionBinding
       ? { executionBinding: cloneExecutionBinding(thread.executionBinding) }

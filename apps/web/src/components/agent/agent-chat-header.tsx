@@ -298,7 +298,10 @@ function PersonaPickerItem({
   )
 }
 
-function AgentSessionSwitcher({
+// Exported for session-chat-header.tsx (SC.10 §9.5 step 4): the session
+// surface's own reduced header reuses this Sheet trigger at compact/mobile
+// widths, where the persistent list pane (§9.2) isn't reachable.
+export function AgentSessionSwitcher({
   busy,
   controls,
   personaName,
@@ -311,9 +314,14 @@ function AgentSessionSwitcher({
     (thread) => thread.id === controls.activeThreadId,
   )
   const threads = useAgentThreads()
+  // Controlled so ProjectWorkspaceNav's onDismiss can close the Sheet after a
+  // selection — it no longer uses SheetClose internally (that crashed the
+  // moment it was promoted into the Dialog-less persistent pane; see
+  // project-workspace-nav.tsx).
+  const [open, setOpen] = useState(false)
 
   return (
-    <Sheet>
+    <Sheet onOpenChange={setOpen} open={open}>
       <SheetTrigger
         disabled={busy}
         render={
@@ -342,6 +350,7 @@ function AgentSessionSwitcher({
         <ProjectWorkspaceNav
           activeThreadId={controls.activeThreadId}
           busy={busy}
+          onDismiss={() => setOpen(false)}
           onSelectThread={(threadId) => void controls.selectThread(threadId)}
           threads={threads.data ?? []}
         />

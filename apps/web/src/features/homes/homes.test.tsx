@@ -150,12 +150,35 @@ const sharedWorkspaceView: WorkspaceHomeView = {
   attention: fixtureAttention,
 }
 
+/** Every roving row in the Workspaces section — workspace rows AND the
+ *  session rows nested under them, which share one arrow-key list. */
 function workspaceList(el: HTMLElement): HTMLElement[] {
   return Array.from(
     el.querySelectorAll<HTMLElement>(
       "section[aria-label='Workspaces'] [data-home-row]",
     ),
   )
+}
+
+/** Workspace rows only, excluding the sessions nested beneath them. */
+function workspaceRows(el: HTMLElement): HTMLElement[] {
+  return Array.from(
+    el.querySelectorAll<HTMLElement>(
+      "section[aria-label='Workspaces'] [data-testid='workspace-row']",
+    ),
+  )
+}
+
+/** How many roving rows the Workspaces section owns for a given view —
+ *  derived from the fixture so extending it never forces a test edit.
+ *  Restricted mounts are deliberately excluded: they are not roving rows. */
+function expectedRovingRows(view: ProjectHomeView): number {
+  const entered = view.workspaces.filter((row) => !("restricted" in row))
+  const enteredIds = new Set(entered.flatMap((row) => ("id" in row ? [row.id] : [])))
+  const nested = view.sessions.filter(
+    (session) => session.workspaceId && enteredIds.has(session.workspaceId),
+  )
+  return entered.length + nested.length
 }
 
 const sessionView: SessionHomeView = {
@@ -391,8 +414,8 @@ describe("keyboard — roving tabindex", () => {
       <ProjectHome state={{ kind: "ready", view: projectView }} />,
     )
     const rows = workspaceList(el)
-    expect(rows.length).toBe(2) // restricted row is not a roving row
-    expect(rows.map((r) => r.tabIndex)).toEqual([0, -1])
+    expect(rows).toHaveLength(expectedRovingRows(projectView))
+    expect(rows.filter((r) => r.tabIndex === 0)).toEqual([rows[0]])
 
     rows[0].focus()
     act(() => {
@@ -401,7 +424,7 @@ describe("keyboard — roving tabindex", () => {
       )
     })
     expect(document.activeElement).toBe(rows[1])
-    expect(rows.map((r) => r.tabIndex)).toEqual([-1, 0])
+    expect(rows.filter((r) => r.tabIndex === 0)).toEqual([rows[1]])
 
     act(() => {
       rows[1].dispatchEvent(
@@ -415,7 +438,7 @@ describe("keyboard — roving tabindex", () => {
         new KeyboardEvent("keydown", { key: "End", bubbles: true }),
       )
     })
-    expect(document.activeElement).toBe(rows[1])
+    expect(document.activeElement).toBe(rows[rows.length - 1])
   })
 
   it("a leading restricted row still leaves exactly one tabbable row", async () => {
@@ -430,8 +453,88 @@ describe("keyboard — roving tabindex", () => {
       <ProjectHome state={{ kind: "ready", view: restrictedFirst }} />,
     )
     const rows = workspaceList(el)
-    expect(rows.length).toBe(2)
+    // The restricted row is not among them, and does not consume the one
+    // tabbable slot — the count is unchanged by putting it first.
+    expect(rows).toHaveLength(expectedRovingRows(restrictedFirst))
     expect(rows.filter((row) => row.tabIndex === 0)).toHaveLength(1)
+  })
+})
+
+describe("containment — a session sits under the workspace that homes it", () => {
+  it("nests a workspace's sessions beneath its row, not in a sibling list", async () => {
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: projectView }} />,
+    )
+    const rows = workspaceList(el)
+    const workspaceIndex = rows.findIndex(
+      (row) => row.dataset.testid === "workspace-row",
+    )
+    const nested = rows.filter(
+      (row) => row.dataset.testid === "workspace-session-row",
+    )
+    expect(nested.map((row) => row.textContent)).toContain("Retry storm triage")
+    // Directly after the Checkout Reliability row it belongs to.
+    expect(rows[workspaceIndex + 1]).toBe(nested[0])
+    // ...and NOT repeating its parent's name as a subtitle, which is what the
+    // flat list did.
+    expect(nested[0].textContent).not.toContain("Checkout Reliability")
+
+    const projectSessions = el.querySelector(
+      "section[aria-label='Project sessions']",
+    )
+    expect(projectSessions?.textContent).not.toContain("Retry storm triage")
+  })
+
+  it("keeps a workspace-less session in the project's own section", async () => {
+    const withDirect: ProjectHomeView = {
+      ...projectView,
+      sessions: [
+        ...projectView.sessions,
+        {
+          id: "t-direct",
+          title: "Project scratch",
+          personaId: "neve",
+          status: "active",
+          updatedAt: "2026-07-22T10:00:00Z",
+          workspaceId: undefined,
+          workspaceName: undefined,
+          href: "/sessions/t-direct",
+        },
+      ],
+    }
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: withDirect }} />,
+    )
+    const projectSessions = el.querySelector(
+      "section[aria-label='Project sessions']",
+    )
+    expect(projectSessions?.textContent).toContain("Project scratch")
+    expect(
+      workspaceList(el).map((row) => row.textContent).join(" "),
+    ).not.toContain("Project scratch")
+  })
+
+  it("never drops a session whose workspace is not a visible row", async () => {
+    const subject = projectView.sessions.find(
+      (session) => session.title === "Retry storm triage",
+    )!
+    const orphaned: ProjectHomeView = {
+      ...projectView,
+      sessions: [
+        {
+          ...subject,
+          workspaceId: "workspace:not-visible-here",
+          workspaceName: "Elsewhere",
+        },
+      ],
+    }
+    const el = await render(
+      <ProjectHome state={{ kind: "ready", view: orphaned }} />,
+    )
+    const projectSessions = el.querySelector(
+      "section[aria-label='Project sessions']",
+    )
+    expect(projectSessions?.textContent).toContain("Retry storm triage")
   })
 })
 
@@ -440,7 +543,7 @@ describe("via propagation — the path you arrived by survives the click", () =>
     const el = await render(
       <ProjectHome state={{ kind: "ready", view: projectView }} />,
     )
-    const rows = workspaceList(el)
+    const rows = workspaceRows(el)
     expect(rows[0].getAttribute("href")).toBe(
       "/workspaces/workspace:checkout-reliability",
     )

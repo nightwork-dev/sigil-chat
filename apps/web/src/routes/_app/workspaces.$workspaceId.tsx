@@ -1,19 +1,36 @@
-// Route: /workspaces/$workspaceId?via=<projectId>
+// Route: /workspaces/$workspaceId?via=<projectId>  (RESOLVER)
 // Tree:
 //   apps/web/src/routes/__root.tsx                       — HTML shell, theme/query providers, shared agent session (no visible chrome)
-//   apps/web/src/routes/_app.tsx                         — one-rail product shell, breadcrumb via-path, theme picker
+//   apps/web/src/routes/_app.tsx                         — one-rail product shell, breadcrumb bar, theme picker
 //   apps/web/src/routes/_app/workspaces.$workspaceId.tsx — THIS FILE
-// Content: WorkspaceHome — permission-filtered initiative composition with validated via display
+// Content: keeps old links, directly-granted access, and workspace-less
+// sessions working (SC.10 §2). `beforeLoad` resolves canonical containment
+// from the permission-filtered nav and `throw redirect`s into
+// /projects/$projectId/workspaces/$workspaceId. When no containing project
+// is visible to this principal, it renders WorkspaceHome directly at this
+// shallow depth — the honest home for that principal, not a placeholder.
+// $workspaceId and `?via=` are each either the canonical slug or a legacy/
+// UUID id (container slugs, SC.10 CRITICAL BOUNDARY) — both resolve against
+// the nav summary before anything scope-keyed fires, and the shallow-render
+// case still canonicalizes $workspaceId in the URL even when containment
+// doesn't redirect it elsewhere.
 
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useMemo } from "react"
 
 import { useAgentRoster } from "@/lib/agent-profile"
 import { useMediaQuery } from "@/lib/agent-surface-registry"
 import { useAgentThreads } from "@/lib/agent-threads"
 import { useArtifacts } from "@/lib/artifacts"
+import {
+  resolveProjectRouteParam,
+  resolveWorkspaceRouteParam,
+} from "@/lib/container-route-target"
 import { useHomeSignals } from "@/lib/home-signals"
-import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
+import {
+  projectWorkspaceNavQueryOptions,
+  useProjectWorkspaceNav,
+} from "@/lib/project-workspace-nav"
 import {
   buildWorkspaceHome,
   type HomesAdapterInput,
@@ -32,16 +49,68 @@ export const Route = createFileRoute("/_app/workspaces/$workspaceId")({
   validateSearch: (search: Record<string, unknown>): { via?: string } => ({
     ...(typeof search.via === "string" ? { via: search.via } : {}),
   }),
+  beforeLoad: async ({ context, params, search }) => {
+    const principalId = context.user.id
+    const nav = await context.queryClient
+      .ensureQueryData(projectWorkspaceNavQueryOptions(principalId))
+      .catch(() => undefined)
+    const resolvedWorkspace = resolveWorkspaceRouteParam(
+      nav,
+      params.workspaceId,
+    )
+    if (!resolvedWorkspace) return
+    const workspace = nav!.workspaces.find(
+      (w) => w.id === resolvedWorkspace.id,
+    )!
+    const resolvedVia = search.via
+      ? resolveProjectRouteParam(nav, search.via)
+      : undefined
+    const viaVisible =
+      resolvedVia &&
+      (workspace.projectId === resolvedVia.id ||
+        workspace.mountedProjectIds.includes(resolvedVia.id))
+    const targetProjectId = viaVisible ? resolvedVia.id : workspace.projectId
+    if (targetProjectId) {
+      const targetProject = nav!.projects.find(
+        (p) => p.id === targetProjectId,
+      )!
+      throw redirect({
+        to: "/projects/$projectId/workspaces/$workspaceId",
+        params: {
+          projectId: targetProject.slug,
+          workspaceId: resolvedWorkspace.slug,
+        },
+      })
+    }
+    // Owning project not visible — render shallow, but still land on the
+    // canonical slug form.
+    if (resolvedWorkspace.slug !== params.workspaceId) {
+      throw redirect({
+        to: "/workspaces/$workspaceId",
+        params: { workspaceId: resolvedWorkspace.slug },
+        search,
+      })
+    }
+  },
   component: WorkspaceHomeRoute,
 })
 
 function WorkspaceHomeRoute() {
-  const { workspaceId } = Route.useParams()
-  const { via } = Route.useSearch()
+  const { workspaceId: routeWorkspaceId } = Route.useParams()
+  const { via: routeVia } = Route.useSearch()
   const nav = useProjectWorkspaceNav()
   const threads = useAgentThreads()
   const roster = useAgentRoster()
   const compact = useMediaQuery("(max-width: 640px)")
+  // Route params/search may still be slugs mid-redirect, or (transiently)
+  // legacy UUIDs — resolve against the already-fetched nav the same way the
+  // beforeLoad did (cache hit).
+  const workspaceId =
+    resolveWorkspaceRouteParam(nav.data, routeWorkspaceId)?.id ??
+    routeWorkspaceId
+  const via = routeVia
+    ? (resolveProjectRouteParam(nav.data, routeVia)?.id ?? routeVia)
+    : undefined
   const access = useScopeHomeAccess(workspaceId)
   const scopedWork = useScopeWork(
     workspaceId,

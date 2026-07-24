@@ -30,7 +30,7 @@ export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
       className={
         compact
           ? "flex flex-col gap-4 p-3 pb-20"
-          : "mx-auto flex w-full max-w-3xl flex-col gap-6 p-6"
+          : "flex w-full max-w-3xl flex-col gap-6 p-6"
       }
     >
       <header
