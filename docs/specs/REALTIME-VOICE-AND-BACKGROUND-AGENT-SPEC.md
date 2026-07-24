@@ -379,6 +379,65 @@ is what the WebSocket path requires anyway. Re-implementing the subscription
 WebRTC client is the one path that is NOT viable without whatever attestation
 Codex carries.
 
+## The no-API-key path: drive Codex's app-server (2026-07-24)
+
+Re-implementing the subscription WebRTC client is dead — Codex's exact
+payload still fails from outside Codex, so the gap is context it establishes,
+not bytes. But Codex's **app-server exposes realtime as a JSON-RPC API**, and
+that path needs no API key, no attestation work, and no reimplementation.
+Codex IS the attested client; we compose with it.
+
+Full surface (`app-server-protocol/src/protocol/common.rs`, all
+`#[experimental]`):
+
+```
+thread/realtime/start        thread/realtime/sdp          (notification)
+thread/realtime/stop         thread/realtime/started      (notification)
+thread/realtime/appendText   thread/realtime/itemAdded    (notification)
+thread/realtime/appendAudio  thread/realtime/closed       (notification)
+thread/realtime/appendSpeech thread/realtime/error        (notification)
+thread/realtime/listVoices
+```
+
+**The WebRTC handshake never touches our code:**
+
+```rust
+pub enum ThreadRealtimeStartTransport {
+    Websocket,
+    Webrtc { sdp: String },   // the browser's OFFER
+}
+pub struct ThreadRealtimeSdpNotification { thread_id, sdp }  // the ANSWER
+```
+
+1. Browser builds the offer (`RTCPeerConnection` + mic + `oai-events` channel).
+2. Sigil Chat calls `thread/realtime/start` with
+   `transport: {type: "webrtc", sdp: <offer>}`.
+3. Codex creates the call using its own subscription OAuth and attestation.
+4. `thread/realtime/sdp` returns the answer; the browser sets it as remote.
+5. Audio flows browser ↔ OpenAI directly. No credential ever reaches us OR
+   the browser — strictly better than the original design, which had our
+   server holding the token.
+
+**Codex already implements this spec's delegation contract.** The start params
+carry `clientManagedHandoffs`, `flushTranscriptTailOnSessionEnd`,
+`codexResponseHandoffMode: "bemTags"`, and
+`codexResponseHandoffChannelPrefixes: {analysis: ["[THINKING]"], commentary:
+["[PROGRESS]", "[UPDATE]"], final: ["[DONE]"]}` — a channel-tagged
+coordinator→agent handoff protocol. Our §Delegation contract and §Projecting
+agent output back to voice should be RE-DERIVED from this rather than invented
+beside it; the bounded-progress channels we specified already exist here.
+
+**Consequences for the slices:** Slice 3 no longer needs the credential seam,
+the sideband client, or the provider adapter — the `RealtimeVoiceProvider`
+interface in this spec is obsolete for the subscription path. What it needs is
+an app-server JSON-RPC client plus the browser WebRTC half. The §Ownership
+split changes accordingly: `apps/agent` no longer resolves credentials or
+holds a call id; it proxies to Codex's app-server.
+
+**Caveat:** every one of these methods is `#[experimental]` and the app-server
+is a local process, so this is a local/dev capability, not a deployment story.
+A hosted Sigil Chat still has no subscription path.
+
 **Version pinning caveat, now demonstrated:** this spec cited Codex commit
 `99744cfe` and warned the pin was evidence rather than a stability promise.
 That warning was correct — the shipped CLI is **0.144.6**, its wire format has
