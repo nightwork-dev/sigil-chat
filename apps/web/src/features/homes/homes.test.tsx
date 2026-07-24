@@ -169,6 +169,18 @@ function workspaceRows(el: HTMLElement): HTMLElement[] {
   )
 }
 
+/** How many roving rows the Workspaces section owns for a given view —
+ *  derived from the fixture so extending it never forces a test edit.
+ *  Restricted mounts are deliberately excluded: they are not roving rows. */
+function expectedRovingRows(view: ProjectHomeView): number {
+  const entered = view.workspaces.filter((row) => !("restricted" in row))
+  const enteredIds = new Set(entered.flatMap((row) => ("id" in row ? [row.id] : [])))
+  const nested = view.sessions.filter(
+    (session) => session.workspaceId && enteredIds.has(session.workspaceId),
+  )
+  return entered.length + nested.length
+}
+
 const sessionView: SessionHomeView = {
   header: {
     scopeId: NORTHSTAR.draftOffers,
@@ -402,7 +414,7 @@ describe("keyboard — roving tabindex", () => {
       <ProjectHome state={{ kind: "ready", view: projectView }} />,
     )
     const rows = workspaceList(el)
-    expect(rows.length).toBeGreaterThan(1) // restricted row is not a roving row
+    expect(rows).toHaveLength(expectedRovingRows(projectView))
     expect(rows.filter((r) => r.tabIndex === 0)).toEqual([rows[0]])
 
     rows[0].focus()
@@ -441,7 +453,9 @@ describe("keyboard — roving tabindex", () => {
       <ProjectHome state={{ kind: "ready", view: restrictedFirst }} />,
     )
     const rows = workspaceList(el)
-    expect(rows.length).toBeGreaterThan(0)
+    // The restricted row is not among them, and does not consume the one
+    // tabbable slot — the count is unchanged by putting it first.
+    expect(rows).toHaveLength(expectedRovingRows(restrictedFirst))
     expect(rows.filter((row) => row.tabIndex === 0)).toHaveLength(1)
   })
 })
@@ -501,11 +515,14 @@ describe("containment — a session sits under the workspace that homes it", () 
   })
 
   it("never drops a session whose workspace is not a visible row", async () => {
+    const subject = projectView.sessions.find(
+      (session) => session.title === "Retry storm triage",
+    )!
     const orphaned: ProjectHomeView = {
       ...projectView,
       sessions: [
         {
-          ...projectView.sessions[0],
+          ...subject,
           workspaceId: "workspace:not-visible-here",
           workspaceName: "Elsewhere",
         },
