@@ -691,6 +691,16 @@ async function postSession(
         throw new Error("receive should not be called")
       },
       cancel: async () => ({ status: "no_active_turn" }),
+      // Added by eve 0.27.4/0.27.5: custom channel routes now receive
+      // session reset and active-session resolution alongside cancel. This
+      // route exercises neither, so both throw rather than returning a
+      // plausible value that could mask a future call.
+      reset: async () => {
+        throw new Error("reset should not be called")
+      },
+      resolveActiveSession: async () => {
+        throw new Error("resolveActiveSession should not be called")
+      },
       params: {},
       waitUntil: () => {},
       requestIp: null,
