@@ -260,6 +260,80 @@ Gonk owns:
 The realtime provider owns only the ephemeral voice conversation. It receives
 no ambient application authority.
 
+## Wire protocol — measured, not inferred (2026-07-24)
+
+Probed directly against the live endpoint with David's Codex credentials, at
+his explicit instruction to bypass the Eve seam. Findings correct this spec in
+ways that change what is actually blocked.
+
+**The Eve credential seam was never the blocker.** Reading
+`~/.codex/auth.json` and calling the endpoint directly authenticates fine
+(`auth_mode: chatgpt`). Building a supported Eve credential/transport seam
+would not have moved this forward by one byte. Slice 3 was queued behind the
+wrong dependency.
+
+**The body is JSON, not multipart.** This spec documented a multipart form.
+For the `/backend-api` host it is `{"sdp": "...", "session": {...}}` as
+`application/json`. Codex branches on the URL containing `/backend-api`
+(`uses_backend_request_shape()`); multipart is the PUBLIC API shape only.
+Sending multipart to the backend host returns `Unsupported content type`.
+
+**`OpenAI-Alpha` is the real gate, and this spec never mentioned it.**
+Required header, and its value decides access:
+
+| Header                                    | Result                                               |
+| ----------------------------------------- | ---------------------------------------------------- |
+| absent                                    | `403 Voice session access denied.`                   |
+| `OpenAI-Alpha: v1` / `v2, quicksilver=v1` | `400` — must be `quicksilver=v1` or `quicksilver=v2` |
+| `OpenAI-Alpha: quicksilver=v1`            | `403 Voice session access denied.`                   |
+| `OpenAI-Alpha: quicksilver=v2`            | **passes the access check**                          |
+
+So `quicksilver=v1` — the dialect this spec was written against — is no longer
+granted. `v2` is the live one. A 403 here reads like an entitlement problem and
+is not: it is a protocol-version refusal.
+
+**Entitlement is NOT the blocker either.** David ran a Codex voice session on
+this account the same day (`~/.codex/realtime-voice-continuity.json`). The
+account has voice.
+
+**Validated request, as far as it gets today:**
+
+```
+POST https://chatgpt.com/backend-api/codex/realtime/calls
+       ?intent=quicksilver&architecture=avas
+Authorization: Bearer <tokens.access_token from ~/.codex/auth.json>
+ChatGPT-Account-Id: <tokens.account_id>
+OpenAI-Alpha: quicksilver=v2
+Content-Type: application/json
+
+{"sdp": "<offer SDP>", "session": {"type": "quicksilver"}}
+```
+
+`session.type` must be `"quicksilver"` whenever `intent=quicksilver`.
+
+**The one remaining unknown** is the v2 `session` schema. Every object-valued
+session returns `Field session.model is not allowed for this Codex realtime
+session` — including an empty `{}`, and regardless of an `openai-model` header
+— while omitting `session` returns `Field session must be an object`. Something
+in the v2 envelope differs from the v1 shape; blind probing did not find it and
+was stopped rather than continued.
+
+**How to close it (do this before writing any client code):** run Codex's own
+voice session through an intercepting proxy and capture one real request. That
+is one observation versus unbounded guessing, and it also yields the sideband
+handshake this spec still describes only from the stale pinned source. Other
+strings in the shipped binary (`x-session-id`, `x-models-etag`,
+`x-reasoning-included`, `originator`, `server_vad`, `near_field`, `audio/pcm`,
+`conversation.handoff.append`) suggest the capture will answer several open
+questions at once.
+
+**Version pinning caveat, now demonstrated:** this spec cited Codex commit
+`99744cfe` and warned the pin was evidence rather than a stability promise.
+That warning was correct — the shipped CLI is **0.144.6**, its wire format has
+moved (JSON body, `OpenAI-Alpha`, quicksilver v2), and building against the
+pinned source would have produced a client that cannot connect. Re-measure
+against the installed binary, not the pinned commit.
+
 ## Subscription-backed provider boundary
 
 The first provider is the subscription-backed call path currently used by
