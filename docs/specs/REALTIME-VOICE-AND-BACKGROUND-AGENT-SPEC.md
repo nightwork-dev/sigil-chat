@@ -327,6 +327,58 @@ strings in the shipped binary (`x-session-id`, `x-models-etag`,
 `conversation.handoff.append`) suggest the capture will answer several open
 questions at once.
 
+**Transport decides the auth — the single most important finding.** From
+`codex-rs/core/src/realtime_conversation.rs:800-815` (vendored at
+`~/Dev/vendor/codex`, tag `rust-v0.144.5`):
+
+```rust
+Websocket   => realtime_api_key(auth, &provider)?      // API KEY REQUIRED
+Webrtc {..} => realtime_request_headers(.., /*api_key*/ None, ..)  // OAuth, no key
+```
+
+`realtime_api_key()` errors with "realtime conversation requires API key auth"
+and carries an OpenAI TODO to remove that requirement "once realtime auth no
+longer requires API key auth for ChatGPT/SIWC sessions".
+
+So the WEBSOCKET sideband needs an API key, while the WEBRTC call path passes
+`None` and rides the session's subscription OAuth. **This spec's premise — use
+the subscription, keep credentials server-side, no API key — is architecturally
+correct for WebRTC and impossible for the WebSocket sideband.** Any design that
+assumed one credential covers both is wrong. WebRTC also pins `RealtimeWsVersion::V1`.
+
+**Session payload, from Codex's own fixture**
+(`app-server/tests/suite/v2/realtime_conversation.rs:3105`):
+
+```json
+{
+  "audio": {
+    "input": { "format": { "type": "audio/pcm", "rate": 24000 } },
+    "output": { "voice": "cove" }
+  },
+  "type": "quicksilver",
+  "model": "gpt-realtime-1.5",
+  "instructions": "..."
+}
+```
+
+**Where this stopped, and why.** With that exact payload, `quicksilver=v1`
+still returns `403 Voice session access denied`, while `quicksilver=v2` rejects
+`session.model`. Auth is definitively accepted (validation errors only reach
+that depth after auth succeeds), and the account is entitled (a Codex voice
+session ran the same day). The remaining gap is most likely a client
+attestation or originator gate. **Probing stopped there deliberately:**
+permuting headers to get past an explicit access-denied response is
+circumventing an access control, which this spec already forbids
+("must not work around product attestation or entitlement checks") and which
+no amount of client-side cleverness legitimately solves.
+
+**Therefore the honest options are:** (a) drive Codex's own app-server, which
+already holds a working session, rather than re-implementing its client; or
+(b) use the public Realtime API with an API key, which is unblocked today and
+is what the WebSocket path requires anyway. Re-implementing the subscription
+WebRTC client is the one path that is NOT viable without whatever attestation
+Codex carries.
+
 **Version pinning caveat, now demonstrated:** this spec cited Codex commit
 `99744cfe` and warned the pin was evidence rather than a stability promise.
 That warning was correct — the shipped CLI is **0.144.6**, its wire format has
