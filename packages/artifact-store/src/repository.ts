@@ -31,6 +31,7 @@ import {
 } from "./urls"
 import type {
   ArtifactProvenance,
+  ArtifactScopeAction,
   CanAccessScope,
   PutSessionArtifactInput,
   ScopePrincipal,
@@ -40,6 +41,7 @@ import type {
 
 export type {
   ArtifactProvenance,
+  ArtifactScopeAction,
   CanAccessScope,
   PutSessionArtifactInput,
   ScopePrincipal,
@@ -72,21 +74,25 @@ export interface FileArtifactRepositoryOptions
 export function canAccessScope(
   _principal: ScopePrincipal,
   _scope: ResourceScope,
+  _action: ArtifactScopeAction,
 ): boolean {
   return true
 }
 
-export function createScopeAccessCheck(
-  policy: {
-    authorize(input: {
-      action: "read" | "write"
-      principalId: string
-      resourceScope: string
-    }): boolean
-  },
-  action: "read" | "write" = "read",
-): CanAccessScope {
-  return (principal, scope) => {
+/**
+ * The action comes from the CALL, never from construction. Binding it once
+ * here (it used to default to "read") meant every operation on a repository
+ * asked the policy the same question, so a read-only grant authorized
+ * putFile and removeFromScope — SC.9, 2026-07-24.
+ */
+export function createScopeAccessCheck(policy: {
+  authorize(input: {
+    action: ArtifactScopeAction
+    principalId: string
+    resourceScope: string
+  }): boolean
+}): CanAccessScope {
+  return (principal, scope, action) => {
     const principalId = principalIdentifier(principal)
     return (
       principalId !== undefined &&
@@ -151,7 +157,7 @@ export class SessionArtifactStore {
     principal?: ScopePrincipal,
   ): Promise<SessionArtifactMetadata> {
     const scope = requireScope(input.scope)
-    await this.assertScopeAccess(principal, scope)
+    await this.assertScopeAccess(principal, scope, "write")
 
     return this.withScopeLock(scope, async (lease) => {
       const id = input.provenance
@@ -202,7 +208,7 @@ export class SessionArtifactStore {
     principal?: ScopePrincipal,
   ): Promise<SessionArtifactMetadata[]> {
     const scope = requireScope(input)
-    await this.assertScopeAccess(principal, scope)
+    await this.assertScopeAccess(principal, scope, "read")
     const stream = await this.objects.get(manifestKey(scope))
     if (!stream) return []
     const bytes = await collectBytes(stream)
@@ -244,7 +250,7 @@ export class SessionArtifactStore {
     principal?: ScopePrincipal,
   ): Promise<boolean> {
     const scope = requireScope(input)
-    await this.assertScopeAccess(principal, scope)
+    await this.assertScopeAccess(principal, scope, "write")
 
     return this.withScopeLock(scope, async (lease) => {
       const artifacts = await this.listByScope(scope, principal)
@@ -271,8 +277,9 @@ export class SessionArtifactStore {
   private async assertScopeAccess(
     principal: ScopePrincipal,
     scope: ResourceScope,
+    action: ArtifactScopeAction,
   ): Promise<void> {
-    if (!(await this.canAccessScope(principal, scope))) {
+    if (!(await this.canAccessScope(principal, scope, action))) {
       throw new ArtifactScopeAccessDeniedError(scope)
     }
   }

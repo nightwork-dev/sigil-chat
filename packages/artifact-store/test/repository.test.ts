@@ -22,6 +22,7 @@ import {
   ArtifactScopeLockLostError,
   ArtifactScopeLockTimeoutError,
   createFileSessionArtifactStore,
+  createScopeAccessCheck,
   SessionArtifactStore,
 } from "../src/repository"
 import { formatScopeHeader } from "../src/scope"
@@ -347,5 +348,77 @@ describe("SessionArtifactStore", () => {
       bytes: new TextEncoder().encode("memory"),
       mediaType: "text/plain",
     })
+  })
+})
+
+describe("scope action separation (SC.9)", () => {
+  // A read-only grant must authorize reads and DENY mutations. Before the
+  // action was threaded through, every operation asked the policy for
+  // "read", so this principal could write into a scope it may only read.
+  const readOnlyPolicy = {
+    authorize: (input: { action: string; principalId: string }) =>
+      input.principalId === "reader" && input.action === "read",
+  }
+
+  it("lets a read-only principal read but not write", async () => {
+    const seed = new SessionArtifactStore(new InMemoryObjectStore())
+    const scope = "workspace:holiday-launch"
+    const stored = await seed.putFile({
+      bytes: new TextEncoder().encode("seeded"),
+      filename: "seeded.txt",
+      mediaType: "text/plain",
+      scope,
+    })
+
+    const secured = new SessionArtifactStore(
+      (seed as unknown as { objects: ObjectStore }).objects,
+      { canAccessScope: createScopeAccessCheck(readOnlyPolicy) },
+    )
+    const reader = { id: "reader" }
+
+    // Reads are permitted by the grant.
+    await expect(secured.listByScope(scope, reader)).resolves.toHaveLength(1)
+    await expect(
+      secured.readContent(stored.id, scope, reader),
+    ).resolves.toMatchObject({ mediaType: "text/plain" })
+
+    // Mutations are not. This is the assertion that was silently false.
+    await expect(
+      secured.putFile(
+        {
+          bytes: new TextEncoder().encode("escalated"),
+          filename: "escalated.txt",
+          mediaType: "text/plain",
+          scope,
+        },
+        reader,
+      ),
+    ).rejects.toBeInstanceOf(ArtifactScopeAccessDeniedError)
+    await expect(
+      secured.removeFromScope(stored.id, scope, reader),
+    ).rejects.toBeInstanceOf(ArtifactScopeAccessDeniedError)
+
+    // ...and the denied write left no trace in the manifest.
+    await expect(secured.listByScope(scope, reader)).resolves.toHaveLength(1)
+  })
+
+  it("passes the operation's own action to the policy", async () => {
+    const seen: string[] = []
+    const store = new SessionArtifactStore(new InMemoryObjectStore(), {
+      canAccessScope: (_principal, _scope, action) => {
+        seen.push(action)
+        return true
+      },
+    })
+    await store.putFile({
+      bytes: new TextEncoder().encode("x"),
+      filename: "x.txt",
+      mediaType: "text/plain",
+      scope: "workspace:w",
+    })
+    expect(seen).toContain("write")
+    seen.length = 0
+    await store.listByScope("workspace:w", { id: "anyone" })
+    expect(seen).toEqual(["read"])
   })
 })

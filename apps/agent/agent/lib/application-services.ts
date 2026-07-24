@@ -1,6 +1,9 @@
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
-import { createFileSessionArtifactStore } from "@workspace/artifact-store/repository"
+import {
+  createFileSessionArtifactStore,
+  type ArtifactScopeAction,
+} from "@workspace/artifact-store/repository"
 import {
   formatScopeHeader,
   type ResourceScope,
@@ -25,8 +28,8 @@ export const threadScopeOwners = new MirkAgentThreadScopeOwnerRegistry()
 export const eveSessionOwnerStore = new MirkEveSessionOwnerStore()
 
 export const artifactStore = createFileSessionArtifactStore({
-  canAccessScope: (principal, scope) =>
-    canPrincipalAccessArtifactScope(principal?.id, scope),
+  canAccessScope: (principal, scope, action) =>
+    canPrincipalAccessArtifactScope(principal?.id, scope, action),
 })
 
 export const agentToolRegistry = createSigilAgentToolRegistry({
@@ -44,16 +47,23 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   workItems: workItemsRepository,
 })
 
+/**
+ * The action is threaded through to the grant policy rather than pinned to
+ * "read". A read-only grant on a container must not authorize writing
+ * artifacts into it (SC.9, 2026-07-24). Members are unaffected: membership
+ * fall-through in the policy still authorizes every action.
+ */
 export function canPrincipalAccessArtifactScope(
   principalId: string | undefined,
   scope: ResourceScope,
+  action: ArtifactScopeAction,
 ): boolean {
   if (!principalId) return false
   const resourceScope = formatScopeHeader(scope)
   if (!resourceScope) return false
   if (scope.tier === "project" || scope.tier === "workspace") {
     return scopeGrantPolicy.authorize({
-      action: "read",
+      action,
       principalId,
       resourceScope,
     })
@@ -70,7 +80,7 @@ export function canPrincipalAccessArtifactScope(
     return Boolean(
       homeScope &&
       scopeGrantPolicy.authorize({
-        action: "read",
+        action,
         principalId,
         resourceScope: homeScope,
       }),
