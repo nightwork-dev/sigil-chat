@@ -4,8 +4,10 @@
 // ever emit a thread's `.slug` into a URL — never `.id` (session slugs,
 // SC.10) — locked by session-route-target.test.ts.
 
-import type { AgentThreadSummary } from "@/lib/agent-threads-domain"
-import type { AgentThreadPreference } from "@/lib/agent-threads-domain"
+import type {
+  AgentThreadPreference,
+  AgentThreadSummary,
+} from "@/lib/agent-threads-domain"
 import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
 
 /** The active thread (by preference), falling back to the most recently

@@ -1,18 +1,29 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const repositoryRoot = new URL("../", import.meta.url);
 
-async function skillNames(harness) {
-  const entries = await readdir(
-    new URL(`.${harness}/skills/`, repositoryRoot),
-    { withFileTypes: true },
+/** REPOSITORY skills only — the ones git actually tracks. A developer may
+ *  keep a gitignored, harness-local skill (`.claude/skills/local-coordination`
+ *  is one); it has no counterpart to mirror and must not trip the parity
+ *  guard, or the guard fails for everyone who has one and gets muted. */
+function skillNames(harness) {
+  const tracked = execFileSync(
+    "git",
+    ["ls-files", "-z", `.${harness}/skills/`],
+    { cwd: fileURLToPath(repositoryRoot), encoding: "utf8" },
   );
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
+  const names = new Set(
+    tracked
+      .split("\0")
+      .filter(Boolean)
+      .map((path) => path.split("/")[2])
+      .filter(Boolean),
+  );
+  return [...names].sort();
 }
 
 async function skillText(harness, name) {
@@ -23,8 +34,8 @@ async function skillText(harness, name) {
 }
 
 test("Codex and Claude receive byte-identical repository skills", async () => {
-  const agentSkills = await skillNames("agents");
-  const claudeSkills = await skillNames("claude");
+  const agentSkills = skillNames("agents");
+  const claudeSkills = skillNames("claude");
   assert.deepEqual(claudeSkills, agentSkills);
 
   for (const name of agentSkills) {
@@ -37,8 +48,8 @@ test("Codex and Claude receive byte-identical repository skills", async () => {
 });
 
 test("Pi mirrors every skill and preserves load-bearing gates", async () => {
-  const agentSkills = await skillNames("agents");
-  assert.deepEqual(await skillNames("pi"), agentSkills);
+  const agentSkills = skillNames("agents");
+  assert.deepEqual(skillNames("pi"), agentSkills);
 
   const building = await skillText("pi", "building-in-sigil-chat");
   assert.match(building, /REGISTRY LOOP — STEP 0/);
