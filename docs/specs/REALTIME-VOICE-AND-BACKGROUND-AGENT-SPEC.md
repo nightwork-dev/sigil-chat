@@ -434,9 +434,31 @@ an app-server JSON-RPC client plus the browser WebRTC half. The §Ownership
 split changes accordingly: `apps/agent` no longer resolves credentials or
 holds a call id; it proxies to Codex's app-server.
 
-**Caveat:** every one of these methods is `#[experimental]` and the app-server
-is a local process, so this is a local/dev capability, not a deployment story.
-A hosted Sigil Chat still has no subscription path.
+**Correction (same day): the app-server is NOT local-only.** An earlier
+revision of this section claimed it was, and that was wrong. `codex app-server`
+takes `--listen <URL>` (with a default listen URL) or `--stdio`, ships
+`AppServerWebsocketAuthArgs` for authenticated WebSocket transport, exposes
+`codex app-server proxy` to bridge stdio to the control socket, and has a
+first-class `codex remote-control` subcommand described as "manage the
+app-server daemon with remote control enabled". Remote operation is a
+supported, authenticated feature, not a workaround.
+
+Deployment shape: run `codex app-server` beside `apps/agent` wherever Sigil
+Chat runs, logged in with `codex login`. **Its location does not affect audio
+latency at all** — WebRTC carries audio browser ↔ OpenAI directly, and the
+app-server only performs signalling (offer in, answer out) plus delegation
+events.
+
+The real remaining constraints are not technical:
+
+- The deployment needs a Codex login provisioned on it.
+- One ChatGPT subscription backing a multi-user hosted app is an account/ToS
+  question, not an engineering one. Moot for a single-operator instance.
+- Whether OpenAI's attestation is device-bound is unknown; running the
+  app-server on the target host is the experiment that answers it.
+
+Every method is `#[experimental]` and may change without notice — accepted
+deliberately (David, 2026-07-24).
 
 **Version pinning caveat, now demonstrated:** this spec cited Codex commit
 `99744cfe` and warned the pin was evidence rather than a stability promise.
