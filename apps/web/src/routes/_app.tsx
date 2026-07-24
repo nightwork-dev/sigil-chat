@@ -21,7 +21,7 @@ import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
 import {
   ContainerBreadcrumb,
-  useContainerBreadcrumbPage,
+  useHideBreadcrumbPage,
 } from "@/components/agent/container-breadcrumb"
 import { AgentRailStatus } from "@/components/agent/agent-rail-status"
 import { SessionListPane } from "@/components/agent/session-list-pane"
@@ -63,7 +63,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user } = Route.useRouteContext()
-  const breadcrumbPage = useContainerBreadcrumbPage()
+  const hideBreadcrumbPage = useHideBreadcrumbPage()
   const hideStatusRail = useHideStatusRail()
   const nav = buildAppNav({
     internalWorkspaces:
@@ -96,12 +96,7 @@ function AppLayout() {
                   </>
                 }
                 breadcrumbContext={<ContainerBreadcrumb />}
-                breadcrumbPage={
-                  breadcrumbPage.kind === "label"
-                    ? breadcrumbPage.label
-                    : undefined
-                }
-                hideBreadcrumbPage={breadcrumbPage.kind === "own-home"}
+                hideBreadcrumbPage={hideBreadcrumbPage}
                 viewContent={<ViewRailTop />}
                 statusRailStart={<ViewRailStatusStart />}
                 statusRailEnd={

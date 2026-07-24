@@ -222,6 +222,7 @@ export function ContainerBreadcrumb() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <ContainerMenu
+              current
               label={liveSession.data?.title ?? "Session"}
               href={sessionHomeHref}
               items={siblingSessions.map((thread) => ({
@@ -234,35 +235,25 @@ export function ContainerBreadcrumb() {
           </BreadcrumbItem>
         </>
       ) : null}
-
-      <BreadcrumbSeparator />
     </>
   )
 }
 
-/** §5.1 — three outcomes, not two, because "no override" (`none`, a
- *  non-container route — let the shell fall back to the nav label) and "no
- *  leaf, the container crumb is the whole story" (`own-home`) both used to
- *  collapse to the same `undefined`. That conflation is exactly what made
- *  "Project Home"/"Workspace Home" render as a tautological label instead
- *  of disappearing: `_app.tsx` couldn't tell "not container-scoped" from
- *  "container-scoped, at its own root" from a single optional string. */
-export type ContainerBreadcrumbPage =
-  | { readonly kind: "none" }
-  | { readonly kind: "own-home" }
-  | { readonly kind: "label"; readonly label: string }
-
-export function useContainerBreadcrumbPage(): ContainerBreadcrumbPage {
+/** §5.1 — on EVERY container-scoped route the deepest container crumb is
+ *  already the current location, so the shell must not append a leaf naming
+ *  the surface type. "Project Home"/"Workspace Home"/"Session" were all the
+ *  same defect: a tautological label restating what the crumb beside it
+ *  already said (David, 2026-07-23 and 2026-07-24). Non-container routes
+ *  return false and keep the shell's nav-label fallback. */
+export function useHideBreadcrumbPage(): boolean {
   const matches = useMatches()
-  if (matches.some((m) => m.routeId === PROJECT_SESSION_ROUTE_ID))
-    return { kind: "label", label: "Session" }
-  if (matches.some((m) => m.routeId === WORKSPACE_SESSION_ROUTE_ID))
-    return { kind: "label", label: "Session" }
-  if (matches.some((m) => m.routeId === WORKSPACE_ROUTE_ID))
-    return { kind: "own-home" }
-  if (matches.some((m) => m.routeId === PROJECT_ROUTE_ID))
-    return { kind: "own-home" }
-  return { kind: "none" }
+  return matches.some(
+    (m) =>
+      m.routeId === PROJECT_ROUTE_ID ||
+      m.routeId === WORKSPACE_ROUTE_ID ||
+      m.routeId === PROJECT_SESSION_ROUTE_ID ||
+      m.routeId === WORKSPACE_SESSION_ROUTE_ID,
+  )
 }
 
 /** Split control: the crumb LABEL navigates to the container's home (SC.7 —
