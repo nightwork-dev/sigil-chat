@@ -10,6 +10,7 @@
 
 import type { AgentMessagePart } from "@zigil/agent-surface"
 
+import { AGENT_PERSONA_HEADER } from "./agent-session-scope"
 import { speakableText, type SpeakableOptions } from "./speakable-text"
 
 export type SpeakOutcome =
@@ -29,11 +30,15 @@ type FetchLike = (input: string, init: RequestInit) => Promise<Response>
 export async function synthesizeSpeech(
   text: string,
   fetchImpl: FetchLike = fetch,
+  personaId?: string,
 ): Promise<Blob | undefined> {
   try {
     const response = await fetchImpl("/api/voice/speech", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(personaId ? { [AGENT_PERSONA_HEADER]: personaId } : {}),
+      },
       body: JSON.stringify({ text }),
     })
     if (!response.ok) return undefined
@@ -52,10 +57,11 @@ export async function speakMessageParts(
   parts: readonly AgentMessagePart[],
   options: SpeakableOptions = {},
   fetchImpl: FetchLike = fetch,
+  personaId?: string,
 ): Promise<SpeakOutcome> {
   const text = speakableText(parts, options)
   if (!text) return { status: "nothing-to-say" }
 
-  const audio = await synthesizeSpeech(text, fetchImpl)
+  const audio = await synthesizeSpeech(text, fetchImpl, personaId)
   return audio ? { status: "spoken", audio } : { status: "failed" }
 }

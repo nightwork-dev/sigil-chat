@@ -29,6 +29,10 @@ import {
   type ResolvedPersona,
 } from "@gonk/persona"
 import { readIdentityEnvironment } from "@workspace/runtime-env/server"
+import {
+  readPersonaVoice,
+  type PersonaVoiceConfig,
+} from "@workspace/runtime-env/voice"
 
 import type {
   AgentMemoryCorrectionInput,
@@ -52,6 +56,16 @@ export const personaRegistry = new PersonaRegistry(
   { ...scopeEnv, cwd: personaDir },
   "eve",
 )
+
+/** Typed persona-sidecar seam for voice identity. The registry intentionally
+ * keeps plugin data out of the persona definition itself. */
+export function resolvePersonaVoice(
+  personaId: string | undefined,
+): PersonaVoiceConfig | undefined {
+  return personaId
+    ? readPersonaVoice(personaRegistry.scopeFor(personaId))
+    : undefined
+}
 
 // All writes below use the same StoreBackedMemoryRecordStore and PersonaRegistry
 // that Eve uses. Store writes are atomic rename operations; the agent can read

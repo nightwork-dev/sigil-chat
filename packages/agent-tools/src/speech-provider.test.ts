@@ -79,6 +79,73 @@ describe("synthesizeThroughVoiceProvider", () => {
     expect(result.mediaType).toBe(SPEECH_MEDIA_TYPES.mp3)
   })
 
+  it("keeps personas distinct while an explicit per-call voice wins", async () => {
+    const { calls } = stubFetch(
+      () => new Response(new Uint8Array([4]), { headers: { "content-type": "audio/mpeg" } }),
+    )
+
+    const first = await synthesizeThroughVoiceProvider(
+      request({ personaVoice: { voice: "persona-a", speed: 0.9 } }),
+    )
+    const second = await synthesizeThroughVoiceProvider(
+      request({ personaVoice: { voice: "persona-b" } }),
+    )
+    const overridden = await synthesizeThroughVoiceProvider(
+      request({
+        voice: "call-voice",
+        personaVoice: { voice: "persona-b", speed: 1.1 },
+      }),
+    )
+
+    expect([first.voice, second.voice, overridden.voice]).toEqual([
+      "persona-a",
+      "persona-b",
+      "call-voice",
+    ])
+    expect(
+      calls.map(({ init }) => JSON.parse(String(init.body)).voice),
+    ).toEqual(["persona-a", "persona-b", "call-voice"])
+  })
+
+  it("returns converter output and degrades converter failure to original TTS audio", async () => {
+    stubFetch(
+      () => new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "audio/mpeg" } }),
+    )
+    const conversion = {
+      enabled: true as const,
+      baseURL: "https://converter.secret/v1",
+      model: "rvc-a",
+      voice: "target-a",
+      format: "wav" as const,
+      apiKey: "conversion-secret",
+    }
+    const converter = vi.fn(async ({ bytes }: { bytes: Uint8Array }) => {
+      expect(Array.from(bytes)).toEqual([1, 2, 3])
+      return { bytes: new Uint8Array([9, 8]), mediaType: "audio/wav" }
+    })
+
+    const converted = await synthesizeThroughVoiceProvider(
+      request({ personaVoice: { voice: "persona-a", conversion }, converter }),
+    )
+    expect(Array.from(converted.bytes)).toEqual([9, 8])
+    expect(converted.mediaType).toBe("audio/wav")
+
+    const degraded = await synthesizeThroughVoiceProvider(
+      request({
+        personaVoice: { voice: "persona-a", conversion },
+        converter: async () => {
+          throw new Error(
+            "https://converter.secret/v1 credential=conversion-secret",
+          )
+        },
+      }),
+    )
+    expect(Array.from(degraded.bytes)).toEqual([1, 2, 3])
+    expect(JSON.stringify(degraded)).not.toMatch(
+      /converter\.secret|conversion-secret/,
+    )
+  })
+
   it("reports an upstream rejection by status alone", async () => {
     stubFetch(
       () =>
