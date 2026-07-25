@@ -1,6 +1,9 @@
 import { shape, ToolRegistry } from "@gonk/tool-registry"
 import { describe, expect, it } from "vitest"
 
+import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
+import { MemoryWorkItemsRepository } from "@workspace/work-items-store/repository"
+
 import { createApplicationToolCatalogRoute } from "./application-tool-catalog"
 
 describe("application tool catalog route", () => {
@@ -52,5 +55,40 @@ describe("application tool catalog route", () => {
         },
       ],
     })
+  })
+
+  it("projects a newly registered application tool with no Eve-side wiring", async () => {
+    // Registration in the shared registry is the whole integration: speech
+    // synthesis reaches the host through the same projection as every other
+    // tool, with no connection file, schema copy, or transport of its own.
+    const route = createApplicationToolCatalogRoute(
+      () =>
+        Promise.resolve({
+          attributes: {},
+          authenticator: "test",
+          principalId: "owner-1",
+          principalType: "user",
+        }),
+      createSigilAgentToolRegistry({
+        artifacts: {} as never,
+        containers: { projects: {} as never, workspaces: {} as never },
+        graph: {} as never,
+        reviews: {} as never,
+        skills: {} as never,
+        workItems: new MemoryWorkItemsRepository(),
+      }),
+    )
+    const response = await route.handler(
+      new Request("http://agent.test/sigil/v1/application-tools"),
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    const { tools } = (await response.json()) as {
+      tools: Array<{ name: string; runtimeStatus: string }>
+    }
+    expect(
+      tools.find((tool) => tool.name === "sigil-synthesize-speech"),
+    ).toMatchObject({ runtimeStatus: "discoverable" })
   })
 })

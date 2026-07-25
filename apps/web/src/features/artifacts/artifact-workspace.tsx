@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { Link } from "@tanstack/react-router"
 import {
+  AudioLinesIcon,
   FileIcon,
   FileJsonIcon,
   FileTextIcon,
@@ -356,6 +357,21 @@ function ArtifactDetail({
             className="max-h-[32rem] w-auto max-w-full rounded-md border border-border object-contain"
           />
         ) : null}
+        {preview?.kind === "audio" ? (
+          // Native controls on purpose: playback affordances are one of the few
+          // places the platform's chrome is better understood than anything we
+          // would draw, and this view has no playback state of its own.
+          <audio
+            className="w-full"
+            controls
+            preload="none"
+            src={artifactUrl(artifact.id, scope)}
+          >
+            <a href={artifactUrl(artifact.id, scope)}>
+              Download {artifact.filename}
+            </a>
+          </audio>
+        ) : null}
         {distill ? <DistilledCard distilled={distill} /> : null}
         {preview?.kind === "text" && !distill ? (
           <TextPreview
@@ -421,7 +437,9 @@ function ArtifactIcon({ artifact }: { artifact: ArtifactRecord }) {
       ? SparklesIcon
       : artifact.mediaType.startsWith("image/")
         ? ImageIcon
-        : artifact.mediaType.includes("json")
+        : artifact.mediaType.startsWith("audio/")
+          ? AudioLinesIcon
+          : artifact.mediaType.includes("json")
           ? FileJsonIcon
           : artifact.mediaType.startsWith("text/")
             ? FileTextIcon
@@ -432,6 +450,7 @@ function ArtifactIcon({ artifact }: { artifact: ArtifactRecord }) {
 function artifactKind(artifact: ArtifactRecord): string {
   if (artifact.mediaType === DISTILL_MEDIA_TYPE) return "Distill"
   if (artifact.mediaType.startsWith("image/")) return "Image"
+  if (artifact.mediaType.startsWith("audio/")) return "Audio"
   if (
     artifact.mediaType.startsWith("text/") ||
     artifact.mediaType.includes("json")

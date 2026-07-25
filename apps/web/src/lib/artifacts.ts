@@ -23,6 +23,7 @@ export type ArtifactPreview =
       readonly truncated: boolean
     }
   | { readonly kind: "image"; readonly mediaType: string }
+  | { readonly kind: "audio"; readonly mediaType: string }
   | { readonly kind: "binary"; readonly mediaType: string }
 
 export const artifactKeys = {

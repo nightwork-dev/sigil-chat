@@ -23,6 +23,7 @@ import { registerRequestTools } from "./request.js"
 import { registerReviewTools } from "./review.js"
 import { registerRuntimeTools, registerUiCommandTools } from "./runtime.js"
 import { registerSkillTools, type SkillRegistryResolver } from "./skills.js"
+import { registerSpeechTools } from "./speech.js"
 import { registerSpecTools } from "./spec.js"
 import { registerStoryTools } from "./story.js"
 
@@ -63,6 +64,7 @@ export function createSigilAgentToolRegistry(
       ? null
       : undefined,
   )
+  registerSpeechTools(registry, dependencies.artifacts)
   registerFileTools(registry, dependencies.artifacts, {
     ...dependencies.containers,
     ...(dependencies.sessions ? { sessions: dependencies.sessions } : {}),

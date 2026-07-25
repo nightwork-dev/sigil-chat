@@ -7,6 +7,7 @@ import {
 import { DistilledArtifactCard } from "@/components/agent/distilled-artifact-card"
 import { EvidenceCitationsRenderer } from "@/components/agent/evidence-citations-renderer"
 import { GenerateImageRenderer } from "@/components/agent/image-tool-renderer"
+import { SynthesizedSpeechRenderer } from "@/components/agent/speech-artifact-player"
 import {
   SandboxActivityRenderer,
   SubagentActivityRenderer,
@@ -16,6 +17,7 @@ import {
 
 setDefaultToolRenderer(ToolCall)
 registerToolRenderer("sigil-generate-image", GenerateImageRenderer)
+registerToolRenderer("sigil-synthesize-speech", SynthesizedSpeechRenderer)
 registerToolRenderer("sigil-distill", DistilledArtifactCard)
 registerToolRenderer("sigil-evidence-ask", EvidenceCitationsRenderer)
 registerToolRenderer("todo", TodoActivityRenderer)

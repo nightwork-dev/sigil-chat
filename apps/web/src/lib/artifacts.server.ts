@@ -45,6 +45,9 @@ export async function readArtifactPreview(
   const content = await store.readContent(input.id, input.scope, principal)
   const mediaType = content.mediaType.toLowerCase()
   if (mediaType.startsWith("image/")) return { kind: "image", mediaType }
+  // Audio is played from the same authenticated media URL as an image, so the
+  // preview only has to name the kind — the bytes never travel through here.
+  if (mediaType.startsWith("audio/")) return { kind: "audio", mediaType }
   if (!isTextualMediaType(mediaType)) return { kind: "binary", mediaType }
 
   const bytes = content.bytes

@@ -1049,6 +1049,25 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "sigil-synthesize-speech",
+    description:
+      "Speak a passage of text aloud as audio, in a chosen voice and delivery, and attach it to the conversation as a playable artifact. Use when the user asks to hear something spoken, wants a line performed a particular way, or wants a named voice — not for narrating your own replies, which the chat surface already handles. Voices and formats are whatever the deployment's speech provider supports; omit them for its defaults.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["text"],
+      properties: ["text", "voice", "format", "speed"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+      openWorld: false,
+    },
+  },
+  {
     name: "sigil-resource-discover",
     description:
       "For a personal agent session, discover the current principal's readable project, workspace, and session resource scopes plus identity-deduplicated file metadata. Every scope is re-authorized live; use sigil-read-file with one returned scope to retrieve content.",
