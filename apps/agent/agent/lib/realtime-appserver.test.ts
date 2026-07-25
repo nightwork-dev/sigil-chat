@@ -241,6 +241,34 @@ describe("realtime app-server client", () => {
     harness.client.dispose()
   })
 
+  it("injects a caller-supplied developer prompt into the realtime start", async () => {
+    const harness = createHarness()
+    const started = harness.client.start(OFFER_SDP, { prompt: "boundary context" })
+    await driveHandshake(harness)
+
+    const params = harness.child.lastRequest(APP_SERVER_METHODS.realtimeStart)
+      .params as Record<string, unknown>
+    expect(params.prompt).toBe("boundary context")
+
+    harness.notify(APP_SERVER_NOTIFICATIONS.sdp, { threadId: THREAD_ID, sdp: ANSWER_SDP })
+    await started
+    harness.client.dispose()
+  })
+
+  it("omits the prompt field entirely when none is supplied", async () => {
+    const harness = createHarness()
+    const started = harness.client.start(OFFER_SDP)
+    await driveHandshake(harness)
+
+    const params = harness.child.lastRequest(APP_SERVER_METHODS.realtimeStart)
+      .params as Record<string, unknown>
+    expect(Object.keys(params)).not.toContain("prompt")
+
+    harness.notify(APP_SERVER_NOTIFICATIONS.sdp, { threadId: THREAD_ID, sdp: ANSWER_SDP })
+    await started
+    harness.client.dispose()
+  })
+
   it("leaves attestation to codex by not declaring requestAttestation", () => {
     expect(Object.keys(APP_SERVER_CAPABILITIES)).not.toContain("requestAttestation")
   })

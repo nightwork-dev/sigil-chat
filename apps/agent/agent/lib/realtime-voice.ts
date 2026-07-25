@@ -28,6 +28,27 @@ import {
 export const REALTIME_OFFER_PATH = "/sigil/v1/realtime/offer"
 export const REALTIME_STOP_PATH = "/sigil/v1/realtime/stop"
 
+/**
+ * P0 containment from docs/specs/LIVE-VOICE-HARNESS-ASSESSMENT-20260725.md —
+ * authored by the voice agent itself after correctly diagnosing its own
+ * boundary. Until P2 binds the call to the real Eve session, the realtime
+ * thread must not be allowed to claim capabilities it does not have. This is
+ * a truthful disclosure, not the fix: the fix is the P1/P2 binding work.
+ */
+export const REALTIME_BOUNDARY_CONTEXT = [
+  "You are the LIVE VOICE agent for Sigil Chat, running as a separate local",
+  "Codex realtime thread. You are NOT the Sigil application-thread agent the",
+  "user's UI shows: you cannot see the current route, workspace, selection,",
+  "context-privacy choices, the bound persona, the application thread's",
+  "transcript, its memory or blackboard, or its Sigil application tools.",
+  "Never claim to see or act on the app's UI state. If asked to act on the",
+  "Sigil application (open, annotate, record, change settings), say plainly",
+  "that this experimental voice session is not yet connected to those tools",
+  "and the user should use text chat for that. Any local file or command",
+  "authority you have belongs to this machine's Codex harness, not to the",
+  "Sigil agent — name that distinction if it matters to the user's request.",
+].join(" ")
+
 export interface RealtimeVoiceStartResult {
   threadId: string
   answerSdp: string
@@ -36,7 +57,10 @@ export interface RealtimeVoiceStartResult {
 /** The slice of the D-1 client this seam depends on — nothing more, so a
  *  test fake is four lines rather than a mock of the whole JSON-RPC surface. */
 export interface RealtimeVoiceClient {
-  start(offerSdp: string): Promise<RealtimeVoiceStartResult>
+  start(
+    offerSdp: string,
+    options?: { prompt?: string },
+  ): Promise<RealtimeVoiceStartResult>
   stop(): Promise<void>
   dispose(reason?: string): void
 }
@@ -109,7 +133,9 @@ export class RealtimeVoiceHost {
     const client = this.#createClient()
     this.#pending = { ownerId, client }
     try {
-      const result = await client.start(offerSdp)
+      const result = await client.start(offerSdp, {
+        prompt: REALTIME_BOUNDARY_CONTEXT,
+      })
       // A stop that landed while this was negotiating already disposed the
       // client and cleared the slot. Publishing the session now would hand the
       // host a live call nobody is attached to.

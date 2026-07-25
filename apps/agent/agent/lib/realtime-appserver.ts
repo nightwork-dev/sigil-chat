@@ -123,6 +123,10 @@ export interface RealtimeAppServerOptions {
 export interface RealtimeStartOptions {
   signal?: AbortSignal
   timeoutMs?: number
+  /** Developer context injected at session start. Containment, not prompt
+   *  engineering: the live-voice host uses it to truthfully name the current
+   *  agent boundary (see docs/specs/LIVE-VOICE-HARNESS-ASSESSMENT, P0). */
+  prompt?: string
 }
 
 export interface RealtimeStartResult {
@@ -222,7 +226,7 @@ export class RealtimeAppServerClient {
       // The handshake never rejects on its own: every failure is funnelled into
       // the answer waiter, so `answer` is the single channel this await settles
       // on and no losing branch is left rejecting into nobody's hands.
-      void this.#handshake(offerSdp).catch((error: unknown) => {
+      void this.#handshake(offerSdp, options.prompt).catch((error: unknown) => {
         const failure = error instanceof Error ? error : new RealtimeAppServerError(String(error))
         if (this.#answerWaiter) this.#failStart(failure)
         else this.#diagnose({ type: "child-error", reason: failure.message })
@@ -236,7 +240,7 @@ export class RealtimeAppServerClient {
     }
   }
 
-  async #handshake(offerSdp: string): Promise<void> {
+  async #handshake(offerSdp: string, prompt?: string): Promise<void> {
     this.#ensureChild()
     await this.#request(APP_SERVER_METHODS.initialize, {
       clientInfo: this.#options.clientInfo ?? APP_SERVER_CLIENT_INFO,
@@ -255,6 +259,7 @@ export class RealtimeAppServerClient {
       outputModality: REALTIME_OUTPUT_MODALITY,
       version: REALTIME_CONVERSATION_VERSION,
       transport: { type: REALTIME_TRANSPORT_TYPE, sdp: offerSdp },
+      ...(prompt ? { prompt } : {}),
     })
   }
 

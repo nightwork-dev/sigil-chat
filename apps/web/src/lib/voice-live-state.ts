@@ -80,7 +80,12 @@ const PRESENTATION: Record<LiveVoiceState, LiveVoicePresentation> = {
     // A waveform, not a microphone: the mic beside it already means "dictate",
     // and two mics in one row would be two controls claiming one meaning.
     icon: "waveform",
-    label: "Start a live voice call",
+    // "Experimental, separate voice agent" is a capability disclosure, not
+    // hedging: the call currently opens its own codex realtime thread and
+    // does NOT share this thread's agent, memory, or tools (see
+    // LIVE-VOICE-HARNESS-ASSESSMENT). The label may only lose that clause
+    // when the P2 binding makes it untrue.
+    label: "Start a live voice call (experimental, separate voice agent)",
     motion: "none",
     tone: "muted",
   },

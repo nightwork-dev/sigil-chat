@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { RealtimeAppServerError } from "./realtime-appserver"
 import {
   createRealtimeVoiceRoutes,
+  REALTIME_BOUNDARY_CONTEXT,
   REALTIME_OFFER_PATH,
   REALTIME_STOP_PATH,
   RealtimeVoiceHost,
@@ -14,6 +15,7 @@ const ANSWER = "v=0\r\na=ice-lite\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"
 
 interface FakeClient extends RealtimeVoiceClient {
   readonly offers: string[]
+  readonly prompts: (string | undefined)[]
   readonly stops: number
   readonly disposals: string[]
 }
@@ -27,16 +29,19 @@ function fakeClient(
   } = {},
 ): FakeClient {
   const offers: string[] = []
+  const prompts: (string | undefined)[] = []
   const disposals: string[] = []
   let stops = 0
   return {
     offers,
+    prompts,
     disposals,
     get stops() {
       return stops
     },
-    async start(offerSdp) {
+    async start(offerSdp, options) {
       offers.push(offerSdp)
+      prompts.push(options?.prompt)
       if (behavior.failStartWith) throw behavior.failStartWith
       return {
         threadId: behavior.threadId ?? "thread-1",
@@ -122,6 +127,22 @@ describe("realtime voice offer relay", () => {
     })
     expect(client.offers).toEqual([OFFER])
     expect(host.liveOwnerId).toBe("owner-1")
+  })
+
+  // P0 containment (LIVE-VOICE-HARNESS-ASSESSMENT): the realtime thread is a
+  // separate agent boundary until P2 binds it, so every session must open
+  // with a developer context that says so. Injection alone isn't the claim —
+  // the claim is that it truthfully names the boundary, so the assertions
+  // pin the load-bearing denials, not just any non-empty string.
+  it("opens every session with the truthful boundary context", async () => {
+    const client = fakeClient()
+    const host = new RealtimeVoiceHost({ createClient: () => client })
+
+    await routes(principal("owner-1"), host).offer({ offerSdp: OFFER })
+
+    expect(client.prompts).toEqual([REALTIME_BOUNDARY_CONTEXT])
+    expect(REALTIME_BOUNDARY_CONTEXT).toContain("NOT the Sigil application-thread agent")
+    expect(REALTIME_BOUNDARY_CONTEXT).toContain("Never claim to see or act on the app's UI state")
   })
 
   it("rejects a request with no offer SDP without starting a session", async () => {
