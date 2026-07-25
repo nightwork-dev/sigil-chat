@@ -857,3 +857,53 @@ This draft is based on:
 The pinned Codex source is implementation evidence, not a stability promise.
 Revalidate it before implementation and on every provider compatibility
 upgrade.
+
+## RESOLVED: the 403 was dialect-gated, not account-gated (2026-07-25)
+
+The 2026-07-24 dead end — `403 Voice session access denied` from
+`thread/realtime/start` over WebRTC — is **solved**. The denial was specific
+to realtime **v1** (the legacy Bidi dialect), which WebRTC silently defaults
+to when no `version` is passed (`realtime_conversation.rs`:
+`params.version.unwrap_or(… Webrtc → V1)`). Passing `version: "v3"`
+(Frameless Bidi) through the same start params returns a real answer SDP over
+the same subscription OAuth, no API key:
+
+```
+thread/realtime/start {
+  threadId, outputModality: "audio", version: "v3",
+  transport: { type: "webrtc", sdp: <browser offer> }
+}
+→ thread/realtime/sdp { sdp: <answer, a=ice-lite, DTLS fingerprint, opus m-line> }
+```
+
+Measured matrix (2026-07-25, codex 0.146.0-alpha.3.1 — the binary embedded in
+ChatGPT.app, which shares `~/.codex` auth):
+
+| start params                        | result                                          |
+| ----------------------------------- | ----------------------------------------------- |
+| default (→ v1)                      | 403 Voice session access denied (backend-api)   |
+| `version: "v3"`                     | **answer SDP received** ✅                      |
+| `model: "gpt-realtime"` (v1)        | 403 (same as default)                           |
+| `version: "v3", model: …`           | `session.model not allowed for Codex realtime`  |
+| `outputModality: "text"`            | rejected: text modality requires realtime v2    |
+
+Constraints that follow:
+
+- **codex ≥ 0.146.0-alpha is required** — 0.144/0.145 reject
+  `version: "v3"` at params validation (`unknown variant v3`). npm ships
+  `@openai/codex@alpha` (0.146.0-alpha.10); the ChatGPT desktop app embeds a
+  working build at `/Applications/ChatGPT.app/Contents/Resources/codex`.
+- Do not set `model` with v3; the backend rejects explicit session models for
+  Codex realtime sessions.
+- The desktop app's own voice drives this same `thread/realtime/*` JSON-RPC
+  surface (confirmed in its bundle) — we are composing with the supported
+  client, not a private one.
+- Repro: `docs/specs/evidence/realtime-probe.mjs` — run
+  `PROBE_EXTRA='{"version":"v3"}' node docs/specs/evidence/realtime-probe.mjs \
+  /Applications/ChatGPT.app/Contents/Resources/codex` and it prints the
+  answer SDP (or the v1 403 when `PROBE_EXTRA` is omitted). Its offer SDP is
+  synthetic, which suffices to prove call admission; a real browser offer is
+  the next integration step.
+
+US-001 of the app-server plan (prove the surface) therefore PASSES, and duplex
+is no longer blocked on entitlement — only on engineering.
