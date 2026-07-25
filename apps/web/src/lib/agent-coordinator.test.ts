@@ -51,7 +51,15 @@ interface FakePort extends CoordinatorSessionPort {
 }
 
 function createFakePort(
-  options: { readonly autoSettle?: boolean; readonly failSend?: boolean } = {},
+  options: {
+    readonly autoSettle?: boolean
+    readonly failSend?: boolean
+    /** When false, cancel resolves as pure ACKNOWLEDGEMENT and the cancelled
+     *  turn keeps draining until settleActive — which is how eve actually
+     *  behaves. Defaults to true for the older tests written against the
+     *  stronger (settle-inside-cancel) fake. */
+    readonly cancelSettlesTurn?: boolean
+  } = {},
 ): FakePort {
   const calls: string[] = []
   const cancelTurnIds: Array<string | undefined> = []
@@ -112,7 +120,9 @@ function createFakePort(
     cancel(cancelOptions) {
       cancelTurnIds.push(cancelOptions.turnId)
       calls.push(`cancel:${cancelOptions.turnId}`)
-      active?.settle({ status: "cancelled" })
+      if (options.cancelSettlesTurn !== false) {
+        active?.settle({ status: "cancelled" })
+      }
       return Promise.resolve()
     },
   }
@@ -364,6 +374,42 @@ describe("steering", () => {
           event.type === "steered" && event.cancelledTurnId === observedTurnId,
       ),
     ).toBe(true)
+  })
+
+  // The realistic port: cancel resolves as acknowledgement while the
+  // cancelled turn keeps draining (eve resolves "accepted" this way). The
+  // replacement must wait for the turn's own settlement — a fake whose cancel
+  // settles the turn synchronously cannot catch this, which is exactly how
+  // the defect survived the original suite.
+  it("holds delivery until the cancelled turn itself settles", async () => {
+    const port = createFakePort({ cancelSettlesTurn: false })
+    const coordinator = createAgentCoordinator({ port })
+
+    coordinator.delegate(delegation("d1"))
+    const observedTurnId = port.activeTurnId()
+    const steering = coordinator.steer(delegation("d2"))
+    await flush()
+
+    // Cancel has been acknowledged, but d1 is still draining: d2 must not
+    // have gone out, and nothing has ever run concurrently.
+    expect(port.calls).toEqual(["send:d1", `cancel:${observedTurnId}`])
+    expect(port.maxConcurrentTurns()).toBe(1)
+
+    port.settleActive({ status: "cancelled" })
+    await flush()
+    port.settleActive()
+    const outcome = await steering
+
+    expect(outcome).toEqual({
+      status: "steered",
+      cancelledTurnId: observedTurnId,
+    })
+    expect(port.calls).toEqual([
+      "send:d1",
+      `cancel:${observedTurnId}`,
+      "deliver:d2",
+    ])
+    expect(port.maxConcurrentTurns()).toBe(1)
   })
 
   it("always passes a turnId to cancel", async () => {

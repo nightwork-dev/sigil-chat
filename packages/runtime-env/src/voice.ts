@@ -54,7 +54,10 @@ const PROFILE_DEFAULTS: Record<
   { tts: Omit<TtsProviderConfig, "apiKey">; stt: Omit<VoiceProviderConfig, "apiKey"> }
 > = {
   // Kokoro behind an OpenAI-compatible server (kokoro-fastapi's conventional
-  // port). Runs on ordinary server hardware.
+  // port). Runs on ordinary server hardware. STT defaults to a separate
+  // endpoint on purpose: kokoro-fastapi is TTS-only and would 404 on
+  // /audio/transcriptions, so the default points at the conventional port for
+  // an OpenAI-compatible Whisper server (speaches / faster-whisper-server).
   server: {
     tts: {
       baseURL: "http://localhost:8880/v1",
@@ -62,7 +65,7 @@ const PROFILE_DEFAULTS: Record<
       voice: "af_heart",
       format: "mp3",
     },
-    stt: { baseURL: "http://localhost:8880/v1", model: "whisper-1" },
+    stt: { baseURL: "http://localhost:8000/v1", model: "whisper-1" },
   },
   // Gonk's own defaults, valid only where MLX runs.
   "local-mac": {

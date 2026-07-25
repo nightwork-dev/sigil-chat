@@ -21,6 +21,7 @@ import {
 import type { RuntimeEnvironment } from "@workspace/runtime-env/topology"
 
 import { getSession, requireSession } from "./auth/session"
+import { rejectCrossOrigin } from "./same-origin.server"
 
 /** Upper bound on one utterance. Speakable text is a projection of a chat
  *  message, not a document; anything past this is a caller bug, and an
@@ -56,6 +57,12 @@ export async function synthesizeSpeechFromRequest(
   request: Request,
   env: RuntimeEnvironment = process.env,
 ): Promise<Response> {
+  // JSON POSTs are preflight-protected, so this is defence in depth here;
+  // the guard exists for the CORS-simple transcribe route and both voice
+  // routes behave identically on purpose.
+  const crossOrigin = rejectCrossOrigin(request)
+  if (crossOrigin) return crossOrigin
+
   const session = await getSession(request.headers)
   try {
     requireSession(session)

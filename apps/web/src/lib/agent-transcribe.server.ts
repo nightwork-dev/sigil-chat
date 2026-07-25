@@ -21,6 +21,7 @@ import {
 import type { RuntimeEnvironment } from "@workspace/runtime-env/topology"
 
 import { getSession, requireSession } from "./auth/session"
+import { rejectCrossOrigin } from "./same-origin.server"
 
 /** Upper bound on one dictation capture. Matches the conventional upload
  *  ceiling for OpenAI-compatible transcription endpoints; an unbounded body
@@ -42,6 +43,11 @@ export async function transcribeAudioFromRequest(
   request: Request,
   env: RuntimeEnvironment = process.env,
 ): Promise<Response> {
+  // Multipart POSTs are CORS-simple (no preflight), so a hostile page could
+  // otherwise spend the user's session against the STT backend.
+  const crossOrigin = rejectCrossOrigin(request)
+  if (crossOrigin) return crossOrigin
+
   const session = await getSession(request.headers)
   try {
     requireSession(session)
