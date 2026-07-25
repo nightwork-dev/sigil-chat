@@ -13,6 +13,7 @@
 import { useCallback, useRef } from "react"
 
 import { VoiceMicControl } from "@/components/agent/voice-mic-control"
+import type { AudioFocusManager } from "@/lib/audio-focus"
 import { useVoiceDictation, type VoiceRecorder } from "@/lib/voice-dictation"
 import {
   voiceSessionStore,
@@ -34,6 +35,10 @@ export interface ComposerVoiceControlProps {
   /** Test seam: the browser recorder is the default. */
   readonly createRecorder?: () => VoiceRecorder
   readonly transcribe?: (audio: Blob) => Promise<string | undefined>
+  /** Defaults to the app's shared manager. Overridden only so a test can put
+   *  this control and the speech player on one manager and observe that
+   *  claiming the microphone really pauses the agent's voice. */
+  readonly audioFocus?: AudioFocusManager
 }
 
 export function ComposerVoiceControl({
@@ -45,6 +50,7 @@ export function ComposerVoiceControl({
   store = voiceSessionStore,
   createRecorder,
   transcribe,
+  audioFocus,
 }: ComposerVoiceControlProps) {
   // The thread this capture took the binding FOR, recorded when it started.
   // Release compares against this, never against the current `thread` prop:
@@ -65,6 +71,7 @@ export function ComposerVoiceControl({
   )
 
   const dictation = useVoiceDictation({
+    audioFocus,
     createRecorder,
     onActiveChange: handleActiveChange,
     onDraft,
