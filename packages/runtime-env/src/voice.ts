@@ -18,6 +18,21 @@
 //
 // Pointing at a REMOTE OpenAI-compatible endpoint is the same thing as pointing
 // at a local one: set the base URL. There is deliberately no third code path.
+//
+// Optional conversion contract (external service; this package does not host
+// or install an inference stack):
+//   POST {conversion.baseURL}/convert
+//   Content-Type: multipart/form-data
+//   fields:
+//     audio           binary TTS output, filename `speech.<input format>`
+//     model           conversion model id
+//     voice           target voice id
+//     response_format requested output format
+//   response: raw audio bytes, with an optional audio/* Content-Type.
+//
+// Conversion is fail-open. A rejected, unreachable, empty, or oversized
+// conversion response returns the original TTS bytes and media type. Endpoint,
+// credential, and upstream response text are never included in an error.
 
 import {
   parseHttpUrl,
@@ -37,6 +52,58 @@ export interface VoiceProviderConfig {
 export interface TtsProviderConfig extends VoiceProviderConfig {
   readonly voice: string;
   readonly format: "mp3" | "opus" | "aac" | "wav" | "flac" | "pcm";
+  readonly speed?: number;
+  readonly style?: string;
+  readonly conversion?: VoiceConversionConfig;
+}
+
+export interface VoiceConversionConfig {
+  readonly enabled: boolean;
+  /** External conversion service base URL, no trailing slash. */
+  readonly baseURL: string;
+  readonly model: string;
+  readonly voice: string;
+  readonly format: TtsProviderConfig["format"];
+  readonly apiKey: string | undefined;
+}
+
+/** Namespaced Gonk persona-scope setting. A future consent-gated editor may
+ * write this value; VOX.9 deliberately provides no upload/training/picker UI. */
+export const PERSONA_VOICE_KEY = "tts.voice";
+
+export interface PersonaVoiceConfig {
+  readonly voice: string;
+  readonly speed?: number;
+  readonly style?: string;
+  readonly conversion?: VoiceConversionConfig;
+}
+
+export interface PersonaVoiceScope {
+  get(key: string, scope?: "persona"): unknown;
+}
+
+export function readPersonaVoice(
+  scope: PersonaVoiceScope | undefined,
+): PersonaVoiceConfig | undefined {
+  const value = scope?.get(PERSONA_VOICE_KEY, "persona");
+  if (!isRecord(value) || typeof value.voice !== "string" || !value.voice.trim()) {
+    return undefined;
+  }
+  const speed =
+    typeof value.speed === "number" && Number.isFinite(value.speed)
+      ? value.speed
+      : undefined;
+  const style =
+    typeof value.style === "string" && value.style.trim()
+      ? value.style.trim()
+      : undefined;
+  const conversion = parsePersonaConversion(value.conversion);
+  return {
+    voice: value.voice.trim(),
+    ...(speed === undefined ? {} : { speed }),
+    ...(style === undefined ? {} : { style }),
+    ...(conversion === undefined ? {} : { conversion }),
+  };
 }
 
 export interface VoiceRuntimeEnvironment {
@@ -80,6 +147,7 @@ const PROFILE_DEFAULTS: Record<
 };
 
 const TTS_FORMATS = ["mp3", "opus", "aac", "wav", "flac", "pcm"] as const;
+const MAX_CONVERTED_AUDIO_BYTES = 32 * 1024 * 1024;
 
 function parseProfile(raw: string | undefined): VoiceProfile {
   const value = raw?.trim();
@@ -92,18 +160,225 @@ function parseProfile(raw: string | undefined): VoiceProfile {
   );
 }
 
-function parseFormat(raw: string | undefined, fallback: TtsProviderConfig["format"]) {
+function parseFormat(
+  raw: string | undefined,
+  fallback: TtsProviderConfig["format"],
+  variable = "SIGIL_VOICE_TTS_FORMAT",
+) {
   const value = raw?.trim();
   if (!value) return fallback;
   const match = TTS_FORMATS.find((format) => format === value);
   if (!match) {
     throw new RuntimeEnvironmentError(
       "INVALID_VOICE_FORMAT",
-      "SIGIL_VOICE_TTS_FORMAT",
+      variable,
       `must be one of ${TTS_FORMATS.join(", ")} (received "${value}")`,
     );
   }
   return match;
+}
+
+function parseEnabled(raw: string | undefined): boolean {
+  const value = raw?.trim().toLowerCase();
+  if (!value) return false;
+  if (value === "true" || value === "1") return true;
+  if (value === "false" || value === "0") return false;
+  throw new RuntimeEnvironmentError(
+    "INVALID_VOICE_CONVERSION",
+    "SIGIL_VOICE_CONVERSION_ENABLED",
+    'must be "true", "false", "1", or "0"',
+  );
+}
+
+function parseConversion(
+  env: RuntimeEnvironment,
+  fallbackFormat: TtsProviderConfig["format"],
+): VoiceConversionConfig | undefined {
+  if (!parseEnabled(env.SIGIL_VOICE_CONVERSION_ENABLED)) return undefined;
+  const baseURL = env.SIGIL_VOICE_CONVERSION_BASE_URL?.trim();
+  const model = env.SIGIL_VOICE_CONVERSION_MODEL?.trim();
+  const voice = env.SIGIL_VOICE_CONVERSION_VOICE?.trim();
+  if (!baseURL || !model || !voice) {
+    throw new RuntimeEnvironmentError(
+      "INVALID_VOICE_CONVERSION",
+      "SIGIL_VOICE_CONVERSION_ENABLED",
+      "enabled conversion requires a base URL, model, and voice id",
+    );
+  }
+  return {
+    enabled: true,
+    baseURL: parseHttpUrl(
+      baseURL,
+      baseURL,
+      "SIGIL_VOICE_CONVERSION_BASE_URL",
+    ),
+    model,
+    voice,
+    format: parseFormat(
+      env.SIGIL_VOICE_CONVERSION_FORMAT,
+      fallbackFormat,
+      "SIGIL_VOICE_CONVERSION_FORMAT",
+    ),
+    apiKey: env.SIGIL_VOICE_CONVERSION_API_KEY?.trim() || undefined,
+  };
+}
+
+function parsePersonaConversion(value: unknown): VoiceConversionConfig | undefined {
+  if (!isRecord(value) || value.enabled === false) return undefined;
+  if (
+    value.enabled !== true ||
+    typeof value.baseURL !== "string" ||
+    typeof value.model !== "string" ||
+    typeof value.voice !== "string" ||
+    typeof value.format !== "string" ||
+    !TTS_FORMATS.includes(value.format as TtsProviderConfig["format"])
+  ) {
+    return undefined;
+  }
+  try {
+    return {
+      enabled: true,
+      baseURL: parseHttpUrl(value.baseURL, value.baseURL, PERSONA_VOICE_KEY),
+      model: value.model.trim(),
+      voice: value.voice.trim(),
+      format: value.format as TtsProviderConfig["format"],
+      apiKey:
+        typeof value.apiKey === "string" && value.apiKey.trim()
+          ? value.apiKey.trim()
+          : undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+export interface VoiceConversionRequest {
+  readonly bytes: Uint8Array;
+  readonly inputFormat: TtsProviderConfig["format"];
+  readonly inputMediaType: string;
+  readonly config: VoiceConversionConfig;
+  readonly signal?: AbortSignal;
+}
+
+export interface VoiceConversionResult {
+  readonly bytes: Uint8Array;
+  readonly mediaType: string;
+}
+
+export interface AppliedVoiceConversionResult extends VoiceConversionResult {
+  readonly converted: boolean;
+}
+
+export type VoiceConverter = (
+  request: VoiceConversionRequest,
+) => Promise<VoiceConversionResult>;
+
+export const convertVoiceAudio: VoiceConverter = async (request) => {
+  const form = new FormData();
+  form.set(
+    "audio",
+    new Blob([new Uint8Array(request.bytes).buffer], {
+      type: request.inputMediaType,
+    }),
+    `speech.${request.inputFormat}`,
+  );
+  form.set("model", request.config.model);
+  form.set("voice", request.config.voice);
+  form.set("response_format", request.config.format);
+  const response = await fetch(`${request.config.baseURL}/convert`, {
+    method: "POST",
+    redirect: "error",
+    headers: request.config.apiKey
+      ? { Authorization: `Bearer ${request.config.apiKey}` }
+      : {},
+    body: form,
+    ...(request.signal ? { signal: request.signal } : {}),
+  });
+  if (!response.ok) throw new Error("Voice conversion was rejected");
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > MAX_CONVERTED_AUDIO_BYTES
+  ) {
+    throw new Error("Voice conversion returned oversized audio");
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_CONVERTED_AUDIO_BYTES) {
+    throw new Error("Voice conversion returned invalid audio");
+  }
+  const contentType = response.headers
+    .get("content-type")
+    ?.split(";", 1)[0]
+    ?.trim()
+    .toLowerCase();
+  return {
+    bytes,
+    mediaType: contentType?.startsWith("audio/")
+      ? contentType
+      : voiceMediaType(request.config.format),
+  };
+};
+
+export async function applyVoiceConversion(
+  input: Omit<VoiceConversionRequest, "config"> & {
+    readonly conversion?: VoiceConversionConfig;
+  },
+  converter?: VoiceConverter,
+): Promise<AppliedVoiceConversionResult> {
+  if (!input.conversion?.enabled) {
+    return {
+      bytes: input.bytes,
+      mediaType: input.inputMediaType,
+      converted: false,
+    };
+  }
+  try {
+    const result = await (converter ?? convertVoiceAudio)({
+      ...input,
+      config: input.conversion,
+    });
+    return { ...result, converted: true };
+  } catch {
+    return {
+      bytes: input.bytes,
+      mediaType: input.inputMediaType,
+      converted: false,
+    };
+  }
+}
+
+export function resolveTtsConfig(
+  deployment: TtsProviderConfig,
+  persona: PersonaVoiceConfig | undefined,
+): TtsProviderConfig {
+  return {
+    ...deployment,
+    ...(persona
+      ? {
+          voice: persona.voice,
+          ...(persona.speed === undefined ? {} : { speed: persona.speed }),
+          ...(persona.style === undefined ? {} : { style: persona.style }),
+          ...(persona.conversion === undefined
+            ? {}
+            : { conversion: persona.conversion }),
+        }
+      : {}),
+  };
+}
+
+function voiceMediaType(format: TtsProviderConfig["format"]): string {
+  return {
+    mp3: "audio/mpeg",
+    opus: "audio/opus",
+    aac: "audio/aac",
+    wav: "audio/wav",
+    flac: "audio/flac",
+    pcm: "audio/pcm",
+  }[format];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**
@@ -147,6 +422,7 @@ export function readVoiceEnvironment(
 
   const ttsBaseURL = env.SIGIL_VOICE_TTS_BASE_URL?.trim() || defaults.tts.baseURL;
   const sttBaseURL = env.SIGIL_VOICE_STT_BASE_URL?.trim() || defaults.stt.baseURL;
+  const conversion = parseConversion(env, defaults.tts.format);
 
   const resolved: VoiceRuntimeEnvironment = {
     profile,
@@ -156,6 +432,7 @@ export function readVoiceEnvironment(
       voice: env.SIGIL_VOICE_TTS_VOICE?.trim() || defaults.tts.voice,
       format: parseFormat(env.SIGIL_VOICE_TTS_FORMAT, defaults.tts.format),
       apiKey: env.SIGIL_VOICE_TTS_API_KEY?.trim() || undefined,
+      ...(conversion ? { conversion } : {}),
     },
     stt: {
       baseURL: parseHttpUrl(sttBaseURL, sttBaseURL, "SIGIL_VOICE_STT_BASE_URL"),

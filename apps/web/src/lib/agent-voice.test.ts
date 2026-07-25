@@ -23,6 +23,21 @@ describe("synthesizeSpeech", () => {
     ).toEqual({ text: "hello" })
   })
 
+  it("projects the bound persona without exposing voice settings to the client", async () => {
+    let init: RequestInit | undefined
+    const fetchImpl = async (_input: string, next: RequestInit) => {
+      init = next
+      return new Response(new Blob(["audio"], { type: "audio/mpeg" }))
+    }
+
+    await synthesizeSpeech("hello", fetchImpl, "persona-a")
+
+    expect((init?.headers as Record<string, string>)["x-sigil-persona-id"]).toBe(
+      "persona-a",
+    )
+    expect(init?.body).toBe(JSON.stringify({ text: "hello" }))
+  })
+
   // Every failure mode is silence, never an exception.
   it.each([
     ["a network failure", vi.fn().mockRejectedValue(new Error("offline"))],

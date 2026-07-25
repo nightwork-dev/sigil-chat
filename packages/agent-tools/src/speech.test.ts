@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest"
 
 import { sigilApprovalProvider } from "./approval.js"
 import { registerSpeechTools, MAX_SYNTHESIZABLE_LENGTH } from "./speech.js"
+import type { PersonaVoiceResolver } from "./speech.js"
 import type {
   SpeechSynthesisProvider,
   SpeechSynthesisRequest,
@@ -62,11 +63,12 @@ async function temporaryStore(
 function registryWith(
   artifacts: SessionArtifactStore,
   provider: SpeechSynthesisProvider,
+  personaVoice?: PersonaVoiceResolver,
   registry = new ToolRegistry({
     security: { approvalProvider: sigilApprovalProvider },
   }),
 ): ToolRegistry {
-  registerSpeechTools(registry, artifacts, provider)
+  registerSpeechTools(registry, artifacts, provider, personaVoice)
   return registry
 }
 
@@ -74,6 +76,7 @@ async function invoke(
   registry: ToolRegistry,
   input: unknown,
   env: Record<string, string | undefined> = {},
+  personaId?: string,
 ): Promise<
   | { type: "result"; data: Record<string, unknown> }
   | { type: "error"; message: string; code?: string }
@@ -83,7 +86,7 @@ async function invoke(
     input,
     makeBaseContext({
       auth: allowAllAuth(),
-      host: { resourceScope: SCOPE },
+      host: { resourceScope: SCOPE, ...(personaId ? { personaId } : {}) },
       env,
     }),
   )) {
@@ -187,6 +190,29 @@ describe("sigil-synthesize-speech", () => {
     }
   })
 
+  it("passes the trusted host persona's voice defaults to the provider", async () => {
+    const { provider, calls } = recordingProvider()
+    const event = await invoke(
+      registryWith(
+        await temporaryStore(),
+        provider,
+        (personaId) => ({
+          voice: personaId === "persona-a" ? "voice-a" : "voice-b",
+          speed: 0.9,
+        }),
+      ),
+      { text: "Persona delivery." },
+      {},
+      "persona-a",
+    )
+
+    expect(event.type).toBe("result")
+    expect(calls[0]?.personaVoice).toEqual({
+      voice: "voice-a",
+      speed: 0.9,
+    })
+  })
+
   it("rejects text past the utterance bound before calling the provider", async () => {
     const artifacts = await temporaryStore()
     const { provider, calls } = recordingProvider()
@@ -282,7 +308,7 @@ describe("sigil-synthesize-speech", () => {
       },
     })
 
-    const event = await invoke(registryWith(artifacts, provider, denying), {
+    const event = await invoke(registryWith(artifacts, provider, undefined, denying), {
       text: "Should never be synthesized.",
     })
 

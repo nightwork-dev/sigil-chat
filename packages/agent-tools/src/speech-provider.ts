@@ -14,8 +14,16 @@
 // because a tool error is transcript text the model reads back to the user.
 
 import { ToolError } from "@gonk/tool-registry";
-import { readVoiceEnvironment } from "@workspace/runtime-env/voice";
-import type { TtsProviderConfig } from "@workspace/runtime-env/voice";
+import {
+  applyVoiceConversion,
+  readVoiceEnvironment,
+  resolveTtsConfig,
+} from "@workspace/runtime-env/voice";
+import type {
+  PersonaVoiceConfig,
+  TtsProviderConfig,
+  VoiceConverter,
+} from "@workspace/runtime-env/voice";
 import type { RuntimeEnvironment } from "@workspace/runtime-env/topology";
 
 export const SPEECH_FORMATS = [
@@ -60,6 +68,8 @@ export interface SpeechSynthesisRequest {
   readonly voice?: string;
   readonly format?: SpeechFormat;
   readonly speed?: number;
+  readonly personaVoice?: PersonaVoiceConfig;
+  readonly converter?: VoiceConverter;
   readonly signal: AbortSignal;
   readonly env: RuntimeEnvironment;
 }
@@ -81,7 +91,10 @@ export const synthesizeThroughVoiceProvider: SpeechSynthesisProvider = async (
 ) => {
   let tts: TtsProviderConfig;
   try {
-    tts = readVoiceEnvironment(request.env).tts;
+    tts = resolveTtsConfig(
+      readVoiceEnvironment(request.env).tts,
+      request.personaVoice,
+    );
   } catch {
     // RuntimeEnvironmentError messages quote the offending value, which for a
     // base-URL or key variable is exactly what must not surface.
@@ -93,6 +106,7 @@ export const synthesizeThroughVoiceProvider: SpeechSynthesisProvider = async (
 
   const voice = request.voice ?? tts.voice;
   const format = request.format ?? tts.format;
+  const speed = request.speed ?? tts.speed;
 
   let response: Response;
   try {
@@ -108,7 +122,8 @@ export const synthesizeThroughVoiceProvider: SpeechSynthesisProvider = async (
         voice,
         input: request.text,
         response_format: format,
-        ...(request.speed === undefined ? {} : { speed: request.speed }),
+        ...(speed === undefined ? {} : { speed }),
+        ...(tts.style === undefined ? {} : { style: tts.style }),
       }),
       signal: request.signal,
     });
@@ -141,8 +156,24 @@ export const synthesizeThroughVoiceProvider: SpeechSynthesisProvider = async (
   const mediaType = upstreamMediaType?.startsWith("audio/")
     ? upstreamMediaType
     : SPEECH_MEDIA_TYPES[format];
+  const converted = await applyVoiceConversion(
+    {
+      bytes,
+      inputFormat: format,
+      inputMediaType: mediaType,
+      conversion: tts.conversion,
+      signal: request.signal,
+    },
+    request.converter,
+  );
 
-  return { bytes, mediaType, voice, format, model: tts.model };
+  return {
+    bytes: converted.bytes,
+    mediaType: converted.mediaType,
+    voice,
+    format: converted.converted ? tts.conversion!.format : format,
+    model: tts.model,
+  };
 };
 
 async function readAudioBytes(response: Response): Promise<Uint8Array> {

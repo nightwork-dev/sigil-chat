@@ -23,12 +23,15 @@ import { cn } from "@workspace/ui/lib/utils"
 import { speakMessageParts, type SpeakOutcome } from "@/lib/agent-voice"
 import { speakableText, type SpeakableOptions } from "@/lib/speakable-text"
 import { agentSpeechPlayer, type SpeechPlayer } from "@/lib/speech-playback"
+import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 
 const FAILED = "Could not play that."
 
 type SpeakFn = (
   parts: readonly AgentMessagePart[],
   options?: SpeakableOptions,
+  fetchImpl?: typeof fetch,
+  personaId?: string,
 ) => Promise<SpeakOutcome>
 
 export interface MessageReadAloudProps {
@@ -44,6 +47,7 @@ export function MessageReadAloud({
   player = agentSpeechPlayer,
   className,
 }: MessageReadAloudProps) {
+  const personaId = useAgentPersonaSession()
   const [speaking, setSpeaking] = useState(false)
   const [failed, setFailed] = useState(false)
   const mounted = useRef(true)
@@ -66,7 +70,12 @@ export function MessageReadAloud({
     setFailed(false)
     setSpeaking(true)
     void (async () => {
-      const outcome = await speak(parts, { announceApprovals: true })
+      const outcome = await speak(
+        parts,
+        { announceApprovals: true },
+        fetch,
+        personaId ?? undefined,
+      )
       if (outcome.status !== "spoken") {
         // Silence, not a broken message: `speakMessageParts` never throws, and
         // the rendered text is untouched either way.
@@ -79,7 +88,7 @@ export function MessageReadAloud({
       if (!mounted.current) return
       setSpeaking(false)
     })()
-  }, [parts, speak, speaking])
+  }, [parts, personaId, speak, speaking])
 
   // Nothing this message could say — no control, rather than a dead one.
   if (!speakableText(parts, { announceApprovals: true })) return null

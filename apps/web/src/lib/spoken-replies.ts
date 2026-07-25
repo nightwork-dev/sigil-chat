@@ -31,6 +31,8 @@ import type { SpeakableOptions } from "./speakable-text"
 type SpeakFn = (
   parts: AgentMessage["parts"],
   options?: SpeakableOptions,
+  fetchImpl?: typeof fetch,
+  personaId?: string,
 ) => Promise<SpeakOutcome>
 
 export interface UseSpokenAgentRepliesOptions {
@@ -39,6 +41,7 @@ export interface UseSpokenAgentRepliesOptions {
   readonly enabled: boolean
   readonly messages: readonly AgentMessage[]
   readonly isStreaming: boolean
+  readonly personaId?: string
   readonly speak?: SpeakFn
   readonly player?: SpeechPlayer
 }
@@ -47,6 +50,7 @@ export function useSpokenAgentReplies({
   enabled,
   messages,
   isStreaming,
+  personaId,
   speak = speakMessageParts,
   player = agentSpeechPlayer,
 }: UseSpokenAgentRepliesOptions): void {
@@ -104,9 +108,12 @@ export function useSpokenAgentReplies({
           // that: one bad reply must not take the rest of the queue down with
           // it, so the failure is contained to the utterance that caused it.
           try {
-            const outcome = await speakRef.current(next.parts, {
-              announceApprovals: true,
-            })
+            const outcome = await speakRef.current(
+              next.parts,
+              { announceApprovals: true },
+              fetch,
+              personaId,
+            )
             // Anything other than `spoken` — nothing speakable, network down,
             // empty audio — is silence, and the rendered message is untouched.
             if (outcome.status === "spoken") {
@@ -120,5 +127,5 @@ export function useSpokenAgentReplies({
         draining.current = false
       }
     })()
-  }, [enabled, isStreaming, messages])
+  }, [enabled, isStreaming, messages, personaId])
 }

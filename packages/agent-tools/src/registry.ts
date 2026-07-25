@@ -24,6 +24,7 @@ import { registerReviewTools } from "./review.js"
 import { registerRuntimeTools, registerUiCommandTools } from "./runtime.js"
 import { registerSkillTools, type SkillRegistryResolver } from "./skills.js"
 import { registerSpeechTools } from "./speech.js"
+import type { PersonaVoiceResolver } from "./speech.js"
 import { registerSpecTools } from "./spec.js"
 import { registerStoryTools } from "./story.js"
 
@@ -36,6 +37,7 @@ export interface SigilAgentToolDependencies {
   specs?: SpecsRepository
   sessions?: ResourceUniverseRegistries["sessions"]
   skills: SkillRegistryResolver
+  personaVoice?: PersonaVoiceResolver
 }
 
 export function createSigilAgentToolRegistry(
@@ -64,7 +66,12 @@ export function createSigilAgentToolRegistry(
       ? null
       : undefined,
   )
-  registerSpeechTools(registry, dependencies.artifacts)
+  registerSpeechTools(
+    registry,
+    dependencies.artifacts,
+    undefined,
+    dependencies.personaVoice,
+  )
   registerFileTools(registry, dependencies.artifacts, {
     ...dependencies.containers,
     ...(dependencies.sessions ? { sessions: dependencies.sessions } : {}),

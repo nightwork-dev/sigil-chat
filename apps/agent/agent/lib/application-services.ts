@@ -19,6 +19,7 @@ import { MirkEveSessionOwnerStore } from "./eve-session-owners"
 import { personalScopeId } from "./personal-scope"
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import { createScopeGrantPolicy } from "./scope-authorization"
+import { resolvePersonaVoice } from "./memory"
 
 export const projectWorkspaceRegistries = getProjectWorkspaceRegistries()
 export const scopeGrantPolicy = createScopeGrantPolicy({
@@ -45,6 +46,7 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   },
   specs: specsRepository,
   workItems: workItemsRepository,
+  personaVoice: resolvePersonaVoice,
 })
 
 /**

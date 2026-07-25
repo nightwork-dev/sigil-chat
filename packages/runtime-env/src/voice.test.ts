@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { readVoiceEnvironment, type VoiceProfile } from "./voice.js";
+import {
+  applyVoiceConversion,
+  readPersonaVoice,
+  readVoiceEnvironment,
+  resolveTtsConfig,
+  type VoiceProfile,
+} from "./voice.js";
 
 /** The single source of truth for what each profile is FOR. Expectations below
  *  derive from this rather than repeating literals, so adding a profile or
@@ -54,6 +60,54 @@ describe("voice profiles", () => {
     expect(() => readVoiceEnvironment({ SIGIL_VOICE_PROFILE: "gpu-box" })).toThrow(
       /server.*local-mac/s,
     );
+  });
+});
+
+describe("voice conversion and persona identity", () => {
+  it("resolves an enabled external conversion contract without exposing it by default", () => {
+    expect(readVoiceEnvironment({}).tts.conversion).toBeUndefined();
+    const conversion = readVoiceEnvironment({
+      SIGIL_VOICE_CONVERSION_ENABLED: "true",
+      SIGIL_VOICE_CONVERSION_BASE_URL: "https://converter.example/v1/",
+      SIGIL_VOICE_CONVERSION_MODEL: "rvc-model",
+      SIGIL_VOICE_CONVERSION_VOICE: "persona-a",
+      SIGIL_VOICE_CONVERSION_FORMAT: "wav",
+      SIGIL_VOICE_CONVERSION_API_KEY: "secret",
+    }).tts.conversion;
+    expect(conversion).toEqual({
+      enabled: true,
+      baseURL: "https://converter.example/v1",
+      model: "rvc-model",
+      voice: "persona-a",
+      format: "wav",
+      apiKey: "secret",
+    });
+  });
+
+  it("leaves bytes identical and never calls a converter when conversion is absent", async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const converter = vi.fn();
+    const result = await applyVoiceConversion(
+      {
+        bytes,
+        inputFormat: "mp3",
+        inputMediaType: "audio/mpeg",
+      },
+      converter,
+    );
+    expect(result.bytes).toBe(bytes);
+    expect(converter).not.toHaveBeenCalled();
+  });
+
+  it("reads separate persona sidecars and overlays deployment defaults", () => {
+    const scope = (voice: string) => ({
+      get: () => ({ voice, speed: voice === "voice-a" ? 0.9 : 1.1 }),
+    });
+    const deployment = readVoiceEnvironment({}).tts;
+    const a = resolveTtsConfig(deployment, readPersonaVoice(scope("voice-a")));
+    const b = resolveTtsConfig(deployment, readPersonaVoice(scope("voice-b")));
+    expect([a.voice, a.speed]).toEqual(["voice-a", 0.9]);
+    expect([b.voice, b.speed]).toEqual(["voice-b", 1.1]);
   });
 });
 

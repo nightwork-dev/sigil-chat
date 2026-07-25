@@ -36,6 +36,12 @@ function speechRequest(body: unknown): Request {
   })
 }
 
+function personaSpeechRequest(body: unknown, personaId: string): Request {
+  const request = speechRequest(body)
+  request.headers.set("x-sigil-persona-id", personaId)
+  return request
+}
+
 describe("synthesizeSpeechFromRequest", () => {
   beforeEach(() => {
     mocks.getSession.mockReset()
@@ -85,6 +91,78 @@ describe("synthesizeSpeechFromRequest", () => {
       speechRequest({ text: "hello" }),
     )
     expect(response.headers.get("Cache-Control")).toBe("private, no-store")
+  })
+
+  it("uses persona voice defaults and returns converted audio", async () => {
+    const converter = vi.fn(async ({ bytes }: { bytes: Uint8Array }) => {
+      expect(bytes).toEqual(new Uint8Array([1, 2, 3]))
+      return { bytes: new Uint8Array([7, 8]), mediaType: "audio/wav" }
+    })
+    const response = await synthesizeSpeechFromRequest(
+      personaSpeechRequest({ text: "hello" }, "persona-a"),
+      {},
+      {
+        converter,
+        personaVoice: (personaId) => ({
+          voice: personaId === "persona-a" ? "voice-a" : "voice-b",
+          speed: 1.25,
+          conversion: {
+            enabled: true,
+            baseURL: "https://converter.invalid/v1",
+            model: "rvc-a",
+            voice: "target-a",
+            format: "wav",
+            apiKey: "conversion-secret",
+          },
+        }),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("Content-Type")).toBe("audio/wav")
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+      new Uint8Array([7, 8]),
+    )
+    expect(converter).toHaveBeenCalledOnce()
+    const [, init] = upstreamFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      voice: "voice-a",
+      speed: 1.25,
+    })
+  })
+
+  it("degrades a conversion failure to the original TTS bytes without leaking configuration", async () => {
+    const converter = vi.fn(async () => {
+      throw new Error(
+        "https://converter.secret/v1 credential=conversion-secret",
+      )
+    })
+    const response = await synthesizeSpeechFromRequest(
+      personaSpeechRequest({ text: "hello" }, "persona-a"),
+      {},
+      {
+        converter,
+        personaVoice: () => ({
+          voice: "voice-a",
+          conversion: {
+            enabled: true,
+            baseURL: "https://converter.secret/v1",
+            model: "rvc-a",
+            voice: "target-a",
+            format: "wav",
+            apiKey: "conversion-secret",
+          },
+        }),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3]),
+    )
+    expect(JSON.stringify({ status: response.status })).not.toMatch(
+      /converter\.secret|conversion-secret/,
+    )
   })
 
   it("forwards the provider credential only when one is configured", async () => {
