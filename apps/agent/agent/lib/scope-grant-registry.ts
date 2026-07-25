@@ -1,7 +1,10 @@
 import { createScope } from "@gonk/scope"
 import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
 import type { KvStore } from "@gonk/store/types"
-import type { ScopeGrant } from "@workspace/agent-contracts/scope-authorization"
+import {
+  SCOPE_AUTHORIZATION_ACTIONS,
+  type ScopeGrant,
+} from "@workspace/agent-contracts/scope-authorization"
 
 import type { ScopeRecord } from "./scope-registry"
 
@@ -195,7 +198,9 @@ function isResourceScope(value: unknown): value is string {
 }
 
 function isAction(value: unknown): value is ScopeGrant["actions"][number] {
-  return value === "discover" || value === "read" || value === "tool"
+  return (SCOPE_AUTHORIZATION_ACTIONS as readonly string[]).includes(
+    value as string,
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

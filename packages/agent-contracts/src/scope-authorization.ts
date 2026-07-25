@@ -13,7 +13,15 @@
  * read-only grant authorized writes (SC.9, 2026-07-24). Added while no
  * issuance surface exists yet, so no persisted grant needs migrating.
  */
-export type ScopeAuthorizationAction = "discover" | "read" | "write" | "tool";
+export const SCOPE_AUTHORIZATION_ACTIONS = [
+  "discover",
+  "read",
+  "write",
+  "tool",
+] as const;
+
+export type ScopeAuthorizationAction =
+  (typeof SCOPE_AUTHORIZATION_ACTIONS)[number];
 
 export interface ScopeAuthorizationTarget {
   readonly resourceScope: string;
