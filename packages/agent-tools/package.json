@@ -37,6 +37,8 @@
     "./request": "./src/request.ts",
     "./schemas": "./src/schemas.ts",
     "./skills": "./src/skills.ts",
+    "./speech": "./src/speech.ts",
+    "./speech-provider": "./src/speech-provider.ts",
     "./spec": "./src/spec.ts",
     "./story": "./src/story.ts"
   }
