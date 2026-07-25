@@ -6,6 +6,7 @@ import {
   MAX_AUDIO_BYTES,
   transcribeAudioFromRequest,
 } from "./agent-transcribe.server"
+import { DIARIZED_SEGMENTS_FIXTURE } from "./agent-transcription.test-fixtures"
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -28,9 +29,13 @@ const expectedProvider = readVoiceEnvironment({}).stt
 const upstreamFetch = vi.fn()
 vi.stubGlobal("fetch", upstreamFetch)
 
-function transcribeRequest(audio?: Blob, fieldName = "audio"): Request {
+function transcribeRequest(
+  audio?: Blob,
+  options: { readonly fieldName?: string; readonly diarize?: boolean } = {},
+): Request {
   const form = new FormData()
-  if (audio) form.set(fieldName, audio, "dictation.webm")
+  if (audio) form.set(options.fieldName ?? "audio", audio, "dictation.webm")
+  if (options.diarize) form.set("diarize", "true")
   return new Request("http://sigil.test/api/voice/transcribe", {
     method: "POST",
     body: form,
@@ -75,6 +80,43 @@ describe("transcribeAudioFromRequest", () => {
     expect(sentForm.get("model")).toBe(expectedProvider.model)
     const sentFile = sentForm.get("file")
     expect(sentFile).toBeInstanceOf(File)
+    expect(sentForm.get("diarize")).toBeNull()
+  })
+
+  it("returns real segments from a diarizing fake provider", async () => {
+    const providerResponse = {
+      text: DIARIZED_SEGMENTS_FIXTURE.map((segment) => segment.text).join(" "),
+      segments: DIARIZED_SEGMENTS_FIXTURE,
+    }
+    upstreamFetch.mockResolvedValue(
+      new Response(JSON.stringify(providerResponse), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+
+    const response = await transcribeAudioFromRequest(
+      transcribeRequest(new Blob(["fake audio"]), { diarize: true }),
+      { SIGIL_VOICE_STT_DIARIZATION: "true" },
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(providerResponse)
+    const [, init] = upstreamFetch.mock.calls[0] as [string, RequestInit]
+    expect((init.body as FormData).get("diarize")).toBe("true")
+  })
+
+  it("returns flat text and unavailable when the fake provider cannot diarize", async () => {
+    const response = await transcribeAudioFromRequest(
+      transcribeRequest(new Blob(["fake audio"]), { diarize: true }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      text: "remind me to call mom",
+      diarization: "unavailable",
+    })
+    const [, init] = upstreamFetch.mock.calls[0] as [string, RequestInit]
+    expect((init.body as FormData).get("diarize")).toBeNull()
   })
 
   it("keeps the transcript out of shared caches", async () => {
@@ -106,6 +148,14 @@ describe("transcribeAudioFromRequest", () => {
 
   it("rejects a request with no audio field without calling the provider", async () => {
     const response = await transcribeAudioFromRequest(transcribeRequest())
+    expect(response.status).toBe(400)
+    expect(upstreamFetch).not.toHaveBeenCalled()
+  })
+
+  it("rejects a differently named audio field without calling the provider", async () => {
+    const response = await transcribeAudioFromRequest(
+      transcribeRequest(new Blob(["fake audio"]), { fieldName: "recording" }),
+    )
     expect(response.status).toBe(400)
     expect(upstreamFetch).not.toHaveBeenCalled()
   })

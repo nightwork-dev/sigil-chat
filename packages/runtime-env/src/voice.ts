@@ -39,10 +39,15 @@ export interface TtsProviderConfig extends VoiceProviderConfig {
   readonly format: "mp3" | "opus" | "aac" | "wav" | "flac" | "pcm";
 }
 
+export interface SttProviderConfig extends VoiceProviderConfig {
+  /** Whether this provider can return real speaker-attributed segments. */
+  readonly diarization: boolean;
+}
+
 export interface VoiceRuntimeEnvironment {
   readonly profile: VoiceProfile;
   readonly tts: TtsProviderConfig;
-  readonly stt: VoiceProviderConfig;
+  readonly stt: SttProviderConfig;
 }
 
 /** Ports that only ever serve an Apple-Silicon stack. Named so the guard below
@@ -51,7 +56,10 @@ const APPLE_ONLY_PORTS = [1243, 10650] as const;
 
 const PROFILE_DEFAULTS: Record<
   VoiceProfile,
-  { tts: Omit<TtsProviderConfig, "apiKey">; stt: Omit<VoiceProviderConfig, "apiKey"> }
+  {
+    tts: Omit<TtsProviderConfig, "apiKey">;
+    stt: Omit<SttProviderConfig, "apiKey">;
+  }
 > = {
   // Kokoro behind an OpenAI-compatible server (kokoro-fastapi's conventional
   // port). Runs on ordinary server hardware. STT defaults to a separate
@@ -65,7 +73,11 @@ const PROFILE_DEFAULTS: Record<
       voice: "af_heart",
       format: "mp3",
     },
-    stt: { baseURL: "http://localhost:8000/v1", model: "whisper-1" },
+    stt: {
+      baseURL: "http://localhost:8000/v1",
+      model: "whisper-1",
+      diarization: false,
+    },
   },
   // Gonk's own defaults, valid only where MLX runs.
   "local-mac": {
@@ -75,7 +87,11 @@ const PROFILE_DEFAULTS: Record<
       voice: "af_heart",
       format: "mp3",
     },
-    stt: { baseURL: "http://localhost:10650/v1", model: "whisper-1" },
+    stt: {
+      baseURL: "http://localhost:10650/v1",
+      model: "whisper-1",
+      diarization: false,
+    },
   },
 };
 
@@ -92,7 +108,10 @@ function parseProfile(raw: string | undefined): VoiceProfile {
   );
 }
 
-function parseFormat(raw: string | undefined, fallback: TtsProviderConfig["format"]) {
+function parseFormat(
+  raw: string | undefined,
+  fallback: TtsProviderConfig["format"],
+) {
   const value = raw?.trim();
   if (!value) return fallback;
   const match = TTS_FORMATS.find((format) => format === value);
@@ -104,6 +123,21 @@ function parseFormat(raw: string | undefined, fallback: TtsProviderConfig["forma
     );
   }
   return match;
+}
+
+function parseDiarizationCapability(
+  raw: string | undefined,
+  fallback: boolean,
+): boolean {
+  const value = raw?.trim();
+  if (!value) return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new RuntimeEnvironmentError(
+    "INVALID_VOICE_DIARIZATION",
+    "SIGIL_VOICE_STT_DIARIZATION",
+    `must be "true" or "false" (received "${value}")`,
+  );
 }
 
 /**
@@ -145,8 +179,10 @@ export function readVoiceEnvironment(
   const profile = parseProfile(env.SIGIL_VOICE_PROFILE);
   const defaults = PROFILE_DEFAULTS[profile];
 
-  const ttsBaseURL = env.SIGIL_VOICE_TTS_BASE_URL?.trim() || defaults.tts.baseURL;
-  const sttBaseURL = env.SIGIL_VOICE_STT_BASE_URL?.trim() || defaults.stt.baseURL;
+  const ttsBaseURL =
+    env.SIGIL_VOICE_TTS_BASE_URL?.trim() || defaults.tts.baseURL;
+  const sttBaseURL =
+    env.SIGIL_VOICE_STT_BASE_URL?.trim() || defaults.stt.baseURL;
 
   const resolved: VoiceRuntimeEnvironment = {
     profile,
@@ -161,6 +197,10 @@ export function readVoiceEnvironment(
       baseURL: parseHttpUrl(sttBaseURL, sttBaseURL, "SIGIL_VOICE_STT_BASE_URL"),
       model: env.SIGIL_VOICE_STT_MODEL?.trim() || defaults.stt.model,
       apiKey: env.SIGIL_VOICE_STT_API_KEY?.trim() || undefined,
+      diarization: parseDiarizationCapability(
+        env.SIGIL_VOICE_STT_DIARIZATION,
+        defaults.stt.diarization,
+      ),
     },
   };
 
