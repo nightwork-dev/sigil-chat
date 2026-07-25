@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { transcribeAudio } from "./agent-transcribe"
-import { createAudioFocusManager, type AudioFocusManager } from "./audio-focus"
+import { voiceAudioFocus, type AudioFocusManager } from "./audio-focus"
 import { createCaptureLifecycle } from "./capture-lifecycle"
 import { dictationOutcome } from "./dictation-outcome"
 import {
@@ -83,10 +83,10 @@ export function useVoiceDictation({
   // Bumped by every stop/cancel so a late async result from an abandoned
   // capture can be recognised and dropped instead of landing in the composer.
   const runRef = useRef(0)
-  const focus = useMemo(
-    () => audioFocus ?? createAudioFocusManager(),
-    [audioFocus],
-  )
+  // The shared manager by default: dictation and a live duplex call are on
+  // separate controls but one physical channel, and a per-hook manager would
+  // coordinate this component with only itself.
+  const focus = useMemo(() => audioFocus ?? voiceAudioFocus, [audioFocus])
   const activeRef = useRef(false)
   const activeChangeRef = useRef(onActiveChange)
   activeChangeRef.current = onActiveChange

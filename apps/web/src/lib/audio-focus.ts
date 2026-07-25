@@ -58,3 +58,9 @@ export function createAudioFocusManager(): AudioFocusManager {
     isPlaying: () => playing,
   }
 }
+
+/** The app's one audio channel. Dictation and a live duplex call are separate
+ *  features on separate controls, but they share one microphone and one pair
+ *  of speakers — so they have to share one manager, or the coordination this
+ *  module exists for is coordination between a component and itself. */
+export const voiceAudioFocus: AudioFocusManager = createAudioFocusManager()
