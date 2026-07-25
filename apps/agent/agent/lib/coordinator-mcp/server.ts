@@ -59,7 +59,9 @@ export function createCoordinatorMcpServer(
     async ({ request }) => {
       const outcome = await delegateToEve(core, request)
       // Only `spoken` ever leaves this process. The receipt (grantId) is logged
-      // to stderr for the session's audit trail, not spoken.
+      // to stderr for the session's audit trail, not spoken. A DURABLE,
+      // structured audit record (who delegated what, under which grant, when)
+      // is VOX.6.2 — stderr is the first-cut trail, not the system of record.
       if ("grantId" in outcome) {
         process.stderr.write(
           `[coordinator] ${outcome.status} under grant ${outcome.grantId}\n`,

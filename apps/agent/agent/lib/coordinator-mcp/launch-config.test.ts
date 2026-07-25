@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { CODEX_APP_SERVER_ARGS } from "../realtime-appserver"
 import {
   parseCoordinatorContext,
   COORDINATOR_CONTEXT_ENV_VAR,
@@ -28,9 +29,11 @@ const CONTEXT: CoordinatorBoundContext = {
 function build() {
   return buildCoordinatorLaunchConfig({
     codexHome: "/tmp/session-home",
-    serverCommand: "node",
-    serverArgs: ["/abs/coordinator-mcp/server.js"],
-    context: CONTEXT,
+    coordinator: {
+      serverCommand: "node",
+      serverArgs: ["/abs/coordinator-mcp/server.js"],
+      context: CONTEXT,
+    },
   })
 }
 
@@ -80,5 +83,28 @@ describe("the launch carries the bound context to the subprocess", () => {
     const config = build()
     expect(config.appServerArgs).toEqual(["app-server", "--stdio"])
     expect(config.appServerEnv.CODEX_HOME).toBe("/tmp/session-home")
+  })
+})
+
+describe("hardened-only launch (Annika Finding 1): no coordinator, no ambient", () => {
+  const hardened = () =>
+    buildCoordinatorLaunchConfig({ codexHome: "/tmp/session-home" })
+
+  it("stays fully hardened with zero mcp servers", () => {
+    const config = hardened()
+    expect(config.features.shellTool).toBe(false)
+    expect(config.sandboxMode).toBe("read-only")
+    expect(config.approvalPolicy).toBe("never")
+    expect(Object.keys(config.mcpServers)).toEqual([])
+    expect(config.configToml).toContain("shell_tool = false")
+    expect(config.configToml).not.toContain("[mcp_servers")
+  })
+
+  it("NEVER uses the ambient app-server args, with or without a coordinator", () => {
+    // CODEX_APP_SERVER_ARGS carries mcp_servers={} + realtime via -c and, with
+    // the user's ~/.codex, full ambient exec. The hardened launch must not be it.
+    expect(hardened().appServerArgs).not.toEqual(CODEX_APP_SERVER_ARGS)
+    expect(build().appServerArgs).not.toEqual(CODEX_APP_SERVER_ARGS)
+    expect(hardened().appServerArgs).toEqual(["app-server", "--stdio"])
   })
 })

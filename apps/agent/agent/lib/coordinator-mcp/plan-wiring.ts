@@ -1,4 +1,4 @@
-// The production wiring that turns Eve's ambient state into a coordinator plan.
+// The production wiring that turns Eve's ambient state into a hardened plan.
 //
 // Kept out of session-plan.ts so that module stays free of registry and env
 // singletons and remains the testable core. This one resolves the concrete
@@ -6,15 +6,19 @@
 // the delegated grants, the Eve origin the coordinator submits back to, and the
 // per-session MCP server entry codex launches.
 //
+// Annika Finding 1: this ALWAYS returns a plan (never undefined). Every live
+// voice session is hardened — exec off — whether or not a coordinator surface
+// can be formed. Without a binding secret or a resolvable scope the plan simply
+// carries no delegate tool; it never carries ambient exec.
+//
 // GRANTS, first cut: there is no issuance surface yet (coordinator-authority.ts
 // says as much), so production grants resolve to EMPTY — the coordinator comes
 // up and refuses every delegation cleanly, exec already disabled. For David's
 // local live verification a single grant can be seeded in-memory by setting
 // SIGIL_COORDINATOR_DEV_GRANT=1, and only when Eve also accepts local-dev auth
-// (SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH). It is never authority in a real deployment;
-// it exists so the authorized path can be heard end to end before issuance and
-// the credential fence (VOX.6.2) land.
+// (SIGIL_EVE_ALLOW_LOCAL_DEV_AUTH). It is never authority in a real deployment.
 
+import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import {
@@ -33,49 +37,41 @@ import { buildCoordinatorSessionPlan } from "./session-plan"
 /** The capability a grant must name to authorize delegating into Eve. */
 const COORDINATOR_CAPABILITY = "eve-delegation"
 
-/** The compiled stdio server codex spawns per session. `eve build` emits it
- *  beside this module as `.js`; resolved from import.meta.url so it is correct
- *  wherever the agent bundle is deployed. */
-const SERVER_ENTRY_URL = new URL("./server.js", import.meta.url)
-
 export interface CoordinatorPlanWiringOptions {
-  /** SIGIL_AGENT_BINDING_SECRET. Without it there is no coordinator surface —
-   *  the subprocess could not mint the proofs an Eve turn needs. */
+  /** SIGIL_AGENT_BINDING_SECRET. Absent, the launch is hardened but exposes no
+   *  coordinator tool (the subprocess could not mint the proofs Eve needs). */
   readonly bindingSecret: string | undefined
   readonly env?: NodeJS.ProcessEnv
 }
 
 /**
- * Bind the deps and return a `planSession` for createRealtimeVoiceRoutes, or a
- * function that always yields undefined (containment) when no binding secret is
- * configured.
+ * Bind the deps and return a `planSession` for createRealtimeVoiceRoutes. It
+ * always resolves to a hardened plan; the ambient app-server client is never
+ * reachable through this path.
  */
 export function createCoordinatorPlanSession(
   options: CoordinatorPlanWiringOptions,
 ): (input: {
   binding: AgentSessionBindingPayload
   principalId: string
-}) => Promise<RealtimeVoiceSessionPlan | undefined> {
+}) => Promise<RealtimeVoiceSessionPlan> {
   const env = options.env ?? process.env
   const bindingSecret = options.bindingSecret
-  if (!bindingSecret) {
-    return async () => undefined
-  }
-
   const authEnvironment = readSigilEveAuthEnvironment(env)
   const eveOrigin = readRuntimeTopology(env).eveOrigin
   const devGrantEnabled =
     authEnvironment.allowLocalDev && env.SIGIL_COORDINATOR_DEV_GRANT === "1"
+  const serverLaunch = resolveCoordinatorServerLaunch()
 
   return (input) =>
     buildCoordinatorSessionPlan(
       {
-        bindingSecret,
+        ...(bindingSecret ? { bindingSecret } : {}),
         eveOrigin,
         allowLocalDevAuth: authEnvironment.allowLocalDev,
         capability: COORDINATOR_CAPABILITY,
-        serverCommand: process.execPath,
-        serverArgs: [fileURLToPath(SERVER_ENTRY_URL)],
+        serverCommand: serverLaunch.command,
+        serverArgs: serverLaunch.args,
         resolveAuthorityScope,
         resolveGrants: ({ authorityResourceScope }) =>
           devGrantEnabled
@@ -93,6 +89,24 @@ function resolveAuthorityScope(homeScopeId: string): string | undefined {
   if (registries.projects.get(homeScopeId)) return `project:${homeScopeId}`
   if (registries.workspaces.get(homeScopeId)) return `workspace:${homeScopeId}`
   return undefined
+}
+
+/**
+ * The per-session stdio server codex spawns. Deployed, `eve build` emits
+ * `server.js` beside this module and we run it with node. In `pnpm dev` the
+ * agent runs from `.ts` source under tsx, so no `.js` exists — run `server.ts`
+ * with node's tsx loader (tsx is an apps/agent devDependency for exactly this).
+ */
+function resolveCoordinatorServerLaunch(): {
+  command: string
+  args: string[]
+} {
+  const builtJs = fileURLToPath(new URL("./server.js", import.meta.url))
+  if (existsSync(builtJs)) {
+    return { command: process.execPath, args: [builtJs] }
+  }
+  const sourceTs = fileURLToPath(new URL("./server.ts", import.meta.url))
+  return { command: process.execPath, args: ["--import", "tsx", sourceTs] }
 }
 
 /** A single in-memory grant for local live verification only. Never persisted,

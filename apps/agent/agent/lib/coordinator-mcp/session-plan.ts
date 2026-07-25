@@ -1,33 +1,40 @@
-// Turn a verified voice binding into a coordinator launch plan (Eve side).
+// Turn a verified voice binding into a hardened launch plan (Eve side).
 //
-// This is where the two scopes the spec names diverge. The bound thread's
-// homeScopeId is a BARE id (a workspace id, or a personal-project id); the
-// registries here — the same ones every Eve turn authorizes against — resolve
-// it to the container form (`project:<id>` / `workspace:<id>`) that the
-// coordinator's authority is checked in. The subprocess never sees a registry;
-// it receives the already-resolved scope. The Eve turn the coordinator later
-// submits still runs under `session:<thread>`, unchanged.
+// Annika Finding 1 (BLOCKING, fixed): exec-hardening is UNCONDITIONAL. Every
+// live voice session launches into an isolated CODEX_HOME with the built-in
+// shell tools disabled, read-only sandbox, and no interactive approvals —
+// whether or not a coordinator can be formed. There is no path here that yields
+// the ambient client. Scope and grant decide only ONE thing: whether the
+// coordinator MCP delegate surface is present at all.
 //
-// Building the plan disables the realtime thread's built-in exec (the isolated
-// CODEX_HOME) whether or not any grant exists: no grant means the coordinator
-// refuses every delegation, but exec is gone either way. The plan is only
-// withheld — falling back to VOX.5 containment — when the launch genuinely
-// cannot be formed (no binding secret, or a home scope that does not resolve).
-// That residual containment path still carries ambient exec; it is called out
-// in the VOX.6.1 report for Annika, not silently accepted as safe.
+//   scope resolves (+ any grants) -> hardened + coordinator MCP (delegates
+//     when a grant matches, refuses cleanly otherwise).
+//   scope does NOT resolve         -> hardened, NO coordinator tool. The voice
+//     agent can talk and cannot act; exec is still gone.
+//
+// The two scopes the spec names diverge here: the bound thread's homeScopeId is
+// a BARE id; the registries (via deps.resolveAuthorityScope) resolve it to the
+// container form (`project:`/`workspace:`) the coordinator's authority is
+// checked in. The Eve turn the coordinator later submits still runs under
+// `session:<thread>`.
 
 import { RealtimeAppServerClient } from "../realtime-appserver"
-import type { RealtimeVoiceSessionPlan } from "../realtime-voice"
+import type {
+  RealtimeVoiceClient,
+  RealtimeVoiceSessionPlan,
+} from "../realtime-voice"
 import type { AgentSessionBindingPayload } from "@workspace/agent-contracts/session-binding"
 import type { CoordinatorAuthorityGrant } from "@workspace/agent-contracts/coordinator-authority"
 import { coordinatorPrincipalId } from "@workspace/agent-contracts/coordinator-authority"
 
 import type { CoordinatorBoundContext } from "./context"
+import type { CoordinatorServerInput } from "./launch-config"
 import { materializeCoordinatorHome } from "./materialize-codex-home"
 
-/** The prompt the coordinator-enabled thread runs under. Unlike the VOX.5
- *  containment prompt, this one tells the agent it CAN act — through the one
- *  tool — and holds the same honesty about what it cannot see. */
+/** The prompt a coordinator-enabled thread runs under: it CAN act, through the
+ *  one tool, and stays honest about what it cannot see. The image-view caveat
+ *  is deliberate — codex keeps ViewImageHandler registered even with the shell
+ *  tools off (Annika low-sev), so the prompt does not over-promise. */
 export const REALTIME_COORDINATOR_CONTEXT = [
   "You are the live voice COORDINATOR for Sigil Chat. You speak with the user",
   "directly, and when they ask you to actually DO something in the app you call",
@@ -36,14 +43,30 @@ export const REALTIME_COORDINATOR_CONTEXT = [
   "the app shows — and gives you back Eve's reply to speak. Prefer delegating",
   "real work over describing it. You still cannot see the app's screen, route,",
   "selection, or Eve's transcript, so describe what the user wants rather than",
-  "claiming to see it. `delegate_to_eve` is your ONLY way to act: you have no",
-  "shell, file, or command authority on this machine. If a delegation comes back",
-  "saying it is not authorized, tell the user plainly that they need to approve",
-  "it from the app first.",
+  "claiming to see it. `delegate_to_eve` is your only way to act on the app; you",
+  "have no shell, file, or command authority on this machine (you may be able to",
+  "view a shared image, and nothing more). If a delegation comes back saying it",
+  "is not authorized, tell the user plainly that they need to approve it from the",
+  "app first.",
+].join(" ")
+
+/** The prompt when no coordinator surface could be formed: exec is still off,
+ *  but there is no delegate tool, so the agent must not claim it can act. */
+export const REALTIME_HARDENED_CONTAINMENT_CONTEXT = [
+  "You are the live voice agent for Sigil Chat, running as a separate local",
+  "Codex realtime thread with NO app tools connected for this session and NO",
+  "shell, file, or command authority (you may be able to view a shared image,",
+  "and nothing more). You cannot see or act on the Sigil application — its",
+  "route, workspace, selection, persona, transcript, memory, or tools. If asked",
+  "to act on the app, say plainly that this voice session is not connected to",
+  "those tools and the user should use text chat for that. Never claim to see or",
+  "act on app state.",
 ].join(" ")
 
 export interface CoordinatorSessionPlanDeps {
-  readonly bindingSecret: string
+  /** Without it the subprocess could not mint the proofs an Eve turn needs, so
+   *  no coordinator surface is formed — but the launch still hardens exec. */
+  readonly bindingSecret?: string
   readonly eveOrigin: string
   readonly allowLocalDevAuth: boolean
   /** The capability class a grant must name to authorize delegation. */
@@ -61,17 +84,56 @@ export interface CoordinatorSessionPlanDeps {
   }): readonly CoordinatorAuthorityGrant[]
   /** A web-signed Eve bearer, when one can be obtained at launch. The fence. */
   resolveBearer?: (principalId: string) => Promise<string | undefined>
+  /** Injected for tests so the resolved launch args/env can be captured; the
+   *  default builds the real isolated-home app-server client. */
+  createRealtimeClient?: (input: {
+    args: readonly string[]
+    env: NodeJS.ProcessEnv
+  }) => RealtimeVoiceClient
+}
+
+export interface CoordinatorSessionPlanInput {
+  readonly binding: AgentSessionBindingPayload
+  readonly principalId: string
 }
 
 /**
- * Build the plan, or undefined to keep the containment default. The signature
- * matches RealtimeVoiceRouteOptions.planSession once bound to its deps.
+ * Always returns a hardened plan — never undefined, never ambient. The plan
+ * carries a coordinator MCP surface only when the authority scope resolves.
  */
 export async function buildCoordinatorSessionPlan(
   deps: CoordinatorSessionPlanDeps,
-  input: { binding: AgentSessionBindingPayload; principalId: string },
-): Promise<RealtimeVoiceSessionPlan | undefined> {
+  input: CoordinatorSessionPlanInput,
+): Promise<RealtimeVoiceSessionPlan> {
+  const coordinator = await resolveCoordinatorServer(deps, input)
+  const home = await materializeCoordinatorHome(
+    coordinator ? { coordinator } : {},
+  )
+  const createRealtimeClient =
+    deps.createRealtimeClient ??
+    ((launch) => new RealtimeAppServerClient(launch))
+
+  return {
+    prompt: coordinator
+      ? REALTIME_COORDINATOR_CONTEXT
+      : REALTIME_HARDENED_CONTAINMENT_CONTEXT,
+    createClient: () =>
+      createRealtimeClient({
+        args: home.config.appServerArgs,
+        env: { ...process.env, ...home.config.appServerEnv },
+      }),
+    dispose: () => home.dispose(),
+  }
+}
+
+/** Build the coordinator server input, or undefined to launch hardened-only. */
+async function resolveCoordinatorServer(
+  deps: CoordinatorSessionPlanDeps,
+  input: CoordinatorSessionPlanInput,
+): Promise<CoordinatorServerInput | undefined> {
   const { binding, principalId } = input
+  // No secret => no proofs => no delegate surface, but still hardened.
+  if (!deps.bindingSecret) return undefined
   const authorityResourceScope = deps.resolveAuthorityScope(binding.homeScopeId)
   if (!authorityResourceScope) return undefined
 
@@ -99,19 +161,9 @@ export async function buildCoordinatorSessionPlan(
     allowLocalDevAuth: deps.allowLocalDevAuth,
   }
 
-  const home = await materializeCoordinatorHome({
-    context,
+  return {
     serverCommand: deps.serverCommand,
     serverArgs: deps.serverArgs,
-  })
-
-  return {
-    prompt: REALTIME_COORDINATOR_CONTEXT,
-    createClient: () =>
-      new RealtimeAppServerClient({
-        args: home.config.appServerArgs,
-        env: { ...process.env, ...home.config.appServerEnv },
-      }),
-    dispose: () => home.dispose(),
+    context,
   }
 }

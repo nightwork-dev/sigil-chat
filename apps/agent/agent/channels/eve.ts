@@ -38,6 +38,7 @@ import {
   RealtimeVoiceHost,
 } from "../lib/realtime-voice"
 import { createCoordinatorPlanSession } from "../lib/coordinator-mcp/plan-wiring"
+import { sweepStaleCoordinatorHomes } from "../lib/coordinator-mcp/materialize-codex-home"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const bindingSecret = readOptionalSecretFromFile(
@@ -73,6 +74,9 @@ const compileMessage = createSigilEveOnMessage({
     }),
 })
 const realtimeVoiceHost = new RealtimeVoiceHost()
+// Clear any per-session CODEX_HOMEs a prior crash could not dispose (each holds
+// a 0600 config with the binding secret). Best-effort, never blocks startup.
+void sweepStaleCoordinatorHomes()
 const channel = createOwnedEveChannel({
   auth: async (request) => {
     const auth = await authenticatePrincipal(request)

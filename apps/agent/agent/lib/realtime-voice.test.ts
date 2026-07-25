@@ -13,6 +13,7 @@ import {
   REALTIME_OFFER_PATH,
   REALTIME_STOP_PATH,
   RealtimeVoiceHost,
+  RealtimeVoiceLaunchError,
   voiceResourceScope,
   type RealtimeVoiceClient,
 } from "./realtime-voice"
@@ -739,5 +740,17 @@ describe("route paths", () => {
     const [offer, stop] = createRealtimeVoiceRoutes(principal("owner-1"), host)
     expect([offer!.method, offer!.path]).toEqual(["POST", REALTIME_OFFER_PATH])
     expect([stop!.method, stop!.path]).toEqual(["POST", REALTIME_STOP_PATH])
+  })
+})
+
+describe("fail closed without a hardened plan (Annika Finding 1)", () => {
+  it("refuses to start rather than spawn an ambient client", async () => {
+    // A host with no injected client and no plan has NO ambient default to fall
+    // back to: starting must throw, never spawn raw exec.
+    const host = new RealtimeVoiceHost()
+    await expect(
+      host.start({ applicationThreadId: THREAD, principalId: "owner-1" }, OFFER),
+    ).rejects.toBeInstanceOf(RealtimeVoiceLaunchError)
+    expect(host.liveCall).toBeUndefined()
   })
 })

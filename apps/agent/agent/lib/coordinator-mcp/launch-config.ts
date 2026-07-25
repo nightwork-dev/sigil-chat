@@ -36,14 +36,23 @@ export const COORDINATOR_MCP_SERVER_NAME = "coordinator"
 /** Tight enough that one slow MCP launch cannot eat the realtime window. */
 export const DEFAULT_COORDINATOR_STARTUP_TIMEOUT_SEC = 20
 
-export interface CoordinatorLaunchInput {
-  /** The per-session isolated CODEX_HOME (materialized separately). */
-  readonly codexHome: string
+/** The coordinator MCP server to expose, when one can be formed. Omitting it
+ *  leaves the launch hardened but with no delegate surface (Annika Finding 1:
+ *  exec-hardening is unconditional; the coordinator is what scope/grant gate). */
+export interface CoordinatorServerInput {
   /** Command codex spawns for the MCP server (e.g. "node"). */
   readonly serverCommand: string
   /** Args for that command (e.g. [absolute path to the built server]). */
   readonly serverArgs: readonly string[]
   readonly context: CoordinatorBoundContext
+}
+
+export interface CoordinatorLaunchInput {
+  /** The per-session isolated CODEX_HOME (materialized separately). */
+  readonly codexHome: string
+  /** The delegate surface, or undefined for a hardened-only launch (exec still
+   *  disabled, no coordinator tool). */
+  readonly coordinator?: CoordinatorServerInput
   readonly startupTimeoutSec?: number
 }
 
@@ -57,15 +66,17 @@ export interface CoordinatorStdioMcpServer {
 export interface CoordinatorLaunchConfig {
   readonly codexHome: string
   /** shellTool is `false` as a type, not just a value: the whole build exists
-   *  to keep it that way. */
+   *  to keep it that way, WHETHER OR NOT a coordinator is present. */
   readonly features: { readonly shellTool: false; readonly realtimeConversation: true }
   readonly sandboxMode: "read-only"
   readonly approvalPolicy: "never"
-  /** Keyed by name; this cut ships exactly one entry. */
+  /** Keyed by name; zero entries (hardened only) or exactly one (coordinator).
+   *  Never the user's ~/.codex servers. */
   readonly mcpServers: Readonly<Record<string, CoordinatorStdioMcpServer>>
   /** The config.toml body written into codexHome. */
   readonly configToml: string
-  /** Args the realtime app-server itself is spawned with. */
+  /** Args the realtime app-server itself is spawned with. Always the isolated
+   *  form — NEVER CODEX_APP_SERVER_ARGS, which carries ambient exec. */
   readonly appServerArgs: readonly string[]
   /** Env the app-server is spawned with — CODEX_HOME points it at the
    *  isolated home so it reads the config above and none of the user's. */
@@ -77,13 +88,16 @@ export function buildCoordinatorLaunchConfig(
 ): CoordinatorLaunchConfig {
   const startupTimeoutSec =
     input.startupTimeoutSec ?? DEFAULT_COORDINATOR_STARTUP_TIMEOUT_SEC
-  const mcpServer: CoordinatorStdioMcpServer = {
-    command: input.serverCommand,
-    args: [...input.serverArgs],
-    env: serializeCoordinatorContext(input.context),
-    startupTimeoutSec,
-  }
-  const mcpServers = { [COORDINATOR_MCP_SERVER_NAME]: mcpServer }
+  const mcpServers: Record<string, CoordinatorStdioMcpServer> = input.coordinator
+    ? {
+        [COORDINATOR_MCP_SERVER_NAME]: {
+          command: input.coordinator.serverCommand,
+          args: [...input.coordinator.serverArgs],
+          env: serializeCoordinatorContext(input.coordinator.context),
+          startupTimeoutSec,
+        },
+      }
+    : {}
 
   return {
     codexHome: input.codexHome,

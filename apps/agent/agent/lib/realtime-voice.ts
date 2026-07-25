@@ -30,10 +30,7 @@ import type { AgentSessionBindingPayload } from "@workspace/agent-contracts/sess
 import { AGENT_SESSION_BINDING_HEADER } from "@workspace/agent-contracts/session-binding"
 import { readAgentSessionBinding } from "@workspace/agent-contracts/session-binding.server"
 
-import {
-  RealtimeAppServerClient,
-  RealtimeAppServerError,
-} from "./realtime-appserver"
+import { RealtimeAppServerError } from "./realtime-appserver"
 import { requireAuthorizedResourceScope } from "./scope-authorization"
 
 export const REALTIME_OFFER_PATH = "/sigil/v1/realtime/offer"
@@ -88,6 +85,15 @@ export class RealtimeVoiceCancelledError extends Error {
   constructor(message: string) {
     super(message)
     this.name = "RealtimeVoiceCancelledError"
+  }
+}
+
+/** No hardened launch plan was available, so the host refused to start rather
+ *  than fall back to ambient authority. */
+export class RealtimeVoiceLaunchError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "RealtimeVoiceLaunchError"
   }
 }
 
@@ -173,7 +179,17 @@ export class RealtimeVoiceHost {
     | undefined
 
   constructor(options: RealtimeVoiceHostOptions = {}) {
-    this.#createClient = options.createClient ?? (() => new RealtimeAppServerClient())
+    // FAIL CLOSED (Annika Finding 1): the default is NOT an ambient client. A
+    // live session must arrive with a hardened launch plan (createClient) — the
+    // production host is constructed with no default and always started with a
+    // plan; a start without one refuses rather than spawning raw exec.
+    this.#createClient =
+      options.createClient ??
+      (() => {
+        throw new RealtimeVoiceLaunchError(
+          "A live voice session requires a hardened launch plan; refusing to start with ambient authority.",
+        )
+      })
   }
 
   /** The live call, named by the thread it is bound to. */
@@ -458,6 +474,11 @@ export function createRealtimeVoiceRoutes(
           error instanceof RealtimeVoiceCancelledError
         ) {
           return errorResponse(409, error.message)
+        }
+        // Fail closed: no hardened launch was available, so no session was
+        // started. Never a fallback to ambient authority (Annika Finding 1).
+        if (error instanceof RealtimeVoiceLaunchError) {
+          return errorResponse(503, error.message)
         }
         // Backend and entitlement refusals arrive as app-server errors and are
         // the whole reason the browser needs a message rather than a code:
