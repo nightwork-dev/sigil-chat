@@ -114,7 +114,11 @@ function assertPortableOnServer(env: VoiceRuntimeEnvironment): void {
     ["tts", env.tts],
     ["stt", env.stt],
   ] as const) {
-    if (/^mlx-/i.test(provider.model) || /(^|\/)mlx-community\//i.test(provider.model)) {
+    // Matches "mlx" as a whole word anywhere in the id, so non-canonical
+    // names are caught too — `someorg/mlx-tts-model` and `qwen-mlx-variant`
+    // are just as unrunnable on Linux as `mlx-community/...`, and a prefix
+    // match would have waved both through.
+    if (/\bmlx\b/i.test(provider.model)) {
       throw new RuntimeEnvironmentError(
         "UNPORTABLE_VOICE_PROVIDER",
         `SIGIL_VOICE_${label.toUpperCase()}_MODEL`,
