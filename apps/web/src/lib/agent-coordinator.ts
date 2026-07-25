@@ -89,6 +89,15 @@ export interface CoordinatorSessionPort {
    *  this and only this. */
   activeTurnId(): string | undefined
   send(delegation: Delegation): Promise<CoordinatorTurnResult>
+  /**
+   * PORT CONTRACT: resolution of cancel is acknowledgement, NOT settlement of
+   * the turn — eve resolves "accepted" while the cancelled turn is still
+   * draining, and treats a stale turnId as a benign no-op. The coordinator
+   * therefore holds delivery until the in-flight send()'s own promise
+   * settles. What an adapter owes in return: after an acknowledged cancel,
+   * the corresponding send() promise MUST eventually settle (eve guarantees
+   * this — the stream ends), or steering will wait forever.
+   */
   cancel(options: { readonly turnId: string }): Promise<void>
   deliver(delegation: Delegation): Promise<CoordinatorTurnResult>
 }
@@ -196,6 +205,9 @@ export function createAgentCoordinator({
   const idleWaiters: Array<() => void> = []
   let progress: ProgressProjection = EMPTY_PROGRESS
   let inFlight: Delegation | undefined
+  /** The running turn's own settlement — held so steering can await the
+   *  cancelled turn actually ending, not merely the cancel being accepted. */
+  let inFlightSettled: Promise<void> | undefined
   // Held across cancel-then-deliver so the queue cannot slip a send in
   // between and make two turns concurrent.
   let steering = false
@@ -246,7 +258,7 @@ export function createAgentCoordinator({
     }
     if (port.isBusy()) return
     queue.shift()
-    void runTurn(next)
+    inFlightSettled = runTurn(next)
   }
 
   function enqueue(delegation: Delegation): DelegationAdmission {
@@ -294,7 +306,7 @@ export function createAgentCoordinator({
     if (inFlight || steering || port.isBusy() || queue.length > 0) {
       return enqueue(delegation)
     }
-    void runTurn(delegation)
+    inFlightSettled = runTurn(delegation)
     return { status: "started" }
   }
 
@@ -330,10 +342,13 @@ export function createAgentCoordinator({
       }
     }
 
-    // `steering` — not a cleared `inFlight` — is what holds the queue back
-    // here. The cancelled turn settles on its own schedule, and the pump waits
-    // for it, so a port that reports cancellation asynchronously still cannot
-    // produce two concurrent turns.
+    // Cancel resolution is acknowledgement, not settlement — the real port
+    // resolves "accepted" while the cancelled turn is still draining. Deliver
+    // must not go out until that turn's own send() has settled, or the two
+    // are concurrent in exactly the way this method exists to prevent. The
+    // `steering` flag holds the queue back meanwhile.
+    if (inFlightSettled) await inFlightSettled
+
     let result: CoordinatorTurnResult
     try {
       result = await port.deliver(delegation)

@@ -38,12 +38,19 @@ function isSpeakablePart(
  * grant, and it never reads back the authorization URL or receipt, so nothing
  * spoken can be acted on as authority.
  */
+/** displayName is the ONE string that crosses from a non-text part into
+ *  speech, and it is provider-supplied — bound it so a hostile or broken
+ *  provider cannot turn the announcement into a monologue. */
+const MAX_ANNOUNCED_NAME_LENGTH = 80
+
 export function announceAuthorization(part: {
   readonly displayName: string
   readonly state: "required" | "completed"
 }): string | undefined {
   if (part.state !== "required") return undefined
-  return `${part.displayName} needs your approval.`
+  const name = part.displayName.trim().slice(0, MAX_ANNOUNCED_NAME_LENGTH)
+  if (!name) return undefined
+  return `${name} needs your approval.`
 }
 
 export interface SpeakableOptions {

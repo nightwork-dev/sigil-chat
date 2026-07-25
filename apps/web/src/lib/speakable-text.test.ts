@@ -130,6 +130,18 @@ describe("approval announcements", () => {
     expect(speakableText([pending])).toBeUndefined()
   })
 
+  // displayName is provider-supplied and the one string crossing into
+  // speech — it must stay a name, not a monologue.
+  it("bounds an oversized display name instead of speaking it whole", () => {
+    const spoken =
+      speakableText(
+        [{ ...pending, displayName: "A".repeat(500) }],
+        { announceApprovals: true },
+      ) ?? ""
+    expect(spoken.length).toBeLessThan(120)
+    expect(spoken).toContain("needs your approval")
+  })
+
   // The announcement is not a grant. Nothing spoken may be actionable as
   // authority — no URL, no receipt, no confirmation token.
   it("never speaks an authorization URL or outcome", () => {
