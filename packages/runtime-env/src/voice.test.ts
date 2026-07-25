@@ -95,13 +95,30 @@ describe("explicit overrides", () => {
 describe("server portability guard", () => {
   // Well-formed but unrunnable: the failure must be a clear configuration
   // error at startup, not a confusing connection error at first use.
-  it("rejects an MLX model on the server profile", () => {
+  // Not just the canonical `mlx-community/...` default: an MLX weight
+  // published under any other org is equally unrunnable on Linux, and a
+  // prefix-only match would wave it through.
+  it.each([
+    "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+    "someorg/mlx-tts-model",
+    "qwen-mlx-variant",
+    "MLX-Community/Some-Model",
+  ])("rejects the MLX model %s on the server profile", (model) => {
     expect(() =>
       readVoiceEnvironment({
         SIGIL_VOICE_PROFILE: "server",
-        SIGIL_VOICE_TTS_MODEL: "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+        SIGIL_VOICE_TTS_MODEL: model,
       }),
     ).toThrow(/Apple Silicon/);
+  });
+
+  it("does not mistake an unrelated model containing those letters", () => {
+    expect(() =>
+      readVoiceEnvironment({
+        SIGIL_VOICE_PROFILE: "server",
+        SIGIL_VOICE_TTS_MODEL: "kokoro-mlxtra-v1",
+      }),
+    ).not.toThrow();
   });
 
   it("rejects an Apple-only port on the server profile", () => {
