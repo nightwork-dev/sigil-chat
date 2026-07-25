@@ -352,6 +352,46 @@ CONSEQUENCES:
   websocket resets ~40s into a session and transcripts stop arriving.
   Needs its own ticket before any transcript-dependent feature relies on it.
 
+## REFRAME (2026-07-25, David): the voice agent is a COORDINATOR, not a muted Eve
+
+The P2 gate above answered the wrong question. It asked "can we silence the
+realtime voice model so Eve answers in its place?" — and no, we can't. But
+making the voice agent *be* Eve was never the right target. The realtime
+model answering on its own is the FEATURE: it is a personal / coordinating
+agent that speaks directly AND delegates to other agents (Eve, peers),
+speaking their results. That is exactly assessment P3/P6, and it dissolves
+the "blocked" framing — twice now a hard block turned out false (the 403 was
+a v1-dialect default; "can't cede the turn" was the wrong question).
+
+Empirical: David's own live session had the voice agent behaving capably
+because it had its normal codex tool harness (it used real tools — it wrote
+this file). So "tools work in a realtime session" is observed, not
+hypothetical. The prior probes ran it with `-c mcp_servers={}` (stripped)
+and mistook the stripped floor for the ceiling.
+
+The buildable architecture:
+- STOP stripping tools. Replace the ambient local-codex authority (raw
+  exec/filesystem — the actual hazard the assessment named) with a GRANTED
+  Sigil COORDINATOR MCP surface: delegate-to-Eve, message-peer,
+  record-request. Narrow, revocable, receipted — wired to the
+  coordinator-authority grants already in
+  apps/web/src/lib/coordinator-authority.ts.
+- Use v3's HANDOFF channels (analysis/[THINKING], commentary/[PROGRESS,
+  UPDATE], final/[DONE]) to project bounded progress and speak results —
+  the coordinator delegation core already models exactly this.
+- The voice coordinator delegates INTO the P1-bound Eve thread for app
+  work, so "what am I looking at / annotate this" reaches the real Eve
+  agent with its scope/persona/tools — the one-agent contract satisfied by
+  DELEGATION rather than by impersonation.
+
+This makes the separate-agent boundary honest AND useful: a named
+coordinator with real reach, not a mouth pretending to be Eve. P0
+containment copy stays until the granted surface ships (it is still
+separate), but the destination is the coordinator, not silence.
+
+Gate in flight: prove the tool-reach + handoff-channel-separation mechanism
+live (coord-voice-gate probe) before building the granted surface.
+
 ## Stop condition
 
 This work is complete when text and live voice are demonstrably two modalities
