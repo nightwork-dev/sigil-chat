@@ -31,6 +31,7 @@ describe("voice profiles", () => {
         expect(provider.model.length).toBeGreaterThan(0);
       }
       expect(env.tts.voice.length).toBeGreaterThan(0);
+      expect(env.stt.diarization).toBe(false);
     }
   });
 
@@ -51,9 +52,9 @@ describe("voice profiles", () => {
   });
 
   it("rejects an unknown profile instead of silently falling back", () => {
-    expect(() => readVoiceEnvironment({ SIGIL_VOICE_PROFILE: "gpu-box" })).toThrow(
-      /server.*local-mac/s,
-    );
+    expect(() =>
+      readVoiceEnvironment({ SIGIL_VOICE_PROFILE: "gpu-box" }),
+    ).toThrow(/server.*local-mac/s);
   });
 });
 
@@ -83,6 +84,19 @@ describe("explicit overrides", () => {
     expect(env.tts.voice).toBe("bf_emma");
     expect(env.tts.format).toBe("wav");
     expect(env.stt.model).toBe("whisper-large-v3");
+  });
+
+  it("enables diarization only through an explicit provider capability", () => {
+    const env = readVoiceEnvironment({
+      SIGIL_VOICE_STT_DIARIZATION: "true",
+    });
+    expect(env.stt.diarization).toBe(true);
+  });
+
+  it("rejects an ambiguous diarization capability value", () => {
+    expect(() =>
+      readVoiceEnvironment({ SIGIL_VOICE_STT_DIARIZATION: "yes" }),
+    ).toThrow(/true.*false/s);
   });
 
   it("rejects an unsupported audio format", () => {
