@@ -321,6 +321,37 @@ WebRTC media path if possible; unify the semantic turn and authority path.
     requests, cancellation, and terminal result; direct store mutation outside
     authorized tools is neither implied nor silently performed.
 
+## P2 GATE VERDICT (2026-07-25, measured — appended by the coordinator)
+
+The P2 premise was tested live before building, per "Do not assume they are
+sufficient", and it FAILS: `clientManagedHandoffs: true` stops Codex-side
+responses being forwarded but does NOT stop the frontend realtime voice model
+from answering the user unprompted — measured by RTP speech packets on a real
+WebRTC call (positive control first, so silence is trustworthy) and by
+sideband transcripts. A session prompt ordering silence was overridden in
+both runs. The V3 session payload carries no `turn_detection`, so backend VAD
+auto-response governs and ThreadRealtimeStartParams exposes no knob. Adjacent
+doors verified shut: websocket transport requires API-key auth on a
+subscription login; transcription-only realtime is rejected for WebRTC
+("AVAS realtime calls require conversational realtime").
+Evidence: docs/specs/evidence/realtime-handoff-gate.mjs (needs werift via
+GATE_WERIFT_DIR; header documents the runs).
+
+CONSEQUENCES:
+- P2 as scoped is closed on this transport. The realtime call remains a
+  SEPARATE, capability-limited voice agent; P0 containment and P1 true
+  binding are the honest posture for it.
+- "Voice as a modality of the bound Eve agent" is delivered instead by the
+  half-duplex loop this repo already owns end-to-end (STT dictation →
+  the real Eve session → TTS speak-replies): slower turn-taking, but the
+  one-agent contract holds by construction — persona, memory, tools,
+  approvals, transcript are the text path's own.
+- Upstream ask filed as a spec note: a turnDetection/createResponse
+  passthrough on ThreadRealtimeStartParams would reopen P2 as written.
+- Incidental defect from every gate run: the app-server sideband control
+  websocket resets ~40s into a session and transcripts stop arriving.
+  Needs its own ticket before any transcript-dependent feature relies on it.
+
 ## Stop condition
 
 This work is complete when text and live voice are demonstrably two modalities
