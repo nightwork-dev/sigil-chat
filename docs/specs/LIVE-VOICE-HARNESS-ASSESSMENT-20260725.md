@@ -397,3 +397,59 @@ live (coord-voice-gate probe) before building the granted surface.
 This work is complete when text and live voice are demonstrably two modalities
 of one Eve-owned application thread, and both the user and the agent can inspect
 an authoritative capability manifest that matches observed behavior.
+
+## COORDINATOR-TOOL-REACH GATE VERDICT (2026-07-25, measured — the re-framed question)
+
+The P2 gate asked "can the realtime model be kept SILENT so Eve answers in its
+place" and proved it cannot. That was the wrong question. The right one, tested
+here: the realtime voice model IS a personal COORDINATOR that speaks on its own
+AND delegates to tools/agents and speaks their results — so does the delegation
+edge actually carry a real tool?
+
+VERDICT: PASS. Live (codex-cli 0.146.0-alpha.3.1, subscription OAuth, realtime
+v3 / WebRTC), positive-control-first, the realtime coordinator — given a real
+MCP tool surface (`mcp_servers` with one stdio `lookup` tool) — DELEGATED to the
+Codex backend, the backend CALLED the tool, and the tool's output reached spoken
+output:
+
+- positive control: 111 RTP speech pkts (we can hear the model — negatives are
+  trustworthy);
+- delegation edge: a `handoff_request` itemAdded whose `input_transcript` is the
+  user request;
+- tool reach, out-of-band: the MCP server logged `tools/call name=lookup` +
+  `TOOL-INVOKED`;
+- tool reach, in-band: assistant transcript " Got it. The passphrase is
+  SIGIL-U3EFOB-HHJ7K6." — a per-run sentinel unknowable without calling the tool.
+
+WHY IT WORKS (source, codex 322d5b9): `ThreadRealtimeStartParams` carries no
+tool field — tools live on the app-server's `mcp_servers` config, reached via
+delegation. `RealtimeEvent::HandoffRequested` →
+`Session::route_realtime_text_input(text)` (core `session/mod.rs`) →
+`Op::UserInput`, i.e. a NORMAL session turn that runs the full turn machinery
+WITH the configured MCP tools; backend output streams back via
+`send_conversation_function_call_output`, BEM-routed (analysis/commentary/final)
+and spoken. So the production lever `-c mcp_servers={}` (which strips tools) is
+exactly what to REPLACE with a Sigil coordinator surface.
+
+Q2 (progress vs final separation): the delegation edge (`handoff_request`) and
+per-utterance transcript/done events are visible to the app-server client, so
+"coordinator is delegating" and interim-vs-final utterances ARE distinguishable.
+The literal BEM channel prefixes ([THINKING]/[PROGRESS]/[DONE]) are consumed
+inside codex and do NOT surface as wire tags. The clean lever for explicit
+machine-readable labels is `codexResponsesAsItems=true` + `codexResponseItemPrefix`
+(delivers backend responses as `ConversationItemAdded` items to the client) —
+source-identified, not yet live-run.
+
+CONSTRAINT: the ~32s realtime-websocket reset defect still bites; the tool
+round-trip must complete inside that window (this run finished at +25.6s).
+Front-load the request; do not spend the window on long preambles.
+
+Evidence: docs/specs/evidence/coordinator-tool-gate.mjs (+ coordinator-tool-mcp.mjs);
+needs werift via GATE_WERIFT_DIR. Headers document the run.
+
+CONSEQUENCE / BUILD DIRECTION: build a Sigil coordinator MCP surface
+(delegate-to-Eve, message-peer, record-request) and launch the realtime thread
+with `mcp_servers` pointing at it instead of `{}`, wired to the
+coordinator-authority grants in apps/web/src/lib/coordinator-authority.ts. The
+coordinator speaks on its own for chatter and delegates the real work through
+authorized tools whose results it voices.
