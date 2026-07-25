@@ -45,6 +45,7 @@ import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
 import { LiveVoiceComposerControl } from "@/components/agent/live-voice-composer-control"
+import { VoiceConversationControl } from "@/components/agent/voice-conversation-control"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
@@ -52,6 +53,8 @@ import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
 import { useAgentThread } from "@/lib/agent-threads"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import { appendDictationDraft } from "@/lib/voice-dictation"
+import { useSpeakReplies } from "@/lib/agent-speak-replies"
+import { useSpokenAgentReplies } from "@/lib/spoken-replies"
 import type { VoiceBoundThread } from "@/lib/voice-session-binding"
 import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
@@ -143,6 +146,18 @@ export function AgentChat({
     setInput((current) => appendDictationDraft(current, text))
   }, [])
 
+  // Voice conversation is per-session and starts off. The durable "speak
+  // replies" preference turns on only the speaking half — a user who wants to
+  // hear answers while still typing their questions gets that without
+  // auto-send, which is the half that can send words they did not mean.
+  const [conversationMode, setConversationMode] = useState(false)
+  const speakRepliesPreference = useSpeakReplies()
+  useSpokenAgentReplies({
+    enabled: conversationMode || speakRepliesPreference,
+    isStreaming: session.status === "streaming",
+    messages: session.data.messages,
+  })
+
   const handleAttachUrl = useCallback(
     (url: string) => addUrl(url, { mediaType: imageMediaTypeFromUrl(url) }),
     [addUrl],
@@ -173,40 +188,58 @@ export function AgentChat({
     [],
   )
 
-  const handleSend = useCallback(async () => {
-    const message = input.trim()
-    if ((!message && ready.length === 0) || busy || attachmentsUploading) {
-      return
-    }
-    const snapshot = attachments
-    const outgoing = ready.map((attachment) => ({
-      url: attachment.url,
-      mediaType: attachment.mediaType,
-      filename: attachment.filename,
-    }))
+  // Both the composer's Send and a voice-first dictation land here. Voice
+  // passes its transcript directly rather than writing it into the composer
+  // and sending "whatever is in there": the composer is a text field the user
+  // may still be typing in, and a spoken turn must send the words that were
+  // actually spoken.
+  const submit = useCallback(
+    async (message: string) => {
+      if ((!message && ready.length === 0) || busy || attachmentsUploading) {
+        return
+      }
+      const snapshot = attachments
+      const outgoing = ready.map((attachment) => ({
+        url: attachment.url,
+        mediaType: attachment.mediaType,
+        filename: attachment.filename,
+      }))
 
-    setInput("")
-    clearAttachments()
-    const result = await session.send({
-      message,
-      attachments: outgoing,
-      headers: { [AGENT_SCOPE_HEADER]: activeResourceScope },
-    })
-    if (result.status !== "succeeded") {
-      setInput(message)
-      setAttachments(snapshot)
-    }
-  }, [
-    activeResourceScope,
-    attachments,
-    attachmentsUploading,
-    busy,
-    clearAttachments,
-    input,
-    ready,
-    session,
-    setAttachments,
-  ])
+      setInput("")
+      clearAttachments()
+      const result = await session.send({
+        message,
+        attachments: outgoing,
+        headers: { [AGENT_SCOPE_HEADER]: activeResourceScope },
+      })
+      if (result.status !== "succeeded") {
+        // A failed voice turn falls back to the composer, where the words are
+        // recoverable and editable — a spoken utterance that vanished on a
+        // network error would be unrecoverable.
+        setInput(message)
+        setAttachments(snapshot)
+      }
+    },
+    [
+      activeResourceScope,
+      attachments,
+      attachmentsUploading,
+      busy,
+      clearAttachments,
+      ready,
+      session,
+      setAttachments,
+    ],
+  )
+
+  const handleSend = useCallback(() => submit(input.trim()), [input, submit])
+
+  const handleVoiceSend = useCallback(
+    (text: string) => {
+      void submit(text.trim())
+    },
+    [submit],
+  )
 
   return (
     <div
@@ -314,12 +347,23 @@ export function AgentChat({
         trailingControls={
           <>
             {hideHeader ? <ModelLabel /> : null}
+            {/* The mode switch sits immediately before the mic it changes:
+                with it on, the same press-to-talk gesture sends instead of
+                drafting, and Eve's finished replies are spoken back. */}
+            <VoiceConversationControl
+              active={conversationMode}
+              onChange={setConversationMode}
+            />
             {/* Dictation is opt-in per click — there is no listening mode to
                 turn on, so the control is always present and always resting
-                until pressed. */}
+                until pressed. Voice conversation does NOT make it
+                always-listening: it still takes one press per utterance, and
+                capture never restarts by itself after a reply is spoken. */}
             <ComposerVoiceControl
               onDraft={handleDictationDraft}
+              onSend={handleVoiceSend}
               thread={voiceThread}
+              voiceFirst={conversationMode}
             />
             {/* A live call is a different promise from dictation — the agent
                 talks back — so it gets its own adjacent control rather than a

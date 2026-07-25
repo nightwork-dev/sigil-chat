@@ -12,6 +12,13 @@ export interface PlaybackHandle {
   readonly pause: () => void
 }
 
+/** The two features that can own the voice channel as a MODE — a state the
+ *  user enters and leaves, as opposed to a single capture or playback. They
+ *  are mutually exclusive by construction: a live call and a spoken
+ *  conversation would both be talking and listening on one device with no way
+ *  to tell which one an utterance belonged to. */
+export type VoiceModeOwner = "live-call" | "voice-conversation"
+
 export interface AudioFocusManager {
   /** Register the current TTS playback handle, replacing any prior one.
    *  Pass undefined when playback has ended to clear the registration. */
@@ -28,12 +35,21 @@ export interface AudioFocusManager {
   readonly notifyPlaybackStopped: () => void
   readonly isCapturing: () => boolean
   readonly isPlaying: () => boolean
+  /** Take the exclusive voice mode. Returns false when the OTHER mode already
+   *  holds it — the caller must then refuse and say so, never proceed. Taking
+   *  a mode you already hold succeeds and changes nothing. */
+  readonly claimMode: (owner: VoiceModeOwner) => boolean
+  /** Give up a mode. A release from a non-owner is ignored, so a component
+   *  unmounting cannot free a mode another feature is still in. */
+  readonly releaseMode: (owner: VoiceModeOwner) => void
+  readonly modeOwner: () => VoiceModeOwner | undefined
 }
 
 export function createAudioFocusManager(): AudioFocusManager {
   let playback: PlaybackHandle | undefined
   let capturing = false
   let playing = false
+  let mode: VoiceModeOwner | undefined
 
   return {
     registerPlayback(handle) {
@@ -56,6 +72,15 @@ export function createAudioFocusManager(): AudioFocusManager {
     },
     isCapturing: () => capturing,
     isPlaying: () => playing,
+    claimMode(owner) {
+      if (mode !== undefined && mode !== owner) return false
+      mode = owner
+      return true
+    },
+    releaseMode(owner) {
+      if (mode === owner) mode = undefined
+    },
+    modeOwner: () => mode,
   }
 }
 

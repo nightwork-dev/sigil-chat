@@ -2,69 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import type { AgentMessagePart } from "@zigil/agent-surface"
 
+import {
+  NON_SPEAKABLE_PARTS,
+  SPEECH_LEAK_CANARY as SECRET,
+} from "./speakable-parts.fixture"
 import { announceAuthorization, speakableText } from "./speakable-text"
-
-/** One sample of every part kind the agent surface can produce, each carrying
- *  a marker that must never be spoken. Driving the leak tests from this table
- *  means a NEW part type added upstream gets covered by adding one row, not by
- *  remembering to write another test. */
-const SECRET = "LEAKCANARY"
-
-const NON_SPEAKABLE_PARTS: ReadonlyArray<{
-  readonly label: string
-  readonly part: AgentMessagePart
-}> = [
-  {
-    label: "reasoning trace",
-    part: { type: "reasoning", text: `thinking about ${SECRET}` },
-  },
-  {
-    label: "tool arguments",
-    part: {
-      type: "tool-call",
-      id: "t1",
-      name: "read_file",
-      state: "input-available",
-      input: { path: `/etc/${SECRET}` },
-    },
-  },
-  {
-    label: "tool results",
-    part: {
-      type: "tool-call",
-      id: "t2",
-      name: "read_file",
-      state: "output-available",
-      output: { contents: SECRET },
-    },
-  },
-  {
-    label: "tool error text",
-    part: {
-      type: "tool-call",
-      id: "t3",
-      name: "read_file",
-      state: "output-error",
-      errorText: `failed on ${SECRET}`,
-    },
-  },
-  {
-    label: "authorization receipt",
-    part: {
-      type: "authorization",
-      id: "a1",
-      state: "completed",
-      displayName: "GitHub",
-      description: `token ${SECRET}`,
-      outcome: "authorized",
-      authorizationUrl: `https://example.com/${SECRET}`,
-    },
-  },
-  {
-    label: "file part",
-    part: { type: "file", mediaType: "text/plain", url: `https://x/${SECRET}` },
-  },
-]
 
 describe("speakableText", () => {
   it("speaks assistant text", () => {

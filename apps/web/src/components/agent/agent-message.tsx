@@ -13,6 +13,7 @@ import { ToolCallSlot } from "@workspace/ui/components/tool-renderer-registry"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AuthorizationCard } from "@/components/agent/authorization-card"
+import { MessageReadAloud } from "@/components/agent/message-read-aloud"
 
 export function AgentTranscriptMessage({
   canRespond,
@@ -61,7 +62,7 @@ export function AgentTranscriptMessage({
   )
 
   return (
-    <div className="min-w-0 max-w-full">
+    <div className="group min-w-0 max-w-full">
       {text || thinking ? (
         <ChatMessage
           content={text}
@@ -107,6 +108,16 @@ export function AgentTranscriptMessage({
               part={part}
             />
           ))}
+        </div>
+      ) : null}
+      {/* A per-message secondary action repeated down the whole transcript
+          would be permanent furniture in the reading column, so it reveals on
+          hover — and on keyboard focus, which is what keeps it reachable
+          rather than merely hidden. Only agent messages: reading the user's
+          own words back to them is not a thing anyone asked for. */}
+      {message.role === "assistant" && !isStreaming ? (
+        <div className="mt-1 flex opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <MessageReadAloud parts={message.parts} />
         </div>
       ) : null}
     </div>

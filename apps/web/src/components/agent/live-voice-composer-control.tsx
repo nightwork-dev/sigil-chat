@@ -42,6 +42,11 @@ import {
 const DICTATION_ACTIVE =
   "Finish dictation before starting a live voice call."
 const NO_THREAD = "Open a conversation before starting a live voice call."
+/** Plain wording naming the mode that is in the way. A live call and a voice
+ *  conversation are two different agents on one pair of speakers — never
+ *  both. */
+const CONVERSATION_ACTIVE =
+  "Turn off voice conversation before starting a live voice call."
 
 export interface LiveVoiceComposerControlProps {
   /** The thread this call belongs to. A call REQUIRES one since P1: the
@@ -87,6 +92,7 @@ export function LiveVoiceComposerControl({
     sessionRef.current = undefined
     audioFocus.registerPlayback(undefined)
     audioFocus.notifyPlaybackStopped()
+    audioFocus.releaseMode("live-call")
     const owned = ownedThreadRef.current
     ownedThreadRef.current = undefined
     if (owned) store.releaseOwned(owned)
@@ -159,6 +165,21 @@ export function LiveVoiceComposerControl({
     // Only claim ownership of a binding this call actually created; an
     // already-bound thread belongs to whoever bound it.
     if (decision === "bind") ownedThreadRef.current = thread.threadId
+
+    // The exclusive voice mode, claimed AFTER the binding decision so a parked
+    // rebind request does not leave this call holding a mode it never opened.
+    if (!audioFocus.claimMode("live-call")) {
+      // Hand back only the binding this click just took. Deliberately NOT
+      // `release()`: that also clears the shared playback registration, which
+      // at this moment belongs to the voice conversation that is refusing us.
+      if (ownedThreadRef.current) {
+        store.releaseOwned(ownedThreadRef.current)
+        ownedThreadRef.current = undefined
+      }
+      setErrorMessage(CONVERSATION_ACTIVE)
+      setState((current) => nextLiveVoiceState(current, "fail"))
+      return
+    }
 
     setErrorMessage(undefined)
     setState((current) => nextLiveVoiceState(current, "start"))

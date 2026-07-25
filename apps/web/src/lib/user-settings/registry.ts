@@ -254,6 +254,27 @@ export const SETTINGS_REGISTRY = {
       isValid: isToolApprovalOverrides,
     },
   ),
+  // Whether finished agent replies are read aloud. A delivery preference over
+  // an unchanged text transcript — it grants nothing and reveals nothing the
+  // reader could not already see.
+  "agent.speakReplies": defineSetting<boolean>({
+    key: "agent.speakReplies",
+    allowedScopes: ["user"],
+    allowedScopeKinds: [
+      "installation",
+      "organization",
+      "project",
+      "workspace",
+      "session",
+      "personal",
+    ],
+    allowedContributingLinkKinds: ["contributes-defaults"],
+    mergeMode: "replace",
+    allowsPersonalOverride: true,
+    affectsSecurity: false,
+    defaultValue: false,
+    isValid: isBoolean,
+  }),
   "agent.activeChannelId": defineSetting<string | null>({
     key: "agent.activeChannelId",
     allowedScopes: ["user"],

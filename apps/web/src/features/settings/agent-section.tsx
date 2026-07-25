@@ -10,7 +10,9 @@ import { useEffect } from "react"
 import { Label } from "@workspace/ui/components/label"
 import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
 import { SectionHeader } from "@workspace/ui/components/section-header"
+import { Switch } from "@workspace/ui/components/switch"
 
+import { setSpeakReplies, useSpeakReplies } from "@/lib/agent-speak-replies"
 import {
   setToolApprovalMode,
   setToolApprovalOverrides,
@@ -44,6 +46,9 @@ export function AgentSection({ userId }: { userId: string }) {
     userId,
     "agent.toolApprovalOverrides",
   )
+  const localSpeakReplies = useSpeakReplies()
+  const registrySpeakReplies = useUserSetting(userId, "agent.speakReplies")
+  const setRegistrySpeakReplies = useSetUserSetting(userId, "agent.speakReplies")
   const catalog = useAgentCatalog()
 
   // One-time sync on load: if the registry already has a value for this
@@ -64,6 +69,24 @@ export function AgentSection({ userId }: { userId: string }) {
     // Only adopt the durable value once per resolved account fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registryOverrides.data?.source])
+
+  useEffect(() => {
+    if (registrySpeakReplies.data && registrySpeakReplies.data.source !== "default") {
+      setSpeakReplies(registrySpeakReplies.data.value)
+    }
+    // Only adopt the durable value once per resolved account fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registrySpeakReplies.data?.source])
+
+  function handleSpeakRepliesChange(next: boolean) {
+    setSpeakReplies(next)
+    setRegistrySpeakReplies.mutate({
+      scopeKind: "user",
+      scopeId: "",
+      value: next,
+      expectedRevision: registrySpeakReplies.data?.revision ?? undefined,
+    })
+  }
 
   function handleChange(next: ToolApprovalMode) {
     setToolApprovalMode(next)
@@ -110,6 +133,27 @@ export function AgentSection({ userId }: { userId: string }) {
             </div>
           ))}
         </RadioGroup>
+      </section>
+
+      {/* One switch, one sentence: the title already says what it does, so
+          the supporting line is spent on the two things a user cannot see —
+          that it waits for the turn to finish, and that nothing about the
+          written transcript changes. */}
+      <section className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+        <div className="flex flex-col gap-0.5">
+          <Label htmlFor="speak-replies">Speak replies aloud</Label>
+          <p className="text-xs text-muted-foreground">
+            Read each of Eve&apos;s replies once the turn finishes. The written
+            transcript is unchanged, and tool calls, reasoning, and approvals
+            are never spoken.
+          </p>
+        </div>
+        <Switch
+          checked={localSpeakReplies}
+          disabled={setRegistrySpeakReplies.isPending}
+          id="speak-replies"
+          onCheckedChange={handleSpeakRepliesChange}
+        />
       </section>
 
       <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
