@@ -44,6 +44,7 @@ import { AddMenu } from "@/components/agent/add-menu"
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
+import { LiveVoiceComposerControl } from "@/components/agent/live-voice-composer-control"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
@@ -320,6 +321,11 @@ export function AgentChat({
               onDraft={handleDictationDraft}
               thread={voiceThread}
             />
+            {/* A live call is a different promise from dictation — the agent
+                talks back — so it gets its own adjacent control rather than a
+                sixth state on the mic. Also explicit per click: no call opens
+                without one, and the same button ends it. */}
+            <LiveVoiceComposerControl thread={voiceThread} />
           </>
         }
         onAttach={addFiles}

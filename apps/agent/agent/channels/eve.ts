@@ -33,6 +33,10 @@ import {
   requireAuthorizedResourceScope,
 } from "../lib/scope-authorization"
 import { createReadinessRoute } from "../lib/readiness"
+import {
+  createRealtimeVoiceRoutes,
+  RealtimeVoiceHost,
+} from "../lib/realtime-voice"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const bindingSecret = readOptionalSecretFromFile(
@@ -67,6 +71,7 @@ const compileMessage = createSigilEveOnMessage({
       query,
     }),
 })
+const realtimeVoiceHost = new RealtimeVoiceHost()
 const channel = createOwnedEveChannel({
   auth: async (request) => {
     const auth = await authenticatePrincipal(request)
@@ -165,6 +170,9 @@ export default {
     createReadinessRoute(authenticatePrincipal, {
       applicationToolCount: () => agentToolRegistry.list().length,
     }),
+    // Live voice relays only SDP: the browser's offer in, Codex's answer out.
+    // One host, one live session — the host object holds that lifecycle.
+    ...createRealtimeVoiceRoutes(authenticatePrincipal, realtimeVoiceHost),
   ],
 }
 
