@@ -37,6 +37,7 @@ import {
   createRealtimeVoiceRoutes,
   RealtimeVoiceHost,
 } from "../lib/realtime-voice"
+import { createCoordinatorPlanSession } from "../lib/coordinator-mcp/plan-wiring"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const bindingSecret = readOptionalSecretFromFile(
@@ -174,8 +175,12 @@ export default {
     // One host, one live session — the host object holds that lifecycle, keyed
     // by the application thread the call is bound to. The binding secret is
     // what lets it verify that binding rather than take the browser's word.
+    // planSession (VOX.6.1) grants the live thread the narrow coordinator
+    // surface in place of ambient exec; it is built only from the verified
+    // binding and refuses cleanly without a delegated grant.
     ...createRealtimeVoiceRoutes(authenticatePrincipal, realtimeVoiceHost, {
       bindingSecret,
+      planSession: createCoordinatorPlanSession({ bindingSecret }),
     }),
   ],
 }

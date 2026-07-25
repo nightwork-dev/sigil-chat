@@ -27,6 +27,7 @@
     "@gonk/skills": "0.3.1",
     "@gonk/store": "0.3.1",
     "@gonk/tool-registry": "0.3.1",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@workspace/agent-contracts": "workspace:*",
     "@workspace/agent-tools": "workspace:*",
     "@workspace/artifact-store": "workspace:*",
