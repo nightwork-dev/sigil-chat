@@ -893,6 +893,9 @@ Constraints that follow:
   `version: "v3"` at params validation (`unknown variant v3`). npm ships
   `@openai/codex@alpha` (0.146.0-alpha.10); the ChatGPT desktop app embeds a
   working build at `/Applications/ChatGPT.app/Contents/Resources/codex`.
+  **Both verified**: the npm alpha binary returns the same answer SDP
+  (2026-07-25), so deployments pin `@openai/codex@alpha` and need no desktop
+  app.
 - Do not set `model` with v3; the backend rejects explicit session models for
   Codex realtime sessions.
 - The desktop app's own voice drives this same `thread/realtime/*` JSON-RPC
