@@ -1,4 +1,5 @@
 import type { KvStore } from "@gonk/store/types"
+import { SCOPE_AUTHORIZATION_ACTIONS } from "@workspace/agent-contracts/scope-authorization"
 import { describe, expect, it } from "vitest"
 
 import { ProjectRegistry } from "./project-registry"
@@ -52,6 +53,41 @@ describe("ScopeGrantRegistry", () => {
     expect(grants.listActive()).toEqual([])
     expect(grants.list()).toEqual([revoked])
   })
+
+  // The registry's action validator must track the CONTRACT union, not its own
+  // literal list — "write" was silently rejected for a day because the union
+  // grew (SC.9) and a repeated literal list here did not.
+  it.each(SCOPE_AUTHORIZATION_ACTIONS)(
+    "accepts a grant naming the contract action %s",
+    (action) => {
+      const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
+      projects.upsert({
+        id: "project-home",
+        name: "Home project",
+        description: "Canonical home.",
+        members: [{ principalId: "user-owner", role: "owner" }],
+        settings: {},
+        createdAt: "2026-07-21T12:00:00.000Z",
+        createdBy: "user-owner",
+      })
+      const workspaces = new WorkspaceRegistry({
+        projects,
+        store: memoryKv(new Map()),
+      })
+      const grants = new ScopeGrantRegistry({
+        scopes: new ProjectWorkspaceScopeRegistry(projects, workspaces),
+        store: memoryKv(new Map()),
+      })
+
+      const grant = grants.create({
+        actions: [action],
+        createdBy: "user-owner",
+        principalId: "user-grantee",
+        resourceScope: "project:project-home",
+      })
+      expect(grant.actions).toEqual([action])
+    },
+  )
 
   it("rejects a grant for a non-existent resource identity", () => {
     const projects = new ProjectRegistry({ store: memoryKv(new Map()) })
