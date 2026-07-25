@@ -267,6 +267,59 @@ describe("thread binding", () => {
     expect(fake.ended()).toBe(1)
   })
 
+  // P1: the readout is allowed to say "bound" only because the server said
+  // so. These two tests are the whole difference between describing a real
+  // server-side binding and dressing up a UI association as one.
+  it("marks the binding confirmed when the server names the same thread", async () => {
+    const store = createVoiceSessionStore()
+    const fake = fakePrimitives({
+      exchange: () =>
+        Promise.resolve({
+          threadId: "realtime-1",
+          answerSdp: ANSWER_SDP,
+          boundApplicationThreadId: THREAD.threadId,
+        }),
+    })
+    const el = mount({ primitives: fake.primitives, store })
+
+    await click(el)
+
+    expect(state(el)).toBe("live")
+    expect(store.getSnapshot().boundConfirmed).toBe(true)
+  })
+
+  it("leaves the binding unconfirmed when the server confirms nothing", async () => {
+    const store = createVoiceSessionStore()
+    const el = mount({ primitives: fakePrimitives().primitives, store })
+
+    await click(el)
+
+    expect(state(el)).toBe("live")
+    expect(store.getSnapshot().bound?.threadId).toBe(THREAD.threadId)
+    expect(store.getSnapshot().boundConfirmed).toBeUndefined()
+  })
+
+  it("refuses to open a call with no conversation to bind to", async () => {
+    const store = createVoiceSessionStore()
+    const exchange = vi.fn(() =>
+      Promise.resolve({ threadId: "realtime-1", answerSdp: ANSWER_SDP }),
+    )
+    const el = mount({
+      primitives: fakePrimitives({ exchange }).primitives,
+      store,
+      thread: undefined,
+    })
+
+    await click(el)
+
+    // Since the server binds the call to a thread, a thread-less call cannot
+    // be opened at all — and saying so beats a call that comes up unbound.
+    expect(state(el)).toBe("error")
+    expect(exchange).not.toHaveBeenCalled()
+    expect(store.getSnapshot().bound).toBeUndefined()
+    expect(el.textContent?.toLowerCase()).toContain("conversation")
+  })
+
   it("does not steal a binding another thread already holds", async () => {
     const store = createVoiceSessionStore()
     store.requestBinding({

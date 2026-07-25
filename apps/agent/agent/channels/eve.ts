@@ -171,8 +171,12 @@ export default {
       applicationToolCount: () => agentToolRegistry.list().length,
     }),
     // Live voice relays only SDP: the browser's offer in, Codex's answer out.
-    // One host, one live session — the host object holds that lifecycle.
-    ...createRealtimeVoiceRoutes(authenticatePrincipal, realtimeVoiceHost),
+    // One host, one live session — the host object holds that lifecycle, keyed
+    // by the application thread the call is bound to. The binding secret is
+    // what lets it verify that binding rather than take the browser's word.
+    ...createRealtimeVoiceRoutes(authenticatePrincipal, realtimeVoiceHost, {
+      bindingSecret,
+    }),
   ],
 }
 
