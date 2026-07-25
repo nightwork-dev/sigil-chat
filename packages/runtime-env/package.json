@@ -26,6 +26,7 @@
     "./config": "./src/config.ts",
     "./project-root": "./src/project-root.ts",
     "./topology": "./src/topology.ts",
-    "./server": "./src/server.ts"
+    "./server": "./src/server.ts",
+    "./voice": "./src/voice.ts"
   }
 }
