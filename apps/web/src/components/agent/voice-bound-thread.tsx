@@ -41,7 +41,10 @@ export function VoiceBoundThread({
       <Link
         className="flex min-w-0 items-center gap-1.5 text-primary hover:underline"
         data-testid="voice-bound-thread-link"
-        title={`Voice is bound to ${bound.title}`}
+        // "Opened from", not "bound to": the server-side realtime thread is
+        // not this Eve thread yet (see LIVE-VOICE-HARNESS-ASSESSMENT — P1).
+        // The label must not claim a binding the backend does not have.
+        title={`Voice opened from ${bound.title} — separate voice agent (experimental)`}
         to={voiceBoundThreadHref(bound)}
       >
         {/* The mic icon is the one thing that says "this readout is about
