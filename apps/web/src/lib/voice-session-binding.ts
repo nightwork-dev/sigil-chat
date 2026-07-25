@@ -60,6 +60,11 @@ export function resolveVoiceBindingRequest(
 export interface VoiceSessionSnapshot {
   /** The thread capturing this voice session, if one is live. */
   readonly bound?: VoiceBoundThread
+  /** The server confirmed the live call really is bound to `bound` (P1).
+   *  Until it does, this is a UI association only — the readout says "opened
+   *  from", never "bound to", because the backend had no such binding before
+   *  P1 and a call can still come up without one. */
+  readonly boundConfirmed?: boolean
   /** A different thread that asked for voice while `bound` was live. Held,
    *  not applied — the user resolves it. */
   readonly pendingRebind?: VoiceBoundThread
@@ -87,6 +92,10 @@ export interface VoiceSessionStore {
     thread: VoiceBoundThread,
     handle?: VoiceCaptureHandle,
   ) => VoiceBindingDecision
+  /** The server answered that the live call is bound to this thread. Only the
+   *  currently bound thread can be confirmed — a stale or mismatched id is a
+   *  no-op, so a late answer can never dress up a binding that moved on. */
+  readonly confirmBinding: (threadId: string) => void
   /** End the live capture through its own owner. Freeing voice is the only
    *  thing another surface may do to a capture it does not own. */
   readonly stopBound: () => void
@@ -121,9 +130,14 @@ export function createVoiceSessionStore(): VoiceSessionStore {
         commit({ bound: thread })
       }
       if (decision === "needs-confirmation") {
-        commit({ bound: snapshot.bound, pendingRebind: thread })
+        commit({ ...snapshot, pendingRebind: thread })
       }
       return decision
+    },
+    confirmBinding(threadId) {
+      if (snapshot.bound?.threadId !== threadId) return
+      if (snapshot.boundConfirmed) return
+      commit({ ...snapshot, boundConfirmed: true })
     },
     stopBound() {
       if (!snapshot.bound) return
@@ -141,7 +155,8 @@ export function createVoiceSessionStore(): VoiceSessionStore {
     },
     dismissPendingRebind() {
       if (!snapshot.pendingRebind) return
-      commit({ bound: snapshot.bound })
+      const { pendingRebind: _dropped, ...kept } = snapshot
+      commit(kept)
     },
     releaseOwned(threadId) {
       if (snapshot.bound?.threadId !== threadId) return

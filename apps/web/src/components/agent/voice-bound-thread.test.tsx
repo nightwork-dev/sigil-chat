@@ -82,6 +82,50 @@ describe("VoiceBoundThread", () => {
     expect(link?.getAttribute("href")).toBe("/sessions/ab12cd34")
   })
 
+  // P1: "opened from" and "bound to" are different promises about the
+  // backend, so the readout may only make the second one once the server has
+  // confirmed the binding it verified.
+  it("says the call was opened from the thread until the server confirms it", async () => {
+    const store = createVoiceSessionStore()
+    store.requestBinding(PRICING)
+    const el = await render(<VoiceBoundThread store={store} />)
+
+    const title = el
+      .querySelector("[data-testid='voice-bound-thread-link']")
+      ?.getAttribute("title")
+    expect(title).toContain("opened from")
+    expect(title).not.toContain("is live on")
+  })
+
+  it("says voice is live on the thread once the server confirms the binding", async () => {
+    const store = createVoiceSessionStore()
+    store.requestBinding(PRICING)
+    const el = await render(<VoiceBoundThread store={store} />)
+
+    act(() => store.confirmBinding(PRICING.threadId))
+
+    expect(
+      el
+        .querySelector("[data-testid='voice-bound-thread-link']")
+        ?.getAttribute("title"),
+    ).toBe(`Voice is live on ${PRICING.title}`)
+  })
+
+  it("ignores a confirmation for a thread that does not hold the binding", async () => {
+    const store = createVoiceSessionStore()
+    store.requestBinding(PRICING)
+    const el = await render(<VoiceBoundThread store={store} />)
+
+    act(() => store.confirmBinding(ROADMAP.threadId))
+
+    expect(store.getSnapshot().boundConfirmed).toBeUndefined()
+    expect(
+      el
+        .querySelector("[data-testid='voice-bound-thread-link']")
+        ?.getAttribute("title"),
+    ).toContain("opened from")
+  })
+
   it("keeps container containment in the href when the thread has it", () => {
     expect(
       voiceBoundThreadHref({

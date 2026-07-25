@@ -166,6 +166,32 @@ describe("the offer the browser builds", () => {
   })
 })
 
+describe("the server's confirmation of the thread binding", () => {
+  // P1: the UI may claim a call is bound to a conversation only on the
+  // server's own word, so the confirmation has to survive the negotiation
+  // rather than being reconstructed from what the browser asked for.
+  it("carries the confirmed application thread through to the session", async () => {
+    const test = harness({
+      exchange: () =>
+        Promise.resolve({
+          threadId: "realtime-1",
+          answerSdp: ANSWER_SDP,
+          boundApplicationThreadId: "thread-42",
+        }),
+    })
+
+    const session = await startRealtimeVoiceSession(test.primitives)
+
+    expect(session.boundApplicationThreadId).toBe("thread-42")
+  })
+
+  it("leaves the session unconfirmed when the server did not say", async () => {
+    const session = await startRealtimeVoiceSession(harness().primitives)
+
+    expect(session.boundApplicationThreadId).toBeUndefined()
+  })
+})
+
 describe("cleanup on every exit path", () => {
   it("a refused microphone opens no peer connection and reports the mic message", async () => {
     const test = harness({ microphoneFails: true })

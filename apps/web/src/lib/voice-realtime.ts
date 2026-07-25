@@ -82,11 +82,19 @@ export interface RealtimeVoicePrimitives {
 }
 
 export type RealtimeOfferExchange =
-  | { readonly threadId: string; readonly answerSdp: string }
+  | {
+      readonly threadId: string
+      readonly answerSdp: string
+      /** Present only when the server verified the call against a real
+       *  application thread (P1). The UI may claim a binding only on this. */
+      readonly boundApplicationThreadId?: string
+    }
   | { readonly error: string }
 
 export interface RealtimeVoiceSession {
   readonly threadId: string
+  /** The application thread the server confirmed this call is bound to. */
+  readonly boundApplicationThreadId?: string
   /** Idempotent. Stops the microphone, closes the peer connection, releases
    *  playback, and tells the host to end the realtime session. */
   readonly stop: () => void
@@ -173,7 +181,13 @@ export async function startRealtimeVoiceSession(
       sdp: exchange.answerSdp,
     })
 
-    return { threadId: exchange.threadId, stop }
+    return {
+      threadId: exchange.threadId,
+      ...(exchange.boundApplicationThreadId
+        ? { boundApplicationThreadId: exchange.boundApplicationThreadId }
+        : {}),
+      stop,
+    }
   } catch (error) {
     stop()
     throw error instanceof RealtimeVoiceError
@@ -186,32 +200,44 @@ export async function startRealtimeVoiceSession(
   }
 }
 
+interface RealtimeOfferInput {
+  offerSdp: string
+  applicationThreadId: string
+}
+
 const exchangeRealtimeOfferFn = createServerFn({ method: "POST" })
-  .validator((offerSdp: string) => offerSdp)
+  .validator((input: RealtimeOfferInput) => input)
   .handler(async ({ data }): Promise<RealtimeOfferExchange> => {
     const { exchangeRealtimeOffer } = await import("./voice-realtime.server")
     return exchangeRealtimeOffer(data)
   })
 
-const stopRealtimeVoiceFn = createServerFn({ method: "POST" }).handler(
-  async (): Promise<boolean> => {
+const stopRealtimeVoiceFn = createServerFn({ method: "POST" })
+  .validator((applicationThreadId: string) => applicationThreadId)
+  .handler(async ({ data }): Promise<boolean> => {
     const { requestRealtimeStop } = await import("./voice-realtime.server")
-    return requestRealtimeStop()
-  },
-)
+    return requestRealtimeStop(data)
+  })
 
 /** The browser's exchange step: same-origin, session-cookie authenticated,
- *  and it never sees the Eve service token that the server side uses. */
+ *  and it never sees the Eve service token that the server side uses. The
+ *  thread id is the browser's only contribution to the binding — the proofs
+ *  that make it authoritative are minted on the server. */
 export function exchangeRealtimeOfferFromBrowser(
   offerSdp: string,
+  applicationThreadId: string,
 ): Promise<RealtimeOfferExchange> {
-  return exchangeRealtimeOfferFn({ data: offerSdp }).catch(() => ({
+  return exchangeRealtimeOfferFn({
+    data: { offerSdp, applicationThreadId },
+  }).catch(() => ({
     error: "Live voice is unavailable right now.",
   }))
 }
 
-export function endRealtimeVoiceFromBrowser(): Promise<boolean> {
-  return stopRealtimeVoiceFn().catch(() => false)
+export function endRealtimeVoiceFromBrowser(
+  applicationThreadId: string,
+): Promise<boolean> {
+  return stopRealtimeVoiceFn({ data: applicationThreadId }).catch(() => false)
 }
 
 /** Real microphone capture. Only reachable in a browser. */

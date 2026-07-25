@@ -33,7 +33,7 @@ export function VoiceBoundThread({
 }: {
   store?: VoiceSessionStore
 }) {
-  const { bound, pendingRebind } = useVoiceSession(store)
+  const { bound, boundConfirmed, pendingRebind } = useVoiceSession(store)
   if (!bound) return null
 
   return (
@@ -41,10 +41,15 @@ export function VoiceBoundThread({
       <Link
         className="flex min-w-0 items-center gap-1.5 text-primary hover:underline"
         data-testid="voice-bound-thread-link"
-        // "Opened from", not "bound to": the server-side realtime thread is
-        // not this Eve thread yet (see LIVE-VOICE-HARNESS-ASSESSMENT — P1).
-        // The label must not claim a binding the backend does not have.
-        title={`Voice opened from ${bound.title} — separate voice agent (experimental)`}
+        // "Bound to" only once the server said so (P1): it verifies the
+        // signed thread binding and answers with the thread it bound the call
+        // to. Without that confirmation this is a UI association and the label
+        // says so — see LIVE-VOICE-HARNESS-ASSESSMENT.
+        title={
+          boundConfirmed
+            ? `Voice is live on ${bound.title}`
+            : `Voice opened from ${bound.title} — separate voice agent (experimental)`
+        }
         to={voiceBoundThreadHref(bound)}
       >
         {/* The mic icon is the one thing that says "this readout is about

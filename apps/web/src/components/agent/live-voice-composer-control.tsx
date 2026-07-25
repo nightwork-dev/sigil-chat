@@ -41,10 +41,12 @@ import {
 
 const DICTATION_ACTIVE =
   "Finish dictation before starting a live voice call."
+const NO_THREAD = "Open a conversation before starting a live voice call."
 
 export interface LiveVoiceComposerControlProps {
-  /** The thread this call belongs to. Omitted on composers with no thread of
-   *  their own — the call still works, it just has no binding to announce. */
+  /** The thread this call belongs to. A call REQUIRES one since P1: the
+   *  server binds the call to it and refuses an offer that names none, so a
+   *  composer with no thread yet (one still loading) cannot start a call. */
   readonly thread?: VoiceBoundThread
   readonly disabled?: boolean
   readonly store?: VoiceSessionStore
@@ -111,19 +113,32 @@ export function LiveVoiceComposerControl({
     [release],
   )
 
-  const defaults = useMemo<RealtimeVoicePrimitives>(
-    () => ({
-      getMicrophone: browserMicrophone,
-      createPeerConnection: browserPeerConnection,
-      createAudioSink: browserAudioSink,
-      exchange: exchangeRealtimeOfferFromBrowser,
-      endSession: endRealtimeVoiceFromBrowser,
-    }),
-    [],
+  // The thread rides into both server calls: the offer binds to it, and the
+  // stop names the call it means so it cannot end one on another thread.
+  const defaults = useMemo<RealtimeVoicePrimitives | undefined>(
+    () =>
+      thread
+        ? {
+            getMicrophone: browserMicrophone,
+            createPeerConnection: browserPeerConnection,
+            createAudioSink: browserAudioSink,
+            exchange: (offerSdp) =>
+              exchangeRealtimeOfferFromBrowser(offerSdp, thread.threadId),
+            endSession: () => endRealtimeVoiceFromBrowser(thread.threadId),
+          }
+        : undefined,
+    [thread],
   )
 
   const start = useCallback(() => {
     if (state === "connecting" || state === "live") return
+    if (!thread || !defaults) {
+      // Since P1 a call is bound to a real application thread server-side, so
+      // there is no thread-less call to fall back to.
+      setErrorMessage(NO_THREAD)
+      setState((current) => nextLiveVoiceState(current, "fail"))
+      return
+    }
     if (audioFocus.isCapturing()) {
       // Dictation holds the microphone. Opening a duplex call on top of it
       // would put two features on one device with no way to tell which one
@@ -132,20 +147,18 @@ export function LiveVoiceComposerControl({
       setState((current) => nextLiveVoiceState(current, "fail"))
       return
     }
-    if (thread) {
-      const decision = store.requestBinding(thread, {
-        stop: () => stopRef.current(),
-      })
-      if (decision === "needs-confirmation") {
-        // Voice is live on another thread. The click parks a request — it does
-        // not steal the binding and does not open a call here. The shell
-        // readout now carries the choice.
-        return
-      }
-      // Only claim ownership of a binding this call actually created; an
-      // already-bound thread belongs to whoever bound it.
-      if (decision === "bind") ownedThreadRef.current = thread.threadId
+    const decision = store.requestBinding(thread, {
+      stop: () => stopRef.current(),
+    })
+    if (decision === "needs-confirmation") {
+      // Voice is live on another thread. The click parks a request — it does
+      // not steal the binding and does not open a call here. The shell
+      // readout now carries the choice.
+      return
     }
+    // Only claim ownership of a binding this call actually created; an
+    // already-bound thread belongs to whoever bound it.
+    if (decision === "bind") ownedThreadRef.current = thread.threadId
 
     setErrorMessage(undefined)
     setState((current) => nextLiveVoiceState(current, "start"))
@@ -170,6 +183,12 @@ export function LiveVoiceComposerControl({
           return
         }
         sessionRef.current = session
+        // Only the server's own answer may upgrade the readout from "opened
+        // from" to "bound": a call that came up without a confirmed binding
+        // stays described as the association it actually is.
+        if (session.boundApplicationThreadId === thread.threadId) {
+          store.confirmBinding(thread.threadId)
+        }
         setState((current) => nextLiveVoiceState(current, "connected"))
       })
       .catch((error: unknown) => {
