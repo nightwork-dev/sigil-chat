@@ -18,6 +18,7 @@ import { AccountMenu } from "@/components/account-menu"
 import { fetchCurrentSession } from "@/lib/auth/route-guard"
 import { WorkspaceAttentionProvider } from "@/components/agent/workspace-attention"
 import { ShellAgentHud } from "@/components/agent/shell-agent-hud"
+import { GazeCaptureController } from "@/components/agent/gaze-capture-controller"
 import { ShellOmnibar } from "@/components/agent/shell-omnibar"
 import {
   ContainerBreadcrumb,
@@ -121,6 +122,7 @@ function AppLayout() {
               >
                 <Outlet />
                 <ShellAgentHud />
+                <GazeCaptureController />
                 <ShellOmnibar />
               </SidebarShell>
             </AgentSurfaceProvider>

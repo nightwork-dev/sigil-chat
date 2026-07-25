@@ -46,6 +46,9 @@ import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
 import { LiveVoiceComposerControl } from "@/components/agent/live-voice-composer-control"
 import { VoiceConversationControl } from "@/components/agent/voice-conversation-control"
+import { GazeConsentControl } from "@/components/agent/gaze-consent-control"
+import { usePortraitAcknowledged } from "@/lib/gaze/gaze-capture-store"
+import { gazeVoiceAddressee } from "@/lib/gaze/meet-gaze"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
@@ -151,6 +154,16 @@ export function AgentChat({
   // hear answers while still typing their questions gets that without
   // auto-send, which is the half that can send words they did not mean.
   const [conversationMode, setConversationMode] = useState(false)
+  // VOX.7 capability 2b: in a voice conversation, looking at the agent while
+  // you speak marks the turn as addressed to it. Advisory only — the gaze rides
+  // the same attention envelope every turn already sends (the presence portrait
+  // is a gaze region), so this is purely the legible cue, never a gate.
+  const portraitAcknowledged = usePortraitAcknowledged()
+  const addressingAgent =
+    gazeVoiceAddressee({
+      acknowledged: portraitAcknowledged,
+      conversationActive: conversationMode,
+    }) === "agent"
   const speakRepliesPreference = useSpeakReplies()
   useSpokenAgentReplies({
     enabled: conversationMode || speakRepliesPreference,
@@ -247,6 +260,12 @@ export function AgentChat({
         "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden",
         className,
       )}
+      // A gaze region (VOX.7): looking here surfaces "Conversation" as advisory
+      // attention. The nested presence portrait opts in separately and wins by
+      // nearest-ancestor, so meeting the agent's gaze stays distinct from
+      // looking at the transcript.
+      data-gaze-id="conversation"
+      data-gaze-label="Conversation"
     >
       {!hideHeader ? (
         <AgentChatHeader
@@ -350,6 +369,17 @@ export function AgentChat({
             {/* The mode switch sits immediately before the mic it changes:
                 with it on, the same press-to-talk gesture sends instead of
                 drafting, and Eve's finished replies are spoken back. */}
+            {/* Appears only while a voice conversation is on AND the user has
+                met the agent's gaze — text that changes with real state, so
+                it's information; primary tone = the active addressee. */}
+            {addressingAgent ? (
+              <span
+                className="hidden text-[11px] text-primary sm:inline"
+                title="You're looking at the agent — this turn is marked as addressed to it"
+              >
+                Addressing the agent
+              </span>
+            ) : null}
             <VoiceConversationControl
               active={conversationMode}
               onChange={setConversationMode}
@@ -370,6 +400,11 @@ export function AgentChat({
                 sixth state on the mic. Also explicit per click: no call opens
                 without one, and the same button ends it. */}
             <LiveVoiceComposerControl thread={voiceThread} />
+            {/* Gaze rides beside the audio inputs because it is the same kind
+                of promise: a sensor the user turns on to give the agent more
+                of what they mean. Same restraint, same reversibility — nothing
+                captures until pressed, and the same press turns it off. */}
+            <GazeConsentControl />
           </>
         }
         onAttach={addFiles}

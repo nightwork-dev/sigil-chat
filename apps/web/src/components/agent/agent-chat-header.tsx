@@ -42,6 +42,7 @@ import { ContextTray } from "@/components/agent/context-tray"
 import { ProjectWorkspaceNav } from "@/components/agent/project-workspace-nav"
 import { SessionBlackboard } from "@/components/agent/session-blackboard"
 import { AgentPortrait } from "@/components/agents/agent-portrait"
+import { AgentPresencePortrait } from "@/components/agent/agent-presence-portrait"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRoster, type AgentPersonaSummary } from "@/lib/agent-profile"
 import { deriveThreadProjectId } from "@/lib/agent-thread-containers"
@@ -85,9 +86,8 @@ export function AgentChatHeader({
   const session = useAppAgentSession(providedSession)
   const personaId = useAgentPersonaSession()
   const roster = useAgentRoster()
-  const personaName = roster.data?.find(
-    (persona) => persona.id === personaId,
-  )?.name
+  const activePersona = roster.data?.find((persona) => persona.id === personaId)
+  const personaName = activePersona?.name
   const attention = useAttention()
   const threadControls = useAgentThreadControls()
   const busy = isAgentSessionBusy(session)
@@ -122,6 +122,13 @@ export function AgentChatHeader({
     <div className={agentChatHeaderClasses(variant, showLeading)}>
       {showLeading ? (
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          {activePersona ? (
+            <AgentPresencePortrait
+              personaId={activePersona.id}
+              name={activePersona.name}
+              hasPortrait={activePersona.hasPortrait}
+            />
+          ) : null}
           {showStatus && showStatusIndicator ? (
             <AgentStatusIndicator status={session.status} />
           ) : null}
