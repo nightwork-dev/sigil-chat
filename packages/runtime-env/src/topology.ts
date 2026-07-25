@@ -8,7 +8,13 @@ export type RuntimeEnvironmentErrorCode =
   | "INVALID_PATH_BASE"
   | "INVALID_PORT"
   | "INVALID_SECRET"
-  | "INVALID_STORAGE_PATH";
+  | "INVALID_STORAGE_PATH"
+  | "INVALID_VOICE_PROFILE"
+  | "INVALID_VOICE_FORMAT"
+  /** A voice provider that only runs on Apple Silicon reached a server
+   *  deployment. Distinct from a malformed value: the setting is well-formed,
+   *  it is just unrunnable where it landed. */
+  | "UNPORTABLE_VOICE_PROVIDER";
 
 export class RuntimeEnvironmentError extends Error {
   override readonly name = "RuntimeEnvironmentError";
