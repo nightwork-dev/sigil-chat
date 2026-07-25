@@ -908,5 +908,24 @@ Constraints that follow:
   synthetic, which suffices to prove call admission; a real browser offer is
   the next integration step.
 
+Schema-verified param shapes (from `codex app-server generate-json-schema
+--experimental`, 0.146.0-alpha — stronger evidence than the earlier strings
+dump): `thread/realtime/appendText` is `{threadId, text, role?}` with role in
+`user|developer|assistant`; `appendSpeech` is `{threadId, text}`; `stop` is
+`{threadId}`; the error notification is `{threadId, message}`; `version` is a
+real enum `v1|v2|v3`. The start params also carry `clientManagedHandoffs`,
+`codexResponseHandoffMode` (`thinking|commentary|bemTags`),
+`codexResponseHandoffChannelPrefixes`, `flushTranscriptTailOnSessionEnd`,
+`voice`, `prompt`, and `initialItems` — deliberately unwired until the
+delegation story. Operational note: `-c mcp_servers={}` does NOT silence MCP
+startup traffic (~20 `mcpServer/startupStatus/updated` notifications precede
+realtime start); never treat notification volume as progress.
+
+The production client (`apps/agent/agent/lib/realtime-appserver.ts`) has been
+verified LIVE end to end — real thread, real answer SDP, subscription OAuth
+only. Rerun that check any time with
+`docs/specs/evidence/realtime-live-check.mjs` (needs `codex login`, network,
+and a ≥0.146-alpha binary via `SIGIL_CODEX_BIN`; not CI-safe by design).
+
 US-001 of the app-server plan (prove the surface) therefore PASSES, and duplex
 is no longer blocked on entitlement — only on engineering.
