@@ -43,11 +43,15 @@ import { cn } from "@workspace/ui/lib/utils"
 import { AddMenu } from "@/components/agent/add-menu"
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
+import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
+import { useAgentThread } from "@/lib/agent-threads"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
+import { appendDictationDraft } from "@/lib/voice-dictation"
+import type { VoiceBoundThread } from "@/lib/voice-session-binding"
 import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
   AGENT_SCOPE_HEADER,
@@ -119,6 +123,24 @@ export function AgentChat({
     isUploading: attachmentsUploading,
     ready,
   } = useAttachments({ upload: uploadFile })
+
+  // The thread a live dictation binds to. `/sessions/$threadSlug` is the
+  // resolver route, so one link from anywhere lands on this thread's
+  // canonical containment without this component guessing at it.
+  const activeThreadId = threadControls?.activeThreadId
+  const activeThread = useAgentThread(activeThreadId, Boolean(activeThreadId))
+  const voiceThread: VoiceBoundThread | undefined = activeThread.data
+    ? {
+        threadId: activeThread.data.id,
+        threadSlug: activeThread.data.slug,
+        title: activeThread.data.title,
+      }
+    : undefined
+
+  // Dictation ADDS to whatever is in the composer; it never replaces typing.
+  const handleDictationDraft = useCallback((text: string) => {
+    setInput((current) => appendDictationDraft(current, text))
+  }, [])
 
   const handleAttachUrl = useCallback(
     (url: string) => addUrl(url, { mediaType: imageMediaTypeFromUrl(url) }),
@@ -288,7 +310,18 @@ export function AgentChat({
               )
             : undefined
         }
-        trailingControls={hideHeader ? <ModelLabel /> : undefined}
+        trailingControls={
+          <>
+            {hideHeader ? <ModelLabel /> : null}
+            {/* Dictation is opt-in per click — there is no listening mode to
+                turn on, so the control is always present and always resting
+                until pressed. */}
+            <ComposerVoiceControl
+              onDraft={handleDictationDraft}
+              thread={voiceThread}
+            />
+          </>
+        }
         onAttach={addFiles}
         onAttachUrl={handleAttachUrl}
         onChange={setInput}

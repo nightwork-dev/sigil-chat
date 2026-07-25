@@ -24,6 +24,7 @@ import {
   useHideBreadcrumbPage,
 } from "@/components/agent/container-breadcrumb"
 import { AgentRailStatus } from "@/components/agent/agent-rail-status"
+import { VoiceBoundThread } from "@/components/agent/voice-bound-thread"
 import { SessionListPane } from "@/components/agent/session-list-pane"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
@@ -80,6 +81,11 @@ function AppLayout() {
   // rail already carry everything it would duplicate) via the route's
   // `staticData.rail.hideStatusRail`. The theme picker lives in the sidebar
   // footer with the account menu, not the rail.
+  //
+  // The top rail is the one chrome element every route keeps, so the
+  // live-voice binding readout rides beside the breadcrumb — the only place
+  // it is guaranteed to be visible from any route (it renders nothing at all
+  // unless a capture is live).
   return (
     <AgentPrincipalProvider principalId={user.id}>
       <ActiveContainerProvider>
@@ -95,7 +101,12 @@ function AppLayout() {
                     <AccountMenu user={user} />
                   </>
                 }
-                breadcrumbContext={<ContainerBreadcrumb />}
+                breadcrumbContext={
+                  <>
+                    <ContainerBreadcrumb />
+                    <VoiceBoundThread />
+                  </>
+                }
                 hideBreadcrumbPage={hideBreadcrumbPage}
                 viewContent={<ViewRailTop />}
                 statusRailStart={<ViewRailStatusStart />}
