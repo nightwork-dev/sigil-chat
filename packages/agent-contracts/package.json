@@ -19,6 +19,7 @@
   "exports": {
     "./capability-manifest": "./src/capability-manifest.ts",
     "./client-command": "./src/client-command.ts",
+    "./coordinator-authority": "./src/coordinator-authority.ts",
     "./scope-authorization": "./src/scope-authorization.ts",
     "./scope-delegation": "./src/scope-delegation.ts",
     "./scope-delegation.server": "./src/scope-delegation.server.ts",

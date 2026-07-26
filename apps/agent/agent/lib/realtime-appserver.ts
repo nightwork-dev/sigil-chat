@@ -114,6 +114,10 @@ export type RealtimeAppServerDiagnostic =
 export interface RealtimeAppServerOptions {
   spawn?: SpawnAppServer
   env?: NodeJS.ProcessEnv
+  /** App-server argv. Defaults to CODEX_APP_SERVER_ARGS (mcp_servers={}); the
+   *  live-voice coordinator path overrides it to launch against an isolated
+   *  CODEX_HOME whose config.toml defines the one coordinator MCP server. */
+  args?: readonly string[]
   clientInfo?: { name: string; title: string; version: string }
   startTimeoutMs?: number
   onDiagnostic?: (diagnostic: RealtimeAppServerDiagnostic) => void
@@ -338,9 +342,13 @@ export class RealtimeAppServerClient {
 
   #ensureChild(): AppServerChild {
     if (this.#child) return this.#child
-    const child = this.#spawn(resolveCodexBinary(this.#options.env), CODEX_APP_SERVER_ARGS, {
-      env: this.#options.env ?? process.env,
-    })
+    const child = this.#spawn(
+      resolveCodexBinary(this.#options.env),
+      this.#options.args ?? CODEX_APP_SERVER_ARGS,
+      {
+        env: this.#options.env ?? process.env,
+      },
+    )
     this.#child = child
 
     child.stdout.on("data", (chunk) => this.#consume(String(chunk)))

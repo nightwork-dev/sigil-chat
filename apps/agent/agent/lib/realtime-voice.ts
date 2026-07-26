@@ -30,10 +30,7 @@ import type { AgentSessionBindingPayload } from "@workspace/agent-contracts/sess
 import { AGENT_SESSION_BINDING_HEADER } from "@workspace/agent-contracts/session-binding"
 import { readAgentSessionBinding } from "@workspace/agent-contracts/session-binding.server"
 
-import {
-  RealtimeAppServerClient,
-  RealtimeAppServerError,
-} from "./realtime-appserver"
+import { RealtimeAppServerError } from "./realtime-appserver"
 import { requireAuthorizedResourceScope } from "./scope-authorization"
 
 export const REALTIME_OFFER_PATH = "/sigil/v1/realtime/offer"
@@ -91,8 +88,32 @@ export class RealtimeVoiceCancelledError extends Error {
   }
 }
 
+/** No hardened launch plan was available, so the host refused to start rather
+ *  than fall back to ambient authority. */
+export class RealtimeVoiceLaunchError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "RealtimeVoiceLaunchError"
+  }
+}
+
 export interface RealtimeVoiceHostOptions {
   createClient?: () => RealtimeVoiceClient
+}
+
+/**
+ * A per-session launch plan. VOX.5 always used the host's default client and
+ * the containment prompt; VOX.6.1 lets the offer route hand the host a client
+ * configured for an isolated CODEX_HOME (the coordinator MCP surface) plus the
+ * prompt that goes with it, and a `dispose` that tears down the per-session
+ * home. Absent, the host falls back to the containment-only behaviour — which
+ * stays the correct secure default when the coordinator cannot be wired.
+ */
+export interface RealtimeVoiceSessionPlan {
+  createClient(): RealtimeVoiceClient
+  prompt: string
+  /** Release per-session resources (the isolated CODEX_HOME). Idempotent. */
+  dispose?: () => Promise<void>
 }
 
 /**
@@ -135,6 +156,7 @@ interface LiveSession {
   client: RealtimeVoiceClient
   owner: RealtimeVoiceCallOwner
   threadId: string
+  disposePlan?: () => Promise<void>
 }
 
 /**
@@ -148,10 +170,26 @@ export class RealtimeVoiceHost {
    *  process behind it — and starting a realtime session is SLOW (codex emits
    *  its whole MCP startup sequence first), so cancel-during-connect is the
    *  ordinary path, not the rare one. */
-  #pending: { owner: RealtimeVoiceCallOwner; client: RealtimeVoiceClient } | undefined
+  #pending:
+    | {
+        owner: RealtimeVoiceCallOwner
+        client: RealtimeVoiceClient
+        disposePlan?: () => Promise<void>
+      }
+    | undefined
 
   constructor(options: RealtimeVoiceHostOptions = {}) {
-    this.#createClient = options.createClient ?? (() => new RealtimeAppServerClient())
+    // FAIL CLOSED (Annika Finding 1): the default is NOT an ambient client. A
+    // live session must arrive with a hardened launch plan (createClient) — the
+    // production host is constructed with no default and always started with a
+    // plan; a start without one refuses rather than spawning raw exec.
+    this.#createClient =
+      options.createClient ??
+      (() => {
+        throw new RealtimeVoiceLaunchError(
+          "A live voice session requires a hardened launch plan; refusing to start with ambient authority.",
+        )
+      })
   }
 
   /** The live call, named by the thread it is bound to. */
@@ -169,6 +207,7 @@ export class RealtimeVoiceHost {
   async start(
     owner: RealtimeVoiceCallOwner,
     offerSdp: string,
+    plan?: RealtimeVoiceSessionPlan,
   ): Promise<RealtimeVoiceStartResult> {
     // A start in flight has no live session to compare against yet, so the
     // conflict check has to consult it too — otherwise two simultaneous
@@ -176,6 +215,9 @@ export class RealtimeVoiceHost {
     // codex process with nobody holding a handle to dispose it.
     const holder = this.#live?.owner ?? this.#pending?.owner
     if (holder !== undefined && !sameOwner(holder, owner)) {
+      // The plan's per-session home is ours to release: this call never came
+      // up, so nothing else will dispose it.
+      void plan?.dispose?.()
       throw new RealtimeVoiceConflictError(conflictMessage(holder, owner))
     }
     // The same principal renegotiating the same thread replaces its own
@@ -183,11 +225,14 @@ export class RealtimeVoiceHost {
     // never the second start on a client that already holds one.
     this.#disposeLive("Replaced by a new live voice session.")
 
-    const client = this.#createClient()
-    this.#pending = { owner, client }
+    const client = plan?.createClient
+      ? plan.createClient()
+      : this.#createClient()
+    const disposePlan = plan?.dispose
+    this.#pending = { owner, client, disposePlan }
     try {
       const result = await client.start(offerSdp, {
-        prompt: REALTIME_BOUNDARY_CONTEXT,
+        prompt: plan?.prompt ?? REALTIME_BOUNDARY_CONTEXT,
       })
       // A stop that landed while this was negotiating already disposed the
       // client and cleared the slot. Publishing the session now would hand the
@@ -197,12 +242,13 @@ export class RealtimeVoiceHost {
           "The live voice session was cancelled before it came up.",
         )
       }
-      this.#live = { client, owner, threadId: result.threadId }
+      this.#live = { client, owner, threadId: result.threadId, disposePlan }
       return result
     } catch (error) {
       // A failed start leaves a spawned child behind unless we say otherwise.
       // Dispose is idempotent, so the cancelled path disposing twice is safe.
       client.dispose("The live voice session failed to start.")
+      void disposePlan?.()
       throw error
     } finally {
       if (this.#pending?.client === client) this.#pending = undefined
@@ -224,6 +270,7 @@ export class RealtimeVoiceHost {
       pending.client.dispose(
         "The live voice session was cancelled before it came up.",
       )
+      void pending.disposePlan?.()
       return true
     }
 
@@ -243,6 +290,7 @@ export class RealtimeVoiceHost {
     const live = this.#live
     this.#live = undefined
     live?.client.dispose(reason)
+    void live?.disposePlan?.()
   }
 }
 
@@ -275,6 +323,18 @@ export interface RealtimeVoiceRouteOptions {
     principalId: string
     request: Request
   }) => string | undefined
+  /**
+   * Build the per-session coordinator launch plan from the verified bound
+   * thread (VOX.6.1). Called only AFTER both proofs pass, so a plan is never
+   * built for an unauthorized offer. Returning undefined keeps the
+   * containment-only default — the correct secure behaviour when the
+   * coordinator surface cannot be wired (no binding secret, unresolved scope,
+   * or no delegated grant). It never widens what the offer already authorized.
+   */
+  planSession?: (input: {
+    binding: AgentSessionBindingPayload
+    principalId: string
+  }) => Promise<RealtimeVoiceSessionPlan | undefined>
   now?: () => number
 }
 
@@ -368,10 +428,11 @@ export function createRealtimeVoiceRoutes(
         )
       }
 
+      let binding: AgentSessionBindingPayload
       try {
         // Both proofs before the process: an unauthorized offer must not spawn
         // codex, and must not be distinguishable from any other refusal.
-        requireBoundApplicationThread({
+        binding = requireBoundApplicationThread({
           applicationThreadId,
           now: now(),
           principalId: principal.principalId,
@@ -392,9 +453,16 @@ export function createRealtimeVoiceRoutes(
       }
 
       try {
+        // Built only now, from the verified binding — never from the browser's
+        // claim. Undefined keeps the containment-only default.
+        const plan = await options.planSession?.({
+          binding,
+          principalId: principal.principalId,
+        })
         const { threadId, answerSdp } = await host.start(
           { applicationThreadId, principalId: principal.principalId },
           offerSdp,
+          plan,
         )
         return jsonResponse(200, { threadId, answerSdp, applicationThreadId })
       } catch (error) {
@@ -406,6 +474,11 @@ export function createRealtimeVoiceRoutes(
           error instanceof RealtimeVoiceCancelledError
         ) {
           return errorResponse(409, error.message)
+        }
+        // Fail closed: no hardened launch was available, so no session was
+        // started. Never a fallback to ambient authority (Annika Finding 1).
+        if (error instanceof RealtimeVoiceLaunchError) {
+          return errorResponse(503, error.message)
         }
         // Backend and entitlement refusals arrive as app-server errors and are
         // the whole reason the browser needs a message rather than a code:

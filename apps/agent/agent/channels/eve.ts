@@ -42,6 +42,8 @@ import {
   createRealtimeVoiceRoutes,
   RealtimeVoiceHost,
 } from "../lib/realtime-voice"
+import { createCoordinatorPlanSession } from "../lib/coordinator-mcp/plan-wiring"
+import { sweepStaleCoordinatorHomes } from "../lib/coordinator-mcp/materialize-codex-home"
 
 const authEnvironment = readSigilEveAuthEnvironment()
 const bindingSecret = readOptionalSecretFromFile(
@@ -109,6 +111,9 @@ const compileMessage = createSigilEveOnMessage({
     }),
 })
 const realtimeVoiceHost = new RealtimeVoiceHost()
+// Clear any per-session CODEX_HOMEs a prior crash could not dispose (each holds
+// a 0600 config with the binding secret). Best-effort, never blocks startup.
+void sweepStaleCoordinatorHomes()
 const channel = createOwnedEveChannel({
   auth: async (request) => {
     const auth = await authenticatePrincipal(request)
@@ -211,8 +216,12 @@ export default {
     // One host, one live session — the host object holds that lifecycle, keyed
     // by the application thread the call is bound to. The binding secret is
     // what lets it verify that binding rather than take the browser's word.
+    // planSession (VOX.6.1) grants the live thread the narrow coordinator
+    // surface in place of ambient exec; it is built only from the verified
+    // binding and refuses cleanly without a delegated grant.
     ...createRealtimeVoiceRoutes(authenticatePrincipal, realtimeVoiceHost, {
       bindingSecret,
+      planSession: createCoordinatorPlanSession({ bindingSecret }),
     }),
   ],
 }
