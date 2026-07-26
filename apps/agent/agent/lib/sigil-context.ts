@@ -68,6 +68,20 @@ export interface SigilContextOptions {
     principalId: string
   }) => string
   /**
+   * Host-owned capability manifest projection (VOX.5). Reconstructed from the
+   * verified caller — signed execution binding and authorized resource scope —
+   * and injected each turn so the agent answers who/what-can-see/what-can-change
+   * from one authoritative source rather than inferring it. Returns the rendered
+   * agent-facing block, or undefined when the caller has no execution binding.
+   */
+  capabilityManifest?: (input: {
+    principalId: string
+    personaId: string
+    applicationThreadId: string
+    activeScope: string
+    readableContextScopes: string[]
+  }) => string
+  /**
    * Resolves audience-filtered memory for the latest user turn. The host owns
    * the authenticated identity and returns append-only context; callers must
    * never widen principal, persona, channel, or session through model input.
@@ -120,7 +134,11 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
 
     const blocks: string[] = []
     const compiledContent = compiled.content.trim()
-    if (options.identityFloor || options.recallLatestTurn) {
+    if (
+      options.identityFloor ||
+      options.recallLatestTurn ||
+      options.capabilityManifest
+    ) {
       const principalId = requireNonBlankCallerPrincipal(caller.principalId)
       const personaId = requireCallerPersona(caller)
       const eveSessionId = nonBlank(ctx.eve.sessionId) ?? `new:${principalId}`
@@ -138,6 +156,34 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
           })
           .trim()
         if (identity.length > 0) blocks.push(identity)
+      }
+      if (options.capabilityManifest) {
+        const scopeContext = readExecutionScopeContext(ctx.eve.caller)
+        const applicationThreadId = readExecutionApplicationThreadId(
+          ctx.eve.caller,
+        )
+        // The manifest is meaningful only for a caller with a verified binding.
+        if (scopeContext.focusScopeId && applicationThreadId) {
+          const manifest = options
+            .capabilityManifest({
+              principalId,
+              personaId,
+              applicationThreadId,
+              activeScope: scopeContext.focusScopeId,
+              readableContextScopes: scopeContext.additionalContextScopeIds,
+            })
+            .trim()
+          if (
+            manifest.length > 0 &&
+            (await contextFitsBudget(
+              [...blocks, manifest].join("\n\n"),
+              options.maxTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
+              options.model,
+            ))
+          ) {
+            blocks.push(manifest)
+          }
+        }
       }
       if (options.recallLatestTurn && targetAudience) {
         const recalled = await options.recallLatestTurn({
@@ -362,6 +408,37 @@ function readExecutionHomeScope(
       : undefined
   } catch {
     return undefined
+  }
+}
+
+function readExecutionScopeContext(
+  caller: EveMessageContext["eve"]["caller"],
+): { focusScopeId: string | undefined; additionalContextScopeIds: string[] } {
+  const raw = caller?.attributes.sigilExecutionBinding
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { focusScopeId: undefined, additionalContextScopeIds: [] }
+  }
+  try {
+    const binding = JSON.parse(raw) as Record<string, unknown>
+    const perspective =
+      typeof binding.initialPerspective === "object" &&
+      binding.initialPerspective !== null
+        ? (binding.initialPerspective as Record<string, unknown>)
+        : undefined
+    const focusScopeId =
+      typeof perspective?.focusScopeId === "string"
+        ? nonBlank(perspective.focusScopeId)
+        : undefined
+    const additionalContextScopeIds = Array.isArray(
+      binding.additionalContextScopeIds,
+    )
+      ? binding.additionalContextScopeIds.flatMap((scope) =>
+          typeof scope === "string" && scope.trim().length > 0 ? [scope] : [],
+        )
+      : []
+    return { focusScopeId, additionalContextScopeIds }
+  } catch {
+    return { focusScopeId: undefined, additionalContextScopeIds: [] }
   }
 }
 

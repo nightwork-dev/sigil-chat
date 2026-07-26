@@ -32,6 +32,11 @@ import {
   createScopeGrantPolicy,
   requireAuthorizedResourceScope,
 } from "../lib/scope-authorization"
+import { principalCanMutateScope } from "@workspace/agent-contracts/capability-manifest"
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
+import { createCapabilityManifestContext } from "../lib/capability-manifest-context"
+import { getProjectWorkspaceRegistries } from "../lib/project-workspace-registries"
+import { personalScopeId } from "../lib/personal-scope"
 import { createReadinessRoute } from "../lib/readiness"
 import {
   createRealtimeVoiceRoutes,
@@ -47,6 +52,34 @@ const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
 const requiredSkillIds = readCsvEnv("SIGIL_CONTEXT_REQUIRED_SKILLS")
 const pinnedResourceKeys = readCsvEnv("SIGIL_CONTEXT_PINNED_RESOURCE_KEYS")
 const memorySourcePolicy = createScopeGrantPolicy()
+const { value: sigilConfig } = await loadSigilConfigFixture()
+const capabilityRegistries = getProjectWorkspaceRegistries()
+const capabilityMutationPolicy = createScopeGrantPolicy({
+  registries: capabilityRegistries,
+})
+const capabilityManifestContext = createCapabilityManifestContext({
+  host: {
+    id: "eve",
+    label: "Eve",
+    model: sigilConfig.agent.model,
+  },
+  listTools: () =>
+    agentToolRegistry.list().map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+    })),
+  canMutate: (principalId, scopeId) =>
+    principalCanMutateScope({
+      principalId,
+      scopeId,
+      registries: {
+        scopes: capabilityRegistries.scopes,
+        personalScopes: capabilityRegistries.personalScopes,
+      },
+      policy: capabilityMutationPolicy,
+      personalScopeId,
+    }),
+})
 const compileMessage = createSigilEveOnMessage({
   createCompiler: ({ binding }) =>
     createDefaultSigilContextCompiler({ binding, requiredSkillIds }),
@@ -64,6 +97,10 @@ const compileMessage = createSigilEveOnMessage({
     personaHost(personaId).identityAtSessionStart(
       memoryTurn(eveSessionId, principalId),
     ).markdown,
+  // VOX.5: the same manifest the "What this agent can access" UI shows, rebuilt
+  // here from the verified caller so the agent answers capability questions from
+  // one authoritative source.
+  capabilityManifest: capabilityManifestContext,
   recallLatestTurn: ({ eveSessionId, personaId, principalId, query }) =>
     automaticScopedMemoryRecallForTurn({
       personaId,

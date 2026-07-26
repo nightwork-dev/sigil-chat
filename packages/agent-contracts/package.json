@@ -17,6 +17,7 @@
     "vitest": "^3.2.6"
   },
   "exports": {
+    "./capability-manifest": "./src/capability-manifest.ts",
     "./client-command": "./src/client-command.ts",
     "./scope-authorization": "./src/scope-authorization.ts",
     "./scope-delegation": "./src/scope-delegation.ts",
