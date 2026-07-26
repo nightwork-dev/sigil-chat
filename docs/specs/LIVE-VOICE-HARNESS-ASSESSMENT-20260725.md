@@ -454,20 +454,26 @@ coordinator-authority grants in apps/web/src/lib/coordinator-authority.ts. The
 coordinator speaks on its own for chatter and delegates the real work through
 authorized tools whose results it voices.
 
-## DEPLOYMENT UNLOCKS (2026-07-26, source-verified — appended by the coordinator)
+## DEPLOYMENT FACTS VERIFIED (2026-07-26 — appended by the coordinator)
 
-The assessment above assumed a hard physical dependency: codex >= 0.146-alpha
-existed only as ChatGPT.app's embedded binary on a logged-in Mac. That
-dependency dissolved. Four facts, each verified (vendored source at `61a4488`,
-main 2026-07-26, or npm registry directly — not blog claims):
+Correction of framing (David, 2026-07-26): none of this was ever hard-blocked.
+Codex auth was always portable — Eve deployments already run codex remotely by
+shipping credentials, and this stack's own hardened-launch code copies
+`auth.json` by design. The v3 proof simply ran on ChatGPT.app's embedded
+binary because that was the binary with a live login at proof time, and the
+"embedded-binary dependency" was carried forward as if it were a constraint.
+What changed on 2026-07-26 is that the deployment assumptions became verified
+facts (vendored source at `61a4488`, main 2026-07-26, or npm registry
+directly — not blog claims):
 
-1. INSTALLABLE BINARY: `npm i -g @openai/codex@alpha` now resolves
-   `0.146.0-alpha.10.1` (dist-tag checked 2026-07-26) — a standalone
-   realtime-capable binary on any machine. The live gates and the production
-   runtime no longer depend on ChatGPT.app.
-2. HEADLESS AUTH: `codex login --device-auth` obtains a subscription session
-   without a GUI — the server-deployment answer for how a hosted Eve host
-   logs in.
+1. INSTALLABLE BINARY (already recorded 2026-07-25, reconfirmed):
+   `npm i -g @openai/codex@alpha` resolves `0.146.0-alpha.10.1` — a standalone
+   realtime-capable binary on any machine. The real residual is verification,
+   not availability: v3 backend behavior has not been re-run on this build
+   (see below).
+2. HEADLESS AUTH CONVENIENCE: `codex login --device-auth` obtains a
+   subscription session without a GUI. Credential-copy already worked; this is
+   the cleaner on-server login path, not an unlock.
 3. AUTHENTICATED REMOTE TRANSPORT: `codex app-server --listen` supports
    `--ws-shared-secret-file` bearer auth (`codex-rs/cli/src/main.rs:4098`) plus
    `/readyz` / `/healthz` probes (app-server-transport websocket) and a
