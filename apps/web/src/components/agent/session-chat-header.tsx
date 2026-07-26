@@ -29,6 +29,7 @@ import { AgentSessionSwitcher } from "@/components/agent/agent-chat-header"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRoster } from "@/lib/agent-profile"
+import { AgentAccessControl } from "@/features/capabilities/agent-access-control"
 
 export function SessionChatHeader({ compact }: { compact: boolean }) {
   const session = useAppAgentSession()
@@ -37,8 +38,9 @@ export function SessionChatHeader({ compact }: { compact: boolean }) {
   const personaName = roster.data?.find((p) => p.id === personaId)?.name
   const threadControls = useAgentThreadControls()
   const busy = isAgentSessionBusy(session)
+  const activeThreadId = threadControls?.activeThreadId
   const activeThread = threadControls?.threads.find(
-    (thread) => thread.id === threadControls.activeThreadId,
+    (thread) => thread.id === activeThreadId,
   )
 
   return (
@@ -55,6 +57,11 @@ export function SessionChatHeader({ compact }: { compact: boolean }) {
           {activeThread?.title ?? "Conversation"}
         </span>
       )}
+      {activeThreadId ? (
+        <div className="ml-auto shrink-0">
+          <AgentAccessControl threadId={activeThreadId} />
+        </div>
+      ) : null}
     </div>
   )
 }

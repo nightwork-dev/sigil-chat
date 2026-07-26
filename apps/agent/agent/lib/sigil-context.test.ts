@@ -15,6 +15,7 @@ import {
   createSkillContextContributor,
   type SigilContextOptions,
 } from "./sigil-context"
+import { createCapabilityManifestContext } from "./capability-manifest-context"
 
 const SESSION_AUTH = {
   attributes: sessionAttributes("personal-scope:user-1") as Record<
@@ -179,6 +180,58 @@ describe("Sigil Eve context integration", () => {
     const [payload] = firstSendCall(send)
     expect(JSON.stringify(payload)).toContain("STABLE_IDENTITY_FLOOR")
     expect(JSON.stringify(payload)).toContain("marigold")
+  })
+
+  it("injects the capability manifest, and its contents decide the capability answer", async () => {
+    // A/B (retrieval is not use): the ONLY difference between the two runs is
+    // whether the review tool is in the host's live registry. That difference
+    // flows into the injected context, which is what the agent reads to answer
+    // "can you annotate?" — so the manifest's presence changes the answer.
+    const manifestFor = (toolName: string) =>
+      createCapabilityManifestContext({
+        host: { id: "eve", label: "Eve" },
+        listTools: () => [{ name: toolName, description: "A live tool" }],
+        canMutate: () => true,
+      })
+
+    const runWith = async (toolName: string) => {
+      const channel = testChannel({
+        auth: fullyBoundAuth(),
+        compiler: compilerWith([]),
+        capabilityManifest: manifestFor(toolName),
+      })
+      const send = vi.fn(async () => session())
+      await postSession(channel, send, { message: "What can you change?" })
+      return JSON.stringify(firstSendCall(send)[0])
+    }
+
+    const withReviewTool = await runWith("sigil-review-add-annotation")
+    const withoutReviewTool = await runWith("sigil-ui-highlight")
+
+    expect(withReviewTool).toContain("Your capability manifest")
+    expect(withReviewTool).toContain("sigil-review-add-annotation")
+    expect(withoutReviewTool).not.toContain("sigil-review-add-annotation")
+  })
+
+  it("skips the manifest for a caller without a full execution binding", async () => {
+    // The default session binding carries only a home scope — no focus scope or
+    // application thread — so there is nothing verified to project. The manifest
+    // is a projection of a verified binding, never a fabricated one.
+    const channel = testChannel({
+      compiler: compilerWith([]),
+      capabilityManifest: createCapabilityManifestContext({
+        host: { id: "eve", label: "Eve" },
+        listTools: () => [{ name: "sigil-ui-highlight" }],
+        canMutate: () => true,
+      }),
+    })
+    const send = vi.fn(async () => session())
+
+    await postSession(channel, send, { message: "hi" })
+
+    expect(JSON.stringify(firstSendCall(send)[0])).not.toContain(
+      "Your capability manifest",
+    )
   })
 
   it("keeps personal recall continuity while viewing another workspace", async () => {
@@ -631,6 +684,7 @@ describe("Sigil Eve context integration", () => {
 function testChannel(options: {
   auth?: typeof SESSION_AUTH
   authorizeMemorySource?: SigilContextOptions["authorizeMemorySource"]
+  capabilityManifest?: SigilContextOptions["capabilityManifest"]
   compiler: ContextCompiler
   identityFloor?: (input: {
     eveSessionId: string
@@ -646,6 +700,7 @@ function testChannel(options: {
     auth: [() => options.auth ?? SESSION_AUTH],
     onMessage: createSigilEveOnMessage({
       authorizeMemorySource: options.authorizeMemorySource,
+      capabilityManifest: options.capabilityManifest,
       compiler: options.compiler,
       identityFloor: options.identityFloor,
       maxTokens: options.maxTokens,
@@ -661,6 +716,26 @@ function sessionAttributes(homeScopeId: string, resourceScope?: string) {
     sigilPersonaId: "agent-a",
     sigilExecutionBinding: JSON.stringify({ homeScopeId }),
     ...(resourceScope ? { sigilResourceScope: resourceScope } : {}),
+  }
+}
+
+/** A caller carrying the full signed execution binding the manifest projects. */
+function fullyBoundAuth() {
+  return {
+    ...SESSION_AUTH,
+    attributes: {
+      sigilPersonaId: "agent-a",
+      sigilExecutionBinding: JSON.stringify({
+        applicationThreadId: "thread-1",
+        personaId: "agent-a",
+        homeScopeId: "personal-scope:user-1",
+        initialPerspective: {
+          focusScopeId: "personal-scope:user-1",
+          viaScopeIds: [],
+        },
+        additionalContextScopeIds: [],
+      }),
+    } as Record<string, string>,
   }
 }
 
