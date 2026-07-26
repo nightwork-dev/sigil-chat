@@ -453,3 +453,42 @@ with `mcp_servers` pointing at it instead of `{}`, wired to the
 coordinator-authority grants in apps/web/src/lib/coordinator-authority.ts. The
 coordinator speaks on its own for chatter and delegates the real work through
 authorized tools whose results it voices.
+
+## DEPLOYMENT UNLOCKS (2026-07-26, source-verified — appended by the coordinator)
+
+The assessment above assumed a hard physical dependency: codex >= 0.146-alpha
+existed only as ChatGPT.app's embedded binary on a logged-in Mac. That
+dependency dissolved. Four facts, each verified (vendored source at `61a4488`,
+main 2026-07-26, or npm registry directly — not blog claims):
+
+1. INSTALLABLE BINARY: `npm i -g @openai/codex@alpha` now resolves
+   `0.146.0-alpha.10.1` (dist-tag checked 2026-07-26) — a standalone
+   realtime-capable binary on any machine. The live gates and the production
+   runtime no longer depend on ChatGPT.app.
+2. HEADLESS AUTH: `codex login --device-auth` obtains a subscription session
+   without a GUI — the server-deployment answer for how a hosted Eve host
+   logs in.
+3. AUTHENTICATED REMOTE TRANSPORT: `codex app-server --listen` supports
+   `--ws-shared-secret-file` bearer auth (`codex-rs/cli/src/main.rs:4098`) plus
+   `/readyz` / `/healthz` probes (app-server-transport websocket) and a
+   `-32001` overload error. A remote app-server is a deployable authenticated
+   service, not an open socket. Any deployment of @gonk/voice-realtime's
+   `listen-url` path MUST require both (see VOX.8 H2 contract).
+4. SUBSTRATE DE-RISKED: OpenAI shipped voice-driving-agents as a flagship
+   ChatGPT-desktop feature (2026-07-23, GPT-Live family) — voice as a control
+   surface that keeps talking while worker agents execute and report back.
+   That is this document's coordinator architecture, now load-bearing for
+   their own product. Their shipped turn-taking work still shows no way for
+   the realtime model to cede the turn — independent confirmation of the P2
+   gate verdict above.
+
+Secondary, source-adjacent: the app-server carries a native TRANSCRIPTION mode
+(speech-to-text piped into the agentic loop as text items over the same
+subscription transport). Candidate future replacement for the Whisper STT half
+of the half-duplex loop — no API key, no local Whisper service. Not acted on.
+
+Residual before pinning `@openai/codex@alpha` in a deploy: the v3 backend
+behavior was proven live on alpha.3.1; re-run the live gate once against
+alpha.10.1 (API shape stable in source; backend unverified on that build).
+Known hazard for long sessions: transcript echo loops (codex #12902), partially
+mitigated since 0.121.
