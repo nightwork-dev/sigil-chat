@@ -29,6 +29,9 @@ import {
   type AttentionContext,
 } from "@zigil/agent-react/attention"
 
+import { foldGazeIntoAttention } from "@/lib/gaze/gaze-attention"
+import { useGazeSelection } from "@/lib/gaze/gaze-capture-store"
+
 type PublishFn = (context: AttentionContext | null) => void
 
 const PublishContext = createContext<PublishFn | null>(null)
@@ -61,12 +64,18 @@ export function WorkspaceAttentionProvider({
     setPublished(context)
   }, [])
 
+  // The one place gaze joins the envelope: the current gaze region (from the
+  // shell's consent-gated capture) folds into the SAME AttentionContext every
+  // workspace selection rides, so the tray, exclusions, privacy gating, and
+  // bounded serialization all apply to it unchanged — never a parallel format.
+  const gazeSelection = useGazeSelection()
+
   // Fall back to a minimal context so the HUD/session always have a valid
   // route to reason about, even on workspaces that publish nothing.
-  const context = useMemo<AttentionContext>(
-    () => published ?? { application: "sigil-chat", route: pathname },
-    [published, pathname],
-  )
+  const context = useMemo<AttentionContext>(() => {
+    const base = published ?? { application: "sigil-chat", route: pathname }
+    return foldGazeIntoAttention(base, gazeSelection) ?? base
+  }, [published, pathname, gazeSelection])
 
   const resourceScopeChannel = useMemo<ResourceScopeChannel>(
     () => ({ scope: resourceScope, publishScope: setResourceScope }),

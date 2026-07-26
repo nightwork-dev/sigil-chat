@@ -26,6 +26,7 @@ import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
 import { isAgentSessionBusy } from "@zigil/agent-surface/contracts"
 
 import { AgentSessionSwitcher } from "@/components/agent/agent-chat-header"
+import { AgentPresencePortrait } from "@/components/agent/agent-presence-portrait"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRoster } from "@/lib/agent-profile"
@@ -35,7 +36,8 @@ export function SessionChatHeader({ compact }: { compact: boolean }) {
   const session = useAppAgentSession()
   const personaId = useAgentPersonaSession()
   const roster = useAgentRoster()
-  const personaName = roster.data?.find((p) => p.id === personaId)?.name
+  const activePersona = roster.data?.find((p) => p.id === personaId)
+  const personaName = activePersona?.name
   const threadControls = useAgentThreadControls()
   const busy = isAgentSessionBusy(session)
   const activeThreadId = threadControls?.activeThreadId
@@ -45,6 +47,19 @@ export function SessionChatHeader({ compact }: { compact: boolean }) {
 
   return (
     <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
+      {/* The agent's face lives HERE — the session-identity row is where a user
+          looks to register "who am I talking to", so it is the honest home for
+          the meet-gaze target (VOX.7 capability 2). This is the one live
+          presence portrait in /chat; it opts in as the `agent-portrait` gaze
+          region and acknowledges being looked at. */}
+      {activePersona ? (
+        <AgentPresencePortrait
+          personaId={activePersona.id}
+          name={activePersona.name}
+          hasPortrait={activePersona.hasPortrait}
+          size="default"
+        />
+      ) : null}
       {compact && threadControls ? (
         <AgentSessionSwitcher
           busy={busy}

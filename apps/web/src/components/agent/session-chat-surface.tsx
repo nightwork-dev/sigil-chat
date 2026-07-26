@@ -97,7 +97,13 @@ export function SessionChatSurface({
   // same computed preview via useContextTray(), without a second copy of the
   // attention/privacy/exclusions/attachments pipeline.
   const rail = (
-    <div className="flex h-full min-h-0 flex-col">
+    // The session-context panel is its own gaze region (VOX.7): looking at the
+    // side panel resolves to "Session details" rather than the conversation.
+    <div
+      className="flex h-full min-h-0 flex-col"
+      data-gaze-id="session-details"
+      data-gaze-label="Session details"
+    >
       <ContextRailHeader attention={attention ?? null} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <SessionHome compact state={railState} />
@@ -153,7 +159,9 @@ export function SessionChatSurface({
             <div className="relative my-2 shrink-0 self-start">
               <Button
                 aria-label={
-                  railOpen ? "Collapse session details" : "Expand session details"
+                  railOpen
+                    ? "Collapse session details"
+                    : "Expand session details"
                 }
                 onClick={() => setRailOpen((open) => !open)}
                 size="icon-sm"
@@ -183,7 +191,8 @@ function ContextRailHeader({
 }: {
   attention: Parameters<typeof ContextTray.Root>[0]["attention"]
 }) {
-  const subject = attention?.selection?.label ?? attention?.workspace?.label ?? null
+  const subject =
+    attention?.selection?.label ?? attention?.workspace?.label ?? null
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
       {subject ? (
