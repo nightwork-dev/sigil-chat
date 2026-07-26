@@ -49,6 +49,11 @@ import {
 } from "@/lib/gaze/gaze-region"
 import { GazeRegionDwell } from "@/lib/gaze/region-dwell"
 import {
+  advanceGazeDecay,
+  initialGazeDecayState,
+  type GazeDecayState,
+} from "@/lib/gaze/gaze-decay"
+import {
   advanceMeetGaze,
   initialMeetGazeState,
   type MeetGazeState,
@@ -57,6 +62,7 @@ import {
   setGazeAcknowledged,
   setGazeCaptureEnabled,
   setGazeCapturePhase,
+  setGazeIndicatorRect,
   setGazeSelection,
   useGazeCaptureEnabled,
   useGazeCapturePhase,
@@ -69,6 +75,18 @@ function clampPoint(point: ScreenPoint): ScreenPoint {
   return {
     x: Math.max(0, Math.min(window.innerWidth, point.x)),
     y: Math.max(0, Math.min(window.innerHeight, point.y)),
+  }
+}
+
+// The region's viewport box, rounded to whole pixels so a steady gaze doesn't
+// churn the store on sub-pixel layout jitter.
+function rectOf(element: Element) {
+  const rect = element.getBoundingClientRect()
+  return {
+    top: Math.round(rect.top),
+    left: Math.round(rect.left),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
   }
 }
 
@@ -92,6 +110,11 @@ export function GazeCaptureController() {
   const yFilterRef = useRef(new OneEuroFilter())
   const dwellRef = useRef(new GazeRegionDwell())
   const committedRegionRef = useRef<GazeRegionDescriptor | null>(null)
+  // What the attention envelope carries. Distinct from committedRegionRef (the
+  // LIVE region, which goes null the instant the gaze leaves it): the decay
+  // latch keeps the last region for a short window across a look-away so a
+  // follow-up turn still carries it. Reset by release().
+  const decayRef = useRef<GazeDecayState>(initialGazeDecayState())
   const meetGazeRef = useRef<MeetGazeState>(initialMeetGazeState())
 
   const [calibrationTarget, setCalibrationTarget] =
@@ -111,10 +134,12 @@ export function GazeCaptureController() {
     samplesRef.current = []
     dwellRef.current.reset()
     committedRegionRef.current = null
+    decayRef.current = initialGazeDecayState()
     meetGazeRef.current = initialMeetGazeState()
     setCalibrationTarget(null)
     setGazeSelection(null)
     setGazeAcknowledged(false)
+    setGazeIndicatorRect(null)
   }, [])
 
   // The camera lifecycle is a genuine imperative side effect (getUserMedia,
@@ -132,18 +157,40 @@ export function GazeCaptureController() {
       const element = document.elementFromPoint(point.x, point.y)
       const region = gazeRegionFromElement(element)
       const committedId = dwellRef.current.update(region?.id ?? null, now)
+      const liveRegion =
+        committedId && region?.id === committedId ? region : null
 
-      if (committedId === (committedRegionRef.current?.id ?? null)) {
-        // no committed change; still advance the meet-gaze latch below
-      } else {
-        committedRegionRef.current =
-          committedId && region?.id === committedId ? region : null
-        setGazeSelection(gazeRegionSelection(committedRegionRef.current))
+      // meet-gaze tracks the LIVE region: looking away from the portrait must
+      // un-acknowledge it, so this follows the gaze off the region immediately.
+      committedRegionRef.current = liveRegion
+
+      // The focus indicator also follows the LIVE gaze — it shows where the
+      // eyes are right now — so it outlines the committed region's box (the
+      // nearest opted-in ancestor of the gaze point) and clears when the gaze
+      // rests on nothing registered.
+      const regionEl =
+        liveRegion && element instanceof Element
+          ? element.closest("[data-gaze-id]")
+          : null
+      setGazeIndicatorRect(regionEl ? rectOf(regionEl) : null)
+
+      // Attention carries the region through the DECAY latch: a look-away onto
+      // unregistered chrome (the composer, to type a follow-up) leaves
+      // liveRegion null but keeps the region for a short window, so the next
+      // turn still carries what the first one did. release() resets it.
+      const decay = advanceGazeDecay(decayRef.current, liveRegion, now)
+      if (
+        (decayRef.current.region?.id ?? null) !== (decay.region?.id ?? null)
+      ) {
+        setGazeSelection(gazeRegionSelection(decay.region))
       }
+      decayRef.current = decay
 
-      const onPortrait =
-        committedRegionRef.current?.id === GAZE_PORTRAIT_REGION_ID
-      const nextMeet = advanceMeetGaze(meetGazeRef.current, { onPortrait, t: now })
+      const onPortrait = liveRegion?.id === GAZE_PORTRAIT_REGION_ID
+      const nextMeet = advanceMeetGaze(meetGazeRef.current, {
+        onPortrait,
+        t: now,
+      })
       if (nextMeet.acknowledged !== meetGazeRef.current.acknowledged) {
         setGazeAcknowledged(nextMeet.acknowledged)
       }
@@ -187,13 +234,14 @@ export function GazeCaptureController() {
 
         if (targetFramesRef.current >= CALIBRATION_FRAMES) {
           if (targetIndexRef.current + 1 >= targetsRef.current.length) {
-            const perTarget = targetsRef.current.map((_, index) =>
-              summarizeCalibrationTarget(
-                samplesRef.current.slice(
-                  index * CALIBRATION_FRAMES,
-                  (index + 1) * CALIBRATION_FRAMES,
-                ),
-              ).sample,
+            const perTarget = targetsRef.current.map(
+              (_, index) =>
+                summarizeCalibrationTarget(
+                  samplesRef.current.slice(
+                    index * CALIBRATION_FRAMES,
+                    (index + 1) * CALIBRATION_FRAMES,
+                  ),
+                ).sample,
             )
             layersRef.current = [fitPoseCalibrationLayer(perTarget)]
             xFilterRef.current.reset()

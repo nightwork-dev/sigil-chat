@@ -63,11 +63,7 @@ export function gazeRegionFromElement(
   element: Element | null,
 ): GazeRegionDescriptor | null {
   const chain: GazeDatasetLike[] = []
-  for (
-    let node: Element | null = element;
-    node;
-    node = node.parentElement
-  ) {
+  for (let node: Element | null = element; node; node = node.parentElement) {
     if (node instanceof HTMLElement) chain.push(node.dataset)
   }
   return gazeRegionFromChain(chain)

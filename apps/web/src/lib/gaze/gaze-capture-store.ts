@@ -16,6 +16,17 @@ import type { AttentionSelection } from "@zigil/agent-react/attention"
 
 import type { GazeCapturePhase } from "./gaze-consent-state"
 
+/** The viewport rect of the region under the LIVE gaze, for the focus
+ *  indicator to outline. Distinct from `gazeSelection`, which the decay latch
+ *  keeps past a look-away: the indicator tracks the eyes, so it follows the
+ *  live region and clears the instant the gaze leaves one. */
+export interface GazeIndicatorRect {
+  readonly top: number
+  readonly left: number
+  readonly width: number
+  readonly height: number
+}
+
 interface GazeCaptureState {
   /** User intent from the consent toggle. The controller owns the camera in
    *  response to this; it is the reversible switch. */
@@ -26,6 +37,9 @@ interface GazeCaptureState {
   readonly gazeSelection: AttentionSelection | null
   /** Whether the user has met the agent's gaze (portrait dwell). */
   readonly acknowledged: boolean
+  /** Where to draw the "what you're looking at" outline, or null when the live
+   *  gaze rests on no registered region. */
+  readonly indicatorRect: GazeIndicatorRect | null
 }
 
 let state: GazeCaptureState = {
@@ -33,6 +47,7 @@ let state: GazeCaptureState = {
   phase: "off",
   gazeSelection: null,
   acknowledged: false,
+  indicatorRect: null,
 }
 
 const listeners = new Set<() => void>()
@@ -52,7 +67,8 @@ function set(next: Partial<GazeCaptureState>): void {
     merged.enabled === state.enabled &&
     merged.phase === state.phase &&
     merged.gazeSelection === state.gazeSelection &&
-    merged.acknowledged === state.acknowledged
+    merged.acknowledged === state.acknowledged &&
+    merged.indicatorRect === state.indicatorRect
   ) {
     return
   }
@@ -60,11 +76,35 @@ function set(next: Partial<GazeCaptureState>): void {
   emit()
 }
 
+function sameRect(
+  a: GazeIndicatorRect | null,
+  b: GazeIndicatorRect | null,
+): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return (
+    a.top === b.top &&
+    a.left === b.left &&
+    a.width === b.width &&
+    a.height === b.height
+  )
+}
+
 // --- writes (consent toggle + controller) ---
 
 /** The consent toggle. Turning it off is always available and immediate. */
 export function setGazeCaptureEnabled(enabled: boolean): void {
-  set(enabled ? { enabled } : { enabled, phase: "off", gazeSelection: null, acknowledged: false })
+  set(
+    enabled
+      ? { enabled }
+      : {
+          enabled,
+          phase: "off",
+          gazeSelection: null,
+          acknowledged: false,
+          indicatorRect: null,
+        },
+  )
 }
 
 export function setGazeCapturePhase(phase: GazeCapturePhase): void {
@@ -73,7 +113,9 @@ export function setGazeCapturePhase(phase: GazeCapturePhase): void {
 
 /** Publish the gazed region. Ref-stable when the region is unchanged so
  *  subscribers don't re-render on identical selections. */
-export function setGazeSelection(gazeSelection: AttentionSelection | null): void {
+export function setGazeSelection(
+  gazeSelection: AttentionSelection | null,
+): void {
   const current = state.gazeSelection
   if (
     current?.kind === gazeSelection?.kind &&
@@ -88,8 +130,23 @@ export function setGazeAcknowledged(acknowledged: boolean): void {
   set({ acknowledged })
 }
 
+/** Publish where the focus indicator should sit. Value-compared so a steady
+ *  gaze on one region doesn't churn the store every animation frame. */
+export function setGazeIndicatorRect(
+  indicatorRect: GazeIndicatorRect | null,
+): void {
+  if (sameRect(indicatorRect, state.indicatorRect)) return
+  set({ indicatorRect })
+}
+
 export function resetGazeCaptureForTests(): void {
-  state = { enabled: false, phase: "off", gazeSelection: null, acknowledged: false }
+  state = {
+    enabled: false,
+    phase: "off",
+    gazeSelection: null,
+    acknowledged: false,
+    indicatorRect: null,
+  }
   emit()
 }
 
@@ -100,17 +157,41 @@ export function getGazeCaptureEnabled(): boolean {
 }
 
 export function useGazeCaptureEnabled(): boolean {
-  return useSyncExternalStore(subscribe, () => state.enabled, () => false)
+  return useSyncExternalStore(
+    subscribe,
+    () => state.enabled,
+    () => false,
+  )
 }
 
 export function useGazeCapturePhase(): GazeCapturePhase {
-  return useSyncExternalStore(subscribe, () => state.phase, () => "off")
+  return useSyncExternalStore(
+    subscribe,
+    () => state.phase,
+    () => "off",
+  )
 }
 
 export function useGazeSelection(): AttentionSelection | null {
-  return useSyncExternalStore(subscribe, () => state.gazeSelection, () => null)
+  return useSyncExternalStore(
+    subscribe,
+    () => state.gazeSelection,
+    () => null,
+  )
 }
 
 export function usePortraitAcknowledged(): boolean {
-  return useSyncExternalStore(subscribe, () => state.acknowledged, () => false)
+  return useSyncExternalStore(
+    subscribe,
+    () => state.acknowledged,
+    () => false,
+  )
+}
+
+export function useGazeIndicatorRect(): GazeIndicatorRect | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => state.indicatorRect,
+    () => null,
+  )
 }

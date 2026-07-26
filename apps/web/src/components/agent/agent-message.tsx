@@ -62,7 +62,17 @@ export function AgentTranscriptMessage({
   )
 
   return (
-    <div className="group min-w-0 max-w-full">
+    // Each message is its own gaze region (VOX.7): looking at one resolves to
+    // THIS message, not just "the conversation", so the agent can tell which
+    // turn you're reading. Label by role — the raw id is the stable region key,
+    // the label is what the agent reads.
+    <div
+      className="group min-w-0 max-w-full"
+      data-gaze-id={`message-${message.id}`}
+      data-gaze-label={
+        message.role === "assistant" ? "Assistant message" : "Your message"
+      }
+    >
       {text || thinking ? (
         <ChatMessage
           content={text}

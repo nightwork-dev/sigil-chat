@@ -6,6 +6,11 @@ import {
 } from "@zigil/agent-react/context-draft"
 
 import { foldGazeIntoAttention } from "./gaze-attention"
+import {
+  advanceGazeDecay,
+  GAZE_ATTENTION_DECAY_MS,
+  initialGazeDecayState,
+} from "./gaze-decay"
 import { gazeRegionSelection, type GazeRegionDescriptor } from "./gaze-region"
 
 // Fixture regions the user might look at. The behavioral assertions derive the
@@ -55,7 +60,10 @@ describe("foldGazeIntoAttention", () => {
       workspaceAttention(),
       gazeRegionSelection(REGIONS[0]!),
     )
-    const second = foldGazeIntoAttention(first, gazeRegionSelection(REGIONS[1]!))
+    const second = foldGazeIntoAttention(
+      first,
+      gazeRegionSelection(REGIONS[1]!),
+    )
     const gazeSelections = (second?.selections ?? []).filter(
       (selection) => selection.kind === "gaze",
     )
@@ -100,5 +108,57 @@ describe("gaze attention consequence (A/B)", () => {
     )
     const minimal = serializeAttentionDraft(folded, "minimal", [])
     expect(minimal).not.toContain(looked.label)
+  })
+})
+
+// The persistence guard for the "what about now?" bug: with capture live, a
+// region the gaze has left must keep riding the payload for the decay window,
+// then drop. Drives the real delivery path (fold + serialize) off the decay
+// latch so the assertions are on the payload the agent actually receives.
+function deliverGaze(
+  decay: ReturnType<typeof initialGazeDecayState>,
+  excludedKeys: readonly string[] = [],
+): string {
+  const selection = gazeRegionSelection(decay.region)
+  return serializeAttentionDraft(
+    foldGazeIntoAttention(workspaceAttention(), selection),
+    "focused",
+    excludedKeys,
+  )
+}
+
+describe("gaze persists for a decay window across turns", () => {
+  it("carries the region on a follow-up turn within the window, then drops it", () => {
+    const looked = REGIONS[0]!
+    const t0 = 1000
+
+    // Turn 1: the gaze commits on the region and rides the delivered payload.
+    let decay = advanceGazeDecay(initialGazeDecayState(), looked, t0)
+    expect(deliverGaze(decay)).toContain(looked.label)
+
+    // Between turns the gaze wanders onto unregistered chrome (null) — the
+    // composer glance that types "what about now?" — still inside the window.
+    decay = advanceGazeDecay(decay, null, t0 + GAZE_ATTENTION_DECAY_MS - 1)
+    // Turn 2: same live capture, so the region is STILL delivered. (Pre-fix the
+    // look-away nulled the selection immediately and this was empty.)
+    expect(deliverGaze(decay)).toContain(looked.label)
+
+    // Turn 3: the window has elapsed with no new gaze — the region is gone.
+    decay = advanceGazeDecay(decay, null, t0 + GAZE_ATTENTION_DECAY_MS)
+    expect(deliverGaze(decay)).not.toContain(looked.label)
+  })
+
+  it("still lets the tray exclude the retained region for a turn", () => {
+    const looked = REGIONS[0]!
+    // A region held over into the decay window (commit → look-away).
+    let decay = advanceGazeDecay(initialGazeDecayState(), looked, 1000)
+    decay = advanceGazeDecay(decay, null, 1500)
+    const gaze = gazeRegionSelection(decay.region)!
+
+    const delivered = deliverGaze(decay, [attentionSelectionKey(gaze)])
+    // Persistence does not bypass the exclude control: an excluded retained
+    // region is withheld exactly as a freshly-committed one would be.
+    expect(delivered).not.toContain(looked.label)
+    expect(delivered).toContain("Document 7")
   })
 })

@@ -331,92 +331,103 @@ export function AgentChat({
           ChatInput's control row instead (session surface only; a future
           non-session AgentChat caller keeps approval mode in its header,
           showApprovalMode there, untouched — additive, not a second copy). */}
-      <ChatInput
-        actionClassName="max-sm:size-11"
-        attachments={attachments}
+      {/* The composer is its own gaze region (VOX.7): looking at where you
+          type resolves to "the composer", distinct from the transcript above.
+          The wrapper carries the box (the same left-anchored max-w-3xl cap) so
+          the focus outline hugs the input, and ChatInput fills it. */}
+      <div
         className="mx-4 mb-4 max-w-3xl"
-        disabled={session.status === "error" || attachmentsUploading}
-        isStreaming={busy}
-        leadingControls={
-          hideHeader
-            ? (controls) => (
-                <>
-                  {threadControls?.activeThreadId ? (
-                    <AddMenu
-                      artifactScope={activeResourceScope}
-                      onAttachResource={handleAttachResource}
-                      onOpenChange={setAddMenuOpen}
-                      open={addMenuOpen}
-                      openFilePicker={controls.openFilePicker}
-                      projectId={blackboardContainers?.projectId}
-                      sessionId={threadControls.activeThreadId}
-                      workspaceId={blackboardContainers?.workspaceId}
-                    />
-                  ) : null}
-                  {showApprovalMode && approvalMode && onApprovalModeChange ? (
-                    <ApprovalChip
-                      mode={approvalMode}
-                      onChange={onApprovalModeChange}
-                    />
-                  ) : null}
-                </>
-              )
-            : undefined
-        }
-        trailingControls={
-          <>
-            {hideHeader ? <ModelLabel /> : null}
-            {/* The mode switch sits immediately before the mic it changes:
+        data-gaze-id="composer"
+        data-gaze-label="Message composer"
+      >
+        <ChatInput
+          actionClassName="max-sm:size-11"
+          attachments={attachments}
+          disabled={session.status === "error" || attachmentsUploading}
+          isStreaming={busy}
+          leadingControls={
+            hideHeader
+              ? (controls) => (
+                  <>
+                    {threadControls?.activeThreadId ? (
+                      <AddMenu
+                        artifactScope={activeResourceScope}
+                        onAttachResource={handleAttachResource}
+                        onOpenChange={setAddMenuOpen}
+                        open={addMenuOpen}
+                        openFilePicker={controls.openFilePicker}
+                        projectId={blackboardContainers?.projectId}
+                        sessionId={threadControls.activeThreadId}
+                        workspaceId={blackboardContainers?.workspaceId}
+                      />
+                    ) : null}
+                    {showApprovalMode &&
+                    approvalMode &&
+                    onApprovalModeChange ? (
+                      <ApprovalChip
+                        mode={approvalMode}
+                        onChange={onApprovalModeChange}
+                      />
+                    ) : null}
+                  </>
+                )
+              : undefined
+          }
+          trailingControls={
+            <>
+              {hideHeader ? <ModelLabel /> : null}
+              {/* The mode switch sits immediately before the mic it changes:
                 with it on, the same press-to-talk gesture sends instead of
                 drafting, and Eve's finished replies are spoken back. */}
-            {/* Appears only while a voice conversation is on AND the user has
+              {/* Appears only while a voice conversation is on AND the user has
                 met the agent's gaze — text that changes with real state, so
                 it's information; primary tone = the active addressee. */}
-            {addressingAgent ? (
-              <span
-                className="hidden text-[11px] text-primary sm:inline"
-                title="You're looking at the agent — this turn is marked as addressed to it"
-              >
-                Addressing the agent
-              </span>
-            ) : null}
-            <VoiceConversationControl
-              active={conversationMode}
-              onChange={setConversationMode}
-            />
-            {/* Dictation is opt-in per click — there is no listening mode to
+              {addressingAgent ? (
+                <span
+                  className="hidden text-[11px] text-primary sm:inline"
+                  title="You're looking at the agent — this turn is marked as addressed to it"
+                >
+                  Addressing the agent
+                </span>
+              ) : null}
+              <VoiceConversationControl
+                active={conversationMode}
+                onChange={setConversationMode}
+              />
+              {/* Dictation is opt-in per click — there is no listening mode to
                 turn on, so the control is always present and always resting
                 until pressed. Voice conversation does NOT make it
                 always-listening: it still takes one press per utterance, and
                 capture never restarts by itself after a reply is spoken. */}
-            <ComposerVoiceControl
-              onDraft={handleDictationDraft}
-              onSend={handleVoiceSend}
-              thread={voiceThread}
-              voiceFirst={conversationMode}
-            />
-            {/* A live call is a different promise from dictation — the agent
+              <ComposerVoiceControl
+                onDraft={handleDictationDraft}
+                onSend={handleVoiceSend}
+                thread={voiceThread}
+                voiceFirst={conversationMode}
+              />
+              {/* A live call is a different promise from dictation — the agent
                 talks back — so it gets its own adjacent control rather than a
                 sixth state on the mic. Also explicit per click: no call opens
                 without one, and the same button ends it. */}
-            <LiveVoiceComposerControl thread={voiceThread} />
-            {/* Gaze rides beside the audio inputs because it is the same kind
+              <LiveVoiceComposerControl thread={voiceThread} />
+              {/* Gaze rides beside the audio inputs because it is the same kind
                 of promise: a sensor the user turns on to give the agent more
                 of what they mean. Same restraint, same reversibility — nothing
                 captures until pressed, and the same press turns it off. */}
-            <GazeConsentControl />
-          </>
-        }
-        onAttach={addFiles}
-        onAttachUrl={handleAttachUrl}
-        onChange={setInput}
-        onKeyDown={handleComposerKeyDown}
-        onRemoveAttachment={removeAttachment}
-        onSend={handleSend}
-        onStop={session.stop}
-        placeholder={placeholder}
-        value={input}
-      />
+              <GazeConsentControl />
+            </>
+          }
+          onAttach={addFiles}
+          onAttachUrl={handleAttachUrl}
+          onChange={setInput}
+          onKeyDown={handleComposerKeyDown}
+          onRemoveAttachment={removeAttachment}
+          onSend={handleSend}
+          onStop={session.stop}
+          placeholder={placeholder}
+          value={input}
+        />
+      </div>
     </div>
   )
 }
