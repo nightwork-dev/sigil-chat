@@ -15,18 +15,30 @@
 // non-OK response as "stay silent" and the chat surface renders unaffected.
 
 import {
+  applyVoiceConversion,
   readVoiceEnvironment,
+  resolveTtsConfig,
+  type PersonaVoiceConfig,
+  type VoiceConverter,
   type VoiceRuntimeEnvironment,
 } from "@workspace/runtime-env/voice"
 import type { RuntimeEnvironment } from "@workspace/runtime-env/topology"
 
 import { getSession, requireSession } from "./auth/session"
 import { rejectCrossOrigin } from "./same-origin.server"
+import { AGENT_PERSONA_HEADER } from "./agent-session-scope"
 
 /** Upper bound on one utterance. Speakable text is a projection of a chat
  *  message, not a document; anything past this is a caller bug, and an
  *  unbounded body would let one request hold the synth backend for minutes. */
 export const MAX_SPEAKABLE_LENGTH = 4000
+
+export interface SpeechRouteDependencies {
+  readonly converter?: VoiceConverter
+  readonly personaVoice?: (
+    personaId: string | undefined,
+  ) => PersonaVoiceConfig | undefined
+}
 
 const FORMAT_CONTENT_TYPES: Record<
   VoiceRuntimeEnvironment["tts"]["format"],
@@ -56,6 +68,7 @@ async function readSpeakableText(request: Request): Promise<string | undefined> 
 export async function synthesizeSpeechFromRequest(
   request: Request,
   env: RuntimeEnvironment = process.env,
+  dependencies: SpeechRouteDependencies = {},
 ): Promise<Response> {
   // JSON POSTs are preflight-protected, so this is defence in depth here;
   // the guard exists for the CORS-simple transcribe route and both voice
@@ -90,29 +103,50 @@ export async function synthesizeSpeechFromRequest(
   }
 
   try {
-    const upstream = await fetch(`${voice.tts.baseURL}/audio/speech`, {
+    const personaId =
+      request.headers.get(AGENT_PERSONA_HEADER)?.trim() || undefined
+    const personaVoice = dependencies.personaVoice
+      ? dependencies.personaVoice(personaId)
+      : personaId
+        ? (
+            await import("./agent-profile.server")
+          ).resolvePersonaVoice(personaId)
+        : undefined
+    const tts = resolveTtsConfig(voice.tts, personaVoice)
+    const upstream = await fetch(`${tts.baseURL}/audio/speech`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(voice.tts.apiKey
-          ? { Authorization: `Bearer ${voice.tts.apiKey}` }
+        ...(tts.apiKey
+          ? { Authorization: `Bearer ${tts.apiKey}` }
           : {}),
       },
       body: JSON.stringify({
-        model: voice.tts.model,
-        voice: voice.tts.voice,
+        model: tts.model,
+        voice: tts.voice,
         input: text,
-        response_format: voice.tts.format,
+        response_format: tts.format,
+        ...(tts.speed === undefined ? {} : { speed: tts.speed }),
+        ...(tts.style === undefined ? {} : { style: tts.style }),
       }),
     })
     if (!upstream.ok) return new Response(null, { status: 502 })
 
-    const audio = await upstream.arrayBuffer()
-    return new Response(audio, {
+    const contentType =
+      upstream.headers.get("Content-Type") ?? FORMAT_CONTENT_TYPES[tts.format]
+    const original = new Uint8Array(await upstream.arrayBuffer())
+    const audio = await applyVoiceConversion(
+      {
+        bytes: original,
+        inputFormat: tts.format,
+        inputMediaType: contentType,
+        conversion: tts.conversion,
+      },
+      dependencies.converter,
+    )
+    return new Response(new Uint8Array(audio.bytes).buffer, {
       headers: {
-        "Content-Type":
-          upstream.headers.get("Content-Type") ??
-          FORMAT_CONTENT_TYPES[voice.tts.format],
+        "Content-Type": audio.mediaType,
         "Cache-Control": "private, no-store",
       },
     })

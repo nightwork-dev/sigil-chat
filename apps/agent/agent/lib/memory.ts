@@ -11,6 +11,10 @@ import {
   type TrustedMemoryTurn,
 } from "@gonk/eve-host/guard"
 import { PersonaRegistry } from "@gonk/persona"
+import {
+  readPersonaVoice,
+  type PersonaVoiceConfig,
+} from "@workspace/runtime-env/voice"
 import { readIdentityEnvironment } from "@workspace/runtime-env/server"
 
 const { personaDir, memoryDir } = readIdentityEnvironment(process.env)
@@ -140,6 +144,15 @@ export function listPersonas() {
 
 export function hasPersona(personaId: string): boolean {
   return personaRegistry.exists(personaId)
+}
+
+/** Host-side projection of the namespaced persona voice sidecar. */
+export function resolvePersonaVoice(
+  personaId: string | undefined,
+): PersonaVoiceConfig | undefined {
+  return personaId
+    ? readPersonaVoice(personaRegistry.scopeFor(personaId))
+    : undefined
 }
 
 /** Default-persona host, for call sites that have not yet been given a

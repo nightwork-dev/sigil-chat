@@ -12,6 +12,7 @@ export type RuntimeEnvironmentErrorCode =
   | "INVALID_VOICE_DIARIZATION"
   | "INVALID_VOICE_PROFILE"
   | "INVALID_VOICE_FORMAT"
+  | "INVALID_VOICE_CONVERSION"
   /** A voice provider that only runs on Apple Silicon reached a server
    *  deployment. Distinct from a malformed value: the setting is well-formed,
    *  it is just unrunnable where it landed. */

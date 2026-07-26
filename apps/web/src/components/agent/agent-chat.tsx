@@ -55,6 +55,7 @@ import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import { appendDictationDraft } from "@/lib/voice-dictation"
 import { useSpeakReplies } from "@/lib/agent-speak-replies"
 import { useSpokenAgentReplies } from "@/lib/spoken-replies"
+import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import type { VoiceBoundThread } from "@/lib/voice-session-binding"
 import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
@@ -152,10 +153,12 @@ export function AgentChat({
   // auto-send, which is the half that can send words they did not mean.
   const [conversationMode, setConversationMode] = useState(false)
   const speakRepliesPreference = useSpeakReplies()
+  const personaId = useAgentPersonaSession()
   useSpokenAgentReplies({
     enabled: conversationMode || speakRepliesPreference,
     isStreaming: session.status === "streaming",
     messages: session.data.messages,
+    personaId: personaId ?? undefined,
   })
 
   const handleAttachUrl = useCallback(

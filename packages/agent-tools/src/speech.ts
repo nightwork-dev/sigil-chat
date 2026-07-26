@@ -24,6 +24,8 @@ import {
   type SpeechSynthesisProvider,
 } from "./speech-provider.js";
 import { hasOnlyKeys, isRecord } from "./validators.js";
+import { toHostContext } from "./types.js";
+import type { PersonaVoiceConfig } from "@workspace/runtime-env/voice";
 
 /** One utterance, matching the read-aloud route's MAX_SPEAKABLE_LENGTH in
  *  apps/web/src/lib/agent-voice.server.ts. Synthesis is a projection of a
@@ -46,10 +48,15 @@ export interface SynthesizeSpeechInput {
   speed?: number;
 }
 
+export type PersonaVoiceResolver = (
+  personaId: string | undefined,
+) => PersonaVoiceConfig | undefined;
+
 export function registerSpeechTools(
   registry: ToolRegistry,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
   synthesize: SpeechSynthesisProvider = synthesizeThroughVoiceProvider,
+  personaVoice: PersonaVoiceResolver = () => undefined,
 ): void {
   registry.register({
     name: "sigil-synthesize-speech",
@@ -83,6 +90,7 @@ export function registerSpeechTools(
       }
 
       const scope = requireResourceScope(undefined, ctx);
+      const personaId = toHostContext(ctx.host)?.personaId;
       const spoken = await synthesize({
         text,
         ...(input.voice ? { voice: input.voice } : {}),
@@ -90,6 +98,7 @@ export function registerSpeechTools(
         ...(input.speed === undefined ? {} : { speed: input.speed }),
         signal: ctx.signal,
         env: ctx.env,
+        personaVoice: personaVoice(personaId),
       });
 
       const stored = await artifacts.putFile(
