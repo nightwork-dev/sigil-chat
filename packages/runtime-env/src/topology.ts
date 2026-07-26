@@ -9,6 +9,7 @@ export type RuntimeEnvironmentErrorCode =
   | "INVALID_PORT"
   | "INVALID_SECRET"
   | "INVALID_STORAGE_PATH"
+  | "INVALID_VOICE_DIARIZATION"
   | "INVALID_VOICE_PROFILE"
   | "INVALID_VOICE_FORMAT"
   /** A voice provider that only runs on Apple Silicon reached a server

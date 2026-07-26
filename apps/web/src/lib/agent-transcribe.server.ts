@@ -20,6 +20,10 @@ import {
 } from "@workspace/runtime-env/voice"
 import type { RuntimeEnvironment } from "@workspace/runtime-env/topology"
 
+import type {
+  DiarizedTranscriptSegment,
+  TranscriptionResult,
+} from "./agent-transcription"
 import { getSession, requireSession } from "./auth/session"
 import { rejectCrossOrigin } from "./same-origin.server"
 
@@ -28,15 +32,57 @@ import { rejectCrossOrigin } from "./same-origin.server"
  *  would let one request hold the STT backend, and the browser, for minutes. */
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
-async function readAudioFile(request: Request): Promise<File | undefined> {
+interface TranscriptionRequest {
+  readonly file: File
+  readonly diarize: boolean
+}
+
+async function readTranscriptionRequest(
+  request: Request,
+): Promise<TranscriptionRequest | undefined> {
   try {
     const form = await request.formData()
     const file = form.get("audio")
     if (!(file instanceof File)) return undefined
-    return file.size > 0 ? file : undefined
+    if (file.size === 0) return undefined
+    return {
+      file,
+      diarize: form.get("diarize") === "true",
+    }
   } catch {
     return undefined
   }
+}
+
+function readDiarizedSegments(
+  value: unknown,
+): DiarizedTranscriptSegment[] | undefined {
+  if (!Array.isArray(value)) return undefined
+
+  const segments: DiarizedTranscriptSegment[] = []
+  for (const candidate of value) {
+    if (
+      typeof candidate !== "object" ||
+      candidate === null ||
+      !("speaker" in candidate) ||
+      typeof candidate.speaker !== "string" ||
+      !("text" in candidate) ||
+      typeof candidate.text !== "string" ||
+      !("start" in candidate) ||
+      typeof candidate.start !== "number" ||
+      !("end" in candidate) ||
+      typeof candidate.end !== "number"
+    ) {
+      return undefined
+    }
+    segments.push({
+      speaker: candidate.speaker,
+      text: candidate.text,
+      start: candidate.start,
+      end: candidate.end,
+    })
+  }
+  return segments
 }
 
 export async function transcribeAudioFromRequest(
@@ -59,9 +105,9 @@ export async function transcribeAudioFromRequest(
     return new Response(null, { status })
   }
 
-  const file = await readAudioFile(request)
-  if (!file) return new Response(null, { status: 400 })
-  if (file.size > MAX_AUDIO_BYTES) {
+  const transcriptionRequest = await readTranscriptionRequest(request)
+  if (!transcriptionRequest) return new Response(null, { status: 400 })
+  if (transcriptionRequest.file.size > MAX_AUDIO_BYTES) {
     return new Response(null, { status: 413 })
   }
 
@@ -76,8 +122,15 @@ export async function transcribeAudioFromRequest(
 
   try {
     const upstreamForm = new FormData()
-    upstreamForm.set("file", file, file.name || "dictation.webm")
+    upstreamForm.set(
+      "file",
+      transcriptionRequest.file,
+      transcriptionRequest.file.name || "dictation.webm",
+    )
     upstreamForm.set("model", voice.stt.model)
+    const requestDiarization =
+      transcriptionRequest.diarize && voice.stt.diarization
+    if (requestDiarization) upstreamForm.set("diarize", "true")
 
     const upstream = await fetch(`${voice.stt.baseURL}/audio/transcriptions`, {
       method: "POST",
@@ -90,9 +143,22 @@ export async function transcribeAudioFromRequest(
     })
     if (!upstream.ok) return new Response(null, { status: 502 })
 
-    const result = (await upstream.json()) as { text?: unknown }
+    const result = (await upstream.json()) as {
+      text?: unknown
+      segments?: unknown
+    }
     const text = typeof result.text === "string" ? result.text : ""
-    return new Response(JSON.stringify({ text }), {
+    let response: TranscriptionResult = { text }
+    if (transcriptionRequest.diarize) {
+      if (!voice.stt.diarization) {
+        response = { text, diarization: "unavailable" }
+      } else {
+        const segments = readDiarizedSegments(result.segments)
+        if (!segments) return new Response(null, { status: 502 })
+        response = { text, segments }
+      }
+    }
+    return new Response(JSON.stringify(response), {
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "private, no-store",
