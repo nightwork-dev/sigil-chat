@@ -113,6 +113,16 @@ export async function buildCoordinatorSessionPlan(
     deps.createRealtimeClient ??
     ((launch) => new RealtimeAppServerClient(launch))
 
+  // Dev trace: when Eve accepts local-dev auth, log the isolated home path and
+  // RETAIN it (no dispose) so David can inspect the realtime rollout + MCP logs
+  // after a call. The startup sweep still clears it within the hour. Production
+  // (allowLocalDevAuth === false) disposes on session end as before.
+  if (deps.allowLocalDevAuth) {
+    process.stderr.write(
+      `[coordinator] isolated home: ${home.config.codexHome}\n`,
+    )
+  }
+
   return {
     prompt: coordinator
       ? REALTIME_COORDINATOR_CONTEXT
@@ -122,7 +132,7 @@ export async function buildCoordinatorSessionPlan(
         args: home.config.appServerArgs,
         env: { ...process.env, ...home.config.appServerEnv },
       }),
-    dispose: () => home.dispose(),
+    ...(deps.allowLocalDevAuth ? {} : { dispose: () => home.dispose() }),
   }
 }
 
