@@ -141,6 +141,72 @@ describe("requireVerifiedEveSessionBinding", () => {
     ).toThrow(EveSessionBindingVerificationError)
   })
 
+  it("accepts a participant-channel create proof when the pending Eve id is channel-local only", () => {
+    const token = issueAgentSessionBinding(
+      {
+        additionalContextScopeIds: ["workspace-b"],
+        applicationThreadId: "thread-2",
+        channel: {
+          channelId: "agent-channel:thread-1+thread-2",
+          ownerPrincipalId: "user-1",
+          participants: [
+            {
+              kind: "human",
+              participantId: "owner:user-1",
+              principalId: "user-1",
+              role: "owner",
+            },
+            {
+              kind: "persona-session",
+              applicationThreadId: "thread-1",
+              eveSessionId: "session-1",
+              participantId: "persona:thread-1",
+              personaId: "personal-agent",
+              principalId: "user-1",
+              role: "participant",
+              state: "dormant",
+            },
+            {
+              kind: "persona-session",
+              applicationThreadId: "thread-2",
+              eveSessionId: "__pending__",
+              participantId: "persona:thread-2",
+              personaId: "critic-agent",
+              principalId: "user-1",
+              role: "participant",
+              state: "active",
+            },
+          ],
+        },
+        expiresAt: now + 60,
+        homeScopeId: "personal:user-1",
+        initialPerspective: {
+          focusScopeId: "workspace-a",
+          viaScopeIds: ["project-a"],
+        },
+        personaId: "critic-agent",
+        subject: "user-1",
+      },
+      secret,
+    )
+
+    expect(
+      requireVerifiedEveSessionBinding(
+        request("/eve/v1/session", token),
+        "user-1",
+        secret,
+        now,
+      ),
+    ).toMatchObject({
+      applicationThreadId: "thread-2",
+      channel: {
+        channelId: "agent-channel:thread-1+thread-2",
+      },
+      personaId: "critic-agent",
+      subject: "user-1",
+    })
+  })
+
   it("does not require a binding on non-session routes", () => {
     expect(
       requireVerifiedEveSessionBinding(

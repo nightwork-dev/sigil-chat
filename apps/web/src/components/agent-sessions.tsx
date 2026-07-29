@@ -4,8 +4,10 @@ import {
 } from "@/lib/agent-session-scope"
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import { AGENT_SESSION_BINDING_HEADER } from "@workspace/agent-contracts/session-binding"
+import type { AgentParticipantEnvelopeSubject } from "@workspace/agent-contracts/participant-channel"
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -51,6 +53,7 @@ import {
 } from "@/lib/agent-threads"
 import { getEveBearerToken } from "@/lib/auth/client"
 import {
+  AGENT_EVENT_RETENTION_POLICY,
   agentEventsForReplay,
   type AgentRuntimeStreamEvent,
 } from "@/lib/agent-event-retention"
@@ -62,12 +65,23 @@ import { AgentOutcomeProjector } from "@/components/agent/agent-outcome-projecto
 import { AgentPersonaSessionProvider } from "@/components/agent/agent-persona-session"
 import { getAgentScopeProof } from "@/lib/agent-scope-delegation"
 import { getAgentSessionBindingProof } from "@/lib/agent-session-binding"
+import {
+  AgentParticipantChannelProvider,
+  normalizeParticipantThreadIds,
+  participantIdForThread,
+  useAgentParticipantChannel,
+  useParticipantSessionAdapter,
+  type AgentParticipantChannelConfig,
+  type AgentParticipantSessionAdapter,
+} from "@/lib/agent-participant-channel"
 
 export function AppAgentSessions({
   children,
+  participantChannel,
   principalId,
 }: {
   children: ReactNode
+  participantChannel?: AgentParticipantChannelConfig
   principalId: string
 }) {
   const threadsQuery = useAgentThreads()
@@ -139,6 +153,7 @@ export function AppAgentSessions({
         forkThread.mutateAsync({ sourceThreadId: activeThread.id })
       }
       key={activeThread.id}
+      participantChannel={participantChannel}
       principalId={principalId}
       selectThread={(threadId) => setActiveThread.mutateAsync({ id: threadId })}
       thread={activeThread}
@@ -153,6 +168,7 @@ function ActiveAgentSession({
   children,
   createThread,
   forkThread,
+  participantChannel,
   principalId,
   selectThread,
   thread,
@@ -161,6 +177,7 @@ function ActiveAgentSession({
   children: ReactNode
   createThread: (personaId: string) => Promise<unknown>
   forkThread: () => Promise<unknown>
+  participantChannel?: AgentParticipantChannelConfig
   principalId: string
   selectThread: (threadId: string) => Promise<unknown>
   thread: AgentThread
@@ -176,6 +193,25 @@ function ActiveAgentSession({
     new AgentSessionPersistenceCoordinator(thread.revision),
   )
   const [persistenceError, setPersistenceError] = useState<Error | null>(null)
+  const [participantAdapters, setParticipantAdapters] = useState<
+    readonly AgentParticipantSessionAdapter[]
+  >([])
+  const participantThreadIds = normalizeParticipantThreadIds(
+    participantChannel?.threadIds ?? [],
+  )
+  const registerParticipantAdapter = useCallback(
+    (adapter: AgentParticipantSessionAdapter) => {
+      setParticipantAdapters((current) => [
+        ...current.filter((entry) => entry.threadId !== adapter.threadId),
+        adapter,
+      ])
+      return () =>
+        setParticipantAdapters((current) =>
+          current.filter((entry) => entry.threadId !== adapter.threadId),
+        )
+    },
+    [],
+  )
 
   useLayoutEffect(() => {
     setContextDraftScope(thread.id)
@@ -369,12 +405,254 @@ function ActiveAgentSession({
       ) : null}
       <AgentRuntimeSessionProvider session={session}>
         <AgentPersonaSessionProvider personaId={thread.personaId}>
-          <AgentOutcomeProjector session={session} />
-          {children}
+          <AgentParticipantChannelProvider
+            adapters={participantAdapters}
+            config={participantChannel}
+            principalId={principalId}
+          >
+            {participantThreadIds.map((threadId) => (
+              <ParticipantAgentSessionMount
+                key={threadId}
+                participantThreadIds={participantThreadIds}
+                principalId={principalId}
+                register={registerParticipantAdapter}
+                threadId={threadId}
+              />
+            ))}
+            <AgentOutcomeProjector session={session} />
+            {children}
+          </AgentParticipantChannelProvider>
         </AgentPersonaSessionProvider>
       </AgentRuntimeSessionProvider>
     </AgentThreadControlsProvider>
   )
+}
+
+function ParticipantAgentSessionMount({
+  participantThreadIds,
+  principalId,
+  register,
+  threadId,
+}: {
+  participantThreadIds: readonly string[]
+  principalId: string
+  register: (adapter: AgentParticipantSessionAdapter) => () => void
+  threadId: string
+}) {
+  const threadQuery = useAgentThread(threadId)
+  const saveSnapshot = useSaveAgentThreadSnapshot()
+  const eventsRef = useRef<AgentRuntimeStreamEvent[]>([])
+  const persistence = useRef<AgentSessionPersistenceCoordinator | null>(null)
+  const thread = threadQuery.data
+  const participantChannel = useAgentParticipantChannel()
+  const participantId = participantIdForThread(threadId)
+  const recordedContextReceiptIds = useRef(new Set<string>())
+  const recordedMessagePartIds = useRef(new Set<string>())
+
+  useEffect(() => {
+    if (!thread) return
+    eventsRef.current = [...agentEventsForReplay(thread.runtime.events)]
+    persistence.current = new AgentSessionPersistenceCoordinator(thread.revision)
+  }, [thread])
+
+  const persistSnapshot = useCallback(
+    (
+      session: AgentThread["runtime"]["session"],
+      events: readonly AgentRuntimeStreamEvent[] = eventsRef.current,
+    ) => {
+      if (!thread || !persistence.current) return Promise.resolve()
+      return persistence.current.persist((expectedRevision) =>
+        saveSnapshot.mutateAsync({
+          id: thread.id,
+          snapshot: { events: [...events], session },
+          expectedRevision,
+        }),
+      )
+    },
+    [saveSnapshot, thread],
+  )
+
+  const handleEvent = useCallback(
+    (event: AgentRuntimeStreamEvent) => {
+      eventsRef.current = [...eventsRef.current, event]
+      for (const envelope of participantEnvelopesForRuntimeEvent(event)) {
+        participantChannel?.record({
+          targetParticipantId: participantId,
+          ...envelope,
+        })
+      }
+    },
+    [participantChannel, participantId],
+  )
+
+  const handleFinish = useCallback(
+    (snapshot: AgentAdapterSnapshot) => {
+      eventsRef.current = [...snapshot.events]
+      void persistSnapshot(snapshot.session, snapshot.events)
+    },
+    [persistSnapshot],
+  )
+  const persistenceCallbacks = useMemo(
+    () => createSingleWriteSessionPersistence(handleFinish),
+    [handleFinish],
+  )
+
+  const eveSession = useEveRuntimeSession({
+    ...persistenceCallbacks,
+    auth: { bearer: getEveBearerToken },
+    initialEvents: thread ? agentEventsForReplay(thread.runtime.events) : [],
+    initialSession: thread?.runtime.session,
+    onEvent: handleEvent,
+  })
+  const adapter = useParticipantSessionAdapter({
+    participantThreadIds,
+    principalId,
+    session: eveSession,
+    thread: thread ?? emptyParticipantThread(threadId, principalId),
+  })
+  const registeredAdapter = useMemo(
+    () => (thread ? adapter : undefined),
+    [adapter, thread],
+  )
+
+  useEffect(() => {
+    if (!registeredAdapter) return
+    return register(registeredAdapter)
+  }, [register, registeredAdapter])
+
+  useEffect(() => {
+    if (!participantChannel || !thread?.contextReceipts) return
+    for (const receipt of thread.contextReceipts) {
+      if (recordedContextReceiptIds.current.has(receipt.recordId)) continue
+      recordedContextReceiptIds.current.add(receipt.recordId)
+      participantChannel.record({
+        payload: receipt,
+        subject: "context-contribution",
+        targetParticipantId: participantId,
+        ...(receipt.turnId ? { turnId: receipt.turnId } : {}),
+      })
+    }
+  }, [participantChannel, participantId, thread?.contextReceipts])
+
+  useEffect(() => {
+    if (!participantChannel) return
+    eveSession.data.messages.forEach((message, messageIndex) => {
+      const record = message as {
+        readonly id?: string
+        readonly parts?: readonly unknown[]
+      }
+      const messageId = record.id ?? `message:${messageIndex}`
+      for (const [partIndex, part] of (record.parts ?? []).entries()) {
+        if (!part || typeof part !== "object") continue
+        const partRecord = part as Record<string, unknown>
+        const partId =
+          typeof partRecord.id === "string"
+            ? partRecord.id
+            : `${messageId}:part:${partIndex}`
+        if (recordedMessagePartIds.current.has(partId)) continue
+        const outcome = domainOutcomeFromToolPart(partRecord)
+        if (!outcome) continue
+        recordedMessagePartIds.current.add(partId)
+        participantChannel.record({
+          payload: outcome,
+          subject: "domain-outcome",
+          targetParticipantId: participantId,
+        })
+      }
+    })
+  }, [eveSession.data.messages, participantChannel, participantId])
+
+  return null
+}
+
+type ParticipantEnvelopeDraft = {
+  readonly payload: unknown
+  readonly streamId?: string
+  readonly subject: AgentParticipantEnvelopeSubject
+  readonly turnId?: string
+}
+
+function participantEnvelopesForRuntimeEvent(
+  event: AgentRuntimeStreamEvent,
+): readonly ParticipantEnvelopeDraft[] {
+  switch (event.type) {
+    case "message.received":
+    case "message.completed":
+      return [
+        {
+          payload: event,
+          subject: "message",
+          turnId: event.data.turnId,
+        },
+      ]
+    case "actions.requested":
+      return event.data.actions.flatMap((action) =>
+        action.kind === "tool-call"
+          ? [
+              {
+                payload: action,
+                subject: "tool-call" as const,
+                turnId: event.data.turnId,
+              },
+            ]
+          : [],
+      )
+    case "input.requested":
+      return event.data.requests.map((request) => ({
+        payload: request.action,
+        subject: "tool-call" as const,
+        turnId: event.data.turnId,
+      }))
+    case "action.result":
+      return [
+        {
+          payload: event.data.result,
+          subject: "tool-result",
+          turnId: event.data.turnId,
+        },
+        ...domainOutcomesFromValue(event.data.result.output).map((outcome) => ({
+          payload: outcome,
+          subject: "domain-outcome" as const,
+          turnId: event.data.turnId,
+        })),
+      ]
+    default:
+      return []
+  }
+}
+
+function domainOutcomeFromToolPart(part: Record<string, unknown>): unknown {
+  if (part.type !== "tool-call" || part.state !== "output-available") {
+    return null
+  }
+  return domainOutcomesFromValue(part.output)[0] ?? null
+}
+
+function domainOutcomesFromValue(value: unknown): readonly unknown[] {
+  const command = commandLike(value)
+  if (command?.type === "agent.domain.outcome") return [command]
+  return []
+}
+
+function commandLike(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null
+  const record = value as Record<string, unknown>
+  if (typeof record.type === "string") return record
+  for (const key of ["data", "structuredContent"]) {
+    const nested = record[key]
+    if (nested && typeof nested === "object") {
+      const nestedRecord = nested as Record<string, unknown>
+      if (typeof nestedRecord.type === "string") return nestedRecord
+      const clientCommand = nestedRecord.clientCommand
+      if (clientCommand && typeof clientCommand === "object") {
+        return clientCommand as Record<string, unknown>
+      }
+    }
+  }
+  const clientCommand = record.clientCommand
+  return clientCommand && typeof clientCommand === "object"
+    ? (clientCommand as Record<string, unknown>)
+    : null
 }
 
 type AgentAdapterSnapshot = Parameters<
@@ -420,4 +698,33 @@ function deriveThreadTitle(message: string): string {
   const normalized = message.replace(/\s+/g, " ").trim()
   if (!normalized) return "New conversation"
   return normalized.length <= 56 ? normalized : `${normalized.slice(0, 55)}…`
+}
+
+function emptyParticipantThread(
+  threadId: string,
+  principalId: string,
+): AgentThread {
+  const now = new Date(0).toISOString()
+  return {
+    members: [principalId],
+    id: threadId,
+    slug: threadId,
+    personaId: "pending-participant",
+    title: "Pending participant",
+    createdAt: now,
+    updatedAt: now,
+    status: "active",
+    revision: 0,
+    runtime: {
+      schemaVersion: 1,
+      session: { streamIndex: 0 },
+      events: [],
+      compaction: {
+        policyVersion: AGENT_EVENT_RETENTION_POLICY,
+        firstRetainedStreamIndex: 0,
+        omittedEventCount: 0,
+        compactedAt: now,
+      },
+    },
+  }
 }

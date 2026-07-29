@@ -59,6 +59,14 @@ export interface ParticipantInterruptInput extends ParticipantDispatchInput {
   readonly reason?: string
 }
 
+export interface ParticipantProvenanceRecordInput {
+  readonly participantId: string
+  readonly payload: unknown
+  readonly streamId?: string
+  readonly subject: AgentParticipantEnvelopeSubject
+  readonly turnId?: string
+}
+
 export interface ParticipantDispatchResult {
   readonly receipt: AgentParticipantDispatchReceipt
   readonly result: AgentTurnResult
@@ -74,6 +82,7 @@ export interface ParticipantChannelRuntime {
   participantState(
     participantId: string,
   ): AgentChannelPersonaSessionParticipant["state"] | undefined
+  record(input: ParticipantProvenanceRecordInput): AgentParticipantProvenanceEnvelope
   sentCount(participantId: string): number
 }
 
@@ -155,6 +164,7 @@ export function createParticipantChannelRuntime({
     provenance: AgentChannelParticipantProvenance,
     payload: unknown,
     turnId: string | undefined,
+    streamId?: string,
   ): void {
     emit({
       type: "participant.envelope",
@@ -165,6 +175,7 @@ export function createParticipantChannelRuntime({
         payload,
         createdAt: now(),
         ...(turnId ? { turnId } : {}),
+        ...(streamId ? { streamId } : {}),
       },
     })
   }
@@ -175,6 +186,23 @@ export function createParticipantChannelRuntime({
     const receipt = createDispatchReceipt(input)
     emit({ type: "participant.dispatch", receipt })
     return sendToTarget(receipt, input)
+  }
+
+  function record(
+    input: ParticipantProvenanceRecordInput,
+  ): AgentParticipantProvenanceEnvelope {
+    const provenance = provenanceFor(input.participantId)
+    const envelope: AgentParticipantProvenanceEnvelope = {
+      kind: "agent.participant.provenance-envelope",
+      subject: input.subject,
+      provenance,
+      payload: input.payload,
+      createdAt: now(),
+      ...(input.turnId ? { turnId: input.turnId } : {}),
+      ...(input.streamId ? { streamId: input.streamId } : {}),
+    }
+    emit({ type: "participant.envelope", envelope })
+    return envelope
   }
 
   async function interrupt(
@@ -332,6 +360,7 @@ export function createParticipantChannelRuntime({
     dispatch,
     interrupt,
     participantState: (participantId) => states.get(participantId),
+    record,
     sentCount: (participantId) => sent.get(participantId) ?? 0,
   }
 }
