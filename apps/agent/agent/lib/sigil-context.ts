@@ -270,7 +270,9 @@ async function recordCompiledReceipt(input: {
 
 export function adaptGonkContextReceipt(
   receipt: ContextCompilationReceipt,
-  options: { pinnedResourceKeys?: readonly string[] } = {},
+  options: {
+    pinnedResourceKeys?: readonly string[]
+  } = {},
 ): AgentContextCompileReceipt {
   const pinnedResourceKeys = new Set(options.pinnedResourceKeys ?? [])
   return {
@@ -327,10 +329,7 @@ function selectionToItem(
       renderedTokens: item.renderedTokens,
       quality: item.tokenQuality,
     },
-    visibility: {
-      decision: "visible",
-      reason: "authorized-for-compile-audience",
-    },
+    visibility: selectionVisibility(item),
   }
 }
 
@@ -360,13 +359,38 @@ function dropToProjection(
       quality: "tokenQuality" in item ? item.tokenQuality : "fallback",
     },
     visibility: {
-      decision: item.reason === "use-denied" ? "withheld" : "visible",
+      decision: "withheld",
       reason:
         item.reason === "use-denied"
           ? "not-authorized-for-compile-audience"
-          : "safe-compile-diagnostic",
+          : "missing-explicit-resource-visibility",
     },
   }
+}
+
+function auditPrivateVisibility(
+  reason: string,
+): AgentContextReceiptItem["visibility"] {
+  return {
+    decision: "withheld",
+    reason,
+  }
+}
+
+function selectionVisibility(
+  item: ContextReceiptSelection,
+): AgentContextReceiptItem["visibility"] {
+  if (
+    item.contributorId === SKILL_CONTEXT_CONTRIBUTOR_ID &&
+    skillIdFromResourceKey(item.resourceKey) !== null
+  ) {
+    return {
+      decision: "visible",
+      reason: "managed-skill-resource",
+      roleIds: ["viewer"],
+    }
+  }
+  return auditPrivateVisibility("missing-explicit-resource-visibility")
 }
 
 function activationReasonForSelection(

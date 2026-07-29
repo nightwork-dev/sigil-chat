@@ -1,4 +1,5 @@
 import {
+  agentContextReceiptProjectionHasVisibleItems,
   projectAgentContextReceiptForRoles,
   type AgentContextCompileReceipt,
   type AgentContextCompileReceiptProjection,
@@ -44,6 +45,7 @@ interface AgentContextReceiptThreadRecord {
 }
 
 export interface AgentContextReceiptKvStore<T> {
+  delete(key: string): void
   get(key: string): T | undefined
   set(key: string, value: T): void
 }
@@ -62,6 +64,7 @@ export interface AgentContextReceiptRepository {
     applicationThreadId: string,
     roleIds: readonly string[],
   ): AgentContextReceiptProjectionRecord[]
+  purge(applicationThreadId: string): void
 }
 
 export class MirkAgentContextReceiptRepository implements AgentContextReceiptRepository {
@@ -107,7 +110,13 @@ export class MirkAgentContextReceiptRepository implements AgentContextReceiptRep
   ): AgentContextReceiptProjectionRecord[] {
     const current = this.kv.get(key(applicationThreadId))
     if (!current) return []
-    return current.receipts.map((record) => projectRecord(record, roleIds))
+    return current.receipts.flatMap(
+      (record) => projectRecord(record, roleIds) ?? [],
+    )
+  }
+
+  purge(applicationThreadId: string): void {
+    this.kv.delete(key(applicationThreadId))
   }
 }
 
@@ -149,19 +158,27 @@ export class MemoryAgentContextReceiptRepository implements AgentContextReceiptR
   ): AgentContextReceiptProjectionRecord[] {
     const current = this.records.get(key(applicationThreadId))
     if (!current) return []
-    return current.receipts.map((record) => projectRecord(record, roleIds))
+    return current.receipts.flatMap(
+      (record) => projectRecord(record, roleIds) ?? [],
+    )
+  }
+
+  purge(applicationThreadId: string): void {
+    this.records.delete(key(applicationThreadId))
   }
 }
 
 function projectRecord(
   record: AgentContextReceiptRecord,
   roleIds: readonly string[],
-): AgentContextReceiptProjectionRecord {
+): AgentContextReceiptProjectionRecord | null {
+  const receipt = projectAgentContextReceiptForRoles(record.receipt, roleIds)
+  if (!agentContextReceiptProjectionHasVisibleItems(receipt)) return null
   return {
     applicationThreadId: record.applicationThreadId,
     compiledAt: record.compiledAt,
     principalId: record.principalId,
-    receipt: projectAgentContextReceiptForRoles(record.receipt, roleIds),
+    receipt,
     recordId: record.recordId,
     retainedAt: record.retainedAt,
     ...(record.personaId ? { personaId: record.personaId } : {}),

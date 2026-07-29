@@ -157,14 +157,16 @@ const archiveAgentThreadFn = createServerFn({ method: "POST" })
 const deleteAgentThreadFn = createServerFn({ method: "POST" })
   .validator((input: { id: string; expectedRevision?: number }) => input)
   .handler(async ({ data }) => {
-    const { agentThreadRepository } =
+    const { agentContextReceiptRepository, agentThreadRepository } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
-    return agentThreadRepository.delete(
+    const deleted = agentThreadRepository.delete(
       session.user.id,
       data.id,
       data.expectedRevision,
     );
+    agentContextReceiptRepository.purge(deleted.id);
+    return deleted;
   });
 
 const saveAgentThreadSnapshotFn = createServerFn({ method: "POST" })
@@ -217,9 +219,8 @@ const getActiveAgentThreadPreferenceFn = createServerFn({
   const preference = agentThreadRepository.getActivePreference(session.user.id);
   if (!preference.activePerspective) return preference;
 
-  const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
-    "@/lib/agent-thread-containers.server"
-  );
+  const { loadProjectWorkspaceNav, resolveScopePerspective } =
+    await import("@/lib/agent-thread-containers.server");
   const nav = loadProjectWorkspaceNav(session.user.id);
   const resolved = resolveScopePerspective(preference.activePerspective, nav);
   if (!resolved) {
@@ -251,9 +252,8 @@ const setActiveContainerFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { agentThreadRepository } =
       await import("@/lib/agent-threads.server");
-    const { loadProjectWorkspaceNav, resolveScopePerspective } = await import(
-      "@/lib/agent-thread-containers.server"
-    );
+    const { loadProjectWorkspaceNav, resolveScopePerspective } =
+      await import("@/lib/agent-thread-containers.server");
     const session = await requireThreadSession();
     const nav = loadProjectWorkspaceNav(session.user.id);
 
@@ -332,9 +332,8 @@ export function useSetActiveContainer() {
   const principalId = useAgentPrincipalId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      perspective?: ScopePerspective;
-    }) => setActiveContainerFn({ data: input }),
+    mutationFn: (input: { perspective?: ScopePerspective }) =>
+      setActiveContainerFn({ data: input }),
     onSuccess: (preference) => {
       queryClient.setQueryData(
         agentThreadKeys.preference(principalId),
@@ -452,6 +451,9 @@ export function useSaveAgentThreadSnapshot() {
     }) => saveAgentThreadSnapshotFn({ data: input }),
     onSuccess: async (thread) => {
       cacheThread(queryClient, principalId, thread);
+      await queryClient.invalidateQueries({
+        queryKey: agentThreadKeys.detail(principalId, thread.id),
+      });
       await invalidateHomeSignals(queryClient, principalId);
     },
   });
@@ -500,9 +502,9 @@ function cacheThread(
   principalId: string,
   thread: AgentThread,
 ) {
-  queryClient.setQueryData(
-    agentThreadKeys.detail(principalId, thread.id),
-    thread,
+  const detailKey = agentThreadKeys.detail(principalId, thread.id);
+  queryClient.setQueryData<AgentThread>(detailKey, (current) =>
+    mergeThreadForCache(current, thread),
   );
   const summary = projectAgentThreadSummary(thread);
   queryClient.setQueryData<AgentThreadSummary[]>(
@@ -516,6 +518,19 @@ function cacheThread(
         ? current?.filter((candidate) => candidate.id !== thread.id)
         : upsertThread(current, summary),
   );
+}
+
+export function mergeThreadForCache(
+  current: AgentThread | undefined,
+  incoming: AgentThread,
+): AgentThread {
+  if (incoming.contextReceipts !== undefined || !current?.contextReceipts) {
+    return incoming;
+  }
+  return {
+    ...incoming,
+    contextReceipts: current.contextReceipts,
+  };
 }
 
 function cacheActivePreference(

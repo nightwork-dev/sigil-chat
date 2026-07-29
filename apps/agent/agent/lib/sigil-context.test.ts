@@ -122,13 +122,47 @@ describe("Sigil Eve context integration", () => {
             }),
             visibility: {
               decision: "visible",
-              reason: "authorized-for-compile-audience",
+              reason: "managed-skill-resource",
+              roleIds: ["viewer"],
             },
           }),
         ],
         status: "ready",
       },
     })
+  })
+
+  it("keeps selected receipt rows audit-private without explicit resource visibility", async () => {
+    const compiled = await compilerWith([
+      tenantContextContributor("tenant-a"),
+    ]).compile({
+      requestId: "receipt-visibility-fail-closed",
+      audience: "model",
+      auth: {
+        principal: {
+          id: "user-1",
+          kind: "human",
+          identity: { issuer: "test", subject: "user-1", method: "session" },
+          roles: [],
+          scopes: [],
+          tenantId: "tenant-a",
+        },
+        authorize: () => ({ outcome: "allow", reason: "test policy" }),
+      },
+      maxTokens: 1_000,
+    })
+
+    expect(compiled.status).toBe("ready")
+    const receipt = adaptGonkContextReceipt(compiled.receipt)
+
+    expect(receipt.selected).toContainEqual(
+      expect.objectContaining({
+        visibility: {
+          decision: "withheld",
+          reason: "missing-explicit-resource-visibility",
+        },
+      }),
+    )
   })
 
   it("does not bulk-inject skills when none are required or deterministically matched", async () => {

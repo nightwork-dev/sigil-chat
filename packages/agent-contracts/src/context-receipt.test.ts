@@ -18,6 +18,7 @@ describe("agent context compile receipt contract", () => {
     expect(projection.selected).toHaveLength(1)
     expect(projection.dropped).toHaveLength(0)
     expect(projection.pinned).toHaveLength(1)
+    expect(projection.totalTokens).toBe(5)
     expect(serialized).toContain("public-resource")
     expect(serialized).not.toContain("private-resource")
     expect(serialized).not.toContain("private-contributor")
@@ -147,7 +148,7 @@ function fixtureReceipt(): AgentContextCompileReceipt {
       },
     ],
     status: "ready",
-    totalTokens: 5,
+    totalTokens: 13,
     version: AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
   }
 }

@@ -101,23 +101,26 @@ export function projectAgentContextReceiptForRole(
   receipt: AgentContextCompileReceipt,
   roleId: string,
 ): AgentContextCompileReceiptProjection {
+  const pinned = receipt.pinned.flatMap((item) =>
+    itemVisibleToRole(item, roleId) ? [item] : [],
+  )
+  const selected = receipt.selected.flatMap((item) =>
+    itemVisibleToRole(item, roleId) ? [item] : [],
+  )
+  const dropped = receipt.dropped.flatMap((item) =>
+    itemVisibleToRole(item, roleId) ? [item] : [],
+  )
   return {
     audience: receipt.audience,
     compiledAt: receipt.compiledAt,
     compiler: receipt.compiler,
     id: receipt.id,
     maxTokens: receipt.maxTokens,
-    pinned: receipt.pinned.flatMap((item) =>
-      itemVisibleToRole(item, roleId) ? [item] : [],
-    ),
-    selected: receipt.selected.flatMap((item) =>
-      itemVisibleToRole(item, roleId) ? [item] : [],
-    ),
-    dropped: receipt.dropped.flatMap((item) =>
-      itemVisibleToRole(item, roleId) ? [item] : [],
-    ),
+    pinned,
+    selected,
+    dropped,
     status: receipt.status,
-    totalTokens: receipt.totalTokens,
+    totalTokens: visibleSelectedTokens(selected),
     version: receipt.version,
   }
 }
@@ -127,25 +130,38 @@ export function projectAgentContextReceiptForRoles(
   roleIds: readonly string[],
 ): AgentContextCompileReceiptProjection {
   const allowed = new Set(roleIds)
+  const pinned = receipt.pinned.flatMap((item) =>
+    itemVisibleToAnyRole(item, allowed) ? [item] : [],
+  )
+  const selected = receipt.selected.flatMap((item) =>
+    itemVisibleToAnyRole(item, allowed) ? [item] : [],
+  )
+  const dropped = receipt.dropped.flatMap((item) =>
+    itemVisibleToAnyRole(item, allowed) ? [item] : [],
+  )
   return {
     audience: receipt.audience,
     compiledAt: receipt.compiledAt,
     compiler: receipt.compiler,
     id: receipt.id,
     maxTokens: receipt.maxTokens,
-    pinned: receipt.pinned.flatMap((item) =>
-      itemVisibleToAnyRole(item, allowed) ? [item] : [],
-    ),
-    selected: receipt.selected.flatMap((item) =>
-      itemVisibleToAnyRole(item, allowed) ? [item] : [],
-    ),
-    dropped: receipt.dropped.flatMap((item) =>
-      itemVisibleToAnyRole(item, allowed) ? [item] : [],
-    ),
+    pinned,
+    selected,
+    dropped,
     status: receipt.status,
-    totalTokens: receipt.totalTokens,
+    totalTokens: visibleSelectedTokens(selected),
     version: receipt.version,
   }
+}
+
+export function agentContextReceiptProjectionHasVisibleItems(
+  receipt: AgentContextCompileReceiptProjection,
+): boolean {
+  return (
+    receipt.pinned.length > 0 ||
+    receipt.selected.length > 0 ||
+    receipt.dropped.length > 0
+  )
 }
 
 export function isAgentContextCompileReceiptEvent(
@@ -200,6 +216,15 @@ function itemVisibleToRole(
   roleId: string,
 ): boolean {
   return itemVisibleToAnyRole(item, new Set([roleId]))
+}
+
+function visibleSelectedTokens(
+  selected: readonly AgentContextReceiptSelection[],
+): number {
+  return selected.reduce(
+    (total, item) => total + (item.tokenEstimate.renderedTokens ?? 0),
+    0,
+  )
 }
 
 function isAgentContextReceiptSelection(
