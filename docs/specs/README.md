@@ -138,6 +138,12 @@ not yet ratified.
   Defines the proof that will determine whether the enabling change belongs in
   Mirk, Gonk, Sigil composition, or a narrow combination of them.
 
+- [`MA.1-PARTICIPANT-CHANNEL-DESIGN.md`](MA.1-PARTICIPANT-CHANNEL-DESIGN.md) —
+  implementation-ready neutral participant-channel contract note for the MA.1
+  slice: keep the immutable session binding intact, add explicit participant
+  membership plus provenance/dispatch receipts, and avoid game vocabulary in
+  shared contracts.
+
 ## Provenance notes
 
 Pointer-only stubs for contracts whose canonical content moved to another
