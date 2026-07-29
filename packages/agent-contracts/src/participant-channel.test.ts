@@ -645,7 +645,7 @@ describe("agent participant channel contract", () => {
     ).toBe(false);
   });
 
-  it("accepts explicit dispatch receipts targeting dormant participants", () => {
+  it("rejects explicit dispatch receipts targeting dormant participants", () => {
     expect(
       isAgentParticipantDispatchReceiptForChannel(
         {
@@ -679,6 +679,6 @@ describe("agent participant channel contract", () => {
         },
         channel,
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

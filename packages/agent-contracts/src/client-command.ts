@@ -14,7 +14,7 @@ import {
 import {
   isAgentUiHighlightAction,
   type AgentUiHighlightAction,
-} from "./ui-highlight"
+} from "./ui-highlight.ts"
 
 export const AGENT_CLIENT_COMMAND_EVENT = "sigil:agent-client-command"
 

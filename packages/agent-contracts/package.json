@@ -5,7 +5,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && pnpm test:runtime-imports",
+    "test:runtime-imports": "node scripts/runtime-import-smoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
