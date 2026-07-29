@@ -1,4 +1,6 @@
 export type AgentChannelParticipantKind = "human" | "persona-session";
+export type AgentChannelParticipantState = "active" | "dormant";
+export type AgentChannelCoordinatorRole = "owner" | "coordinator";
 
 export interface AgentChannelHumanParticipant {
   kind: "human";
@@ -14,11 +16,12 @@ export interface AgentChannelPersonaSessionParticipant {
   personaId: string;
   eveSessionId: string;
   applicationThreadId: string;
+  role?: "participant" | "coordinator";
+  state?: AgentChannelParticipantState;
 }
 
 export type AgentChannelParticipant =
-  | AgentChannelHumanParticipant
-  | AgentChannelPersonaSessionParticipant;
+  AgentChannelHumanParticipant | AgentChannelPersonaSessionParticipant;
 
 export interface AgentSessionChannel {
   channelId: string;
@@ -31,9 +34,54 @@ export interface AgentChannelParticipantProvenance {
   participantId: string;
   principalId: string;
   kind: AgentChannelParticipantKind;
+  role?:
+    | AgentChannelHumanParticipant["role"]
+    | AgentChannelPersonaSessionParticipant["role"];
+  state?: AgentChannelParticipantState;
   personaId?: string;
   eveSessionId?: string;
   applicationThreadId?: string;
+}
+
+export interface AgentParticipantTurnAttribution {
+  kind: "agent.participant.turn";
+  turnId: string;
+  origin: AgentChannelParticipantProvenance;
+  streamId?: string;
+  createdAt: number;
+}
+
+export interface AgentParticipantStreamAttribution {
+  kind: "agent.participant.stream";
+  streamId: string;
+  turnId: string;
+  origin: AgentChannelParticipantProvenance;
+  openedAt: number;
+}
+
+export type AgentParticipantEnvelopeSubject =
+  | "message"
+  | "tool-call"
+  | "tool-result"
+  | "domain-outcome"
+  | "context-contribution";
+
+export interface AgentParticipantProvenanceEnvelope<Payload = unknown> {
+  kind: "agent.participant.provenance-envelope";
+  subject: AgentParticipantEnvelopeSubject;
+  provenance: AgentChannelParticipantProvenance;
+  payload: Payload;
+  createdAt: number;
+  turnId?: string;
+  streamId?: string;
+}
+
+export interface AgentParticipantInterruptionRequest {
+  kind: "agent.participant.interrupt";
+  requester: AgentChannelParticipantProvenance;
+  target: AgentChannelParticipantProvenance;
+  requestedAt: number;
+  reason?: string;
 }
 
 export interface AgentParticipantDispatchBounds {
@@ -45,8 +93,14 @@ export interface AgentParticipantDispatchBounds {
 
 export interface AgentParticipantDispatchReceipt {
   kind: "agent.participant.dispatch";
-  dispatcher: AgentChannelParticipantProvenance;
+  coordinator: AgentChannelParticipantProvenance;
   target: AgentChannelParticipantProvenance;
+  intended: {
+    channelId: string;
+    targetParticipantId: string;
+    targetEveSessionId: string;
+    targetApplicationThreadId: string;
+  };
   bounds: AgentParticipantDispatchBounds;
 }
 
@@ -103,7 +157,13 @@ export function isAgentChannelParticipant(
   return (
     isIdentifier(value.personaId) &&
     isIdentifier(value.eveSessionId) &&
-    isIdentifier(value.applicationThreadId)
+    isIdentifier(value.applicationThreadId) &&
+    (value.role === undefined ||
+      value.role === "participant" ||
+      value.role === "coordinator") &&
+    (value.state === undefined ||
+      value.state === "active" ||
+      value.state === "dormant")
   );
 }
 
@@ -118,12 +178,103 @@ export function isAgentChannelParticipantProvenance(
   ) {
     return false;
   }
-  if (value.kind === "human") return true;
+  if (value.kind === "human") {
+    return (
+      (value.role === undefined ||
+        value.role === "owner" ||
+        value.role === "member") &&
+      value.state === undefined
+    );
+  }
   return (
     value.kind === "persona-session" &&
     isIdentifier(value.personaId) &&
     isIdentifier(value.eveSessionId) &&
-    isIdentifier(value.applicationThreadId)
+    isIdentifier(value.applicationThreadId) &&
+    (value.role === undefined ||
+      value.role === "participant" ||
+      value.role === "coordinator") &&
+    (value.state === undefined ||
+      value.state === "active" ||
+      value.state === "dormant")
+  );
+}
+
+export function isAgentParticipantTurnAttribution(
+  value: unknown,
+): value is AgentParticipantTurnAttribution {
+  if (!isRecord(value) || value.kind !== "agent.participant.turn") {
+    return false;
+  }
+  return (
+    isIdentifier(value.turnId) &&
+    isAgentChannelParticipantProvenance(value.origin) &&
+    (value.streamId === undefined || isIdentifier(value.streamId)) &&
+    typeof value.createdAt === "number" &&
+    Number.isFinite(value.createdAt)
+  );
+}
+
+export function isAgentParticipantStreamAttribution(
+  value: unknown,
+): value is AgentParticipantStreamAttribution {
+  if (!isRecord(value) || value.kind !== "agent.participant.stream") {
+    return false;
+  }
+  return (
+    isIdentifier(value.streamId) &&
+    isIdentifier(value.turnId) &&
+    isAgentChannelParticipantProvenance(value.origin) &&
+    typeof value.openedAt === "number" &&
+    Number.isFinite(value.openedAt)
+  );
+}
+
+export function isAgentParticipantProvenanceEnvelope(
+  value: unknown,
+): value is AgentParticipantProvenanceEnvelope {
+  if (
+    !isRecord(value) ||
+    value.kind !== "agent.participant.provenance-envelope"
+  ) {
+    return false;
+  }
+  return (
+    isAgentParticipantEnvelopeSubject(value.subject) &&
+    isAgentChannelParticipantProvenance(value.provenance) &&
+    "payload" in value &&
+    typeof value.createdAt === "number" &&
+    Number.isFinite(value.createdAt) &&
+    (value.turnId === undefined || isIdentifier(value.turnId)) &&
+    (value.streamId === undefined || isIdentifier(value.streamId))
+  );
+}
+
+export function isAgentParticipantInterruptionRequest(
+  value: unknown,
+): value is AgentParticipantInterruptionRequest {
+  if (!isRecord(value) || value.kind !== "agent.participant.interrupt") {
+    return false;
+  }
+  return (
+    isAgentChannelParticipantProvenance(value.requester) &&
+    isAgentChannelParticipantProvenance(value.target) &&
+    value.requester.channelId === value.target.channelId &&
+    value.target.kind === "persona-session" &&
+    value.target.state !== "dormant" &&
+    typeof value.requestedAt === "number" &&
+    Number.isFinite(value.requestedAt) &&
+    (value.reason === undefined || typeof value.reason === "string")
+  );
+}
+
+export function isAgentParticipantInterruptionRequestForTarget(
+  value: unknown,
+  target: AgentChannelParticipantProvenance,
+): value is AgentParticipantInterruptionRequest {
+  return (
+    isAgentParticipantInterruptionRequest(value) &&
+    sameParticipantSession(value.target, target)
   );
 }
 
@@ -134,9 +285,54 @@ export function isAgentParticipantDispatchReceipt(
     return false;
   }
   return (
-    isAgentChannelParticipantProvenance(value.dispatcher) &&
+    isAgentChannelParticipantProvenance(value.coordinator) &&
     isAgentChannelParticipantProvenance(value.target) &&
+    isRecord(value.intended) &&
+    isIdentifier(value.intended.channelId) &&
+    isIdentifier(value.intended.targetParticipantId) &&
+    isIdentifier(value.intended.targetEveSessionId) &&
+    isIdentifier(value.intended.targetApplicationThreadId) &&
+    value.coordinator.channelId === value.target.channelId &&
+    value.target.channelId === value.intended.channelId &&
+    value.target.participantId === value.intended.targetParticipantId &&
+    value.target.kind === "persona-session" &&
+    value.target.eveSessionId === value.intended.targetEveSessionId &&
+    value.target.applicationThreadId ===
+      value.intended.targetApplicationThreadId &&
+    value.target.state !== "dormant" &&
+    isCoordinatorProvenance(value.coordinator) &&
     isAgentParticipantDispatchBounds(value.bounds)
+  );
+}
+
+export function isAgentParticipantDispatchReceiptForChannel(
+  value: unknown,
+  channel: AgentSessionChannel,
+): value is AgentParticipantDispatchReceipt {
+  if (
+    !isAgentSessionChannel(channel) ||
+    !isAgentParticipantDispatchReceipt(value)
+  ) {
+    return false;
+  }
+
+  const coordinator = findParticipant(channel, value.coordinator.participantId);
+  const target = findParticipant(channel, value.target.participantId);
+
+  return (
+    coordinator !== undefined &&
+    target !== undefined &&
+    provenanceMatchesParticipant(
+      value.coordinator,
+      channel.channelId,
+      coordinator,
+    ) &&
+    provenanceMatchesParticipant(value.target, channel.channelId, target) &&
+    isCoordinatorParticipant(coordinator) &&
+    target.kind === "persona-session" &&
+    target.state !== "dormant" &&
+    target.eveSessionId === value.intended.targetEveSessionId &&
+    target.applicationThreadId === value.intended.targetApplicationThreadId
   );
 }
 
@@ -169,4 +365,93 @@ function isIdentifier(value: unknown): value is string {
 
 function isIdentifierList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isIdentifier);
+}
+
+function isAgentParticipantEnvelopeSubject(
+  value: unknown,
+): value is AgentParticipantEnvelopeSubject {
+  return (
+    value === "message" ||
+    value === "tool-call" ||
+    value === "tool-result" ||
+    value === "domain-outcome" ||
+    value === "context-contribution"
+  );
+}
+
+function isCoordinatorProvenance(
+  provenance: AgentChannelParticipantProvenance,
+): boolean {
+  if (provenance.kind === "human") {
+    return provenance.role === "owner";
+  }
+  return provenance.role === "coordinator";
+}
+
+function isCoordinatorParticipant(
+  participant: AgentChannelParticipant,
+): boolean {
+  if (participant.kind === "human") return participant.role === "owner";
+  return participant.role === "coordinator";
+}
+
+function findParticipant(
+  channel: AgentSessionChannel,
+  participantId: string,
+): AgentChannelParticipant | undefined {
+  return channel.participants.find(
+    (participant) => participant.participantId === participantId,
+  );
+}
+
+function provenanceMatchesParticipant(
+  provenance: AgentChannelParticipantProvenance,
+  channelId: string,
+  participant: AgentChannelParticipant,
+): boolean {
+  if (
+    provenance.channelId !== channelId ||
+    provenance.kind !== participant.kind ||
+    provenance.participantId !== participant.participantId ||
+    provenance.principalId !== participant.principalId
+  ) {
+    return false;
+  }
+
+  if (participant.kind === "human") {
+    return (
+      provenance.role === undefined || provenance.role === participant.role
+    );
+  }
+
+  return (
+    provenance.personaId === participant.personaId &&
+    provenance.eveSessionId === participant.eveSessionId &&
+    provenance.applicationThreadId === participant.applicationThreadId &&
+    (provenance.role === undefined || provenance.role === participant.role) &&
+    (provenance.state === undefined ||
+      participantStatesMatch(provenance.state, participant.state))
+  );
+}
+
+function participantStatesMatch(
+  provenanceState: AgentChannelParticipantState,
+  participantState: AgentChannelParticipantState | undefined,
+): boolean {
+  return provenanceState === (participantState ?? "active");
+}
+
+function sameParticipantSession(
+  left: AgentChannelParticipantProvenance,
+  right: AgentChannelParticipantProvenance,
+): boolean {
+  return (
+    left.channelId === right.channelId &&
+    left.participantId === right.participantId &&
+    left.kind === right.kind &&
+    left.principalId === right.principalId &&
+    left.personaId === right.personaId &&
+    left.eveSessionId === right.eveSessionId &&
+    left.applicationThreadId === right.applicationThreadId
+  );
 }
