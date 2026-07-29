@@ -2,6 +2,7 @@
   "name": "@sigil-design/chat-overlay",
   "version": "0.1.1",
   "license": "Apache-2.0",
+  "private": true,
   "type": "module",
   "description": "Sigil Chat application overlay for the Sigil Design scaffold.",
   "files": [
@@ -11,6 +12,7 @@
   ],
   "scripts": {
     "stage": "node scripts/stage-overlay.mjs",
+    "registry:item": "node scripts/emit-registry-item.mjs",
     "test": "vitest run",
     "prepack": "pnpm stage",
     "postpack": "node scripts/clean-overlay.mjs",
@@ -23,8 +25,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }
