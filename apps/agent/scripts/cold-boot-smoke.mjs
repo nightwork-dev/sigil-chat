@@ -38,8 +38,16 @@ try {
 
   const port = await reservePort()
   child = spawn(
-    join(fixtureDirectory, "node_modules", ".bin", "eve"),
-    ["dev", "--no-ui", "--host", "127.0.0.1", "--port", String(port)],
+    process.execPath,
+    [
+      join(appDirectory, "node_modules", "eve", "bin", "eve.js"),
+      "dev",
+      "--no-ui",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+    ],
     {
       cwd: fixtureDirectory,
       env: {
