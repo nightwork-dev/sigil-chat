@@ -1,4 +1,7 @@
 import { blackboardRepository } from "@workspace/blackboard-store"
+import { createScope } from "@gonk/scope"
+import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
+import { MirkAgentContextReceiptRepository } from "@workspace/agent-tools/context-receipts"
 import {
   createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
@@ -47,6 +50,13 @@ const authenticatePrincipal = createSigilRequestAuthenticator(authEnvironment)
 const requiredSkillIds = readCsvEnv("SIGIL_CONTEXT_REQUIRED_SKILLS")
 const pinnedResourceKeys = readCsvEnv("SIGIL_CONTEXT_PINNED_RESOURCE_KEYS")
 const memorySourcePolicy = createScopeGrantPolicy()
+const scope = createScope({ cwd: process.cwd() })
+const store = createStoreProvider(scope, {
+  backendFactory: mirkBackendFactory(scope),
+})
+const contextReceiptRepository = new MirkAgentContextReceiptRepository({
+  kv: store.kv("project", "sigil-chat.context-receipts.v1"),
+})
 const compileMessage = createSigilEveOnMessage({
   createCompiler: ({ binding }) =>
     createDefaultSigilContextCompiler({ binding, requiredSkillIds }),
@@ -70,6 +80,20 @@ const compileMessage = createSigilEveOnMessage({
       turn: memoryTurn(eveSessionId, principalId),
       query,
     }),
+  recordContextReceipt: ({
+    applicationThreadId,
+    principalId,
+    personaId,
+    receipt,
+  }) => {
+    if (!applicationThreadId) return
+    contextReceiptRepository.append({
+      applicationThreadId,
+      principalId,
+      ...(personaId ? { personaId } : {}),
+      receipt,
+    })
+  },
 })
 const realtimeVoiceHost = new RealtimeVoiceHost()
 const channel = createOwnedEveChannel({

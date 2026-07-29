@@ -1,6 +1,7 @@
 import { createScope } from "@gonk/scope";
 import { createStoreProvider } from "@gonk/store";
 import { mirkBackendFactory } from "@gonk/store/sqlite";
+import { MirkAgentContextReceiptRepository } from "@workspace/agent-tools/context-receipts";
 
 import { AgentThreadRepository } from "@/lib/agent-threads-domain";
 import type { AgentThreadExecutionBinding } from "@/lib/agent-threads-domain";
@@ -22,6 +23,11 @@ export const agentThreadRepository = new AgentThreadRepository({
   defaultPersonaId:
     process.env.SIGIL_DEFAULT_PERSONA_ID?.trim() || "sigil-chat-eve",
 });
+
+export const agentContextReceiptRepository =
+  new MirkAgentContextReceiptRepository({
+    kv: store.kv("project", "sigil-chat.context-receipts.v1"),
+  });
 
 export const agentThreadBindingService = createThreadBindingService({
   repository: agentThreadRepository,

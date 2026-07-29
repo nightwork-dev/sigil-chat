@@ -1,6 +1,13 @@
 import type { BuildEveForkSeedInput } from "@zigil/agent/eve/client"
+import {
+  AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
+  isAgentContextCompileReceiptEvent,
+  type AgentContextCompileReceiptEvent,
+} from "@workspace/agent-contracts/context-receipt"
 
 export type AgentRuntimeStreamEvent = BuildEveForkSeedInput["events"][number]
+export type AgentSessionTimelineEvent =
+  AgentRuntimeStreamEvent | AgentContextCompileReceiptEvent
 
 type AssistantFinishReason = Extract<
   AgentRuntimeStreamEvent,
@@ -122,6 +129,7 @@ export interface PersistedInputRequest {
 
 export type PersistedAgentEvent = PersistedEventMeta &
   (
+    | AgentContextCompileReceiptEvent
     | {
         type: "session.started"
         data: {
@@ -307,7 +315,7 @@ export interface AgentEventRetentionOptions {
 }
 
 export function sanitizeAndBoundAgentEvents(
-  events: readonly AgentRuntimeStreamEvent[],
+  events: readonly AgentSessionTimelineEvent[],
   options: AgentEventRetentionOptions = {},
 ): PersistedAgentEventSnapshot {
   const sanitized = events.flatMap((item, sourceIndex) => {
@@ -353,9 +361,22 @@ export function agentEventsForReplay(
 }
 
 function sanitizeAgentEvent(
-  event: AgentRuntimeStreamEvent,
+  event: AgentSessionTimelineEvent,
 ): PersistedAgentEvent | null {
   const meta = event.meta ? { meta: { at: event.meta.at } } : {}
+  if (isAgentContextCompileReceiptEvent(event)) {
+    return retainedEvent({
+      type: AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
+      data: {
+        applicationThreadId: event.data.applicationThreadId,
+        principalId: event.data.principalId,
+        ...(event.data.personaId ? { personaId: event.data.personaId } : {}),
+        receipt: event.data.receipt,
+        ...(event.data.turnId ? { turnId: event.data.turnId } : {}),
+      },
+      ...meta,
+    })
+  }
   switch (event.type) {
     case "message.received":
       return retainedEvent({
@@ -595,6 +616,7 @@ function replayAgentEvent(
   event: PersistedAgentEvent,
 ): AgentRuntimeStreamEvent | null {
   const meta = event.meta ? { meta: { at: event.meta.at } } : {}
+  if (event.type === AGENT_CONTEXT_COMPILE_RECEIPT_EVENT) return null
   switch (event.type) {
     case "session.started":
       return rawEvent({ type: event.type, data: event.data, ...meta })

@@ -1,9 +1,10 @@
 import {
   sanitizeAndBoundAgentEvents,
   type AgentEventCompactionReceipt,
-  type AgentRuntimeStreamEvent,
+  type AgentSessionTimelineEvent,
   type PersistedAgentEvent,
 } from "./agent-event-retention";
+import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts";
 
 export type AgentThreadStatus = "active" | "archived";
 
@@ -74,6 +75,7 @@ export interface AgentThread {
     events: PersistedAgentEvent[];
     compaction: AgentEventCompactionReceipt;
   };
+  contextReceipts?: AgentContextReceiptProjectionRecord[];
   forkedFrom?: string;
   forkSeed?: AgentThreadForkSeed;
   /**
@@ -128,7 +130,7 @@ export interface AgentThreadRepositoryOptions {
 
 export interface AgentThreadSnapshot {
   session: AgentRuntimeSessionState;
-  events: AgentRuntimeStreamEvent[];
+  events: AgentSessionTimelineEvent[];
 }
 
 export interface ForkAgentThreadInput {

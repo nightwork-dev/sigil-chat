@@ -9,6 +9,7 @@ import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits
 import { eveChannel } from "eve/channels/eve"
 import {
   blackboardContextBlock,
+  adaptGonkContextReceipt,
   contextFitsBudget,
   createDefaultSigilContextCompiler,
   createSigilEveOnMessage,
@@ -69,13 +70,25 @@ describe("Sigil Eve context integration", () => {
       reason: "contributor-failed",
       contributorId: "sigil.retrieval",
     })
+    expect(adaptGonkContextReceipt(result.receipt).dropped).toContainEqual(
+      expect.objectContaining({
+        activationReason: "contributor-failed",
+        dropReason: "contributor-failed",
+        kind: "dropped",
+        provenance: { contributorId: "sigil.retrieval" },
+      }),
+    )
   })
 
   it("adds deterministically selected authorized skill context to the next model turn", async () => {
+    const receipts: unknown[] = []
     const channel = testChannel({
       compiler: compilerWith([
         createSkillContextContributor({ registry: skillRegistry() }),
       ]),
+      recordContextReceipt: (receipt) => {
+        receipts.push(receipt)
+      },
     })
     const send = vi.fn(async () => session())
 
@@ -92,6 +105,30 @@ describe("Sigil Eve context integration", () => {
       "Managed skill: editorial-readiness",
     )
     expect(JSON.stringify(payload)).toContain("AUTHORIZED_EDITORIAL_CONTEXT")
+    expect(receipts).toHaveLength(1)
+    expect(receipts[0]).toMatchObject({
+      applicationThreadId: undefined,
+      principalId: "user-1",
+      personaId: "agent-a",
+      receipt: {
+        audience: "model",
+        selected: [
+          expect.objectContaining({
+            activationReason: "selected",
+            kind: "selected",
+            provenance: expect.objectContaining({
+              contributorId: "sigil.skills",
+              resourceKey: "skill:editorial-readiness",
+            }),
+            visibility: {
+              decision: "visible",
+              reason: "authorized-for-compile-audience",
+            },
+          }),
+        ],
+        status: "ready",
+      },
+    })
   })
 
   it("does not bulk-inject skills when none are required or deterministically matched", async () => {
@@ -641,6 +678,7 @@ function testChannel(options: {
   pinnedResourceKeys?: readonly string[]
   readBlackboard?: (sessionId: string) => Promise<string>
   recallLatestTurn?: SigilContextOptions["recallLatestTurn"]
+  recordContextReceipt?: SigilContextOptions["recordContextReceipt"]
 }) {
   return eveChannel({
     auth: [() => options.auth ?? SESSION_AUTH],
@@ -652,6 +690,7 @@ function testChannel(options: {
       pinnedResourceKeys: options.pinnedResourceKeys,
       readBlackboard: options.readBlackboard,
       recallLatestTurn: options.recallLatestTurn,
+      recordContextReceipt: options.recordContextReceipt,
     }),
   })
 }

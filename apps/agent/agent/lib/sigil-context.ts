@@ -2,8 +2,11 @@ import {
   ContextCompiler,
   ContextContributorRegistry,
   type ContextCandidate,
+  type ContextCompilationReceipt,
   type ContextCompileResult,
   type ContextContributor,
+  type ContextReceiptDrop,
+  type ContextReceiptSelection,
   type ContextTokenCounter,
   fallbackTokenCounter,
   type ResolvedContextCandidate,
@@ -26,6 +29,13 @@ import {
   createSkillRegistry,
   type SkillRegistryBinding,
 } from "@workspace/agent-tools/skills"
+import {
+  AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
+  type AgentContextCompileReceipt,
+  type AgentContextReceiptDrop,
+  type AgentContextReceiptItem,
+  type AgentContextReceiptSelection,
+} from "@workspace/agent-contracts/context-receipt"
 import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
 import { readDataEnvironment } from "@workspace/runtime-env/server"
 import type {
@@ -83,6 +93,18 @@ export interface SigilContextOptions {
     | ScopedMemoryRecallDelivery
     | undefined
     | Promise<ScopedMemoryRecallDelivery | undefined>
+  /**
+   * Optional host persistence hook for the compile receipt. The hook receives
+   * the application-safe projection of Gonk's low-level receipt. It must never
+   * feed this record back into model context; it is audit/UI material only.
+   */
+  recordContextReceipt?: (input: {
+    applicationThreadId?: string
+    eveSessionId?: string
+    principalId: string
+    personaId?: string
+    receipt: AgentContextCompileReceipt
+  }) => void | Promise<void>
 }
 
 export function createSigilEveOnMessage(options: SigilContextOptions) {
@@ -115,8 +137,23 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
     })
 
     if (compiled.status === "blocked") {
+      await recordCompiledReceipt({
+        caller,
+        compiled,
+        ctx,
+        options,
+        pinnedResourceKeys: options.pinnedResourceKeys,
+      })
       return null
     }
+
+    await recordCompiledReceipt({
+      caller,
+      compiled,
+      ctx,
+      options,
+      pinnedResourceKeys: options.pinnedResourceKeys,
+    })
 
     const blocks: string[] = []
     const compiledContent = compiled.content.trim()
@@ -208,6 +245,147 @@ export function createSigilEveOnMessage(options: SigilContextOptions) {
       context: blocks.length > 0 ? blocks : undefined,
     }
   }
+}
+
+async function recordCompiledReceipt(input: {
+  caller: EveSessionAuth
+  compiled: ContextCompileResult
+  ctx: EveMessageContext
+  options: SigilContextOptions
+  pinnedResourceKeys?: readonly string[]
+}): Promise<void> {
+  if (!input.options.recordContextReceipt) return
+  const principalId = nonBlank(input.caller.principalId)
+  if (principalId === undefined) return
+  await input.options.recordContextReceipt({
+    applicationThreadId: readExecutionApplicationThreadId(input.caller),
+    eveSessionId: nonBlank(input.ctx.eve.sessionId),
+    principalId,
+    personaId: callerPersona(input.caller),
+    receipt: adaptGonkContextReceipt(input.compiled.receipt, {
+      pinnedResourceKeys: input.pinnedResourceKeys,
+    }),
+  })
+}
+
+export function adaptGonkContextReceipt(
+  receipt: ContextCompilationReceipt,
+  options: { pinnedResourceKeys?: readonly string[] } = {},
+): AgentContextCompileReceipt {
+  const pinnedResourceKeys = new Set(options.pinnedResourceKeys ?? [])
+  return {
+    audience: receipt.audience,
+    compiledAt: receipt.timestamp,
+    compiler: {
+      configVersion: receipt.configVersion,
+      version: receipt.compilerVersion,
+    },
+    id: receipt.requestId,
+    maxTokens: receipt.maxTokens,
+    pinned: receipt.selected
+      .filter((item) => pinnedResourceKeys.has(item.resourceKey))
+      .map((item) => selectionToItem(item, pinnedResourceKeys)),
+    requestId: receipt.requestId,
+    selected: receipt.selected.map((item) =>
+      selectionToProjection(item, pinnedResourceKeys),
+    ),
+    dropped: receipt.dropped.map((item) =>
+      dropToProjection(item, pinnedResourceKeys),
+    ),
+    status: receipt.status,
+    totalTokens: receipt.totalTokens,
+    version: AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
+  }
+}
+
+function selectionToProjection(
+  item: ContextReceiptSelection,
+  pinnedResourceKeys: ReadonlySet<string>,
+): AgentContextReceiptSelection {
+  return {
+    ...selectionToItem(item, pinnedResourceKeys),
+    kind: "selected",
+  }
+}
+
+function selectionToItem(
+  item: ContextReceiptSelection,
+  pinnedResourceKeys: ReadonlySet<string>,
+): AgentContextReceiptItem {
+  return {
+    activationReason: activationReasonForSelection(item, pinnedResourceKeys),
+    necessity: item.necessity,
+    pinned: pinnedResourceKeys.has(item.resourceKey),
+    provenance: {
+      candidateId: item.candidateId,
+      contributorId: item.contributorId,
+      resourceKey: item.resourceKey,
+      revision: item.revision,
+    },
+    tokenEstimate: {
+      contentTokens: item.contentTokens,
+      renderedTokens: item.renderedTokens,
+      quality: item.tokenQuality,
+    },
+    visibility: {
+      decision: "visible",
+      reason: "authorized-for-compile-audience",
+    },
+  }
+}
+
+function dropToProjection(
+  item: ContextReceiptDrop,
+  pinnedResourceKeys: ReadonlySet<string>,
+): AgentContextReceiptDrop {
+  const resourceKey = "resourceKey" in item ? item.resourceKey : undefined
+  const candidateId = "candidateId" in item ? item.candidateId : undefined
+  return {
+    activationReason: activationReasonForDrop(item, pinnedResourceKeys),
+    dropReason: item.reason,
+    kind: "dropped",
+    ...("necessity" in item ? { necessity: item.necessity } : {}),
+    pinned: resourceKey ? pinnedResourceKeys.has(resourceKey) : false,
+    provenance: {
+      ...(candidateId ? { candidateId } : {}),
+      contributorId: item.contributorId,
+      ...(resourceKey ? { resourceKey } : {}),
+      ...("revision" in item ? { revision: item.revision } : {}),
+    },
+    tokenEstimate: {
+      ...("contentTokens" in item ? { contentTokens: item.contentTokens } : {}),
+      ...("renderedTokens" in item
+        ? { renderedTokens: item.renderedTokens }
+        : {}),
+      quality: "tokenQuality" in item ? item.tokenQuality : "fallback",
+    },
+    visibility: {
+      decision: item.reason === "use-denied" ? "withheld" : "visible",
+      reason:
+        item.reason === "use-denied"
+          ? "not-authorized-for-compile-audience"
+          : "safe-compile-diagnostic",
+    },
+  }
+}
+
+function activationReasonForSelection(
+  item: ContextReceiptSelection,
+  pinnedResourceKeys: ReadonlySet<string>,
+): string {
+  if (pinnedResourceKeys.has(item.resourceKey)) return "pinned"
+  if (item.necessity === "required") return "required"
+  return "selected"
+}
+
+function activationReasonForDrop(
+  item: ContextReceiptDrop,
+  pinnedResourceKeys: ReadonlySet<string>,
+): string {
+  const resourceKey = "resourceKey" in item ? item.resourceKey : undefined
+  if (resourceKey && pinnedResourceKeys.has(resourceKey)) return "pinned"
+  if ("necessity" in item && item.necessity === "required") return "required"
+  return item.reason
 }
 
 export function blackboardContextBlock(content: string): string | undefined {

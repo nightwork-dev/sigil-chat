@@ -30,6 +30,8 @@ import {
   type ContextRetention,
   type TurnContextAttachment,
 } from "@zigil/agent/react"
+import type { AgentContextCompileReceiptProjection } from "@workspace/agent-contracts/context-receipt"
+import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts"
 import { Button } from "@workspace/ui/components/button"
 import { CodeBlock } from "@workspace/ui/components/code-block"
 import {
@@ -52,11 +54,13 @@ import { Separator } from "@workspace/ui/components/separator"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { usePendingAttentionContext } from "@/lib/agent-attention-delivery"
+import { useAgentThread } from "@/lib/agent-threads"
 
 interface ContextTrayValue {
   attention: AttentionContext | null
   attachments: readonly TurnContextAttachment[]
   excludedKeys: readonly string[]
+  latestReceipt: AgentContextCompileReceiptProjection | null
   preview: AttentionContextPreview | null
   privacy: AttentionPrivacyLevel
 }
@@ -85,6 +89,14 @@ function Root({
   const privacy = useAttentionPrivacyLevel()
   const excludedKeys = useAttentionExclusions()
   const attachments = useTurnContextAttachments()
+  const threadControls = useAgentThreadControls()
+  const activeThread = useAgentThread(
+    threadControls?.activeThreadId,
+    Boolean(threadControls?.activeThreadId),
+  )
+  const latestReceipt = latestContextReceipt(
+    activeThread.data?.contextReceipts ?? [],
+  )
   const preview =
     pendingAttention || attachments.length > 0
       ? createAttentionContextPreview(
@@ -101,6 +113,7 @@ function Root({
         attention: pendingAttention,
         attachments,
         excludedKeys,
+        latestReceipt,
         preview,
         privacy,
       }}
@@ -135,7 +148,8 @@ function Trigger({ className }: { className?: string }) {
 }
 
 function Content({ className }: { className?: string }) {
-  const { attachments, excludedKeys, preview, privacy } = useContextTray()
+  const { attachments, excludedKeys, latestReceipt, preview, privacy } =
+    useContextTray()
 
   return (
     <PopoverContent
@@ -224,6 +238,19 @@ function Content({ className }: { className?: string }) {
                 <EmptySection>
                   Pin a selection above only when it should outlive the current
                   workspace selection.
+                </EmptySection>
+              )}
+            </ContextSection>
+
+            <Separator />
+
+            <ContextSection title="Last compiled context receipt">
+              {latestReceipt ? (
+                <CompileReceiptSummary receipt={latestReceipt} />
+              ) : (
+                <EmptySection>
+                  No retained compile receipt has been recorded for this session
+                  yet.
                 </EmptySection>
               )}
             </ContextSection>
@@ -464,6 +491,59 @@ function ExcludeButton({ itemKey, label }: { itemKey: string; label: string }) {
 
 function EmptySection({ children }: { children: ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>
+}
+
+function CompileReceiptSummary({
+  receipt,
+}: {
+  receipt: AgentContextCompileReceiptProjection
+}) {
+  const selectedTokens = receipt.selected.reduce(
+    (total, item) => total + (item.tokenEstimate.renderedTokens ?? 0),
+    0,
+  )
+  return (
+    <div className="space-y-2 rounded-md border border-border px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+          {receipt.status} · {receipt.audience}
+        </p>
+        <p className="font-mono text-[10px] text-muted-foreground">
+          ~{receipt.totalTokens || selectedTokens} / {receipt.maxTokens} tokens
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {receipt.selected.length} selected · {receipt.pinned.length} pinned ·{" "}
+        {receipt.dropped.length} dropped in this projection.
+      </p>
+      {receipt.selected.length > 0 ? (
+        <ul className="space-y-1">
+          {receipt.selected.slice(0, 4).map((item) => (
+            <li
+              className="truncate font-mono text-[10px] text-muted-foreground"
+              key={`${item.provenance.contributorId}:${item.provenance.resourceKey ?? item.provenance.candidateId}`}
+              title={item.provenance.resourceKey ?? item.provenance.candidateId}
+            >
+              {item.activationReason} · {item.provenance.contributorId}
+              {item.provenance.resourceKey
+                ? ` · ${item.provenance.resourceKey}`
+                : ""}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+function latestContextReceipt(
+  records: readonly AgentContextReceiptProjectionRecord[],
+): AgentContextCompileReceiptProjection | null {
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index]
+    if (record) return record.receipt
+  }
+  return null
 }
 
 export const ContextTray = { Root, Trigger, Content }

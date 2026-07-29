@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
+  AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
+} from "@workspace/agent-contracts/context-receipt";
+import {
   AGENT_EVENT_RETENTION_POLICY,
   agentEventsForReplay,
   sanitizeAndBoundAgentEvents,
@@ -344,6 +348,57 @@ describe("agent event retention", () => {
 
     expect(replay).toHaveLength(2);
     expect(JSON.stringify(replay)).not.toContain("redacted");
+  });
+
+  it("retains context compile receipts for inspection but never replays them into Eve", () => {
+    const retained = sanitizeAndBoundAgentEvents([
+      {
+        type: AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
+        data: {
+          applicationThreadId: "thread-1",
+          principalId: "user-1",
+          personaId: "agent-a",
+          receipt: {
+            audience: "model",
+            compiledAt: "2026-07-29T14:30:00.000Z",
+            compiler: {
+              configVersion: "test",
+              version: "0.1.1",
+            },
+            id: "receipt-1",
+            maxTokens: 12000,
+            pinned: [],
+            selected: [
+              {
+                activationReason: "selected",
+                kind: "selected",
+                pinned: false,
+                provenance: {
+                  contributorId: "sigil.skills",
+                  resourceKey: "skill:editorial-readiness",
+                },
+                tokenEstimate: { renderedTokens: 8, quality: "fallback" },
+                visibility: {
+                  decision: "visible",
+                  reason: "authorized-for-compile-audience",
+                },
+              },
+            ],
+            dropped: [],
+            status: "ready",
+            totalTokens: 8,
+            version: AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
+          },
+          turnId: "turn-1",
+        },
+        meta: { at: "2026-07-29T14:30:00.000Z" },
+      },
+    ]);
+
+    expect(retained.events).toHaveLength(1);
+    expect(retained.events[0]?.type).toBe(AGENT_CONTEXT_COMPILE_RECEIPT_EVENT);
+    expect(JSON.stringify(retained)).toContain("skill:editorial-readiness");
+    expect(agentEventsForReplay(retained.events)).toEqual([]);
   });
 });
 

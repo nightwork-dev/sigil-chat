@@ -47,10 +47,21 @@ const listAgentThreadsFn = createServerFn({ method: "GET" })
 const getAgentThreadFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    const { agentThreadBindingService } =
+    const { agentContextReceiptRepository, agentThreadBindingService } =
       await import("@/lib/agent-threads.server");
     const session = await requireThreadSession();
-    return agentThreadBindingService.resolveExecution(session.user.id, data.id);
+    const thread = agentThreadBindingService.resolveExecution(
+      session.user.id,
+      data.id,
+    );
+    return {
+      ...thread,
+      contextReceipts: agentContextReceiptRepository.list(thread.id, [
+        `principal:${session.user.id}`,
+        `persona:${thread.personaId}`,
+        "viewer",
+      ]),
+    };
   });
 
 const createAgentThreadFn = createServerFn({ method: "POST" })
