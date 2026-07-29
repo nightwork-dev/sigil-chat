@@ -2,6 +2,7 @@ import {
   AGENT_CLIENT_COMMAND_EVENT,
   chatAgentDomainOutcomeRegistrations,
   createAgentClientCommandValidator,
+  validateAgentClientCommand as validateAgentClientCommandWithRegistrations,
   type AgentClientCommand,
 } from "@workspace/agent-contracts/client-command"
 
@@ -14,6 +15,19 @@ export {
 export const isAgentClientCommand = createAgentClientCommandValidator(
   chatAgentDomainOutcomeRegistrations,
 )
+
+export async function validateAgentClientCommand(
+  command: unknown,
+): Promise<AgentClientCommand | null> {
+  try {
+    return await validateAgentClientCommandWithRegistrations(
+      command,
+      chatAgentDomainOutcomeRegistrations,
+    )
+  } catch {
+    return null
+  }
+}
 
 export function dispatchAgentClientCommand(
   command: AgentClientCommand,

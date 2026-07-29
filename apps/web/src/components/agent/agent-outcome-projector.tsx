@@ -4,7 +4,7 @@ import type { AgentRuntimeSession } from "@zigil/agent/contracts"
 
 import {
   dispatchAgentClientCommand,
-  isAgentClientCommand,
+  validateAgentClientCommand,
 } from "@/lib/agent-client-command"
 import {
   dispatchAgentDomCommand,
@@ -20,34 +20,44 @@ export function AgentOutcomeProjector({
   const appliedCallIds = useRef(new Set<string>())
 
   useEffect(() => {
-    for (const message of session.data.messages) {
-      for (const part of message.parts) {
-        if (
-          part.type !== "tool-call" ||
-          part.state !== "output-available" ||
-          appliedCallIds.current.has(part.id)
-        ) {
-          continue
-        }
-        const command = extractClientCommand(part.output)
-        if (!command) continue
+    let cancelled = false
+    const projectOutcomes = async () => {
+      for (const message of session.data.messages) {
+        for (const part of message.parts) {
+          if (
+            part.type !== "tool-call" ||
+            part.state !== "output-available" ||
+            appliedCallIds.current.has(part.id)
+          ) {
+            continue
+          }
+          const command = extractClientCommand(part.output)
+          if (!command) continue
 
-        appliedCallIds.current.add(part.id)
-        if (isAgentDomCommand(command)) {
-          dispatchAgentDomCommand(command)
-          continue
-        }
-        if (!isAgentClientCommand(command)) continue
+          appliedCallIds.current.add(part.id)
+          if (isAgentDomCommand(command)) {
+            dispatchAgentDomCommand(command)
+            continue
+          }
+          const clientCommand = await validateAgentClientCommand(command)
+          if (!clientCommand) continue
+          if (cancelled) return
 
-        dispatchAgentClientCommand(command)
-        if (command.type !== "ui.highlight") continue
-        const actions = command.payload.actions?.filter(isAgentDomCommand) ?? []
-        if (actions.length > 0) {
-          dispatchAgentDomCommands(actions, {
-            clearPrevious: command.payload.clearPrevious,
-          })
+          dispatchAgentClientCommand(clientCommand)
+          if (clientCommand.type !== "ui.highlight") continue
+          const actions =
+            clientCommand.payload.actions?.filter(isAgentDomCommand) ?? []
+          if (actions.length > 0) {
+            dispatchAgentDomCommands(actions, {
+              clearPrevious: clientCommand.payload.clearPrevious,
+            })
+          }
         }
       }
+    }
+    void projectOutcomes()
+    return () => {
+      cancelled = true
     }
   }, [session.data.messages])
 

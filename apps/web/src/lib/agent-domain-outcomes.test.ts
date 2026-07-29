@@ -7,7 +7,7 @@ import {
   createAgentDomainOutcomeRegistration,
   type AgentClientCommand,
 } from "@workspace/agent-contracts/client-command"
-import type { AgentOutcomeReconciliationHandler } from "@zigil/agent-react-query"
+import type { AgentOutcomeReconciliationHandler } from "@zigil/agent/react/query"
 
 import {
   agentDomainOutcomeFromCommand,
@@ -170,7 +170,7 @@ describe("agent domain outcome reconciliation", () => {
       },
     }
 
-    expect(isCommand(command)).toBe(true)
+    await expect(isCommand(command)).resolves.toBe(true)
     const outcome = agentDomainOutcomeFromCommand(
       command as AgentClientCommand,
     )
@@ -200,7 +200,7 @@ describe("agent domain outcome reconciliation", () => {
       },
     }
 
-    expect(isChatAgentClientCommand(command)).toBe(true)
+    await expect(isChatAgentClientCommand(command)).resolves.toBe(true)
     const outcome = agentDomainOutcomeFromCommand(command as AgentClientCommand)
     expect(outcome).not.toBeNull()
     await createAgentDomainOutcomeDispatcher(queryClient).dispatch(outcome!)
@@ -232,7 +232,7 @@ describe("agent domain outcome reconciliation", () => {
       },
     }
 
-    expect(isChatAgentClientCommand(command)).toBe(true)
+    await expect(isChatAgentClientCommand(command)).resolves.toBe(true)
     const outcome = agentDomainOutcomeFromCommand(command as AgentClientCommand)
     expect(outcome).not.toBeNull()
     await createAgentDomainOutcomeDispatcher(queryClient).dispatch(outcome!)
