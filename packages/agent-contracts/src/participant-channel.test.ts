@@ -307,6 +307,7 @@ describe("agent participant channel contract", () => {
         role: "owner",
       },
       target,
+      observedTurnId: "turn-a",
       requestedAt: 100,
     } as const;
 
@@ -335,6 +336,7 @@ describe("agent participant channel contract", () => {
         eveSessionId: "eve-session-a",
         applicationThreadId: "thread-a",
       },
+      observedTurnId: "turn-a",
       requestedAt: 100,
     } as const;
 
@@ -347,6 +349,31 @@ describe("agent participant channel contract", () => {
         personaId: "persona-b",
         eveSessionId: "eve-session-b",
         applicationThreadId: "thread-b",
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects interruption without the currently observed active turn", () => {
+    expect(
+      isAgentParticipantInterruptionRequest({
+        kind: "agent.participant.interrupt",
+        requester: {
+          channelId: "channel-a",
+          participantId: "participant-human-a",
+          principalId: "user-a",
+          kind: "human",
+          role: "owner",
+        },
+        target: {
+          channelId: "channel-a",
+          participantId: "participant-eve-a",
+          principalId: "user-a",
+          kind: "persona-session",
+          personaId: "persona-a",
+          eveSessionId: "eve-session-a",
+          applicationThreadId: "thread-a",
+        },
+        requestedAt: 100,
       }),
     ).toBe(false);
   });
@@ -372,6 +399,7 @@ describe("agent participant channel contract", () => {
           applicationThreadId: "thread-dormant-a",
           state: "dormant",
         },
+        observedTurnId: "turn-dormant-a",
         requestedAt: 100,
       }),
     ).toBe(false);
@@ -617,7 +645,7 @@ describe("agent participant channel contract", () => {
     ).toBe(false);
   });
 
-  it("rejects dispatch receipts targeting dormant participants", () => {
+  it("accepts explicit dispatch receipts targeting dormant participants", () => {
     expect(
       isAgentParticipantDispatchReceiptForChannel(
         {
@@ -651,6 +679,6 @@ describe("agent participant channel contract", () => {
         },
         channel,
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

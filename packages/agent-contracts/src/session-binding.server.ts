@@ -1,7 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type {
+  AgentSessionBindingChannel,
   AgentSessionBindingPayload,
+  AgentSessionBindingParticipant,
+  AgentSessionBindingPersonaParticipant,
   AgentSessionExecutionBinding,
   AgentSessionScopePerspective,
 } from "./session-binding";
@@ -59,6 +62,9 @@ function isPayload(
     isIdentifier(value.personaId) &&
     isIdentifier(value.homeScopeId) &&
     (value.eveSessionId === undefined || isIdentifier(value.eveSessionId)) &&
+    (value.channel === undefined ||
+      (isBindingChannel(value.channel) &&
+        bindingSessionAppearsInChannel(value, value.channel))) &&
     isPerspective(value.initialPerspective) &&
     isIdentifierList(value.additionalContextScopeIds) &&
     typeof value.expiresAt === "number" &&
@@ -76,6 +82,93 @@ function isPerspective(value: unknown): value is AgentSessionScopePerspective {
     isIdentifier(perspective.focusScopeId) &&
     isIdentifierList(perspective.viaScopeIds)
   );
+}
+
+function isBindingChannel(value: unknown): value is AgentSessionBindingChannel {
+  if (!isRecord(value)) return false;
+  if (
+    !isIdentifier(value.channelId) ||
+    !isIdentifier(value.ownerPrincipalId) ||
+    !Array.isArray(value.participants) ||
+    value.participants.length === 0 ||
+    !value.participants.every(isBindingParticipant)
+  ) {
+    return false;
+  }
+
+  const participantIds = new Set<string>();
+  let hasOwnerParticipant = false;
+
+  for (const participant of value.participants) {
+    if (participantIds.has(participant.participantId)) return false;
+    participantIds.add(participant.participantId);
+
+    if (
+      participant.kind === "human" &&
+      participant.role === "owner" &&
+      participant.principalId === value.ownerPrincipalId
+    ) {
+      hasOwnerParticipant = true;
+    }
+
+    if (
+      participant.kind === "human" &&
+      participant.role === "owner" &&
+      participant.principalId !== value.ownerPrincipalId
+    ) {
+      return false;
+    }
+  }
+
+  return hasOwnerParticipant;
+}
+
+function isBindingParticipant(
+  value: unknown,
+): value is AgentSessionBindingParticipant {
+  if (!isRecord(value) || !isIdentifier(value.participantId)) return false;
+  if (!isIdentifier(value.principalId)) return false;
+  if (value.kind === "human") {
+    return value.role === "owner" || value.role === "member";
+  }
+  return (
+    value.kind === "persona-session" &&
+    isIdentifier(value.personaId) &&
+    isIdentifier(value.eveSessionId) &&
+    isIdentifier(value.applicationThreadId) &&
+    (value.role === undefined ||
+      value.role === "participant" ||
+      value.role === "coordinator") &&
+    (value.state === undefined ||
+      value.state === "active" ||
+      value.state === "dormant")
+  );
+}
+
+function bindingSessionAppearsInChannel(
+  binding: Partial<AgentSessionBindingPayload>,
+  channel: AgentSessionBindingChannel,
+): boolean {
+  return channel.participants.some((participant) => {
+    if (participant.kind !== "persona-session") return false;
+    return personaParticipantMatchesBinding(participant, binding);
+  });
+}
+
+function personaParticipantMatchesBinding(
+  participant: AgentSessionBindingPersonaParticipant,
+  binding: Partial<AgentSessionBindingPayload>,
+): boolean {
+  return (
+    participant.personaId === binding.personaId &&
+    participant.applicationThreadId === binding.applicationThreadId &&
+    (binding.eveSessionId === undefined ||
+      participant.eveSessionId === binding.eveSessionId)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function isIdentifierList(value: unknown): value is string[] {

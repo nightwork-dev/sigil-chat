@@ -80,6 +80,7 @@ export interface AgentParticipantInterruptionRequest {
   kind: "agent.participant.interrupt";
   requester: AgentChannelParticipantProvenance;
   target: AgentChannelParticipantProvenance;
+  observedTurnId: string;
   requestedAt: number;
   reason?: string;
 }
@@ -262,6 +263,7 @@ export function isAgentParticipantInterruptionRequest(
     value.requester.channelId === value.target.channelId &&
     value.target.kind === "persona-session" &&
     value.target.state !== "dormant" &&
+    isIdentifier(value.observedTurnId) &&
     typeof value.requestedAt === "number" &&
     Number.isFinite(value.requestedAt) &&
     (value.reason === undefined || typeof value.reason === "string")
@@ -299,7 +301,6 @@ export function isAgentParticipantDispatchReceipt(
     value.target.eveSessionId === value.intended.targetEveSessionId &&
     value.target.applicationThreadId ===
       value.intended.targetApplicationThreadId &&
-    value.target.state !== "dormant" &&
     isCoordinatorProvenance(value.coordinator) &&
     isAgentParticipantDispatchBounds(value.bounds)
   );
@@ -330,7 +331,6 @@ export function isAgentParticipantDispatchReceiptForChannel(
     provenanceMatchesParticipant(value.target, channel.channelId, target) &&
     isCoordinatorParticipant(coordinator) &&
     target.kind === "persona-session" &&
-    target.state !== "dormant" &&
     target.eveSessionId === value.intended.targetEveSessionId &&
     target.applicationThreadId === value.intended.targetApplicationThreadId
   );

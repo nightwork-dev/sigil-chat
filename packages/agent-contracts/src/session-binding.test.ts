@@ -30,6 +30,111 @@ describe("agent session binding attestation", () => {
     });
   });
 
+  it("round-trips a channel binding with multiple persona-bound sessions", () => {
+    const channelBinding = {
+      ...binding,
+      channel: {
+        channelId: "channel-a",
+        ownerPrincipalId: "user-a",
+        participants: [
+          {
+            kind: "human",
+            participantId: "participant-human-a",
+            principalId: "user-a",
+            role: "owner",
+          },
+          {
+            kind: "persona-session",
+            participantId: "participant-agent-a",
+            principalId: "user-a",
+            personaId: "agent-a",
+            eveSessionId: "eve-session-a",
+            applicationThreadId: "thread-a",
+          },
+          {
+            kind: "persona-session",
+            participantId: "participant-agent-b",
+            principalId: "user-a",
+            personaId: "agent-b",
+            eveSessionId: "eve-session-b",
+            applicationThreadId: "thread-b",
+            state: "dormant",
+          },
+        ],
+      },
+    } as const;
+
+    const proof = issueAgentSessionBinding(channelBinding, secret);
+
+    expect(readAgentSessionBinding(proof, 100, secret)).toEqual({
+      ...channelBinding,
+      audience: "sigil-agent-session-binding",
+      version: 1,
+    });
+  });
+
+  it("rejects channel bindings that do not contain the bound session pair", () => {
+    const proof = issueAgentSessionBinding(
+      {
+        ...binding,
+        channel: {
+          channelId: "channel-a",
+          ownerPrincipalId: "user-a",
+          participants: [
+            {
+              kind: "human",
+              participantId: "participant-human-a",
+              principalId: "user-a",
+              role: "owner",
+            },
+            {
+              kind: "persona-session",
+              participantId: "participant-agent-b",
+              principalId: "user-a",
+              personaId: "agent-b",
+              eveSessionId: "eve-session-b",
+              applicationThreadId: "thread-b",
+            },
+          ],
+        },
+      },
+      secret,
+    );
+
+    expect(readAgentSessionBinding(proof, 100, secret)).toBeUndefined();
+  });
+
+  it("rejects malformed channel bindings", () => {
+    const proof = issueAgentSessionBinding(
+      {
+        ...binding,
+        channel: {
+          channelId: "channel-a",
+          ownerPrincipalId: "user-a",
+          participants: [
+            {
+              kind: "human",
+              participantId: "participant-human-a",
+              principalId: "user-b",
+              role: "owner",
+            },
+            {
+              kind: "persona-session",
+              participantId: "participant-human-a",
+              principalId: "user-a",
+              personaId: "agent-a",
+              eveSessionId: "eve-session-a",
+              applicationThreadId: "thread-a",
+            },
+          ],
+        },
+      },
+      secret,
+    );
+
+    expect(readAgentSessionBinding(proof, 100, secret)).toBeUndefined();
+  });
+
   it("rejects tampering, the wrong secret, and expiry", () => {
     const proof = issueAgentSessionBinding(binding, secret);
     expect(readAgentSessionBinding(`${proof}x`, 100, secret)).toBeUndefined();
