@@ -34,9 +34,9 @@ export function AgentOutcomeProjector({
           const command = extractClientCommand(part.output)
           if (!command) continue
 
-          appliedCallIds.current.add(part.id)
           if (isAgentDomCommand(command)) {
             dispatchAgentDomCommand(command)
+            appliedCallIds.current.add(part.id)
             continue
           }
           const clientCommand = await validateAgentClientCommand(command)
@@ -44,6 +44,7 @@ export function AgentOutcomeProjector({
           if (cancelled) return
 
           dispatchAgentClientCommand(clientCommand)
+          appliedCallIds.current.add(part.id)
           if (clientCommand.type !== "ui.highlight") continue
           const actions =
             clientCommand.payload.actions?.filter(isAgentDomCommand) ?? []
