@@ -87,6 +87,38 @@ describe("requireVerifiedEveSessionBinding", () => {
     ).toThrow(EveSessionBindingVerificationError)
   })
 
+  it("returns the immutable binding for a cancel route attested to the same Eve session", () => {
+    expect(
+      requireVerifiedEveSessionBinding(
+        request(
+          "/eve/v1/session/session-1/cancel",
+          proof({ eveSessionId: "session-1" }),
+        ),
+        "user-1",
+        secret,
+        now,
+      ),
+    ).toMatchObject({
+      eveSessionId: "session-1",
+      personaId: "personal-agent",
+      subject: "user-1",
+    })
+  })
+
+  it("rejects a cancel route attested for another Eve session", () => {
+    expect(() =>
+      requireVerifiedEveSessionBinding(
+        request(
+          "/eve/v1/session/session-1/cancel",
+          proof({ eveSessionId: "session-2" }),
+        ),
+        "user-1",
+        secret,
+        now,
+      ),
+    ).toThrow(EveSessionBindingVerificationError)
+  })
+
   it("rejects an existing-session proof on the create route", () => {
     expect(() =>
       requireVerifiedEveSessionBinding(

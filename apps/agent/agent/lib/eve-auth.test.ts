@@ -343,6 +343,42 @@ describe("owned Eve channel", () => {
     expect(getSession).not.toHaveBeenCalled()
   })
 
+  it("rejects a cancel route whose channel participant binding belongs to another session", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind(
+      "session-b",
+      "user-1",
+      executionBindingFor("agent-b", "thread-1", {
+        participantEveSessionId: "session-b",
+        participantId: "participant-beatrice",
+      }),
+    )
+    const channel = makeOwnedChannel(ownerStore)
+    const route = findRoute(
+      channel,
+      "POST",
+      "/eve/v1/session/:sessionId/cancel",
+    )
+
+    const response = await route.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-b/cancel",
+        "user-1",
+        { turnId: "turn-b" },
+        "agent-b",
+        {
+          eveSessionId: "session-b",
+          participantEveSessionId: "session-b",
+          participantId: "participant-ada",
+        },
+      ),
+      routeArgs({ params: { sessionId: "session-b" } }),
+    )
+
+    expect(response.status).toBe(403)
+  })
+
   it("fails closed when an existing Eve session has no persisted owner", async () => {
     const channel = makeOwnedChannel(new MemoryEveSessionOwnerStore())
     const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
@@ -699,6 +735,29 @@ describe("owned Eve channel", () => {
       routeArgs({ params: { sessionId: "session-1" } }),
     )
     expect(continued.status).toBe(200)
+  })
+
+  it("rejects a signed cancel route attested for another Eve session", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
+    const channel = makeSignedOwnedChannel(ownerStore)
+    const route = findRoute(
+      channel,
+      "POST",
+      "/eve/v1/session/:sessionId/cancel",
+    )
+
+    const denied = await route.handler(
+      signedRequest(
+        "POST",
+        "/eve/v1/session/session-1/cancel",
+        signedSessionBinding({ eveSessionId: "session-2" }),
+        { turnId: "turn-1" },
+      ),
+      routeArgs({ params: { sessionId: "session-1" } }),
+    )
+
+    expect(denied.status).toBe(403)
   })
 
   it("rejects cross-thread replay against an immutable V3 session", async () => {

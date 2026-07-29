@@ -561,9 +561,10 @@ function sessionParticipantForBinding(
 }
 
 function sessionIdFromRequest(request: Request): string | undefined {
-  const match = /^\/eve\/v1\/session\/([^/]+)(?:\/stream)?$/.exec(
-    new URL(request.url).pathname,
-  )
+  const match =
+    /^\/eve\/v1\/session\/([^/]+)(?:\/(?:stream|cancel))?$/.exec(
+      new URL(request.url).pathname,
+    )
   if (!match?.[1]) return undefined
   try {
     return decodeURIComponent(match[1])

@@ -45,7 +45,8 @@ export function requireVerifiedEveSessionBinding(
 }
 
 function sessionIdFromPath(pathname: string): string | undefined {
-  const match = /^\/eve\/v1\/session\/([^/]+)(?:\/stream)?$/.exec(pathname)
+  const match =
+    /^\/eve\/v1\/session\/([^/]+)(?:\/(?:stream|cancel))?$/.exec(pathname)
   if (!match?.[1]) return undefined
   try {
     return decodeURIComponent(match[1])
