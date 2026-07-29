@@ -1,14 +1,19 @@
 import {
   AGENT_CLIENT_COMMAND_EVENT,
+  chatAgentDomainOutcomeRegistrations,
+  createAgentClientCommandValidator,
   type AgentClientCommand,
 } from "@workspace/agent-contracts/client-command"
 
 export {
   AGENT_CLIENT_COMMAND_EVENT,
-  isAgentClientCommand,
   type AgentClientCommand,
   type AgentDomainOutcome,
 } from "@workspace/agent-contracts/client-command"
+
+export const isAgentClientCommand = createAgentClientCommandValidator(
+  chatAgentDomainOutcomeRegistrations,
+)
 
 export function dispatchAgentClientCommand(
   command: AgentClientCommand,

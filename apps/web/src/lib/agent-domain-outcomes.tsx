@@ -193,14 +193,19 @@ const blackboardChangedHandler: AgentOutcomeReconciliationHandler = {
       return
     }
     const tier =
-      outcome.resource.kind === "workspace-blackboard" ? "workspace" : "project"
+      outcome.resource.kind === "workspace-blackboard"
+        ? "workspace"
+        : "project"
     await context.invalidate([
       blackboardKeys.scoped({ tier, id: outcome.resource.id }),
     ])
   },
 }
 
-export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
+export function createAgentDomainOutcomeDispatcher(
+  queryClient: QueryClient,
+  additionalHandlers: readonly AgentOutcomeReconciliationHandler[] = [],
+) {
   return createReactQueryOutcomeDispatcher({
     queryClient,
     handlers: [
@@ -210,6 +215,7 @@ export function createAgentDomainOutcomeDispatcher(queryClient: QueryClient) {
       evidenceChangedHandler,
       containersChangedHandler,
       blackboardChangedHandler,
+      ...additionalHandlers,
     ],
     duplicateKindPolicy: "reject",
     unhandledOutcomePolicy: "ignore",

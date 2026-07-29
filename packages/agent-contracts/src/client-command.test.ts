@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import { isAgentClientCommand } from "./client-command"
+import {
+  UnregisteredAgentDomainOutcomeKindError,
+  createAgentClientCommandValidator,
+  createAgentDomainOutcomeRegistration,
+  isAgentClientCommand,
+  validateAgentClientCommand,
+} from "./client-command"
 import { isAgentUiHighlightInput } from "./ui-highlight"
 
 describe("agent client command contracts", () => {
@@ -123,6 +129,67 @@ describe("agent client command contracts", () => {
         }),
       ).toBe(true)
     }
+  })
+
+  it("rejects unregistered outcome kinds with a named fail-closed error", () => {
+    const command = {
+      type: "agent.domain.outcome",
+      payload: {
+        id: "external:record-1",
+        kind: "external.changed",
+        resource: {
+          kind: "external-record",
+          id: "record-1",
+        },
+        operation: "external.update",
+      },
+    }
+
+    expect(isAgentClientCommand(command)).toBe(false)
+    expect(() => validateAgentClientCommand(command)).toThrow(
+      UnregisteredAgentDomainOutcomeKindError,
+    )
+  })
+
+  it("accepts externally registered outcome kinds with their validators", () => {
+    const externalRegistration = createAgentDomainOutcomeRegistration({
+      kind: "external.changed",
+      resourceKinds: ["external-record"],
+      vendor: "external-test",
+      invalidMessage: "Expected an external outcome",
+    })
+    const isExternalAwareCommand = createAgentClientCommandValidator([
+      externalRegistration,
+    ])
+
+    expect(
+      isExternalAwareCommand({
+        type: "agent.domain.outcome",
+        payload: {
+          id: "external:record-1",
+          kind: "external.changed",
+          resource: {
+            kind: "external-record",
+            id: "record-1",
+          },
+          operation: "external.update",
+        },
+      }),
+    ).toBe(true)
+    expect(
+      isExternalAwareCommand({
+        type: "agent.domain.outcome",
+        payload: {
+          id: "external:record-1",
+          kind: "external.changed",
+          resource: {
+            kind: "wrong-record",
+            id: "record-1",
+          },
+          operation: "external.update",
+        },
+      }),
+    ).toBe(false)
   })
 
   it("keeps Gonk tool input stricter than the client envelope", () => {

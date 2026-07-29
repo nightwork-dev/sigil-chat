@@ -2,6 +2,14 @@ import { QueryClient } from "@tanstack/react-query"
 import { describe, expect, it, vi } from "vitest"
 
 import {
+  chatAgentDomainOutcomeRegistrations,
+  createAgentClientCommandValidator,
+  createAgentDomainOutcomeRegistration,
+  type AgentClientCommand,
+} from "@workspace/agent-contracts/client-command"
+import type { AgentOutcomeReconciliationHandler } from "@zigil/agent-react-query"
+
+import {
   agentDomainOutcomeFromCommand,
   createAgentDomainOutcomeDispatcher,
 } from "./agent-domain-outcomes"
@@ -46,7 +54,9 @@ describe("agent domain outcome reconciliation", () => {
       changedIds: ["release-check"],
     })
 
-    expect(queryClient.getQueryState(skillKeys.all())?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(skillKeys.all())?.isInvalidated).toBe(
+      true,
+    )
   })
 
   it("invalidates every project/workspace nav query for container mutations", async () => {
@@ -121,6 +131,52 @@ describe("agent domain outcome reconciliation", () => {
       createAgentDomainOutcomeDispatcher(queryClient).dispatch(unrelated),
     ).resolves.toBeUndefined()
     expect(queryClient.getQueryState(review)?.isInvalidated).toBe(false)
+  })
+
+  it("reconciles a synthetic external registration through the outcome cache path", async () => {
+    const syntheticRegistration = createAgentDomainOutcomeRegistration({
+      kind: "external.changed",
+      resourceKinds: ["external-record"],
+      vendor: "external-test",
+      invalidMessage: "Expected an external outcome",
+    })
+    const isCommand = createAgentClientCommandValidator([
+      ...chatAgentDomainOutcomeRegistrations,
+      syntheticRegistration,
+    ])
+    const syntheticKeys = {
+      detail: (id: string) => ["external-record", id] as const,
+    }
+    const syntheticHandler: AgentOutcomeReconciliationHandler = {
+      ...syntheticRegistration,
+      reconcile: async (outcome, context) => {
+        await context.invalidate([syntheticKeys.detail(outcome.resource.id)])
+      },
+    }
+    const queryClient = new QueryClient()
+    const affected = syntheticKeys.detail("record-1")
+    queryClient.setQueryData(affected, { revision: 1 })
+    const command = {
+      type: "agent.domain.outcome",
+      payload: {
+        id: "external:record-1:revision-2",
+        kind: "external.changed",
+        resource: { kind: "external-record", id: "record-1", revision: 2 },
+        operation: "external.update",
+        changedIds: ["record-1"],
+      },
+    }
+
+    expect(isCommand(command)).toBe(true)
+    const outcome = agentDomainOutcomeFromCommand(
+      command as AgentClientCommand,
+    )
+    expect(outcome).not.toBeNull()
+    await createAgentDomainOutcomeDispatcher(queryClient, [
+      syntheticHandler,
+    ]).dispatch(outcome!)
+
+    expect(queryClient.getQueryState(affected)?.isInvalidated).toBe(true)
   })
 
   it("accepts the typed outcome emitted by current Gonk tools", () => {
