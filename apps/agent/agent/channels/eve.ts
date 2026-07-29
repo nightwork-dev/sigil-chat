@@ -167,6 +167,9 @@ const channel = createOwnedEveChannel({
               sigilExecutionBinding: JSON.stringify({
                 applicationThreadId: sessionBinding.applicationThreadId,
                 personaId: sessionBinding.personaId,
+                ...(sessionBinding.channel
+                  ? { channel: sessionBinding.channel }
+                  : {}),
                 homeScopeId: sessionBinding.homeScopeId,
                 initialPerspective: sessionBinding.initialPerspective,
                 additionalContextScopeIds:

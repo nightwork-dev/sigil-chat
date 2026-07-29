@@ -18,10 +18,18 @@ import {
   type EveMessageContext,
   type EveMessageResult,
 } from "eve/channels/eve"
-import type { AgentSessionExecutionBinding } from "@workspace/agent-contracts/session-binding"
+import type {
+  AgentSessionBindingParticipant,
+  AgentSessionBindingPersonaParticipant,
+  AgentSessionExecutionBinding,
+} from "@workspace/agent-contracts/session-binding"
+import type { AgentChannelParticipantProvenance } from "@workspace/agent-contracts/participant-channel"
 import { portlessSiblingUrl } from "@workspace/runtime-env/topology"
 
-import type { EveSessionOwnerStore } from "./eve-session-owners"
+import type {
+  EveSessionBinding,
+  EveSessionOwnerStore,
+} from "./eve-session-owners"
 
 const EVE_AUDIENCE = "sigil-chat-agent"
 const EVE_CREATE_PATH = "/eve/v1/session"
@@ -202,7 +210,31 @@ export function createOwnedEveChannel(
           })
         }
       }
-      const boundCaller = withPersona(caller, personaId)
+      if (
+        request.method === "POST" &&
+        sessionParticipantForBinding(
+          requestedExecutionBinding,
+          subject,
+          sessionId ?? attestedEveSessionId(caller) ?? "__pending__",
+        )?.state === "dormant"
+      ) {
+        throw new ForbiddenError({
+          code: "eve_session_participant_dormant",
+          message: "Dormant participants cannot be dispatched by Eve.",
+        })
+      }
+      const boundCaller = withPersona(
+        caller,
+        personaId,
+        participantProvenanceForTurn({
+          binding: sessionId
+            ? await ownerStore.getBinding(sessionId)
+            : undefined,
+          fallbackBinding: requestedExecutionBinding,
+          principalId: subject,
+          sessionId: sessionId ?? attestedEveSessionId(caller) ?? undefined,
+        }),
+      )
       callers.set(request, boundCaller)
       return boundCaller
     },
@@ -382,8 +414,77 @@ function isExecutionBinding(
     !Array.isArray(perspective) &&
     isNonEmptyString((perspective as Record<string, unknown>).focusScopeId) &&
     isStringList((perspective as Record<string, unknown>).viaScopeIds) &&
-    isStringList(binding.additionalContextScopeIds)
+    isStringList(binding.additionalContextScopeIds) &&
+    (binding.channel === undefined || isBindingChannel(binding.channel))
   )
+}
+
+function isBindingChannel(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const channel = value as Record<string, unknown>
+  if (
+    !isNonEmptyString(channel.channelId) ||
+    !isNonEmptyString(channel.ownerPrincipalId) ||
+    !Array.isArray(channel.participants) ||
+    channel.participants.length === 0 ||
+    !channel.participants.every(isBindingParticipant)
+  ) {
+    return false
+  }
+  const participantIds = new Set<string>()
+  let hasOwnerParticipant = false
+  for (const participant of channel.participants) {
+    if (participantIds.has(participant.participantId)) return false
+    participantIds.add(participant.participantId)
+    if (
+      participant.kind === "human" &&
+      participant.role === "owner" &&
+      participant.principalId === channel.ownerPrincipalId
+    ) {
+      hasOwnerParticipant = true
+    }
+    if (
+      participant.kind === "human" &&
+      participant.role === "owner" &&
+      participant.principalId !== channel.ownerPrincipalId
+    ) {
+      return false
+    }
+  }
+  return hasOwnerParticipant
+}
+
+function isBindingParticipant(
+  value: unknown,
+): value is AgentSessionBindingParticipant {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const participant = value as Record<string, unknown>
+  if (!isNonEmptyString(participant.participantId)) return false
+  if (!isNonEmptyString(participant.principalId)) return false
+  if (participant.kind === "human") {
+    return participant.role === "owner" || participant.role === "member"
+  }
+  return (
+    participant.kind === "persona-session" &&
+    isNonEmptyString(participant.personaId) &&
+    isNonEmptyString(participant.eveSessionId) &&
+    isNonEmptyString(participant.applicationThreadId) &&
+    (participant.role === undefined ||
+      participant.role === "participant" ||
+      participant.role === "coordinator") &&
+    (participant.state === undefined ||
+      participant.state === "active" ||
+      participant.state === "dormant")
+  )
+}
+
+function attestedEveSessionId(caller: SessionAuthContext): string | undefined {
+  const value = caller.attributes.sigilAttestedEveSessionId
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
 }
 
 function isStringList(value: unknown): value is string[] {
@@ -397,14 +498,66 @@ function isNonEmptyString(value: unknown): value is string {
 function withPersona(
   caller: SessionAuthContext,
   personaId: string,
+  provenance?: AgentChannelParticipantProvenance,
 ): SessionAuthContext {
   return {
     ...caller,
     attributes: {
       ...caller.attributes,
       sigilPersonaId: personaId,
+      ...(provenance
+        ? { sigilParticipantProvenance: JSON.stringify(provenance) }
+        : {}),
     },
   }
+}
+
+function participantProvenanceForTurn({
+  binding,
+  fallbackBinding,
+  principalId,
+  sessionId,
+}: {
+  binding: EveSessionBinding | undefined
+  fallbackBinding: AgentSessionExecutionBinding | undefined
+  principalId: string
+  sessionId: string | undefined
+}): AgentChannelParticipantProvenance | undefined {
+  const execution = binding ?? fallbackBinding
+  const participant = sessionParticipantForBinding(
+    execution,
+    principalId,
+    sessionId,
+  )
+  const channel = execution?.channel
+  if (!execution || !channel || !participant || !sessionId) return undefined
+  return {
+    applicationThreadId: execution.applicationThreadId,
+    channelId: channel.channelId,
+    eveSessionId: sessionId,
+    kind: "persona-session",
+    participantId: participant.participantId,
+    personaId: execution.personaId,
+    principalId,
+    ...(participant.role ? { role: participant.role } : {}),
+    state: participant.state ?? "active",
+  }
+}
+
+function sessionParticipantForBinding(
+  binding: AgentSessionExecutionBinding | undefined,
+  principalId: string,
+  sessionId: string | undefined,
+): AgentSessionBindingPersonaParticipant | undefined {
+  if (!binding?.channel || !sessionId) return undefined
+  return binding.channel.participants.find(
+    (participant): participant is AgentSessionBindingPersonaParticipant =>
+      participant.kind === "persona-session" &&
+      participant.principalId === principalId &&
+      participant.personaId === binding.personaId &&
+      participant.applicationThreadId === binding.applicationThreadId &&
+      participant.eveSessionId === sessionId,
+  )
 }
 
 function sessionIdFromRequest(request: Request): string | undefined {

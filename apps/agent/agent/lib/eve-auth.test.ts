@@ -9,6 +9,10 @@ import type { HttpRouteDefinition } from "eve/channels"
 import { ForbiddenError } from "eve/channels/auth"
 import type { EveChannel } from "eve/channels/eve"
 import { beforeAll, describe, expect, it, vi } from "vitest"
+import type {
+  AgentSessionBindingChannel,
+  AgentSessionExecutionBinding,
+} from "@workspace/agent-contracts/session-binding"
 import { issueAgentSessionBinding } from "@workspace/agent-contracts/session-binding.server"
 
 import {
@@ -379,6 +383,192 @@ describe("owned Eve channel", () => {
     expect(send).not.toHaveBeenCalled()
   })
 
+  it("preserves participant provenance for two sessions in one neutral channel and dispatches only the addressed session", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    const observedProvenance: unknown[] = []
+    const channel = makeOwnedChannel(ownerStore, (context) => {
+      const raw = context.eve.caller?.attributes.sigilParticipantProvenance
+      if (typeof raw === "string") observedProvenance.push(JSON.parse(raw))
+      return context.eve.caller ? { auth: context.eve.caller } : null
+    })
+    const createRoute = findRoute(channel, "POST", "/eve/v1/session")
+    const continueRoute = findRoute(
+      channel,
+      "POST",
+      "/eve/v1/session/:sessionId",
+    )
+
+    await expect(
+      createRoute.handler(
+        requestFor(
+          "POST",
+          "/eve/v1/session",
+          "user-1",
+          { message: "Create Ada" },
+          "agent-a",
+          {
+            participantEveSessionId: "session-a",
+            participantId: "participant-ada",
+          },
+        ),
+        routeArgs({
+          send: vi.fn(async () => ({
+            continuationToken: "eve:continuation-a",
+            id: "session-a",
+          })),
+        }),
+      ),
+    ).resolves.toMatchObject({ status: 202 })
+    await expect(
+      createRoute.handler(
+        requestFor(
+          "POST",
+          "/eve/v1/session",
+          "user-1",
+          { message: "Create Beatrice" },
+          "agent-b",
+          {
+            participantEveSessionId: "session-b",
+            participantId: "participant-beatrice",
+          },
+        ),
+        routeArgs({
+          send: vi.fn(async () => ({
+            continuationToken: "eve:continuation-b",
+            id: "session-b",
+          })),
+        }),
+      ),
+    ).resolves.toMatchObject({ status: 202 })
+
+    await expect(ownerStore.getBinding("session-a")).resolves.toMatchObject({
+      applicationThreadId: "thread-1",
+      channel: {
+        channelId: "channel-1",
+        participants: expect.arrayContaining([
+          expect.objectContaining({
+            eveSessionId: "session-a",
+            participantId: "participant-ada",
+            role: "participant",
+          }),
+        ]),
+      },
+      personaId: "agent-a",
+      subject: "user-1",
+    })
+    await expect(ownerStore.getBinding("session-b")).resolves.toMatchObject({
+      applicationThreadId: "thread-1",
+      channel: {
+        channelId: "channel-1",
+        participants: expect.arrayContaining([
+          expect.objectContaining({
+            eveSessionId: "session-b",
+            participantId: "participant-beatrice",
+            role: "participant",
+          }),
+        ]),
+      },
+      personaId: "agent-b",
+      subject: "user-1",
+    })
+
+    const addressedSend = vi.fn(async () => ({ id: "session-a" }))
+    const addressed = await continueRoute.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-a",
+        "user-1",
+        { continuationToken: "eve:continuation-a", message: "Only Ada speaks" },
+        "agent-a",
+        {
+          eveSessionId: "session-a",
+          participantEveSessionId: "session-a",
+          participantId: "participant-ada",
+        },
+      ),
+      routeArgs({ params: { sessionId: "session-a" }, send: addressedSend }),
+    )
+
+    expect(addressed.status).toBe(200)
+    expect(addressedSend).toHaveBeenCalledOnce()
+    expect(observedProvenance.at(-1)).toEqual({
+      applicationThreadId: "thread-1",
+      channelId: "channel-1",
+      eveSessionId: "session-a",
+      kind: "persona-session",
+      participantId: "participant-ada",
+      personaId: "agent-a",
+      principalId: "user-1",
+      role: "participant",
+      state: "active",
+    })
+
+    const misaddressedSend = vi.fn()
+    const misaddressed = await continueRoute.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-b",
+        "user-1",
+        {
+          continuationToken: "eve:continuation-b",
+          message: "Pretend Ada owns Beatrice",
+        },
+        "agent-b",
+        {
+          eveSessionId: "session-b",
+          participantEveSessionId: "session-b",
+          participantId: "participant-ada",
+        },
+      ),
+      routeArgs({
+        params: { sessionId: "session-b" },
+        send: misaddressedSend,
+      }),
+    )
+
+    expect(misaddressed.status).toBe(403)
+    expect(misaddressedSend).not.toHaveBeenCalled()
+  })
+
+  it("fails closed instead of generating for a dormant persona participant", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind(
+      "session-dormant",
+      "user-1",
+      executionBindingFor("agent-a", "thread-1", {
+        participantId: "participant-dormant",
+        participantEveSessionId: "session-dormant",
+        state: "dormant",
+      }),
+    )
+    const channel = makeOwnedChannel(ownerStore)
+    const route = findRoute(channel, "POST", "/eve/v1/session/:sessionId")
+    const send = vi.fn()
+
+    const response = await route.handler(
+      requestFor(
+        "POST",
+        "/eve/v1/session/session-dormant",
+        "user-1",
+        {
+          continuationToken: "eve:continuation-dormant",
+          message: "Wake without a dispatch receipt",
+        },
+        "agent-a",
+        {
+          eveSessionId: "session-dormant",
+          participantEveSessionId: "session-dormant",
+          participantId: "participant-dormant",
+          state: "dormant",
+        },
+      ),
+      routeArgs({ params: { sessionId: "session-dormant" }, send }),
+    )
+
+    expect(response.status).toBe(403)
+    expect(send).not.toHaveBeenCalled()
+  })
+
   it("requires the execution attestation after a session reaches V3", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
     await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
@@ -583,6 +773,7 @@ function makeSignedOwnedChannel(ownerStore: MemoryEveSessionOwnerStore) {
                 sigilExecutionBinding: JSON.stringify({
                   additionalContextScopeIds: binding.additionalContextScopeIds,
                   applicationThreadId: binding.applicationThreadId,
+                  ...(binding.channel ? { channel: binding.channel } : {}),
                   homeScopeId: binding.homeScopeId,
                   initialPerspective: binding.initialPerspective,
                   personaId: binding.personaId,
@@ -669,6 +860,7 @@ function makeOwnedChannel(
         : executionBindingFor(
             requestedPersonaId ?? "agent-a",
             request.headers.get("x-test-thread-id") ?? "thread-1",
+            participantFromRequest(request),
           )
       const routeSessionId = /^\/eve\/v1\/session\/([^/]+)/.exec(
         new URL(request.url).pathname,
@@ -724,6 +916,10 @@ function requestFor(
     eveSessionId?: string
     omitBinding?: boolean
     omitEveSessionId?: boolean
+    participantEveSessionId?: string
+    participantId?: string
+    role?: "participant" | "coordinator"
+    state?: "active" | "dormant"
     threadId?: string
   },
 ) {
@@ -739,6 +935,17 @@ function requestFor(
       ...(binding?.eveSessionId
         ? { "x-test-eve-session-id": binding.eveSessionId }
         : {}),
+      ...(binding?.participantId
+        ? { "x-test-participant-id": binding.participantId }
+        : {}),
+      ...(binding?.participantEveSessionId
+        ? {
+            "x-test-participant-eve-session-id":
+              binding.participantEveSessionId,
+          }
+        : {}),
+      ...(binding?.role ? { "x-test-participant-role": binding.role } : {}),
+      ...(binding?.state ? { "x-test-participant-state": binding.state } : {}),
       ...(binding?.threadId ? { "x-test-thread-id": binding.threadId } : {}),
       "x-test-subject": subject,
     },
@@ -749,7 +956,13 @@ function requestFor(
 function executionBindingFor(
   personaId: string,
   applicationThreadId = "thread-1",
-) {
+  participant?: {
+    participantEveSessionId?: string
+    participantId: string
+    role?: "participant" | "coordinator"
+    state?: "active" | "dormant"
+  },
+): AgentSessionExecutionBinding {
   return {
     applicationThreadId,
     personaId,
@@ -759,6 +972,66 @@ function executionBindingFor(
       viaScopeIds: ["project-a"],
     },
     additionalContextScopeIds: [],
+    ...(participant
+      ? {
+          channel: channelFor(applicationThreadId, personaId, participant),
+        }
+      : {}),
+  }
+}
+
+function participantFromRequest(request: Request):
+  | {
+      participantEveSessionId?: string
+      participantId: string
+      role?: "participant" | "coordinator"
+      state?: "active" | "dormant"
+    }
+  | undefined {
+  const participantId = request.headers.get("x-test-participant-id")
+  if (!participantId) return undefined
+  const role = request.headers.get("x-test-participant-role")
+  const state = request.headers.get("x-test-participant-state")
+  return {
+    participantEveSessionId:
+      request.headers.get("x-test-participant-eve-session-id") ?? undefined,
+    participantId,
+    ...(role === "participant" || role === "coordinator" ? { role } : {}),
+    ...(state === "active" || state === "dormant" ? { state } : {}),
+  }
+}
+
+function channelFor(
+  applicationThreadId: string,
+  personaId: string,
+  participant: {
+    participantEveSessionId?: string
+    participantId: string
+    role?: "participant" | "coordinator"
+    state?: "active" | "dormant"
+  },
+): AgentSessionBindingChannel {
+  return {
+    channelId: "channel-1",
+    ownerPrincipalId: "user-1",
+    participants: [
+      {
+        kind: "human",
+        participantId: "participant-owner",
+        principalId: "user-1",
+        role: "owner",
+      },
+      {
+        applicationThreadId,
+        eveSessionId: participant.participantEveSessionId ?? "__pending__",
+        kind: "persona-session",
+        participantId: participant.participantId,
+        personaId,
+        principalId: "user-1",
+        role: participant.role ?? "participant",
+        ...(participant.state ? { state: participant.state } : {}),
+      },
+    ],
   }
 }
 

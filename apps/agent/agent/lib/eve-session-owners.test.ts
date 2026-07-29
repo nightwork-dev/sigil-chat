@@ -116,7 +116,59 @@ describe("EveSessionOwnerStore", () => {
       }),
     ).rejects.toThrow("already bound")
   })
+
+  it("persists participant-channel binding and rejects cross-participant rebinding", async () => {
+    const values = new Map<string, unknown>()
+    const store = new MirkEveSessionOwnerStore({ store: memoryKv(values) })
+    const participantBinding = {
+      ...executionBinding,
+      channel: channelFor("participant-ada", "session-1"),
+    }
+
+    await store.bind("session-1", "user-1", participantBinding)
+    await expect(store.getBinding("session-1")).resolves.toEqual({
+      subject: "user-1",
+      ...participantBinding,
+    })
+    expect(values.get("session-1")).toEqual({
+      sessionId: "session-1",
+      subject: "user-1",
+      version: 3,
+      ...participantBinding,
+    })
+
+    await expect(
+      store.bind("session-1", "user-1", {
+        ...participantBinding,
+        channel: channelFor("participant-beatrice", "session-1"),
+      }),
+    ).rejects.toThrow("already bound")
+  })
 })
+
+function channelFor(participantId: string, eveSessionId: string) {
+  return {
+    channelId: "channel-1",
+    ownerPrincipalId: "user-1",
+    participants: [
+      {
+        kind: "human",
+        participantId: "participant-owner",
+        principalId: "user-1",
+        role: "owner",
+      },
+      {
+        applicationThreadId: "thread-1",
+        eveSessionId,
+        kind: "persona-session",
+        participantId,
+        personaId: "agent-a",
+        principalId: "user-1",
+        role: "participant",
+      },
+    ],
+  } as const
+}
 
 function memoryKv(values: Map<string, unknown>): KvStore<unknown> {
   return {

@@ -3,6 +3,9 @@ import { createStoreProvider } from "@gonk/store"
 import { mirkBackendFactory } from "@gonk/store/sqlite"
 import type { KvStore } from "@gonk/store/types"
 import type {
+  AgentSessionBindingChannel,
+  AgentSessionBindingParticipant,
+  AgentSessionBindingPersonaParticipant,
   AgentSessionExecutionBinding,
   AgentSessionScopePerspective,
 } from "@workspace/agent-contracts/session-binding"
@@ -76,7 +79,15 @@ export class MirkEveSessionOwnerStore implements EveSessionOwnerStore {
     assertExecutionBinding(executionBinding)
 
     await this.runExclusive(() => {
-      const requested = v3Record(sessionId, subject, executionBinding)
+      const requested = v3Record(
+        sessionId,
+        subject,
+        normalizeExecutionBindingForSession(
+          sessionId,
+          subject,
+          executionBinding,
+        ),
+      )
       const existing = this.readRecord(sessionId)
       if (existing && recordsEqual(existing, requested)) return
       if (existing) throw new EveSessionOwnerConflictError(sessionId)
@@ -155,6 +166,7 @@ function bindingFromRecord(record: EveSessionOwnerRecordV3): EveSessionBinding {
     homeScopeId: record.homeScopeId,
     initialPerspective: structuredClone(record.initialPerspective),
     additionalContextScopeIds: [...record.additionalContextScopeIds],
+    ...(record.channel ? { channel: structuredClone(record.channel) } : {}),
   }
 }
 
@@ -192,8 +204,20 @@ function bindingsEqual(
       left.initialPerspective.viaScopeIds,
       right.initialPerspective.viaScopeIds,
     ) &&
-    arraysEqual(left.additionalContextScopeIds, right.additionalContextScopeIds)
+    arraysEqual(
+      left.additionalContextScopeIds,
+      right.additionalContextScopeIds,
+    ) &&
+    channelsEqual(left.channel, right.channel)
   )
+}
+
+function channelsEqual(
+  left: AgentSessionBindingChannel | undefined,
+  right: AgentSessionBindingChannel | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right
+  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function arraysEqual(
@@ -228,7 +252,8 @@ function isExecutionBinding(
     isIdentifier(value.homeScopeId) &&
     isPerspective(value.initialPerspective) &&
     Array.isArray(value.additionalContextScopeIds) &&
-    value.additionalContextScopeIds.every(isIdentifier)
+    value.additionalContextScopeIds.every(isIdentifier) &&
+    (value.channel === undefined || isBindingChannel(value.channel))
   )
 }
 
@@ -241,6 +266,101 @@ function isPerspective(value: unknown): value is AgentSessionScopePerspective {
     isIdentifier(perspective.focusScopeId) &&
     Array.isArray(perspective.viaScopeIds) &&
     perspective.viaScopeIds.every(isIdentifier)
+  )
+}
+
+function normalizeExecutionBindingForSession(
+  sessionId: string,
+  subject: string,
+  binding: AgentSessionExecutionBinding,
+): AgentSessionExecutionBinding {
+  if (!binding.channel) return binding
+  const matchingParticipants = binding.channel.participants.filter(
+    (participant): participant is AgentSessionBindingPersonaParticipant =>
+      participant.kind === "persona-session" &&
+      participant.principalId === subject &&
+      participant.personaId === binding.personaId &&
+      participant.applicationThreadId === binding.applicationThreadId &&
+      (participant.eveSessionId === sessionId ||
+        participant.eveSessionId === "__pending__"),
+  )
+  if (matchingParticipants.length !== 1) {
+    throw new Error("Eve execution binding does not match this session.")
+  }
+  const matched = matchingParticipants[0]
+  return {
+    ...binding,
+    channel: {
+      ...binding.channel,
+      participants: binding.channel.participants.map((participant) =>
+        participant === matched
+          ? { ...participant, eveSessionId: sessionId }
+          : participant,
+      ),
+    },
+  }
+}
+
+function isBindingChannel(value: unknown): value is AgentSessionBindingChannel {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const channel = value as Record<string, unknown>
+  if (
+    !isIdentifier(channel.channelId) ||
+    !isIdentifier(channel.ownerPrincipalId) ||
+    !Array.isArray(channel.participants) ||
+    channel.participants.length === 0 ||
+    !channel.participants.every(isBindingParticipant)
+  ) {
+    return false
+  }
+  const participantIds = new Set<string>()
+  let hasOwnerParticipant = false
+  for (const participant of channel.participants) {
+    if (participantIds.has(participant.participantId)) return false
+    participantIds.add(participant.participantId)
+    if (
+      participant.kind === "human" &&
+      participant.role === "owner" &&
+      participant.principalId === channel.ownerPrincipalId
+    ) {
+      hasOwnerParticipant = true
+    }
+    if (
+      participant.kind === "human" &&
+      participant.role === "owner" &&
+      participant.principalId !== channel.ownerPrincipalId
+    ) {
+      return false
+    }
+  }
+  return hasOwnerParticipant
+}
+
+function isBindingParticipant(
+  value: unknown,
+): value is AgentSessionBindingParticipant {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const participant = value as Record<string, unknown>
+  if (!isIdentifier(participant.participantId)) return false
+  if (!isIdentifier(participant.principalId)) return false
+  if (participant.kind === "human") {
+    return participant.role === "owner" || participant.role === "member"
+  }
+  return (
+    participant.kind === "persona-session" &&
+    isIdentifier(participant.personaId) &&
+    isIdentifier(participant.eveSessionId) &&
+    isIdentifier(participant.applicationThreadId) &&
+    (participant.role === undefined ||
+      participant.role === "participant" ||
+      participant.role === "coordinator") &&
+    (participant.state === undefined ||
+      participant.state === "active" ||
+      participant.state === "dormant")
   )
 }
 
