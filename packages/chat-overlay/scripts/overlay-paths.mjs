@@ -95,3 +95,8 @@ export const overlayTombstonePaths = Object.freeze([
 
 export const overlayTombstoneContent =
   "export {}\n"
+
+export const consumerTransformedPaths = Object.freeze([
+  "package.json",
+  "pnpm-workspace.yaml",
+])

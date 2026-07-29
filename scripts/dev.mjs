@@ -1,6 +1,12 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +23,20 @@ const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const envPath = resolve(repoRoot, ".env");
 if (existsSync(envPath)) process.loadEnvFile(envPath);
 
+const projectIdentity = readProjectIdentity(repoRoot);
+const localTopology = {
+  eveOrigin: portlessLocalhostUrl(projectIdentity.agentServiceName),
+  webOrigin: portlessLocalhostUrl(projectIdentity.webServiceName),
+};
+process.env.SIGIL_DEV_WEB_SERVICE_NAME = projectIdentity.webServiceName;
+process.env.SIGIL_DEV_AGENT_SERVICE_NAME = projectIdentity.agentServiceName;
+process.env.SIGIL_PUBLIC_URL ??= localTopology.webOrigin;
+process.env.EVE_ORIGIN ??= localTopology.eveOrigin;
+process.env.SIGIL_EVE_AUTH_JWKS_URL ??= new URL(
+  "/api/auth/jwks",
+  localTopology.webOrigin,
+).href;
+
 const preparation = await runToExit("node", ["scripts/dev-prepare.mjs"]);
 if (preparation !== 0) process.exit(preparation);
 
@@ -27,8 +47,8 @@ process.env.SIGIL_DEV_OWNER_CREDENTIALS_FILE = credentialsPath;
 process.env.SIGIL_DEV_LOGIN_TOKEN = randomBytes(24).toString("base64url");
 
 const topology = {
-  eveOrigin: portlessUrl("sigil-chat-agent"),
-  webOrigin: portlessUrl("sigil-chat"),
+  eveOrigin: portlessUrl(projectIdentity.agentServiceName),
+  webOrigin: portlessUrl(projectIdentity.webServiceName),
 };
 const webOrigin = topology.webOrigin;
 const developmentEntryUrl = new URL("/dev-login", webOrigin);
@@ -126,16 +146,47 @@ function portlessUrl(name) {
   }).trim();
 }
 
+function portlessLocalhostUrl(name) {
+  return `http://${name}.localhost:1355`;
+}
+
+function readProjectIdentity(root) {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(root, "package.json"), "utf8"),
+  );
+  const packageName =
+    typeof packageJson.name === "string" && packageJson.name.trim()
+      ? packageJson.name.trim()
+      : "sigil-chat";
+  const webServiceName = toDevHost(packageName) || "sigil-chat";
+  return {
+    packageName,
+    webServiceName,
+    agentServiceName: `${webServiceName}-agent`,
+  };
+}
+
+function toDevHost(name) {
+  return name
+    .replace(/^@[^/]+\//, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function printReadySummary(entryUrl, topology) {
-  const branch = execFileSync("git", ["branch", "--show-current"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  }).trim();
-  const basedOnDev =
-    spawnSync("git", ["merge-base", "--is-ancestor", "dev", "HEAD"], {
-      cwd: repoRoot,
-      stdio: "ignore",
-    }).status === 0;
+  const branch = readGitBranch();
+  const basedOnDev = branch
+    ? spawnSync("git", ["merge-base", "--is-ancestor", "dev", "HEAD"], {
+        cwd: repoRoot,
+        stdio: "ignore",
+      }).status === 0
+    : undefined;
+  const codeStatus = branch
+    ? `${branch || "detached HEAD"}${basedOnDev ? " (based on dev)" : " (warning: dev is not an ancestor)"}`
+    : "not a git checkout";
+
   process.stdout.write(
     [
       "",
@@ -143,11 +194,20 @@ function printReadySummary(entryUrl, topology) {
       `  App: ${topology.webOrigin}`,
       `  Sign in: ${entryUrl}`,
       `  Eve: ${topology.eveOrigin}`,
-      `  Code: ${branch || "detached HEAD"}${basedOnDev ? " (based on dev)" : " (warning: dev is not an ancestor)"}`,
+      `  Code: ${codeStatus}`,
       "  State: app data is worktree-local; the roadmap repository is shared",
       "",
     ].join("\n"),
   );
+}
+
+function readGitBranch() {
+  const result = spawnSync("git", ["branch", "--show-current"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return undefined;
+  return result.stdout.trim() || "detached HEAD";
 }
 
 function openDevelopmentEntry(url) {

@@ -58,7 +58,7 @@ function prepareDevelopmentInstance() {
   runStep("Database", ["auth:migrate"]);
   runStep(
     "Development owner",
-    ["--filter", "web", "exec", "tsx", "scripts/auth-seed-dev.ts"],
+    ["--dir", "apps/web", "exec", "tsx", "scripts/auth-seed-dev.ts"],
     { SIGIL_DEV_OWNER_CREDENTIALS_FILE: credentialsPath },
   );
   process.stdout.write(`  ✓ Ready as ${credentials.email}\n`);

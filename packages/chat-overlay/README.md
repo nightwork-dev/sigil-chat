@@ -26,5 +26,15 @@ The emitted item uses the Sigil CLI registry-overlay contract:
   `{ name, version, overlay, files }`
 - `files[]`: `{ path, content, encoding }`, with `content` base64-encoded here
 
+The release smoke proves the hosted-registry path end to end:
+
+```sh
+SIGIL_DEV_OPEN=0 pnpm --filter @sigil-design/chat-overlay test:registry-smoke
+```
+
+It creates a clean app from the emitted `chat-overlay.json`, installs, runs
+`sigil doctor`, checks generated service identity, starts `pnpm dev`, and waits
+for authenticated web → Eve readiness before tearing the dev stack down.
+
 `files/` and `dist/` are generated from an explicit allowlist. They are not a
 second checked-in scaffold; the current Sigil Chat source remains authoritative.

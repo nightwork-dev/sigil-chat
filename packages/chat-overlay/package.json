@@ -14,6 +14,7 @@
     "stage": "node scripts/stage-overlay.mjs",
     "registry:item": "node scripts/emit-registry-item.mjs",
     "test": "vitest run",
+    "test:registry-smoke": "node scripts/registry-smoke.mjs",
     "prepack": "pnpm stage",
     "postpack": "node scripts/clean-overlay.mjs",
     "typecheck": "tsc --noEmit"

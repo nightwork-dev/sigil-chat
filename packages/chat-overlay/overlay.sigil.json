@@ -130,9 +130,54 @@
       "value": ">=24"
     },
     {
+      "file": "package.json",
+      "jsonPath": "$.scripts.auth:generate",
+      "value": "pnpm --dir apps/web auth:generate"
+    },
+    {
+      "file": "package.json",
+      "jsonPath": "$.scripts.auth:migrate",
+      "value": "pnpm --dir apps/web auth:migrate"
+    },
+    {
+      "file": "package.json",
+      "jsonPath": "$.scripts.seed:scope-composition",
+      "value": "pnpm --dir apps/web seed:scope-composition"
+    },
+    {
+      "file": "apps/agent/package.json",
+      "jsonPath": "$.name",
+      "value": "{{packageName}}-agent"
+    },
+    {
+      "file": "apps/agent/package.json",
+      "jsonPath": "$.scripts.dev",
+      "value": "portless run --name {{devHost}}-agent eve dev --no-ui --host 127.0.0.1"
+    },
+    {
+      "file": "apps/web/package.json",
+      "jsonPath": "$.name",
+      "value": "{{packageName}}"
+    },
+    {
       "file": "apps/web/package.json",
       "jsonPath": "$.scripts.dev",
       "value": "portless {{devHost}} vite dev --host"
+    },
+    {
+      "file": "sigil.doctor.json",
+      "jsonPath": "$.id",
+      "value": "{{packageName}}"
+    },
+    {
+      "file": "sigil.doctor.json",
+      "jsonPath": "$.serviceProbes.0.url",
+      "value": "http://{{devHost}}-agent.localhost:1355/eve/v1/health"
+    },
+    {
+      "file": "sigil.doctor.json",
+      "jsonPath": "$.serviceProbes.0.remediation",
+      "value": "Start the Eve app with pnpm --filter {{packageName}}-agent dev."
     }
   ]
 }

@@ -11,6 +11,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  consumerTransformedPaths,
   coverageRoots,
   overlayTombstoneContent,
   overlayTombstonePaths,
@@ -46,6 +47,7 @@ export function stageOverlay() {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, overlayTombstoneContent, "utf8");
   }
+  transformConsumerFiles();
 }
 
 export function overlayIncludesPath(relativePath) {
@@ -162,6 +164,29 @@ function readFileSyncUtf8(path) {
   return new TextDecoder("utf-8", { fatal: true }).decode(
     readFileSync(path),
   );
+}
+
+function transformConsumerFiles() {
+  const rootPackagePath = join(filesRoot, "package.json");
+  const rootPackage = JSON.parse(readFileSyncUtf8(rootPackagePath));
+  if (rootPackage?.scripts && typeof rootPackage.scripts === "object") {
+    delete rootPackage.scripts["overlay:stage"];
+  }
+  writeFileSync(rootPackagePath, `${JSON.stringify(rootPackage, null, 2)}\n`);
+
+  const workspacePath = join(filesRoot, "pnpm-workspace.yaml");
+  const workspace = readFileSyncUtf8(workspacePath)
+    .split("\n")
+    .filter((line) => !line.includes("packages/chat-overlay"))
+    .join("\n")
+    .replace(/\n*$/, "\n");
+  writeFileSync(workspacePath, workspace);
+
+  for (const path of consumerTransformedPaths) {
+    if (!existsSync(join(filesRoot, path))) {
+      throw new Error(`Consumer transform target was not staged: ${path}`);
+    }
+  }
 }
 
 function isGeneratedPath(path) {

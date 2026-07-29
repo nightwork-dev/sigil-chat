@@ -21,6 +21,7 @@ import {
   stageOverlay,
 } from "../scripts/stage-overlay.mjs";
 import {
+  consumerTransformedPaths,
   coverageRoots,
   overlayTombstoneContent,
   overlayTombstonePaths,
@@ -79,6 +80,9 @@ describe("Sigil Chat overlay", () => {
         expect(readFileSync(staged, "utf8")).toBe(overlayTombstoneContent);
         continue;
       }
+      if (consumerTransformedPaths.includes(sourceRelativePath)) {
+        continue;
+      }
       const source = join(repositoryRoot, sourceRelativePath);
       expect(readFileSync(staged)).toEqual(readFileSync(source));
     }
@@ -87,6 +91,21 @@ describe("Sigil Chat overlay", () => {
         overlayTombstoneContent,
       );
     }
+    const stagedRootPackage = JSON.parse(
+      readFileSync(join(filesRoot, "package.json"), "utf8"),
+    );
+    const stagedDevPrepare = readFileSync(
+      join(filesRoot, "scripts/dev-prepare.mjs"),
+      "utf8",
+    );
+    expect(stagedRootPackage.scripts).not.toHaveProperty("overlay:stage");
+    expect(stagedDevPrepare).not.toContain('"--filter", "web"');
+    expect(stagedDevPrepare).toContain(
+      '"--dir", "apps/web", "exec", "tsx", "scripts/auth-seed-dev.ts"',
+    );
+    expect(
+      readFileSync(join(filesRoot, "pnpm-workspace.yaml"), "utf8"),
+    ).not.toContain("packages/chat-overlay");
   }, 30_000);
 
   it("emits the registry item payload consumed by the Sigil Design CLI lane", () => {
@@ -147,11 +166,8 @@ describe("Sigil Chat overlay", () => {
   }, 30_000);
 
   it("is consumable as the hosted registry item by the Sigil Design CLI", () => {
-    const designRoot =
-      process.env.SIGIL_DESIGN_ROOT ??
-      "/Users/dr/Dev/templates/worktrees/sigil-design-game-integration";
-    const cli = join(designRoot, "packages/cli/dist/sigil.js");
-    if (!existsSync(cli)) return;
+    const cli = resolveOptionalDesignCli();
+    if (!cli) return;
 
     const registryRoot = join(scratch, "registry");
     const targetName = "registry-generated-chat";
@@ -164,7 +180,7 @@ describe("Sigil Chat overlay", () => {
     execFileSync(
       "node",
       [
-        cli,
+        cli.path,
         "create",
         targetName,
         "--cwd",
@@ -176,7 +192,7 @@ describe("Sigil Chat overlay", () => {
         "--no-install",
         "--no-git",
       ],
-      { cwd: designRoot, stdio: "pipe" },
+      { cwd: cli.designRoot, stdio: "pipe" },
     );
 
     expect(readFileSync(join(target, "package.json"), "utf8")).toContain(
@@ -204,16 +220,57 @@ describe("Sigil Chat overlay", () => {
         digest: item.digest,
       }),
     );
+
+    const rootPackage = JSON.parse(
+      readFileSync(join(target, "package.json"), "utf8"),
+    );
+    const webPackage = JSON.parse(
+      readFileSync(join(target, "apps/web/package.json"), "utf8"),
+    );
+    const agentPackage = JSON.parse(
+      readFileSync(join(target, "apps/agent/package.json"), "utf8"),
+    );
+    const doctor = JSON.parse(
+      readFileSync(join(target, "sigil.doctor.json"), "utf8"),
+    );
+    const devPrepare = readFileSync(
+      join(target, "scripts/dev-prepare.mjs"),
+      "utf8",
+    );
+    expect(rootPackage.scripts).not.toHaveProperty("overlay:stage");
+    expect(rootPackage.scripts["auth:generate"]).toBe(
+      "pnpm --dir apps/web auth:generate",
+    );
+    expect(rootPackage.scripts["auth:migrate"]).toBe(
+      "pnpm --dir apps/web auth:migrate",
+    );
+    expect(
+      readFileSync(join(target, "pnpm-workspace.yaml"), "utf8"),
+    ).not.toContain("packages/chat-overlay");
+    expect(webPackage.name).toBe(targetName);
+    expect(webPackage.scripts.dev).toBe(
+      `portless ${targetName} vite dev --host`,
+    );
+    expect(agentPackage.name).toBe(`${targetName}-agent`);
+    expect(agentPackage.scripts.dev).toContain(`--name ${targetName}-agent `);
+    expect(doctor.id).toBe(targetName);
+    expect(doctor.serviceProbes[0].url).toBe(
+      `http://${targetName}-agent.localhost:1355/eve/v1/health`,
+    );
+    expect(devPrepare).not.toContain('"--filter", "web"');
+    expect(devPrepare).toContain(
+      '"--dir", "apps/web", "exec", "tsx", "scripts/auth-seed-dev.ts"',
+    );
   }, 30_000);
 
   it("is consumable by the landed Sigil Design overlay protocol", () => {
-    const designRoot = process.env.SIGIL_DESIGN_ROOT;
-    if (!designRoot) return;
+    const cli = resolveOptionalDesignCli();
+    if (!cli) return;
     const target = join(scratch, "generated-chat");
     execFileSync(
       "node",
       [
-        join(designRoot, "packages/cli/dist/sigil.js"),
+        cli.path,
         "create",
         "generated-chat",
         "--cwd",
@@ -224,7 +281,7 @@ describe("Sigil Chat overlay", () => {
         packageRoot,
         "--no-install",
       ],
-      { cwd: designRoot, stdio: "pipe" },
+      { cwd: cli.designRoot, stdio: "pipe" },
     );
     expect(readFileSync(join(target, "package.json"), "utf8")).toContain(
       '"name": "generated-chat"',
@@ -268,6 +325,28 @@ function stableStringify(value: unknown): string {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function resolveOptionalDesignCli(): { designRoot: string; path: string } | undefined {
+  const candidates = [
+    process.env.SIGIL_DESIGN_ROOT,
+    join(repositoryRoot, "..", "sigil-design"),
+    join(repositoryRoot, "..", "sigil-design-game-integration"),
+    join(repositoryRoot, "..", "..", "sigil-design"),
+    join(repositoryRoot, "..", "..", "sigil-design-game-integration"),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const designRoot of candidates) {
+    const path = join(designRoot, "packages/cli/dist/sigil.js");
+    if (existsSync(path)) return { designRoot, path };
+  }
+
+  if (process.env.SIGIL_DESIGN_ROOT) {
+    throw new Error(
+      `SIGIL_DESIGN_ROOT was set, but packages/cli/dist/sigil.js was not found under ${process.env.SIGIL_DESIGN_ROOT}`,
+    );
+  }
+  return undefined;
 }
 
 function walk(root: string): string[] {
