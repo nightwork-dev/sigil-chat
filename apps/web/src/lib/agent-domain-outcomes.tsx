@@ -18,6 +18,7 @@ import { evidenceKeys } from "./evidence"
 import { blackboardKeys } from "./blackboard"
 import { projectWorkspaceNavKeys } from "./project-workspace-nav"
 import { requestKeys } from "./request-intake"
+import { specKeys } from "./specs"
 
 const reviewDocumentChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "review.document.changed",
@@ -131,6 +132,41 @@ const evidenceChangedHandler: AgentOutcomeReconciliationHandler = {
   },
 }
 
+const roadmapSpecsChangedHandler: AgentOutcomeReconciliationHandler = {
+  kind: "roadmap-specs.changed",
+  schema: {
+    "~standard": {
+      version: 1,
+      vendor: "sigil-chat",
+      validate(value) {
+        const outcome = value as AgentDomainOutcome
+        if (
+          !value ||
+          typeof value !== "object" ||
+          outcome.kind !== "roadmap-specs.changed" ||
+          outcome.resource?.kind !== "roadmap-specs" ||
+          typeof outcome.resource.id !== "string" ||
+          outcome.resource.id.length === 0
+        ) {
+          return { issues: [{ message: "Expected a roadmap specs outcome" }] }
+        }
+        return { value: outcome }
+      },
+    },
+  },
+  reconcile: async (outcome, context) => {
+    await context.invalidate([specKeys.all()])
+    const changedIds = Array.isArray(outcome.changedIds)
+      ? outcome.changedIds
+      : []
+    await context.invalidate(
+      changedIds
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+        .map((id) => specKeys.detail(id)),
+    )
+  },
+}
+
 const containersChangedHandler: AgentOutcomeReconciliationHandler = {
   kind: "containers.changed",
   schema: {
@@ -213,6 +249,7 @@ export function createAgentDomainOutcomeDispatcher(
       skillsChangedHandler,
       workItemsChangedHandler,
       evidenceChangedHandler,
+      roadmapSpecsChangedHandler,
       containersChangedHandler,
       blackboardChangedHandler,
       ...additionalHandlers,

@@ -13,10 +13,13 @@ import {
   agentDomainOutcomeFromCommand,
   createAgentDomainOutcomeDispatcher,
 } from "./agent-domain-outcomes"
+import { isAgentClientCommand as isChatAgentClientCommand } from "./agent-client-command"
 import { blackboardKeys } from "./blackboard"
+import { evidenceKeys } from "./evidence"
 import { projectWorkspaceNavKeys } from "./project-workspace-nav"
 import { reviewDocumentKeys } from "./review-document"
 import { skillKeys } from "./skills"
+import { specKeys } from "./specs"
 
 describe("agent domain outcome reconciliation", () => {
   it("invalidates only the affected review document query", async () => {
@@ -177,6 +180,70 @@ describe("agent domain outcome reconciliation", () => {
     ]).dispatch(outcome!)
 
     expect(queryClient.getQueryState(affected)?.isInvalidated).toBe(true)
+  })
+
+  it("validates and reconciles the evidence-room outcome emitted by distill tools", async () => {
+    const queryClient = new QueryClient()
+    const affected = evidenceKeys.all()
+    queryClient.setQueryData(affected, { documents: [], cards: [] })
+    const command = {
+      type: "agent.domain.outcome",
+      payload: {
+        id: "evidence:distill.created:artifact-1",
+        kind: "evidence.changed",
+        resource: {
+          kind: "evidence-room",
+          id: "workspace:workspace-1",
+        },
+        operation: "distill.created",
+        changedIds: ["artifact-1"],
+      },
+    }
+
+    expect(isChatAgentClientCommand(command)).toBe(true)
+    const outcome = agentDomainOutcomeFromCommand(command as AgentClientCommand)
+    expect(outcome).not.toBeNull()
+    await createAgentDomainOutcomeDispatcher(queryClient).dispatch(outcome!)
+
+    expect(queryClient.getQueryState(affected)?.isInvalidated).toBe(true)
+  })
+
+  it("validates and reconciles the roadmap-specs outcome emitted by spec tools", async () => {
+    const queryClient = new QueryClient()
+    const list = specKeys.all()
+    const changed = specKeys.detail("SPEC.1")
+    const unchanged = specKeys.detail("SPEC.2")
+    queryClient.setQueryData(list, { revision: 1, specs: [] })
+    queryClient.setQueryData(changed, { revision: 1, spec: { id: "SPEC.1" } })
+    queryClient.setQueryData(unchanged, { revision: 1, spec: { id: "SPEC.2" } })
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries")
+    const command = {
+      type: "agent.domain.outcome",
+      payload: {
+        id: "roadmap-specs:spec.create:2:SPEC.1",
+        kind: "roadmap-specs.changed",
+        resource: {
+          kind: "roadmap-specs",
+          id: "roadmap-specs",
+          revision: 2,
+        },
+        operation: "spec.create",
+        changedIds: ["SPEC.1"],
+      },
+    }
+
+    expect(isChatAgentClientCommand(command)).toBe(true)
+    const outcome = agentDomainOutcomeFromCommand(command as AgentClientCommand)
+    expect(outcome).not.toBeNull()
+    await createAgentDomainOutcomeDispatcher(queryClient).dispatch(outcome!)
+
+    expect(queryClient.getQueryState(list)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(changed)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(unchanged)?.isInvalidated).toBe(true)
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: specKeys.all() })
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: specKeys.detail("SPEC.1"),
+    })
   })
 
   it("accepts the typed outcome emitted by current Gonk tools", () => {

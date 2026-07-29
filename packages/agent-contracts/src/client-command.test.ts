@@ -90,6 +90,43 @@ describe("agent client command contracts", () => {
     ).toBe(true)
   })
 
+  it("accepts evidence-room domain outcomes emitted by distill tools", () => {
+    expect(
+      isAgentClientCommand({
+        type: "agent.domain.outcome",
+        payload: {
+          id: "evidence:distill.created:artifact-1",
+          kind: "evidence.changed",
+          resource: {
+            kind: "evidence-room",
+            id: "workspace:workspace-1",
+          },
+          operation: "distill.created",
+          changedIds: ["artifact-1"],
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it("accepts roadmap spec domain outcomes emitted by spec tools", () => {
+    expect(
+      isAgentClientCommand({
+        type: "agent.domain.outcome",
+        payload: {
+          id: "roadmap-specs:spec.create:1:SPEC.1",
+          kind: "roadmap-specs.changed",
+          resource: {
+            kind: "roadmap-specs",
+            id: "roadmap-specs",
+            revision: 1,
+          },
+          operation: "spec.create",
+          changedIds: ["SPEC.1"],
+        },
+      }),
+    ).toBe(true)
+  })
+
   it("accepts project and workspace registry domain outcomes", () => {
     for (const resource of [
       { kind: "project-registry", id: "project-1" },

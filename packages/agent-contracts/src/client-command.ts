@@ -191,6 +191,18 @@ export const chatAgentDomainOutcomeRegistrations = [
     invalidMessage: "Expected a skills catalog outcome",
   }),
   createAgentDomainOutcomeRegistration({
+    kind: "evidence.changed",
+    resourceKinds: ["evidence-room"],
+    vendor: "sigil-chat",
+    invalidMessage: "Expected an evidence-room outcome",
+  }),
+  createAgentDomainOutcomeRegistration({
+    kind: "roadmap-specs.changed",
+    resourceKinds: ["roadmap-specs"],
+    vendor: "sigil-chat",
+    invalidMessage: "Expected a roadmap specs outcome",
+  }),
+  createAgentDomainOutcomeRegistration({
     kind: "containers.changed",
     resourceKinds: ["project-registry", "workspace-registry"],
     vendor: "sigil-chat",
