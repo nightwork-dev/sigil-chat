@@ -28,8 +28,10 @@ a validated model provider contract. A bare string remains backwards-compatible
 and maps to the local Codex subscription path: `experimental_chatgpt()` reads
 the local `codex login` session and calls the Codex backend directly. A
 structured object can select `openai-compatible`, `openrouter`, or `anthropic`
-without putting secrets in the fixture. Missing hosted-provider credentials
-fail closed with the exact `SIGIL_MODEL_*` variable Eve expected. The resolved
+without putting secrets in the fixture. Local OpenAI-compatible models use the
+official `@ai-sdk/openai-compatible` provider; OpenRouter and Anthropic use
+their direct AI SDK provider packages. Missing configured credentials fail
+closed with the exact environment variable Eve expected. The resolved
 `modelContextWindowTokens` bounds how much context Eve's own context management
 will try to fit — this is separate from the client-side
 attention/context-tray budget described in `building-workspaces.md`.

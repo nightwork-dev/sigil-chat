@@ -113,4 +113,28 @@ describe("agent readiness", () => {
       } as never),
     ).resolves.toBe(true)
   })
+
+  it("fails local OpenAI-compatible readiness with a named custom apiKeyEnv", async () => {
+    await expect(
+      readAgentReadiness({
+        env: {},
+        fetcher: async () => new Response(null, { status: 200 }),
+        modelConfig: {
+          provider: "openai-compatible",
+          model: "local-model",
+          baseUrl: "http://127.0.0.1:11434/v1",
+          apiKeyEnv: "SIGIL_MODEL_LOCAL_API_KEY",
+        },
+      } as never),
+    ).resolves.toEqual({
+      status: "unavailable",
+      checks: {
+        modelAuth: "error",
+        modelProvider: "openai-compatible",
+        eveRuntime: "unknown",
+      },
+      diagnostic:
+        'Model provider "openai-compatible" is missing SIGIL_MODEL_LOCAL_API_KEY. Set SIGIL_MODEL_LOCAL_API_KEY in the Eve runtime environment.',
+    })
+  })
 })

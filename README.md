@@ -77,10 +77,11 @@ the Eve turn model. A bare string remains backwards-compatible and means
 `provider: codex`: Eve's `experimental_chatgpt()` reads the local `codex login`
 state and calls the Codex backend directly. Structured fixtures can select
 `provider: openai-compatible` for a local `/v1/chat/completions` server, or a
-hosted provider such as `openrouter` or `anthropic` through Eve's native string
-model route. Provider secrets stay in environment variables named by the
-fixture or by the default `SIGIL_MODEL_<PROVIDER>_API_KEY`; they are never stored
-in fixtures. The web and agent processes share a private
+hosted provider such as `openrouter` or `anthropic` through the official AI SDK
+provider packages. Provider secrets stay in environment variables named by the
+fixture or by the default `SIGIL_MODEL_<PROVIDER>_API_KEY`; if an
+OpenAI-compatible fixture names `apiKeyEnv`, Eve also requires that key before
+startup. Secrets are never stored in fixtures. The web and agent processes share a private
 `SIGIL_AGENT_BINDING_SECRET` used only for signed session and scope bindings;
 local development generates it automatically.
 

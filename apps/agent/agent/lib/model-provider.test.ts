@@ -40,6 +40,27 @@ describe("Sigil agent model provider resolution", () => {
     })).toBe(true)
   })
 
+  it("fails local OpenAI-compatible startup when a configured apiKeyEnv is missing", async () => {
+    const config = {
+      provider: "openai-compatible" as const,
+      model: "local-model",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      apiKeyEnv: "SIGIL_MODEL_LOCAL_API_KEY",
+    }
+
+    expect(() => resolveSigilAgentModel(config, { env: {} })).toThrow(
+      MissingModelCredentialError,
+    )
+    await expect(
+      hasConfiguredModelCredential(config, { env: {} }),
+    ).resolves.toBe(false)
+    await expect(
+      hasConfiguredModelCredential(config, {
+        env: { SIGIL_MODEL_LOCAL_API_KEY: "local-secret" },
+      }),
+    ).resolves.toBe(true)
+  })
+
   it("fails closed with the selected hosted provider's env var name", async () => {
     expect(() =>
       resolveSigilAgentModel(
@@ -62,7 +83,7 @@ describe("Sigil agent model provider resolution", () => {
     ).resolves.toBe(false)
   })
 
-  it("uses Eve's native gateway string route for hosted non-Codex providers", () => {
+  it("creates an official direct Anthropic provider model for hosted non-Codex providers", () => {
     const resolved = resolveSigilAgentModel(
       {
         provider: "anthropic",
@@ -71,7 +92,35 @@ describe("Sigil agent model provider resolution", () => {
       { env: { SIGIL_MODEL_ANTHROPIC_API_KEY: "test-key" } },
     )
 
-    expect(resolved.model).toBe("anthropic/claude-sonnet-4.6")
+    expect(typeof resolved.model).toBe("object")
+    expect((resolved.model as { provider?: string }).provider).toBe(
+      "anthropic.messages",
+    )
+    expect((resolved.model as { modelId?: string }).modelId).toBe(
+      "claude-sonnet-4.6",
+    )
     expect(resolved.display.id).toBe("anthropic/claude-sonnet-4.6")
+  })
+
+  it("creates an official direct OpenRouter provider model using the configured key", () => {
+    const resolved = resolveSigilAgentModel(
+      {
+        provider: "openrouter",
+        model: "openrouter/anthropic/claude-sonnet-4.6",
+        apiKeyEnv: "SIGIL_MODEL_OPENROUTER_TEST_KEY",
+      },
+      { env: { SIGIL_MODEL_OPENROUTER_TEST_KEY: "test-key" } },
+    )
+
+    expect(typeof resolved.model).toBe("object")
+    expect((resolved.model as { provider?: string }).provider).toBe(
+      "openrouter",
+    )
+    expect((resolved.model as { modelId?: string }).modelId).toBe(
+      "anthropic/claude-sonnet-4.6",
+    )
+    expect(resolved.display.id).toBe(
+      "openrouter/anthropic/claude-sonnet-4.6",
+    )
   })
 })

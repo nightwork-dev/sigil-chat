@@ -1,4 +1,7 @@
 import type { LanguageModel } from "ai"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { experimental_chatgpt } from "eve/models/openai"
 
 import {
@@ -6,8 +9,6 @@ import {
   type NormalizedSigilAgentModelConfig,
   type SigilAgentModelConfig,
 } from "@workspace/runtime-env/config"
-
-import { createOpenAICompatibleChatModel } from "./openai-compatible-model"
 
 export class MissingModelCredentialError extends Error {
   readonly envName: string
@@ -57,25 +58,42 @@ export function resolveSigilAgentModel(
   }
 
   if (model.provider === "openai-compatible") {
-    const apiKey = readOptionalCredential(model, options.env)
+    const apiKey = readConfiguredCredential(model, options.env)
+    const provider = createOpenAICompatible({
+      apiKey,
+      baseURL: requireBaseUrl(model),
+      fetch: options.fetch,
+      name: "sigil-openai-compatible",
+    })
     return {
       contextWindowTokens,
       display: display(model),
-      model: createOpenAICompatibleChatModel({
-        apiKey,
-        baseUrl: requireBaseUrl(model),
-        fetch: options.fetch,
-        model: model.model,
-      }),
+      model: provider(model.model) as LanguageModel,
     }
   }
 
   const apiKey = readRequiredCredential(model, options.env)
-  void apiKey
+  if (model.provider === "openrouter") {
+    const provider = createOpenRouter({
+      apiKey,
+      appName: "Sigil Chat",
+      fetch: options.fetch,
+    })
+    return {
+      contextWindowTokens,
+      display: display(model),
+      model: provider.chat(directHostedModelId(model)) as LanguageModel,
+    }
+  }
+
+  const provider = createAnthropic({
+    apiKey,
+    fetch: options.fetch,
+  })
   return {
     contextWindowTokens,
     display: display(model),
-    model: hostedGatewayModelId(model),
+    model: provider.messages(directHostedModelId(model)) as LanguageModel,
   }
 }
 
@@ -90,34 +108,56 @@ export async function hasConfiguredModelCredential(
     return options.hasCodexModelAuth?.() ?? false
   }
   if (model.provider === "openai-compatible") {
-    const envName = model.apiKeyEnv
-    return envName === undefined || hasEnvValue(options.env, envName)
+    return hasConfiguredCredential(model, options.env)
   }
-  return hasEnvValue(options.env, defaultApiKeyEnv(model.provider))
+  return hasConfiguredCredential(model, options.env)
 }
 
-function hostedGatewayModelId(model: NormalizedSigilAgentModelConfig): string {
+function displayModelId(model: NormalizedSigilAgentModelConfig): string {
   return model.model.startsWith(`${model.provider}/`)
     ? model.model
     : `${model.provider}/${model.model}`
 }
 
-function readOptionalCredential(
+function directHostedModelId(model: NormalizedSigilAgentModelConfig): string {
+  return model.model.startsWith(`${model.provider}/`)
+    ? model.model.slice(model.provider.length + 1)
+    : model.model
+}
+
+function readConfiguredCredential(
   model: NormalizedSigilAgentModelConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
   if (model.apiKeyEnv === undefined) return undefined
-  return readEnvValue(env, model.apiKeyEnv)
+  const value = readEnvValue(env, model.apiKeyEnv)
+  if (value !== undefined) return value
+  throw new MissingModelCredentialError(model.provider, model.apiKeyEnv)
 }
 
 function readRequiredCredential(
   model: NormalizedSigilAgentModelConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  const envName = model.apiKeyEnv ?? defaultApiKeyEnv(model.provider)
+  const envName = apiKeyEnvForModel(model)
   const value = readEnvValue(env, envName)
   if (value !== undefined) return value
   throw new MissingModelCredentialError(model.provider, envName)
+}
+
+function hasConfiguredCredential(
+  model: NormalizedSigilAgentModelConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const envName =
+    model.provider === "openai-compatible"
+      ? model.apiKeyEnv
+      : apiKeyEnvForModel(model)
+  return envName === undefined || hasEnvValue(env, envName)
+}
+
+function apiKeyEnvForModel(model: NormalizedSigilAgentModelConfig): string {
+  return model.apiKeyEnv ?? defaultApiKeyEnv(model.provider)
 }
 
 function defaultApiKeyEnv(provider: string): string {
@@ -151,7 +191,7 @@ function display(model: NormalizedSigilAgentModelConfig) {
     id:
       model.provider === "codex" || model.provider === "openai-compatible"
         ? model.model
-        : hostedGatewayModelId(model),
+        : displayModelId(model),
     provider: model.provider,
     source: model.source,
   }

@@ -14,10 +14,14 @@
     "start": "eve start --host 127.0.0.1",
     "test": "vitest run && pnpm test:cold-boot",
     "test:cold-boot": "node scripts/cold-boot-smoke.mjs",
+    "test:hosted-provider-smoke": "node scripts/hosted-provider-eve-smoke.mjs",
+    "test:openai-compatible-smoke": "node scripts/openai-compatible-eve-smoke.mjs",
     "test:sandbox": "node scripts/sandbox-smoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.23",
+    "@ai-sdk/openai-compatible": "3.0.16",
     "@gonk/auth": "catalog:",
     "@gonk/context": "catalog:",
     "@gonk/eve-host": "catalog:",
@@ -27,6 +31,7 @@
     "@gonk/skills": "catalog:",
     "@gonk/store": "catalog:",
     "@gonk/tool-registry": "catalog:",
+    "@openrouter/ai-sdk-provider": "3.0.0",
     "@workspace/agent-contracts": "workspace:*",
     "@workspace/agent-tools": "workspace:*",
     "@workspace/artifact-store": "workspace:*",

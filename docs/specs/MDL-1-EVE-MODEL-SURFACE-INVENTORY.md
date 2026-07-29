@@ -26,8 +26,9 @@ this lane editing the shared roadmap store.
 - Eve's own type documentation describes string model ids as the native hosted
   route through AI Gateway, and direct provider instances as external AI SDK
   provider instances.
-- The app did not have public `@ai-sdk/openai` or `@ai-sdk/anthropic`
-  provider packages installed as direct dependencies.
+- Before MDL.1 repair, the app did not have public provider packages installed
+  as direct dependencies. MDL.1 now adds `@ai-sdk/openai-compatible`,
+  `@ai-sdk/anthropic`, and `@openrouter/ai-sdk-provider`.
 
 ## Consequence for MDL.1
 
@@ -37,13 +38,34 @@ those factories in `0.27.5`. The implementation therefore uses the installed
 surface this way:
 
 1. `provider: codex` continues to use `experimental_chatgpt()`.
-2. Hosted non-Codex providers use Eve's native string model route, e.g.
-   `anthropic/claude-sonnet-4.6` or `openrouter/<provider>/<model>`.
-3. Local OpenAI-compatible servers use a small app-owned AI SDK `LanguageModel`
-   adapter over `/chat/completions`, because a local base URL cannot be
-   represented by Eve's hosted string route.
-4. Provider secrets remain environment-only. The fixture may name an
+2. `provider: openai-compatible` uses the official
+   `@ai-sdk/openai-compatible` `createOpenAICompatible()` factory with the
+   fixture `baseUrl`.
+3. `provider: openrouter` uses the official `@openrouter/ai-sdk-provider`
+   `createOpenRouter()` factory and passes the configured environment key into
+   that provider instance.
+4. `provider: anthropic` uses the official `@ai-sdk/anthropic`
+   `createAnthropic()` factory and passes the configured environment key into
+   that provider instance.
+5. Provider secrets remain environment-only. The fixture may name an
    `apiKeyEnv`; it never stores the key value.
+
+AI Gateway remains a separate possible future provider. MDL.1 deliberately does
+not read `SIGIL_MODEL_*` credentials and return an AI Gateway string model id;
+that would hide which credential actually authorizes the hosted request.
+
+## Verification hooks
+
+- `pnpm --filter sigil-chat-agent test:openai-compatible-smoke` starts a local
+  fake OpenAI-compatible server, boots Eve against a temporary fixture, posts to
+  `/eve/v1/session`, proves Eve exposed the native `todo` tool to the provider,
+  receives a todo tool call, executes it, and sends the tool result back to the
+  model.
+- `pnpm --filter sigil-chat-agent test:hosted-provider-smoke` is the live
+  hosted-provider proof. It skips cleanly when no configured
+  `SIGIL_MODEL_OPENROUTER_API_KEY` or `SIGIL_MODEL_ANTHROPIC_API_KEY` is
+  present; when credentials are present it boots Eve with the selected direct
+  hosted provider and submits a real message turn.
 
 If Eve later publishes first-class provider factories, `apps/agent/agent/lib/model-provider.ts`
 is the single application seam to swap hosted/local provider construction

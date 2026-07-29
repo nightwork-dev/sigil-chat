@@ -99,7 +99,9 @@ agent:
 
 For hosted providers, keep secrets out of the fixture. Either rely on the
 default `SIGIL_MODEL_<PROVIDER>_API_KEY` name or set `apiKeyEnv` to the exact
-environment variable Eve should require before startup:
+environment variable Eve should require before startup. Hosted providers are
+constructed as direct AI SDK provider instances; AI Gateway is not used by this
+contract unless a future fixture provider models it explicitly.
 
 ```yaml
 agent:
@@ -113,6 +115,18 @@ Changing the fixture does not silently rewrite existing owner-managed model
 profiles or thread bindings once those exist. Provider endpoints, credentials,
 and usage are installation state governed by
 [`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](../specs/MODEL-ADMINISTRATION-AND-USAGE-SPEC.md).
+
+Two integration smokes cover the model paths:
+
+```bash
+pnpm --filter sigil-chat-agent test:openai-compatible-smoke
+pnpm --filter sigil-chat-agent test:hosted-provider-smoke
+```
+
+The OpenAI-compatible smoke starts a local fake `/v1/chat/completions` server,
+boots Eve, sends a real `/eve/v1/session` message, and proves the native todo
+tool loop reaches the model. The hosted smoke is credential-gated and reports a
+skip when the configured `SIGIL_MODEL_*_API_KEY` is absent.
 
 Eve honors standard `CODEX_HOME` when it is set and otherwise uses
 `~/.codex`. Local development therefore reuses the operator's existing Codex
