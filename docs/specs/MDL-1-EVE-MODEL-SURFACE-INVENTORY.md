@@ -59,13 +59,23 @@ that would hide which credential actually authorizes the hosted request.
 - `pnpm --filter sigil-chat-agent test:openai-compatible-smoke` starts a local
   fake OpenAI-compatible server, boots Eve against a temporary fixture, posts to
   `/eve/v1/session`, proves Eve exposed the native `todo` tool to the provider,
-  receives a todo tool call, executes it, and sends the tool result back to the
-  model.
+  receives a todo tool call, executes it, sends the tool result back to the
+  model, consumes the Eve stream, and requires final model completion plus
+  `turn.completed`.
 - `pnpm --filter sigil-chat-agent test:hosted-provider-smoke` is the live
   hosted-provider proof. It skips cleanly when no configured
   `SIGIL_MODEL_OPENROUTER_API_KEY` or `SIGIL_MODEL_ANTHROPIC_API_KEY` is
   present; when credentials are present it boots Eve with the selected direct
-  hosted provider and submits a real message turn.
+  hosted provider, consumes the Eve stream, fails on provider/tool stream
+  errors, requires a native todo tool request plus completed result, and
+  requires final model completion.
+- Existing web tests (`apps/web/src/components/agent-sessions.test.ts` and
+  `apps/web/src/lib/voice-realtime.server.test.ts`) prove the authenticated web
+  side attaches the short-lived signed Eve session binding before crossing to
+  Eve. The smoke scripts use that same header and signature contract against a
+  live Eve host. They do not run the full same-origin web application with a
+  cookie-authenticated browser session, so exact browser → web → Eve initiation
+  remains a distinct acceptance gap for a launcher/browser smoke.
 
 If Eve later publishes first-class provider factories, `apps/agent/agent/lib/model-provider.ts`
 is the single application seam to swap hosted/local provider construction

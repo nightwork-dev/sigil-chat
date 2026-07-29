@@ -124,9 +124,16 @@ pnpm --filter sigil-chat-agent test:hosted-provider-smoke
 ```
 
 The OpenAI-compatible smoke starts a local fake `/v1/chat/completions` server,
-boots Eve, sends a real `/eve/v1/session` message, and proves the native todo
-tool loop reaches the model. The hosted smoke is credential-gated and reports a
-skip when the configured `SIGIL_MODEL_*_API_KEY` is absent.
+boots Eve, sends a real signed `/eve/v1/session` message, consumes the Eve
+stream, and requires a native todo tool request, a completed tool result, final
+model text, and `turn.completed`. The hosted smoke applies the same stream
+criteria against a live hosted provider when credentials are present; it reports
+a clean skip when the configured `SIGIL_MODEL_*_API_KEY` is absent.
+
+These smokes exercise the strongest local boundary without running the full web
+app: they use the same signed Eve binding header that the authenticated web
+session attaches in `apps/web/src/components/agent-sessions.test.ts`. They do
+not themselves prove a browser/same-origin web server initiation.
 
 Eve honors standard `CODEX_HOME` when it is set and otherwise uses
 `~/.codex`. Local development therefore reuses the operator's existing Codex

@@ -23,7 +23,7 @@ const provider = resolveProvider()
 
 if (provider === undefined) {
   console.log(
-    "Hosted provider Eve smoke skipped: set SIGIL_HOSTED_MODEL_PROVIDER plus its SIGIL_MODEL_*_API_KEY to run the live full-path proof.",
+    "Hosted provider Eve smoke skipped: set SIGIL_HOSTED_MODEL_PROVIDER plus its SIGIL_MODEL_*_API_KEY to run the live signed-Eve-boundary provider/tool proof.",
   )
   process.exit(0)
 }
@@ -72,7 +72,7 @@ try {
   const response = await fetch(`http://127.0.0.1:${port}/eve/v1/session`, {
     body: JSON.stringify({
       message:
-        "Reply with exactly: hosted provider smoke complete. Do not call tools.",
+        "Use the todo tool once to record that hosted provider smoke ran, then reply with exactly: hosted provider smoke complete.",
     }),
     headers: {
       [AGENT_SESSION_BINDING_HEADER]: proof,
@@ -85,8 +85,16 @@ try {
       `Hosted provider Eve session POST returned HTTP ${response.status}: ${await response.text()}`,
     )
   }
+  const sessionId = await readSessionId(response)
+  const streamSummary = await assertToolLoopStream({
+    expectedFinalText: "hosted provider smoke complete",
+    label: `hosted ${provider.provider}`,
+    port,
+    proof,
+    sessionId,
+  })
   console.log(
-    `Hosted provider Eve smoke submitted through ${provider.provider}/${provider.model}. Check the session stream/logs for provider response completion.`,
+    `Hosted provider Eve smoke passed through ${provider.provider}/${provider.model}: native todo tool requested, tool result completed, and final model completion observed (${streamSummary.events} events).`,
   )
 } catch (error) {
   if (output.length > 0) console.error(output.join("").slice(-20_000))
@@ -158,6 +166,139 @@ function copyAppFixture(targetDirectory, modelProvider) {
 
 function hasEnv(name) {
   return typeof process.env[name] === "string" && process.env[name].trim().length > 0
+}
+
+async function readSessionId(response) {
+  const payload = await response.json()
+  const sessionId =
+    stringOf(payload, "sessionId") ?? response.headers.get("x-eve-session-id")
+  if (!sessionId) {
+    throw new Error(
+      `Eve session POST did not return a session id: ${JSON.stringify(payload)}`,
+    )
+  }
+  return sessionId
+}
+
+async function assertToolLoopStream({
+  expectedFinalText,
+  label,
+  port,
+  proof,
+  sessionId,
+}) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60_000)
+  const response = await fetch(
+    `http://127.0.0.1:${port}/eve/v1/session/${encodeURIComponent(sessionId)}/stream`,
+    {
+      headers: {
+        [AGENT_SESSION_BINDING_HEADER]: proof,
+      },
+      method: "GET",
+      signal: controller.signal,
+    },
+  )
+  try {
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Eve ${label} stream returned HTTP ${response.status}: ${await response.text()}`,
+      )
+    }
+
+    const summary = {
+      actionResultCompleted: false,
+      events: 0,
+      finalMessageCompleted: false,
+      todoRequested: false,
+      turnCompleted: false,
+    }
+    for await (const event of readNdjsonEvents(response.body)) {
+      summary.events += 1
+      if (event.type === "step.failed" || event.type === "turn.failed") {
+        throw new Error(`Eve ${label} stream failed: ${JSON.stringify(event)}`)
+      }
+      if (event.type === "action.result") {
+        if (event.data?.status !== "completed") {
+          throw new Error(
+            `Eve ${label} action did not complete: ${JSON.stringify(event)}`,
+          )
+        }
+        summary.actionResultCompleted = true
+      }
+      if (
+        event.type === "actions.requested" &&
+        JSON.stringify(event.data?.actions ?? []).includes('"todo"')
+      ) {
+        summary.todoRequested = true
+      }
+      if (event.type === "message.completed") {
+        const message = event.data?.message
+        const finishReason = event.data?.finishReason
+        if (finishReason === "error") {
+          throw new Error(
+            `Eve ${label} message completed with error: ${JSON.stringify(event)}`,
+          )
+        }
+        if (
+          finishReason === "stop" &&
+          typeof message === "string" &&
+          message.toLowerCase().includes(expectedFinalText)
+        ) {
+          summary.finalMessageCompleted = true
+        }
+      }
+      if (event.type === "turn.completed") {
+        summary.turnCompleted = true
+        break
+      }
+    }
+
+    const missing = []
+    if (!summary.todoRequested) missing.push("native todo action request")
+    if (!summary.actionResultCompleted) missing.push("completed tool result")
+    if (!summary.finalMessageCompleted) missing.push("final model completion")
+    if (!summary.turnCompleted) missing.push("turn.completed")
+    if (missing.length > 0) {
+      throw new Error(
+        `Eve ${label} stream did not prove ${missing.join(", ")}. Summary: ${JSON.stringify(summary)}`,
+      )
+    }
+    return summary
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function* readNdjsonEvents(body) {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let newlineIndex
+      while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim()
+        buffer = buffer.slice(newlineIndex + 1)
+        if (line) yield JSON.parse(line)
+      }
+    }
+    const tail = buffer.trim()
+    if (tail) yield JSON.parse(tail)
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+function stringOf(value, key) {
+  if (typeof value !== "object" || value === null) return undefined
+  const candidate = value[key]
+  return typeof candidate === "string" && candidate.trim()
+    ? candidate
+    : undefined
 }
 
 function capture(chunk) {
