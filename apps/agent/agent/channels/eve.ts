@@ -36,11 +36,15 @@ import {
   requireAuthorizedResourceScope,
 } from "../lib/scope-authorization"
 import { createReadinessRoute } from "../lib/readiness"
+import { hasConfiguredModelCredential } from "../lib/model-provider"
+import { hasCodexModelAuth } from "../lib/model-auth.mjs"
 import {
   createRealtimeVoiceRoutes,
   RealtimeVoiceHost,
 } from "../lib/realtime-voice"
+import { loadSigilConfigFixture } from "@workspace/runtime-env/config"
 
+const { value: sigilConfig } = await loadSigilConfigFixture()
 const authEnvironment = readSigilEveAuthEnvironment()
 const bindingSecret = readOptionalSecretFromFile(
   process.env,
@@ -193,6 +197,10 @@ export default {
     createApplicationToolCatalogRoute(authenticatePrincipal, agentToolRegistry),
     createReadinessRoute(authenticatePrincipal, {
       applicationToolCount: () => agentToolRegistry.list().length,
+      hasModelAuth: () =>
+        hasConfiguredModelCredential(sigilConfig.agent.model, {
+          hasCodexModelAuth,
+        }),
     }),
     // Live voice relays only SDP: the browser's offer in, Codex's answer out.
     // One host, one live session — the host object holds that lifecycle, keyed

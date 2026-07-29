@@ -77,11 +77,41 @@ SIGIL_IMAGE_EDIT_GATEWAY_KEY=
 SIGIL_IMAGE_EDIT_DOWNLOAD_ORIGINS=https://assets.example
 ```
 
-Its `preset` and `quality` live in the Mirk fixture. `agent.model` is the
-fresh-install bootstrap model: once an installation has owner-managed model
-profiles, changing the fixture does not silently rewrite its default or any
-existing thread binding. Provider endpoints, credentials, and usage are
-installation state governed by
+Its `preset` and `quality` live in the Mirk fixture. `agent.model` selects the
+Eve turn model. The old bare string form still works and maps to
+`provider: codex`:
+
+```yaml
+agent:
+  model: gpt-5.6-terra
+```
+
+Structured model configuration names the provider and model explicitly:
+
+```yaml
+agent:
+  model:
+    provider: openai-compatible
+    model: llama3.1:8b
+    baseUrl: http://127.0.0.1:11434/v1
+    contextWindowTokens: 131072
+```
+
+For hosted providers, keep secrets out of the fixture. Either rely on the
+default `SIGIL_MODEL_<PROVIDER>_API_KEY` name or set `apiKeyEnv` to the exact
+environment variable Eve should require before startup:
+
+```yaml
+agent:
+  model:
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
+    apiKeyEnv: SIGIL_MODEL_OPENROUTER_API_KEY
+```
+
+Changing the fixture does not silently rewrite existing owner-managed model
+profiles or thread bindings once those exist. Provider endpoints, credentials,
+and usage are installation state governed by
 [`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](../specs/MODEL-ADMINISTRATION-AND-USAGE-SPEC.md).
 
 Eve honors standard `CODEX_HOME` when it is set and otherwise uses

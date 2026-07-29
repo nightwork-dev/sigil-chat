@@ -13,8 +13,33 @@ import { parse as parseYaml } from "yaml";
 
 import { resolveSigilProjectRoot } from "@workspace/runtime-env/project-root";
 
+export type SigilAgentModelProvider =
+  | "codex"
+  | "openai-compatible"
+  | "openrouter"
+  | "anthropic";
+
+export interface SigilAgentModelObjectConfig {
+  provider: SigilAgentModelProvider;
+  model: string;
+  baseUrl?: string;
+  apiKeyEnv?: string;
+  contextWindowTokens?: number;
+}
+
+export type SigilAgentModelConfig = string | SigilAgentModelObjectConfig;
+
+export interface NormalizedSigilAgentModelConfig {
+  provider: SigilAgentModelProvider;
+  model: string;
+  baseUrl?: string;
+  apiKeyEnv?: string;
+  contextWindowTokens?: number;
+  source: "bare-slug" | "object";
+}
+
 export interface SigilProductConfig {
-  agent: { model: string };
+  agent: { model: SigilAgentModelConfig };
   auth: { registration: "closed" | "open" };
   branding: {
     accent: string;
@@ -40,6 +65,28 @@ export function loadSigilConfigFixture(
   if (path !== undefined) return loadFixture(path);
   defaultFixture ??= loadFixture(defaultConfigPath());
   return defaultFixture;
+}
+
+export function normalizeSigilAgentModelConfig(
+  model: SigilAgentModelConfig,
+): NormalizedSigilAgentModelConfig {
+  if (typeof model === "string") {
+    return {
+      provider: "codex",
+      model,
+      source: "bare-slug",
+    };
+  }
+  return {
+    provider: model.provider,
+    model: model.model,
+    ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+    ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
+    ...(model.contextWindowTokens !== undefined
+      ? { contextWindowTokens: model.contextWindowTokens }
+      : {}),
+    source: "object",
+  };
 }
 
 function defaultConfigPath(): string {
@@ -98,7 +145,7 @@ function validateConfig(value: unknown): StandardSchemaV1Issue[] {
   const branding = requireRecord(value, "branding", issues);
   const imageEdit = requireRecord(value, "imageEdit", issues);
 
-  requireSlug(agent, "model", issues, ["agent", "model"]);
+  requireModelConfig(agent?.model, issues, ["agent", "model"]);
   const registration = auth?.registration;
   if (registration !== "closed" && registration !== "open") {
     issues.push({
@@ -154,15 +201,91 @@ function requireText(
   issues.push({ message: "must be a non-empty string", path });
 }
 
-function requireSlug(
-  value: Record<string, unknown> | undefined,
-  key: string,
+function requireModelConfig(
+  candidate: unknown,
   issues: StandardSchemaV1Issue[],
   path: string[],
 ): void {
-  const candidate = value?.[key];
-  if (isNonEmptyText(candidate) && !/\s/.test(candidate)) return;
+  if (isModelSlug(candidate)) return;
+  if (isRecord(candidate)) {
+    const provider = candidate.provider;
+    if (!isSupportedModelProvider(provider)) {
+      issues.push({
+        message:
+          'must be one of "codex", "openai-compatible", "openrouter", or "anthropic"',
+        path: [...path, "provider"],
+      });
+    }
+    if (!isModelSlug(candidate.model)) {
+      issues.push({
+        message: "must be a non-empty model id without whitespace",
+        path: [...path, "model"],
+      });
+    }
+    const baseUrl = candidate.baseUrl;
+    if (baseUrl !== undefined && !isHttpUrl(baseUrl)) {
+      issues.push({
+        message: "must be an http(s) URL",
+        path: [...path, "baseUrl"],
+      });
+    }
+    const apiKeyEnv = candidate.apiKeyEnv;
+    if (apiKeyEnv !== undefined && !isEnvironmentVariableName(apiKeyEnv)) {
+      issues.push({
+        message: "must be an environment variable name",
+        path: [...path, "apiKeyEnv"],
+      });
+    }
+    const contextWindowTokens = candidate.contextWindowTokens;
+    if (
+      contextWindowTokens !== undefined &&
+      (typeof contextWindowTokens !== "number" ||
+        !Number.isInteger(contextWindowTokens) ||
+        contextWindowTokens <= 0)
+    ) {
+      issues.push({
+        message: "must be a positive integer",
+        path: [...path, "contextWindowTokens"],
+      });
+    }
+    if (provider === "openai-compatible" && baseUrl === undefined) {
+      issues.push({
+        message: 'is required when provider is "openai-compatible"',
+        path: [...path, "baseUrl"],
+      });
+    }
+    return;
+  }
   issues.push({ message: "must be a non-empty slug without whitespace", path });
+}
+
+function isSupportedModelProvider(
+  value: unknown,
+): value is SigilAgentModelProvider {
+  return (
+    value === "codex" ||
+    value === "openai-compatible" ||
+    value === "openrouter" ||
+    value === "anthropic"
+  );
+}
+
+function isModelSlug(value: unknown): value is string {
+  return isNonEmptyText(value) && !/\s/.test(value);
+}
+
+function isHttpUrl(value: unknown): value is string {
+  if (!isNonEmptyText(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isEnvironmentVariableName(value: unknown): value is string {
+  return isNonEmptyText(value) && /^[A-Z_][A-Z0-9_]*$/.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

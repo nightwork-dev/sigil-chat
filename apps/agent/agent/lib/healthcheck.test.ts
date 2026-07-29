@@ -49,7 +49,8 @@ describe("agent readiness", () => {
     ).resolves.toEqual({
       status: "unavailable",
       checks: {
-        codexModelAuth: "error",
+        modelAuth: "error",
+        modelProvider: "codex",
         eveRuntime: "unknown",
       },
       diagnostic:
@@ -67,7 +68,8 @@ describe("agent readiness", () => {
     expect(report).toEqual({
       status: "unavailable",
       checks: {
-        codexModelAuth: "ok",
+        modelAuth: "ok",
+        modelProvider: "codex",
         eveRuntime: "error",
       },
       diagnostic:
@@ -75,5 +77,40 @@ describe("agent readiness", () => {
     })
     expect(JSON.stringify(report)).not.toContain("model-session-token")
     expect(JSON.stringify(report)).not.toContain("/private")
+  })
+
+  it("fails closed with a named hosted provider credential", async () => {
+    await expect(
+      readAgentReadiness({
+        env: {},
+        fetcher: async () => new Response(null, { status: 200 }),
+        modelConfig: {
+          provider: "openrouter",
+          model: "openrouter/anthropic/claude-sonnet-4.6",
+        },
+      } as never),
+    ).resolves.toEqual({
+      status: "unavailable",
+      checks: {
+        modelAuth: "error",
+        modelProvider: "openrouter",
+        eveRuntime: "unknown",
+      },
+      diagnostic:
+        'Model provider "openrouter" is missing SIGIL_MODEL_OPENROUTER_API_KEY. Set SIGIL_MODEL_OPENROUTER_API_KEY in the Eve runtime environment.',
+    })
+  })
+
+  it("treats local OpenAI-compatible models without apiKeyEnv as configured", async () => {
+    await expect(
+      checkAgentReadiness({
+        fetcher: async () => new Response(null, { status: 200 }),
+        modelConfig: {
+          provider: "openai-compatible",
+          model: "local-model",
+          baseUrl: "http://127.0.0.1:11434/v1",
+        },
+      } as never),
+    ).resolves.toBe(true)
   })
 })

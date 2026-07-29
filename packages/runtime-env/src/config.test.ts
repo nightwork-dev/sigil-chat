@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadSigilConfigFixture } from "./config.js";
+import {
+  loadSigilConfigFixture,
+  normalizeSigilAgentModelConfig,
+} from "./config.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -39,6 +42,11 @@ imageEdit:
       branding: { name: "Test Sigil" },
       imageEdit: { preset: "flux2klein4b", quality: "fast" },
     });
+    expect(normalizeSigilAgentModelConfig(fixture.value.agent.model)).toEqual({
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      source: "bare-slug",
+    });
     expect(fixture.provenance).toMatchObject({
       finalRef: "application:sigil-chat",
       layers: [
@@ -47,6 +55,40 @@ imageEdit:
           sourceId: "sigil-chat-repository",
         }),
       ],
+    });
+  });
+
+  it("loads the structured model provider contract", async () => {
+    const path = fixturePath(`
+agent:
+  model:
+    provider: openai-compatible
+    model: llama3.1:8b
+    baseUrl: http://127.0.0.1:11434/v1
+    apiKeyEnv: SIGIL_MODEL_OPENAI_COMPATIBLE_API_KEY
+    contextWindowTokens: 131072
+auth:
+  registration: closed
+branding:
+  accent: "#b58b35"
+  description: A test workspace.
+  name: Test Sigil
+  shareImageUrl: /share.png
+  title: Test Sigil — conversations
+imageEdit:
+  preset: flux2klein4b
+  quality: fast
+`);
+
+    const fixture = await loadSigilConfigFixture(path);
+
+    expect(normalizeSigilAgentModelConfig(fixture.value.agent.model)).toEqual({
+      provider: "openai-compatible",
+      model: "llama3.1:8b",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      apiKeyEnv: "SIGIL_MODEL_OPENAI_COMPATIBLE_API_KEY",
+      contextWindowTokens: 131072,
+      source: "object",
     });
   });
 
@@ -62,6 +104,33 @@ imageEdit: {}
 
     await expect(loadSigilConfigFixture(path)).rejects.toThrow(
       /must be a non-empty slug without whitespace/,
+    );
+  });
+
+  it("fails before startup when provider-specific model fields are invalid", async () => {
+    const path = fixturePath(`
+agent:
+  model:
+    provider: openai-compatible
+    model: local model
+    baseUrl: not-a-url
+    apiKeyEnv: not-an-env-name
+    contextWindowTokens: 0
+auth:
+  registration: closed
+branding:
+  accent: "#b58b35"
+  description: A test workspace.
+  name: Test Sigil
+  shareImageUrl: /share.png
+  title: Test Sigil — conversations
+imageEdit:
+  preset: flux2klein4b
+  quality: fast
+`);
+
+    await expect(loadSigilConfigFixture(path)).rejects.toThrow(
+      /must be a non-empty model id without whitespace/,
     );
   });
 });

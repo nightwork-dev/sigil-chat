@@ -3,7 +3,8 @@
 An agentic chat template with deliberately narrow ownership:
 
 - **Sigil** renders the TanStack Start chat client.
-- **Local Codex** serves the model through the existing `codex login` session and ChatGPT subscription.
+- **Model providers** are selected by the typed application fixture; the default
+  remains local Codex through the existing `codex login` session.
 - **Eve** owns durable sessions, streaming, interruption, and the native tool host; tool approval is a client-side UI preference.
 - **Gonk** supplies the application tool registry, authorization, skills, memory, and scope contracts that Eve hosts in-process.
 
@@ -55,8 +56,8 @@ binding secret, applies idempotent auth migrations, seeds a development owner,
 and starts the two branch-namespaced services. It then proves the authenticated
 web → Eve → native application-tool path, prints one readiness summary, and opens a private
 single-use URL that creates a normal owner session and lands on `/chat`.
-“Ready” therefore means the account store, agent bearer flow, local Codex model
-session, and native application-tool registry responded—not merely that two
+“Ready” therefore means the account store, agent bearer flow, configured model
+provider, and native application-tool registry responded—not merely that two
 ports are listening.
 
 To reset only the current worktree's disposable app state, stop its dev stack
@@ -71,12 +72,17 @@ See [Development without ceremony](docs/guides/development.md) for the normal
 edit/verify loop, branch-worktree behavior, reset/restore recovery, and the
 short troubleshooting path.
 
-Eve's `experimental_chatgpt()` model
-reads that local login and calls the Codex backend directly; Sigil Chat does not
-use Vercel AI Gateway. The template's model is the checked-in `agent.model` in
-`fixtures/application/sigil-chat.yaml`. The web and agent processes share a
-private `SIGIL_AGENT_BINDING_SECRET` used only for signed session and scope
-bindings; local development generates it automatically.
+The checked-in `agent.model` in `fixtures/application/sigil-chat.yaml` selects
+the Eve turn model. A bare string remains backwards-compatible and means
+`provider: codex`: Eve's `experimental_chatgpt()` reads the local `codex login`
+state and calls the Codex backend directly. Structured fixtures can select
+`provider: openai-compatible` for a local `/v1/chat/completions` server, or a
+hosted provider such as `openrouter` or `anthropic` through Eve's native string
+model route. Provider secrets stay in environment variables named by the
+fixture or by the default `SIGIL_MODEL_<PROVIDER>_API_KEY`; they are never stored
+in fixtures. The web and agent processes share a private
+`SIGIL_AGENT_BINDING_SECRET` used only for signed session and scope bindings;
+local development generates it automatically.
 
 The web process owns human authentication. Local development keeps the database
 and owner-only auth secret under the worktree's single `SIGIL_DATA_DIR`.
