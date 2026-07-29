@@ -196,8 +196,13 @@ function ActiveAgentSession({
   const [participantAdapters, setParticipantAdapters] = useState<
     readonly AgentParticipantSessionAdapter[]
   >([])
-  const participantThreadIds = normalizeParticipantThreadIds(
+  const participantThreadIdsKey = normalizedParticipantThreadIdsKey(
     participantChannel?.threadIds ?? [],
+  )
+  const participantThreadIds = useMemo(
+    () =>
+      participantThreadIdsKey ? participantThreadIdsKey.split("\u0000") : [],
+    [participantThreadIdsKey],
   )
   const registerParticipantAdapter = useCallback(
     (adapter: AgentParticipantSessionAdapter) => {
@@ -341,6 +346,12 @@ function ActiveAgentSession({
     initialSession: thread.runtime.session,
     onEvent: handleEvent,
   })
+  const activeParticipantAdapter = useParticipantSessionAdapter({
+    participantThreadIds,
+    principalId,
+    session: eveSession,
+    thread,
+  })
   const turnActive = useRef(false)
   const session = useMemo<AgentRuntimeSession>(
     () => ({
@@ -392,6 +403,31 @@ function ActiveAgentSession({
       thread.personaId,
     ],
   )
+  const activeThreadIsParticipant = participantThreadIds.includes(thread.id)
+  const channelAdapters = useMemo(
+    () =>
+      activeThreadIsParticipant
+        ? [
+            activeParticipantAdapter,
+            ...participantAdapters.filter(
+              (adapter) => adapter.threadId !== thread.id,
+            ),
+          ]
+        : participantAdapters,
+    [
+      activeParticipantAdapter,
+      activeThreadIsParticipant,
+      participantAdapters,
+      thread.id,
+    ],
+  )
+  const mountedParticipantThreadIds = useMemo(
+    () =>
+      participantThreadIds.filter(
+        (participantThreadId) => participantThreadId !== thread.id,
+      ),
+    [participantThreadIds, thread.id],
+  )
 
   return (
     <AgentThreadControlsProvider value={controls}>
@@ -406,11 +442,11 @@ function ActiveAgentSession({
       <AgentRuntimeSessionProvider session={session}>
         <AgentPersonaSessionProvider personaId={thread.personaId}>
           <AgentParticipantChannelProvider
-            adapters={participantAdapters}
+            adapters={channelAdapters}
             config={participantChannel}
             principalId={principalId}
           >
-            {participantThreadIds.map((threadId) => (
+            {mountedParticipantThreadIds.map((threadId) => (
               <ParticipantAgentSessionMount
                 key={threadId}
                 participantThreadIds={participantThreadIds}
@@ -653,6 +689,10 @@ function commandLike(value: unknown): Record<string, unknown> | null {
   return clientCommand && typeof clientCommand === "object"
     ? (clientCommand as Record<string, unknown>)
     : null
+}
+
+function normalizedParticipantThreadIdsKey(threadIds: readonly string[]): string {
+  return normalizeParticipantThreadIds(threadIds).join("\u0000")
 }
 
 type AgentAdapterSnapshot = Parameters<

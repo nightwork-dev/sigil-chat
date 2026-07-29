@@ -38,10 +38,10 @@ describe("participant channel runtime", () => {
       bounds: { requestedAt: 2 },
     })
 
-    expect(ports.get("eve-a")?.sent.map((input) => input.message)).toEqual([
+    expect(ports.get("persona-a")?.sent.map((input) => input.message)).toEqual([
       "Answer as A",
     ])
-    expect(ports.get("eve-b")?.sent.map((input) => input.message)).toEqual([
+    expect(ports.get("persona-b")?.sent.map((input) => input.message)).toEqual([
       "Answer as B",
     ])
     expect(runtime.sentCount("persona-c")).toBe(0)
@@ -77,19 +77,41 @@ describe("participant channel runtime", () => {
       },
     })
 
-    const envelopes = runtime.events.filter(
-      (event) => event.type === "participant.envelope",
-    )
-    expect(envelopes.map((event) => event.envelope.subject)).toContain(
-      "context-contribution",
-    )
-    expect(envelopes[0]?.envelope.provenance).toMatchObject({
-      channelId: "channel-1",
-      participantId: "persona-a",
-      personaId: "agent-a",
-      eveSessionId: "eve-a",
-      applicationThreadId: "thread-a",
+    expect(
+      runtime.events.filter((event) => event.type === "participant.envelope"),
+    ).toHaveLength(0)
+  })
+
+  it("records participant-produced envelopes explicitly", () => {
+    const { channel, ports } = multiParticipantFixture()
+    const runtime = createParticipantChannelRuntime({
+      channel,
+      sessions: ports,
+      now: sequenceClock(),
     })
+
+    const envelope = runtime.record({
+      participantId: "persona-a",
+      payload: { id: "tool-call-a" },
+      subject: "tool-call",
+      turnId: "turn-a",
+    })
+
+    expect(envelope).toMatchObject({
+      kind: "agent.participant.provenance-envelope",
+      payload: { id: "tool-call-a" },
+      provenance: {
+        applicationThreadId: "thread-a",
+        eveSessionId: "eve-a",
+        participantId: "persona-a",
+        personaId: "agent-a",
+      },
+      subject: "tool-call",
+      turnId: "turn-a",
+    })
+    expect(runtime.events).toEqual([
+      { type: "participant.envelope", envelope },
+    ])
   })
 
   it("captures the target active turn, waits for target settlement, and never cancels another participant", async () => {
@@ -101,8 +123,8 @@ describe("participant channel runtime", () => {
       sessions: ports,
       now: sequenceClock(),
     })
-    const portA = requirePort(ports, "eve-a")
-    const portB = requirePort(ports, "eve-b")
+    const portA = requirePort(ports, "persona-a")
+    const portB = requirePort(ports, "persona-b")
 
     const firstA = runtime.dispatch({
       coordinatorParticipantId: "owner",
@@ -124,7 +146,7 @@ describe("participant channel runtime", () => {
       coordinatorParticipantId: "owner",
       targetParticipantId: "persona-a",
       message: "Replacement A",
-      reason: "player redirected the addressed participant",
+      reason: "coordinator redirected the addressed participant",
     })
     await flush()
 
@@ -165,10 +187,10 @@ describe("participant channel runtime", () => {
       eveSessionId: "eve-a",
       applicationThreadId: "thread-a",
     })
-    const port = createFakePort("eve-a")
+    const port = createFakePort("agent-a:session", "eve-a")
     const runtime = createParticipantChannelRuntime({
       channel,
-      sessions: new Map([[port.sessionId, port]]),
+      sessions: new Map([[port.participantId, port]]),
       now: sequenceClock(),
     })
 
@@ -213,9 +235,13 @@ function multiParticipantFixture(
     participant("persona-c", "agent-c", "eve-c", "thread-c"),
   ]
   const ports = new Map<string, FakePort>(
-    ["eve-a", "eve-b", "eve-c"].map((sessionId) => [
-      sessionId,
-      createFakePort(sessionId, options),
+    [
+      ["persona-a", "eve-a"],
+      ["persona-b", "eve-b"],
+      ["persona-c", "eve-c"],
+    ].map(([participantId, sessionId]) => [
+      participantId,
+      createFakePort(participantId, sessionId, options),
     ]),
   )
   return {
@@ -247,6 +273,7 @@ function participant(
 }
 
 function createFakePort(
+  participantId: string,
   sessionId: string,
   options: { readonly autoSettle?: boolean } = {},
 ): FakePort {
@@ -261,6 +288,7 @@ function createFakePort(
     | undefined
 
   return {
+    participantId,
     sessionId,
     sent,
     cancelTurnIds,
@@ -295,10 +323,10 @@ function createFakePort(
 
 function requirePort(
   ports: ReadonlyMap<string, FakePort>,
-  sessionId: string,
+  participantId: string,
 ): FakePort {
-  const port = ports.get(sessionId)
-  if (!port) throw new Error(`Missing port ${sessionId}`)
+  const port = ports.get(participantId)
+  if (!port) throw new Error(`Missing port ${participantId}`)
   return port
 }
 

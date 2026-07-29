@@ -44,6 +44,7 @@ type MockEveSession = AgentRuntimeSession & {
   cancelTurnIds: Array<string | undefined>;
   callbacks: EveCallbacks;
   pendingSend: Promise<AgentTurnResult> | null;
+  primary: boolean;
   sent: Array<{ headers?: Record<string, string>; message?: unknown }>;
   sendResult: AgentTurnResult | null;
 };
@@ -58,6 +59,8 @@ const harness = vi.hoisted(() => ({
     targetThreadId: string;
   }>,
   eveSessions: new Map<string, MockEveSession>(),
+  eveRuntimeMountCount: 0,
+  eveRuntimeSequence: 0,
   expectedRevisions: [] as Array<{
     operation: "consume" | "rename" | "snapshot";
     revision: number | undefined;
@@ -80,12 +83,21 @@ const TEST_USER_ID = "session-test-user";
 
 vi.mock("@zigil/agent/react/eve", () => ({
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
-    const sessionId = callbacks.initialSession?.sessionId ?? "primary";
+    const fallbackId = ReactRuntime.useRef<string | null>(null);
+    if (!fallbackId.current) {
+      harness.eveRuntimeSequence += 1;
+      fallbackId.current = `runtime-${harness.eveRuntimeSequence}`;
+    }
+    const sessionId = callbacks.initialSession?.sessionId ?? fallbackId.current;
     const session =
       harness.eveSessions.get(sessionId) ?? createMockEveSession(sessionId);
+    if (!harness.eveSessions.has(sessionId)) {
+      harness.eveRuntimeMountCount += 1;
+    }
     session.callbacks = callbacks;
+    session.primary ||= !harness.eveCallbacks;
     harness.eveSessions.set(sessionId, session);
-    if (sessionId === "primary" || !harness.eveCallbacks) {
+    if (session.primary || !harness.eveCallbacks) {
       harness.eveCallbacks = callbacks;
     }
     return session;
@@ -99,12 +111,13 @@ function createMockEveSession(sessionId: string): MockEveSession {
     capabilities: { reset: true, stop: true, streaming: true, cancel: true },
     data: { messages: [] },
     pendingSend: null,
+    primary: false,
     sendResult: null,
     sent: [],
     status: "idle",
     send(input: { headers?: Record<string, string>; message?: unknown }) {
       this.sent.push(input);
-      if (sessionId === "primary") {
+      if (this.primary) {
         harness.eveSendCallCount += 1;
         harness.lastEveSendInput = input;
       }
@@ -115,12 +128,12 @@ function createMockEveSession(sessionId: string): MockEveSession {
           delete this.activeTurnId;
         });
       }
-      if (sessionId === "primary" && harness.nextSnapshot) {
+      if (this.primary && harness.nextSnapshot) {
         this.callbacks.onFinish?.(harness.nextSnapshot);
       }
       const result =
         this.sendResult ??
-        (sessionId === "primary" ? harness.sendResult : null) ??
+        (this.primary ? harness.sendResult : null) ??
         ({ status: "succeeded" as const } satisfies AgentTurnResult);
       delete this.activeTurnId;
       return Promise.resolve(result);
@@ -261,6 +274,8 @@ beforeEach(() => {
   harness.participantChannel = null;
   harness.participantProofRequests = [];
   harness.eveSessions = new Map();
+  harness.eveRuntimeMountCount = 0;
+  harness.eveRuntimeSequence = 0;
   harness.expectedRevisions = [];
   harness.sendResult = null;
   harness.pendingSend = null;
@@ -479,6 +494,83 @@ describe("AppAgentSessions persistence call site", () => {
     ).toHaveLength(2);
   });
 
+  it("routes unsessioned participant threads by participant identity instead of the pending Eve id", async () => {
+    const coordinator = repository.create(TEST_USER_ID, { title: "Coordinator" });
+    const a = createConversationWithoutSession("agent-a");
+    const b = createConversationWithoutSession("agent-b");
+    repository.setActive(TEST_USER_ID, coordinator.id);
+    const participantThreadIds = [a.id, b.id];
+
+    await renderSessions({
+      children: createElement(ParticipantChannelCapture),
+      participantThreadIds,
+    });
+    const channel = await waitForParticipantChannel();
+
+    await act(async () => {
+      await channel.dispatch({
+        targetParticipantId: participantIdForThread(a.id),
+        message: "Ask A",
+      });
+    });
+
+    const participantSessions = [...harness.eveSessions.values()].filter(
+      (session) => !session.primary,
+    );
+    expect(participantSessions).toHaveLength(2);
+    const sentSessions = participantSessions.filter(
+      (session) => session.sent.length > 0,
+    );
+    expect(sentSessions).toHaveLength(1);
+    expect(sentSessions[0]?.sent[0]).toMatchObject({
+      message: "Ask A",
+      headers: {
+        "x-sigil-persona-id": "agent-a",
+        "x-sigil-session-binding": `signed-participant-binding:${a.id}`,
+      },
+    });
+    expect(requireParticipantChannel().sentCount(participantIdForThread(a.id))).toBe(
+      1,
+    );
+    expect(requireParticipantChannel().sentCount(participantIdForThread(b.id))).toBe(
+      0,
+    );
+  });
+
+  it("reuses the primary active session when the active thread is a participant", async () => {
+    const active = repository.create(TEST_USER_ID, {
+      personaId: "agent-a",
+      title: "Active",
+    });
+    const peer = createConversationWithSession("agent-b", "eve-b");
+    repository.setActive(TEST_USER_ID, active.id);
+
+    await renderSessions({
+      children: createElement(ParticipantChannelCapture),
+      participantThreadIds: [active.id, peer.id],
+    });
+    const channel = await waitForParticipantChannel();
+
+    expect(harness.eveRuntimeMountCount).toBe(2);
+
+    await act(async () => {
+      await channel.dispatch({
+        targetParticipantId: participantIdForThread(active.id),
+        message: "Ask active",
+      });
+    });
+
+    expect(harness.eveSendCallCount).toBe(1);
+    expect(harness.lastEveSendInput).toMatchObject({
+      message: "Ask active",
+      headers: {
+        "x-sigil-persona-id": "agent-a",
+        "x-sigil-session-binding": `signed-participant-binding:${active.id}`,
+      },
+    });
+    expect(sessionById("eve-b").sent).toHaveLength(0);
+  });
+
   it("interrupts only the addressed participant session before dispatching the replacement turn", async () => {
     repository.create(TEST_USER_ID, { title: "Coordinator" });
     const a = createConversationWithSession("agent-a", "eve-a");
@@ -509,6 +601,7 @@ describe("AppAgentSessions persistence call site", () => {
       });
       await flush();
     });
+    const latestChannel = requireParticipantChannel();
 
     const observedA = eveA.activeTurnId;
     expect(observedA).toBeTruthy();
@@ -516,10 +609,10 @@ describe("AppAgentSessions persistence call site", () => {
 
     let replacement: Promise<AgentTurnResult> | undefined;
     await act(async () => {
-      replacement = channel.interrupt({
+      replacement = latestChannel.interrupt({
         targetParticipantId: participantIdForThread(a.id),
         message: "Replacement A",
-        reason: "player redirected A",
+        reason: "coordinator redirected A",
       });
       await flush();
     });
@@ -712,6 +805,13 @@ function createConversationWithSession(
     thread.revision,
   );
   return repository.get(TEST_USER_ID, thread.id)!;
+}
+
+function createConversationWithoutSession(personaId: string): AgentThread {
+  return repository.create(TEST_USER_ID, {
+    personaId,
+    title: personaId,
+  });
 }
 
 function seedContextReceipt(threadId: string): void {

@@ -87,6 +87,7 @@ export interface AgentParticipantChannelValue {
 
 export interface AgentParticipantSessionAdapter {
   readonly eveSessionId: string
+  readonly participantId: string
   readonly personaId: string
   readonly session: AgentRuntimeSession
   readonly send: AgentRuntimeSession["send"]
@@ -116,8 +117,13 @@ export function AgentParticipantChannelProvider({
   readonly config?: AgentParticipantChannelConfig
   readonly principalId: string
 }) {
-  const participantThreadIds = normalizeParticipantThreadIds(
-    config?.threadIds ?? [],
+  const participantThreadIdsKey = participantThreadIdsKeyFor(
+    normalizeParticipantThreadIds(config?.threadIds ?? []),
+  )
+  const participantThreadIds = useMemo(
+    () =>
+      participantThreadIdsKey ? participantThreadIdsKey.split("\u0000") : [],
+    [participantThreadIdsKey],
   )
   const configured = participantThreadIds.length > 1
   const [events, setEvents] = useState<readonly AgentParticipantChannelEvent[]>(
@@ -156,7 +162,11 @@ export function AgentParticipantChannelProvider({
       if (!participantThreadIds.includes(adapter.threadId)) continue
       const session = adapter.session as RuntimeSessionWithCancel
       const sessionId = adapter.eveSessionId
+      const participantId = adapter.participantId
       const port: ParticipantChannelSessionPort = {
+        get participantId() {
+          return participantId
+        },
         get sessionId() {
           return sessionId
         },
@@ -169,7 +179,7 @@ export function AgentParticipantChannelProvider({
         port.cancel = (options) =>
           Promise.resolve(session.cancel?.(options)).then(() => ({}))
       }
-      sessions.set(sessionId, port)
+      sessions.set(participantId, port)
     }
     return createParticipantChannelRuntime({
       channel,
@@ -237,7 +247,7 @@ export function useParticipantSessionAdapter({
   readonly session: AgentRuntimeSession
   readonly thread: AgentThread
 }): AgentParticipantSessionAdapter {
-  const threadIdsKey = participantThreadIdsKey(
+  const threadIdsKey = participantThreadIdsKeyFor(
     normalizeParticipantThreadIds(participantThreadIds),
   )
   const threadIds = useMemo(
@@ -253,6 +263,7 @@ export function useParticipantSessionAdapter({
     [thread.id, threadIds],
   )
   const eveSessionId = participantSessionId(thread)
+  const participantId = participantIdForThread(thread.id)
   const personaId = thread.personaId
   const threadId = thread.id
   const send = useCallback<AgentRuntimeSession["send"]>(
@@ -279,12 +290,13 @@ export function useParticipantSessionAdapter({
   return useMemo(
     () => ({
       eveSessionId,
+      participantId,
       personaId,
       session,
       send,
       threadId,
     }),
-    [eveSessionId, personaId, send, session, threadId],
+    [eveSessionId, participantId, personaId, send, session, threadId],
   )
 }
 
@@ -324,6 +336,6 @@ export function useRegisteredParticipantAdapter({
   }, [adapter, register])
 }
 
-function participantThreadIdsKey(threadIds: readonly string[]): string {
+function participantThreadIdsKeyFor(threadIds: readonly string[]): string {
   return threadIds.join("\u0000")
 }

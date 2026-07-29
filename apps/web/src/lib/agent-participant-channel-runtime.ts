@@ -24,6 +24,7 @@ export interface ParticipantCancelResult {
 }
 
 export interface ParticipantChannelSessionPort {
+  readonly participantId: string
   readonly sessionId: string
   readonly activeTurnId?: string
   send(input: AgentSendInput): Promise<AgentTurnResult>
@@ -133,17 +134,6 @@ export function createParticipantChannelRuntime({
   ): Promise<ParticipantDispatchResult> {
     const target = requirePersonaProvenance(receipt.target)
     const port = requireSession(target)
-    const turnId = port.activeTurnId
-    emitEnvelope("message", target, input.message, turnId)
-    if (input.input?.clientContext) {
-      emitEnvelope(
-        "context-contribution",
-        target,
-        input.input.clientContext,
-        turnId,
-      )
-    }
-
     const turn = port.send({
       ...input.input,
       message: input.message,
@@ -155,29 +145,7 @@ export function createParticipantChannelRuntime({
         inFlight.delete(target.participantId)
       }
     })
-    emitEnvelope("message", target, result, port.activeTurnId ?? turnId)
     return { receipt, result }
-  }
-
-  function emitEnvelope(
-    subject: AgentParticipantEnvelopeSubject,
-    provenance: AgentChannelParticipantProvenance,
-    payload: unknown,
-    turnId: string | undefined,
-    streamId?: string,
-  ): void {
-    emit({
-      type: "participant.envelope",
-      envelope: {
-        kind: "agent.participant.provenance-envelope",
-        subject,
-        provenance,
-        payload,
-        createdAt: now(),
-        ...(turnId ? { turnId } : {}),
-        ...(streamId ? { streamId } : {}),
-      },
-    })
   }
 
   function dispatch(
@@ -324,10 +292,10 @@ export function createParticipantChannelRuntime({
   function requireSession(
     target: PersonaSessionProvenance,
   ): ParticipantChannelSessionPort {
-    const port = sessions.get(target.eveSessionId)
-    if (!port) throw new Error(`Missing session port: ${target.eveSessionId}`)
-    if (port.sessionId !== target.eveSessionId) {
-      throw new Error(`Session port mismatch: ${target.eveSessionId}`)
+    const port = sessions.get(target.participantId)
+    if (!port) throw new Error(`Missing session port: ${target.participantId}`)
+    if (port.participantId !== target.participantId) {
+      throw new Error(`Session port mismatch: ${target.participantId}`)
     }
     return port
   }
