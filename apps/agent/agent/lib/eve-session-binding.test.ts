@@ -105,6 +105,17 @@ describe("requireVerifiedEveSessionBinding", () => {
     })
   })
 
+  it("rejects a create-style proof on a cancel route", () => {
+    expect(() =>
+      requireVerifiedEveSessionBinding(
+        request("/eve/v1/session/session-1/cancel", proof()),
+        "user-1",
+        secret,
+        now,
+      ),
+    ).toThrow(EveSessionBindingVerificationError)
+  })
+
   it("rejects a cancel route attested for another Eve session", () => {
     expect(() =>
       requireVerifiedEveSessionBinding(

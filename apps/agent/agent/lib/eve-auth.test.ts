@@ -760,6 +760,32 @@ describe("owned Eve channel", () => {
     expect(denied.status).toBe(403)
   })
 
+  it("rejects a signed cancel route with a create-style proof before cancelling", async () => {
+    const ownerStore = new MemoryEveSessionOwnerStore()
+    await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
+    const channel = makeSignedOwnedChannel(ownerStore)
+    const route = findRoute(
+      channel,
+      "POST",
+      "/eve/v1/session/:sessionId/cancel",
+    )
+    const receive = vi.fn()
+    const args = routeArgs({ receive })
+
+    const denied = await route.handler(
+      signedRequest(
+        "POST",
+        "/eve/v1/session/session-1/cancel",
+        signedSessionBinding(),
+        { turnId: "turn-1" },
+      ),
+      args,
+    )
+
+    expect(denied.status).toBe(403)
+    expect(receive).not.toHaveBeenCalled()
+  })
+
   it("rejects cross-thread replay against an immutable V3 session", async () => {
     const ownerStore = new MemoryEveSessionOwnerStore()
     await ownerStore.bind("session-1", "user-1", executionBindingFor("agent-a"))
@@ -1098,6 +1124,7 @@ function routeArgs(
   overrides: {
     getSession?: ReturnType<typeof vi.fn>
     params?: Record<string, string>
+    receive?: ReturnType<typeof vi.fn>
     send?: ReturnType<typeof vi.fn>
   } = {},
 ) {
@@ -1108,7 +1135,7 @@ function routeArgs(
         getEventStream: async () => new ReadableStream(),
       })),
     params: overrides.params ?? {},
-    receive: vi.fn(),
+    receive: overrides.receive ?? vi.fn(),
     requestIp: null,
     send:
       overrides.send ??

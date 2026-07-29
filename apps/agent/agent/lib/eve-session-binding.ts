@@ -35,6 +35,7 @@ export function requireVerifiedEveSessionBinding(
   const requestedSessionId = sessionIdFromPath(pathname)
   if (
     (requestedSessionId === undefined && binding.eveSessionId !== undefined) ||
+    (isCancelPath(pathname) && binding.eveSessionId !== requestedSessionId) ||
     (requestedSessionId !== undefined &&
       binding.eveSessionId !== undefined &&
       binding.eveSessionId !== requestedSessionId)
@@ -53,4 +54,8 @@ function sessionIdFromPath(pathname: string): string | undefined {
   } catch {
     return match[1]
   }
+}
+
+function isCancelPath(pathname: string): boolean {
+  return /^\/eve\/v1\/session\/[^/]+\/cancel$/.test(pathname)
 }
