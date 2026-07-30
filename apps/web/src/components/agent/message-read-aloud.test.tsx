@@ -12,7 +12,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import type { AgentMessagePart } from "@zigil/agent-surface/contracts"
+import type { AgentMessagePart } from "@zigil/agent/contracts"
 
 import { speakMessageParts } from "@/lib/agent-voice"
 import { createAudioFocusManager } from "@/lib/audio-focus"

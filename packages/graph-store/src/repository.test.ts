@@ -1,13 +1,47 @@
-import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FileGraphRepository } from "./repository";
+import { SqliteAdapter } from "@mirk/store/sqlite";
+import { sampleReducerGraph } from "@workspace/graph/sample";
+
+const planMockState = vi.hoisted(() => ({
+  callRevisions: [] as number[],
+  pauseFirstCall: false,
+  firstCallStarted: undefined as (() => void) | undefined,
+  releaseFirstCall: undefined as Promise<void> | undefined,
+}));
+
+vi.mock("@workspace/graph/document", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@workspace/graph/document")>();
+  return {
+    ...actual,
+    planGraphCommands: vi.fn(
+      async (...args: Parameters<typeof actual.planGraphCommands>) => {
+        planMockState.callRevisions.push(args[0].revision);
+        if (planMockState.pauseFirstCall) {
+          planMockState.pauseFirstCall = false;
+          planMockState.firstCallStarted?.();
+          await planMockState.releaseFirstCall;
+        }
+        return actual.planGraphCommands(...args);
+      },
+    ),
+  };
+});
+
+import { FileGraphRepository, GRAPH_RECORD_KEY } from "./repository";
 
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
+  planMockState.callRevisions = [];
+  planMockState.pauseFirstCall = false;
+  planMockState.firstCallStarted = undefined;
+  planMockState.releaseFirstCall = undefined;
+  vi.restoreAllMocks();
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -43,16 +77,17 @@ describe("FileGraphRepository", () => {
     ).toBe(140);
   });
 
-  it("serializes concurrent writes without losing updates", async () => {
-    const repository = await makeRepository();
+  it("serializes concurrent writes from separate SQLite adapters without losing updates", async () => {
+    const first = await makeRepository();
+    const second = new FileGraphRepository(first.filePath);
 
     const [labeled, valued] = await Promise.all([
-      repository.apply({
+      first.apply({
         type: "node.update",
         id: "budget",
         patch: { label: "Envelope" },
       }),
-      repository.apply({
+      second.apply({
         type: "node.update",
         id: "budget",
         patch: { inputValues: { value: 150 } },
@@ -60,7 +95,7 @@ describe("FileGraphRepository", () => {
     ]);
 
     expect(labeled.revision).not.toBe(valued.revision);
-    const final = await repository.get();
+    const final = await first.get();
     expect(final.revision).toBe(2);
     expect(final.nodes.find((node) => node.id === "budget")).toMatchObject({
       label: "Envelope",
@@ -68,71 +103,121 @@ describe("FileGraphRepository", () => {
     });
   });
 
-  it("reaps a lock held by a dead process without waiting for the hard stale age", async () => {
+  it("replans an asynchronously planned stale snapshot after a concurrent commit", async () => {
+    const first = await makeRepository();
+    const second = new FileGraphRepository(first.filePath);
+    let releaseFirstPlan!: () => void;
+    const firstPlanStarted = new Promise<void>((resolve) => {
+      planMockState.firstCallStarted = resolve;
+    });
+    planMockState.releaseFirstCall = new Promise<void>((resolve) => {
+      releaseFirstPlan = resolve;
+    });
+    planMockState.pauseFirstCall = true;
+
+    const firstWrite = first.apply({
+      type: "node.update",
+      id: "budget",
+      patch: { inputValues: { value: 150 } },
+    });
+    await firstPlanStarted;
+
+    const designed = await second.apply({
+      type: "node.update",
+      id: "design",
+      patch: { inputValues: { value: 35 } },
+    });
+    expect(designed.revision).toBe(1);
+
+    releaseFirstPlan();
+    const budgeted = await firstWrite;
+    expect(budgeted.revision).toBe(2);
+    expect(planMockState.callRevisions).toEqual([0, 0, 1]);
+    const final = await first.get();
+    expect(final.revision).toBe(2);
+    expect(
+      final.nodes.find((node) => node.id === "budget")?.inputValues.value,
+    ).toBe(150);
+    expect(
+      final.nodes.find((node) => node.id === "design")?.inputValues.value,
+    ).toBe(35);
+  });
+
+  it("keeps the SQLite commit callback synchronous", async () => {
     const repository = await makeRepository();
-    await repository.get();
-    await writeFile(
-      `${repository.filePath}.lock`,
-      JSON.stringify({ pid: 999999, createdAt: Date.now() }),
-      "utf8",
+    const initial = await repository.get();
+    const callbackResults: unknown[] = [];
+    const originalTransaction = SqliteAdapter.prototype.transaction;
+    vi.spyOn(SqliteAdapter.prototype, "transaction").mockImplementation(
+      function (
+        this: SqliteAdapter,
+        work: () => unknown,
+        mode?: Parameters<SqliteAdapter["transaction"]>[1],
+      ) {
+        return originalTransaction.call(
+          this,
+          () => {
+            const result = work();
+            callbackResults.push(result);
+            return result;
+          },
+          mode,
+        );
+      },
     );
 
     const updated = await repository.apply({
       type: "node.update",
       id: "budget",
-      patch: { label: "Recovered" },
+      patch: { label: "Synchronous commit" },
     });
 
-    expect(updated.revision).toBe(1);
-    expect(updated.nodes.find((node) => node.id === "budget")?.label).toBe(
-      "Recovered",
+    expect(updated.revision).toBe(initial.revision + 1);
+    expect(callbackResults).toContainEqual({ committed: true });
+    expect(callbackResults.every((result) => !(result instanceof Promise))).toBe(
+      true,
     );
   });
 
-  it("does not reap an old lock held by the current process", async () => {
-    const repository = await makeRepository();
-    await repository.get();
-    const lockPath = `${repository.filePath}.lock`;
-    const old = new Date(Date.now() - 20_000);
-    await writeFile(
-      lockPath,
-      JSON.stringify({ pid: process.pid, createdAt: old.getTime() }),
-      "utf8",
-    );
-    await utimes(lockPath, old, old);
+  it("imports a legacy JSON graph once and leaves SQLite authoritative", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-chat-graph-"));
+    temporaryDirectories.push(directory);
+    const filePath = join(directory, "graph.json");
+    const legacy = {
+      current: {
+        ...sampleReducerGraph,
+        revision: 7,
+        nodes: sampleReducerGraph.nodes.map((node) =>
+          node.id === "budget" ? { ...node, label: "Legacy budget" } : node,
+        ),
+      },
+      history: [sampleReducerGraph],
+    };
+    const raw = `${JSON.stringify(legacy, null, 2)}\n`;
+    await writeFile(filePath, raw, "utf8");
 
-    await expect(
-      repository.apply({
-        type: "node.update",
-        id: "budget",
-        patch: { label: "Should not apply" },
-      }),
-    ).rejects.toThrow(
-      `Could not acquire the graph store lock at "${lockPath}" within`,
+    const repository = new FileGraphRepository(filePath);
+    const imported = await repository.get();
+
+    expect(imported.revision).toBe(7);
+    expect(imported.nodes.find((node) => node.id === "budget")?.label).toBe(
+      "Legacy budget",
     );
+    expect(await readFile(filePath, "utf8")).toBe(raw);
+
+    const adapter = new SqliteAdapter({ path: repository.databasePath });
+    const stored = adapter.kv.get<{ current: { revision: number } }>(
+      GRAPH_RECORD_KEY,
+    );
+    adapter.close();
+    expect(stored?.current.revision).toBe(7);
+
+    await writeFile(filePath, "not-json", "utf8");
+    const sqliteCopy = await new FileGraphRepository(filePath).get();
+    expect(sqliteCopy.revision).toBe(7);
   });
 
-  it("reaps an unparseable lock after the hard stale age", async () => {
-    const repository = await makeRepository();
-    await repository.get();
-    const lockPath = `${repository.filePath}.lock`;
-    const old = new Date(Date.now() - 61_000);
-    await writeFile(lockPath, "not-json", "utf8");
-    await utimes(lockPath, old, old);
-
-    const updated = await repository.apply({
-      type: "node.update",
-      id: "budget",
-      patch: { label: "Recovered" },
-    });
-
-    expect(updated.revision).toBe(1);
-    expect(updated.nodes.find((node) => node.id === "budget")?.label).toBe(
-      "Recovered",
-    );
-  });
-
-  it("reports a corrupt store with its file path", async () => {
+  it("reports a malformed legacy JSON graph with its file path", async () => {
     const repository = await makeRepository();
     await writeFile(
       repository.filePath,
@@ -150,6 +235,25 @@ describe("FileGraphRepository", () => {
 
     await expect(repository.get()).rejects.toThrow(
       new RegExp(`Graph store is corrupt at .*${repository.filePath}`),
+    );
+  });
+
+  it("reports a malformed SQLite graph record with its database path", async () => {
+    const repository = await makeRepository();
+    const adapter = new SqliteAdapter({ path: repository.databasePath });
+    adapter.kv.set(GRAPH_RECORD_KEY, {
+      current: {
+        id: "broken",
+        revision: 0,
+        nodes: "not-an-array",
+        edges: [],
+      },
+      history: [],
+    });
+    adapter.close();
+
+    await expect(repository.get()).rejects.toThrow(
+      new RegExp(`Graph store is corrupt at .*${repository.databasePath}`),
     );
   });
 

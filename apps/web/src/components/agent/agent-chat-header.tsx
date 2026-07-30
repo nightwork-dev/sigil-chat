@@ -6,12 +6,11 @@ import {
   RotateCcwIcon,
 } from "lucide-react"
 
-import { useAttention } from "@zigil/agent-react/attention"
-import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
+import { useAttention, useAgentThreadControls } from "@zigil/agent/react"
 import {
   isAgentSessionBusy,
   type AgentRuntimeSession,
-} from "@zigil/agent-surface/contracts"
+} from "@zigil/agent/contracts"
 import { Button } from "@workspace/ui/components/button"
 import {
   Popover,

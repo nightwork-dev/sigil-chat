@@ -4,7 +4,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import type { AgentToolCallPart } from "@zigil/agent-surface/contracts"
+import type { AgentToolCallPart } from "@zigil/agent/contracts"
 
 import { SynthesizedSpeechRenderer } from "./speech-artifact-player"
 

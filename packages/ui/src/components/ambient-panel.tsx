@@ -19,7 +19,7 @@
 
 import { type ReactNode } from "react";
 
-import { useAgentRuntimeSessionOptional } from "@zigil/agent-react/session";
+import { useAgentRuntimeSessionOptional } from "@zigil/agent/react";
 
 import { cn } from "@workspace/ui/lib/utils";
 

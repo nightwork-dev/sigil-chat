@@ -3,17 +3,17 @@ import type { ComponentType, ReactNode } from "react"
 import type {
   AgentToolCallPart,
   AgentToolInputResponse,
-} from "@zigil/agent-surface/contracts"
+} from "@zigil/agent/contracts"
 
 /**
  * Custom UI for agent tool calls / outputs — a small registry keyed by tool
  * `name` (or `kind`), with a default renderer as fallback. Register app-specific
  * renderers at init; the message-part dispatch renders through {@link ToolCallSlot}.
  *
- * Self-contained by design: it depends only on the `@zigil/agent-surface`
+ * Self-contained by design: it depends only on the `@zigil/agent`
  * contract. Lives in `@workspace/ui` alongside `agent-hud` — the design-system's
  * agent-UI tier. (A non-UI consumer would warrant moving this into
- * `@zigil/agent-react`; none exists yet, so the package split is deferred.)
+ * `@zigil/agent/react`; none exists yet, so the package split is deferred.)
  * Phase 2 hook: a renderer may inspect
  * `part.output`, and a future `block-spec` output kind can delegate to the block
  * runtime — additive, no rewrite.

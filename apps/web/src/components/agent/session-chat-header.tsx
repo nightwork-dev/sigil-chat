@@ -22,8 +22,8 @@
 //   directly via `useActiveThreadContainers()`, so this header no longer
 //   needs the container-resolution it used to duplicate)
 
-import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
-import { isAgentSessionBusy } from "@zigil/agent-surface/contracts"
+import { useAgentThreadControls } from "@zigil/agent/react"
+import { isAgentSessionBusy } from "@zigil/agent/contracts"
 
 import { AgentSessionSwitcher } from "@/components/agent/agent-chat-header"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"

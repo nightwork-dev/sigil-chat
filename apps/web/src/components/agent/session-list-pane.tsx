@@ -9,8 +9,8 @@
 // Sheet (`AgentSessionSwitcher` in agent-chat-header.tsx) stays as the
 // 375px form; this pane does not replace it, it adds the desktop one.
 
-import { isAgentSessionBusy } from "@zigil/agent-surface/contracts"
-import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
+import { isAgentSessionBusy } from "@zigil/agent/contracts"
+import { useAgentThreadControls } from "@zigil/agent/react"
 
 import { ProjectWorkspaceNav } from "@/components/agent/project-workspace-nav"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"

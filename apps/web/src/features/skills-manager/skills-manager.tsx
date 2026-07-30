@@ -9,8 +9,8 @@ import {
 import {
   type AttentionContext,
   type AttentionSelection,
-} from "@zigil/agent-react/attention";
-import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry";
+} from "@zigil/agent/react";
+import { useAttentionTelemetry } from "@zigil/agent/react";
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";

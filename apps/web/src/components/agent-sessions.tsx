@@ -12,22 +12,22 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { AgentRuntimeSessionProvider } from "@zigil/agent-react/session"
-import { AgentThreadControlsProvider } from "@zigil/agent-react/thread-controls"
+import {
+  AgentRuntimeSessionProvider,
+  AgentThreadControlsProvider,
+  addContextAttachment,
+  removeTurnContextAttachment,
+  setContextDraftScope,
+} from "@zigil/agent/react"
 import {
   useEveRuntimeSession,
   type UseEveRuntimeSessionOptions,
-} from "@zigil/agent-eve"
+} from "@zigil/agent/react/eve"
 import type {
   AgentRuntimeSession,
   AgentSendInput,
   AgentThreadControls,
-} from "@zigil/agent-surface/contracts"
-import {
-  addContextAttachment,
-  removeTurnContextAttachment,
-  setContextDraftScope,
-} from "@zigil/agent-react/context-draft"
+} from "@zigil/agent/contracts"
 import {
   Alert,
   AlertDescription,

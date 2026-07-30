@@ -1,8 +1,3 @@
-import {
-  JsonFileStore,
-  resolveWorkspaceDataPath,
-} from "@workspace/file-store-core";
-
 import { MirkWorkItemsRepository } from "./mirk-repository.js";
 import {
   addRequestEvidence,
@@ -14,7 +9,6 @@ import {
   filterRequests,
   filterStories,
   normalizeWorkItemsDocument,
-  parseWorkItemsDocument,
   proposeFeatureRequest,
   recordSponsorshipDecision,
   sortStories,
@@ -273,187 +267,6 @@ export class MemoryWorkItemsRepository implements WorkItemsRepository {
   }
 }
 
-export class FileWorkItemsRepository implements WorkItemsRepository {
-  private readonly store: JsonFileStore<WorkItemsDocument>;
-
-  constructor(
-    readonly filePath = resolveWorkItemsStorePath(),
-    private readonly now: () => string = () => new Date().toISOString(),
-  ) {
-    this.store = new JsonFileStore({
-      filePath,
-      lockLabel: "work-items",
-      createInitial: createWorkItemsDocument,
-      parse: parseWorkItemsDocument,
-      corruptError: (path) =>
-        new Error(
-          `Work-items store is corrupt at "${path}". Expected a work-items document with valid stories, comments, reviews, and history arrays.`,
-        ),
-    });
-  }
-
-  async get(expectedRevision?: number): Promise<WorkItemsDocument> {
-    const document = await this.store.read();
-    assertRevision(document, expectedRevision);
-    return structuredClone(document);
-  }
-
-  async list(filter?: StoryFilter): Promise<Story[]> {
-    const document = await this.store.read();
-    return filterStories(sortStories(document.stories), filter).map((story) =>
-      structuredClone(story),
-    );
-  }
-
-  async listBoardViews(filter?: BoardViewFilter): Promise<BoardView[]> {
-    const document = await this.store.read();
-    return filterBoardViews(document.boardViews, filter).map((view) =>
-      structuredClone(view),
-    );
-  }
-
-  async upsertStory(
-    story: Story,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      upsertStory(document, story, expectedRevision),
-    );
-  }
-
-  async upsertBoardView(
-    view: BoardView,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      upsertBoardView(document, view, expectedRevision),
-    );
-  }
-
-  async transitionStory(
-    id: string,
-    status: StoryStatus,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      transitionStory(document, id, status, this.now, expectedRevision),
-    );
-  }
-
-  async assignReview(
-    id: string,
-    assignment: ReviewAssignment,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      assignReview(document, id, assignment, this.now, expectedRevision),
-    );
-  }
-
-  async decideReview(
-    reviewId: string,
-    decision: ReviewDecision,
-    decidedBy: string,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      decideReview(
-        document,
-        reviewId,
-        decision,
-        decidedBy,
-        this.now,
-        expectedRevision,
-      ),
-    );
-  }
-
-  async addComment(
-    comment: StoryComment,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      addComment(document, comment, expectedRevision),
-    );
-  }
-
-  async proposeFeatureRequest(
-    input: FeatureRequestProposalInput,
-    context: FeatureRequestProposalContext,
-    expectedRevision?: number,
-  ): Promise<FeatureRequestProposalResult> {
-    return this.store.withWriteLock(async () => {
-      const result = proposeFeatureRequest(
-        await this.store.read(),
-        input,
-        context,
-        expectedRevision,
-      );
-      if (result.changedIds.length > 0) await this.store.write(result.document);
-      return structuredClone(result);
-    });
-  }
-
-  async recordSponsorshipDecision(
-    decision: WorkSponsorshipDecision,
-    expectedRevision?: number,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      recordSponsorshipDecision(document, decision, expectedRevision),
-    );
-  }
-
-  async listSponsorshipDecisions(
-    filter?: WorkSponsorshipDecisionFilter,
-  ): Promise<WorkSponsorshipDecision[]> {
-    const document = await this.store.read();
-    return filterSponsorshipDecisions(document.sponsorshipDecisions, filter);
-  }
-
-  async searchRequests(filter?: RequestFilter): Promise<RequestSearchResult> {
-    const document = await this.store.read();
-    return {
-      revision: document.revision,
-      requests: filterRequests(document.stories, filter),
-    };
-  }
-
-  async inspectRequest(id: string): Promise<RequestInspectResult> {
-    const document = await this.store.read();
-    const request = filterRequests(document.stories).find(
-      (candidate) => candidate.id === id,
-    );
-    if (!request) throw new Error(`Unknown request id: ${id}.`);
-    return {
-      revision: document.revision,
-      request,
-      sponsorshipDecisions: filterSponsorshipDecisions(
-        document.sponsorshipDecisions,
-        { workItemId: id },
-      ),
-    };
-  }
-
-  async addRequestEvidence(
-    input: AddRequestEvidenceInput,
-    context: FeatureRequestProposalContext,
-  ): Promise<WorkItemsMutationResult> {
-    return this.mutate((document) =>
-      addRequestEvidence(document, input, context),
-    );
-  }
-
-  private async mutate(
-    operation: (document: WorkItemsDocument) => WorkItemsMutationResult,
-  ): Promise<WorkItemsMutationResult> {
-    return this.store.withWriteLock(async () => {
-      const result = operation(await this.store.read());
-      if (result.changedIds.length > 0) await this.store.write(result.document);
-      return structuredClone(result);
-    });
-  }
-}
-
 export { MarkdownWorkItemsRepository } from "./markdown-repository.js";
 export { MirkWorkItemsRepository } from "./mirk-repository.js";
 
@@ -465,16 +278,6 @@ export { MirkWorkItemsRepository } from "./mirk-repository.js";
  */
 export const workItemsRepository: WorkItemsRepository =
   new MirkWorkItemsRepository();
-
-export function resolveWorkItemsStorePath(
-  startDirectory = process.cwd(),
-): string {
-  return resolveWorkspaceDataPath({
-    relativePath: ".data/work-items.json",
-    rootPackageName: "sigil-chat",
-    startDirectory,
-  });
-}
 
 function filterSponsorshipDecisions(
   decisions: WorkSponsorshipDecision[],

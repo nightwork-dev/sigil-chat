@@ -8,6 +8,7 @@ const packageJson = JSON.parse(
 const compatibilityTrain = JSON.parse(
   await readFile(join(root, "compatibility-train.json"), "utf8"),
 );
+const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
 const exactDependencies = compatibilityTrain.verifiedPublicBoundary;
 
 for (const [name, version] of Object.entries(exactDependencies)) {
@@ -38,6 +39,16 @@ const fixtureSources = [
   ...(await sourceTexts(join(root, "gonk"))),
   ...(await sourceTexts(join(root, "scripts"))),
 ];
+
+if (
+  [lockfile, ...fixtureSources].some((text) =>
+    text.includes("@zigil/" + "agent-gonk"),
+  )
+) {
+  throw new Error(
+    "Fixture must use the current Gonk contracts without agent-gonk",
+  );
+}
 
 for (const text of fixtureSources) {
   if (

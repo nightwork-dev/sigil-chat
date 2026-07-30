@@ -23,9 +23,6 @@ importers:
       '@gonk/tool-registry-mcp':
         specifier: 0.3.1
         version: 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
-      '@zigil/agent-gonk':
-        specifier: 0.1.0
-        version: 0.1.0(@gonk/scope@0.3.1)(zod@4.4.3)
       eve:
         specifier: 0.25.2
         version: 0.25.2(ai@7.0.31(zod@4.4.3))
@@ -388,9 +385,6 @@ packages:
 
   '@workflow/serde@4.1.0':
     resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
-
-  '@zigil/agent-gonk@0.1.0':
-    resolution: {integrity: sha512-9CFZMcjlut+ciMuP4jQB6sG9OOKmxy+mi3qI/V+AnLVGXVV/B/bXyr/b1sgrYdIAPC5C3GPZMCXdzX6wHPxNPA==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -1275,17 +1269,6 @@ snapshots:
   '@vercel/oidc@3.2.0': {}
 
   '@workflow/serde@4.1.0': {}
-
-  '@zigil/agent-gonk@0.1.0(@gonk/scope@0.3.1)(zod@4.4.3)':
-    dependencies:
-      '@gonk/auth': 0.3.1
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
-      '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - '@gonk/scope'
-      - supports-color
-      - zod
 
   accepts@2.0.0:
     dependencies:

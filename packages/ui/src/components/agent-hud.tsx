@@ -4,24 +4,22 @@ import {
   attentionSelectionKey,
   createAttentionContextPreview,
   removeTurnContextAttachment,
-  setAttentionItemExcluded,
-  useAttentionExclusions,
-  useTurnContextAttachments,
-} from "@zigil/agent-react/context-draft";
-import {
   setAttentionPrivacyLevel,
+  setAttentionItemExcluded,
+  useAgentRuntimeSession,
+  useAttention,
+  useAttentionExclusions,
   useAttentionPrivacyLevel,
+  useTurnContextAttachments,
   type AttentionPrivacyLevel,
-} from "@zigil/agent-react/context-privacy";
-import { useAgentRuntimeSession } from "@zigil/agent-react/session";
-import { useAttention } from "@zigil/agent-react/attention";
+} from "@zigil/agent/react";
 import {
   isAgentSessionBusy,
   type AgentApprovalPresentation,
   type AgentForkIntent,
   type AgentRuntimeSession,
   type AgentThreadControls,
-} from "@zigil/agent-surface/contracts";
+} from "@zigil/agent/contracts";
 import { MessageParts } from "@workspace/ui/components/part-projection";
 import { Button } from "@workspace/ui/components/button";
 import {

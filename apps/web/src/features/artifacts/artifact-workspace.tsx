@@ -11,12 +11,12 @@ import {
   LibraryBigIcon,
   SparklesIcon,
 } from "lucide-react"
-import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
-import type {
-  AttentionContext,
-  AttentionSelection,
-} from "@zigil/agent-react/attention"
-import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+import {
+  useAgentThreadControls,
+  useAttentionTelemetry,
+  type AttentionContext,
+  type AttentionSelection,
+} from "@zigil/agent/react"
 
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"

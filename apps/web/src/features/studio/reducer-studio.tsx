@@ -41,7 +41,7 @@ import {
   useReducerGraphRun,
   useReducerGraphUndo,
 } from "@/features/studio/reducer-data"
-import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+import { useAttentionTelemetry } from "@zigil/agent/react"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
@@ -54,7 +54,7 @@ import {
 import {
   type AttentionContext,
   type AttentionSelection,
-} from "@zigil/agent-react/attention"
+} from "@zigil/agent/react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Combobox,

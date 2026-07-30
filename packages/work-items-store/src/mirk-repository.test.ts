@@ -16,6 +16,7 @@ import {
   MirkWorkItemsRepository,
   restoreStoryMarkdownNarrative,
 } from "./mirk-repository.js";
+import { createWorkItemsDocument } from "./sample.js";
 
 const temporaryDirectories: string[] = [];
 const NOW = "2026-07-18T20:00:00.000Z";
@@ -33,6 +34,14 @@ function gitLog(directory: string): string[] {
     .trim()
     .split("\n")
     .filter((line) => line.length > 0);
+}
+
+async function seedStory(id: string) {
+  const story = createWorkItemsDocument().stories.find(
+    (candidate) => candidate.id === id,
+  );
+  if (!story) throw new Error(`Missing seed story ${id}.`);
+  return structuredClone(story);
 }
 
 afterEach(async () => {
@@ -164,6 +173,125 @@ describe("MirkWorkItemsRepository", () => {
       "story S0.3: ready→in-progress",
       "roadmap: seed initial stories",
     ]);
+  });
+
+  it("shares story changes and rejects a stale writer across instances", async () => {
+    const directory = await makeDirectory();
+    const human = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    });
+    const agent = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    });
+
+    const initial = await human.get();
+    const story = await seedStory("S0.3");
+    story.status = "in-progress";
+    const humanEdit = await human.upsertStory(story, initial.revision);
+    expect(humanEdit.changedIds).toEqual(["S0.3"]);
+
+    expect(
+      (await agent.get()).stories.find(({ id }) => id === "S0.3"),
+    ).toMatchObject({ status: "in-progress" });
+
+    await expect(
+      agent.transitionStory("S0.3", "verify", initial.revision),
+    ).rejects.toThrow(
+      `Work-items revision conflict: expected ${initial.revision}, current ${initial.revision + 1}.`,
+    );
+    expect((await human.get()).revision).toBe(initial.revision + 1);
+  });
+
+  it("persists review decisions, comments, and git history across reloads", async () => {
+    const directory = await makeDirectory();
+    const repository = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+    });
+
+    let document = await repository.get();
+    document = (
+      await repository.assignReview(
+        "S1.0",
+        { assignee: "Owner", gate: "decision:owner" },
+        document.revision,
+      )
+    ).document;
+    // Two reviews are pre-seeded, so the review assigned above is
+    // review-S1.0-3 (document.reviews.length + 1 at assignment time).
+    document = (
+      await repository.decideReview(
+        "review-S1.0-3",
+        "changes-requested",
+        "Owner",
+        document.revision,
+      )
+    ).document;
+    document = (
+      await repository.addComment(
+        {
+          id: "comment-shape-decision",
+          storyId: "S1.0",
+          kind: "concern",
+          author: "Owner",
+          body: "The dedicated workspace decision needs one more pass.",
+          createdAt: "2026-07-18T20:01:00.000Z",
+        },
+        document.revision,
+      )
+    ).document;
+
+    const reloaded = await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+    }).get();
+    expect(reloaded.revision).toBe(document.revision);
+    expect(
+      reloaded.reviews.find(({ id }) => id === "review-S1.0-3"),
+    ).toMatchObject({
+      decision: "changes-requested",
+      unread: false,
+      completed: true,
+    });
+    expect(reloaded.stories.find(({ id }) => id === "S1.0")).toMatchObject({
+      reviewDecision: "changes-requested",
+      decidedBy: "Owner",
+    });
+    expect(reloaded.comments).toHaveLength(1);
+    expect(gitLog(directory).slice(0, 3)).toEqual([
+      "story S1.0: comment comment-shape-decision",
+      "review review-S1.0-3: changes-requested",
+      "story S1.0: assign decision:owner review",
+    ]);
+  });
+
+  it("does not apply a stale mutation", async () => {
+    const directory = await makeDirectory();
+    const repository = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    });
+    const initial = await repository.get();
+
+    await repository.transitionStory("S0.3", "in-progress", initial.revision);
+
+    await expect(
+      repository.assignReview(
+        "S0.3",
+        { assignee: "Owner", gate: "peer" },
+        initial.revision,
+      ),
+    ).rejects.toThrow(
+      `Work-items revision conflict: expected ${initial.revision}, current ${initial.revision + 1}.`,
+    );
+    // The rejected assignReview must not have appended a third review on top
+    // of the two pre-seeded reviews.
+    expect((await repository.get()).reviews).toHaveLength(2);
   });
 
   it("round-trips the canonical markdown format byte-for-byte", async () => {

@@ -1,8 +1,7 @@
-import {
-  isRecord,
-  JsonFileStore,
-  resolveWorkspaceDataPath,
-} from "@workspace/file-store-core";
+import { SqliteAdapter } from "@mirk/store/sqlite";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { dirname, extname, join, resolve } from "node:path";
 import { readStorageEnvironment } from "@workspace/runtime-env/server";
 
 import { createDraftArticleReviewDocument } from "./sample.js";
@@ -148,38 +147,34 @@ export class MemoryReviewRepository implements ReviewRepository {
   }
 }
 
+export const REVIEW_RECORD_KEY = "review-store/document";
+
 export class FileReviewRepository implements ReviewRepository {
-  private readonly store: JsonFileStore<ReviewDocument>;
+  readonly filePath: string;
+  readonly databasePath: string;
+  private store: Promise<SqliteAdapter> | undefined;
 
   constructor(
-    readonly filePath = resolveReviewStorePath(),
+    storePath = resolveReviewStorePath(),
     private readonly now: () => string = () => new Date().toISOString(),
   ) {
-    this.store = new JsonFileStore({
-      filePath,
-      lockLabel: "review",
-      createInitial: createDraftArticleReviewDocument,
-      parse: parseReviewDocument,
-      corruptError: (path) =>
-        new Error(
-          `Review store is corrupt at "${path}". Expected a review document with valid outline, passages, decisions, annotations, acceptance, and history arrays.`,
-        ),
-    });
+    this.filePath = resolveReviewLegacyPath(storePath);
+    this.databasePath = resolveReviewDatabasePath(storePath);
   }
 
   async get(): Promise<ReviewDocument> {
-    return this.read();
+    const adapter = await this.getStore();
+    return structuredClone(readStoredDocument(adapter, this.databasePath));
   }
 
   async updatePassages(
     edits: ReviewPassageEdit[],
     expectedRevision?: number,
   ): Promise<ReviewUpdateResult> {
-    return this.withWriteLock(async () => {
-      const document = await this.read();
+    return this.transaction((adapter, document) => {
       const result = applyPassageEdits(document, edits, expectedRevision);
-      if (result.applied) await this.write(result.document);
-      return structuredClone(result);
+      if (result.applied) adapter.kv.set(REVIEW_RECORD_KEY, result.document);
+      return result;
     });
   }
 
@@ -187,8 +182,7 @@ export class FileReviewRepository implements ReviewRepository {
     annotations: Parameters<ReviewRepository["addAnnotations"]>[0],
     expectedRevision?: number,
   ): Promise<{ document: ReviewDocument; annotations: ReviewAnnotation[] }> {
-    return this.withWriteLock(async () => {
-      const document = await this.read();
+    return this.transaction((adapter, document) => {
       assertRevision(document, expectedRevision);
       let sequence = document.annotations.length + 1;
       const result = addAnnotations(
@@ -197,8 +191,8 @@ export class FileReviewRepository implements ReviewRepository {
         this.now,
         () => `agent-annotation-${sequence++}`,
       );
-      await this.write(result.document);
-      return structuredClone(result);
+      adapter.kv.set(REVIEW_RECORD_KEY, result.document);
+      return result;
     });
   }
 
@@ -248,27 +242,152 @@ export class FileReviewRepository implements ReviewRepository {
     );
   }
 
-  private async read(): Promise<ReviewDocument> {
-    return this.store.read();
-  }
-
-  private async write(document: ReviewDocument): Promise<void> {
-    await this.store.write(document);
-  }
-
   private async mutate(
     operation: (document: ReviewDocument) => ReviewMutationResult,
   ): Promise<ReviewMutationResult> {
-    return this.withWriteLock(async () => {
-      const result = operation(await this.read());
-      await this.write(result.document);
-      return structuredClone(result);
+    return this.transaction((adapter, document) => {
+      const result = operation(document);
+      adapter.kv.set(REVIEW_RECORD_KEY, result.document);
+      return result;
     });
   }
 
-  private async withWriteLock<T>(operation: () => Promise<T>): Promise<T> {
-    return this.store.withWriteLock(operation);
+  private async transaction<TResult>(
+    operation: (adapter: SqliteAdapter, document: ReviewDocument) => TResult,
+  ): Promise<TResult> {
+    const adapter = await this.getStore();
+    return structuredClone(
+      adapter.transaction(
+        () =>
+          operation(
+            adapter,
+            readStoredDocumentInTransaction(adapter, this.databasePath),
+          ),
+        "immediate",
+      ),
+    );
   }
+
+  private getStore(): Promise<SqliteAdapter> {
+    return (this.store ??= openReviewStore(this.databasePath, this.filePath));
+  }
+}
+
+async function openReviewStore(
+  databasePath: string,
+  legacyPath: string,
+): Promise<SqliteAdapter> {
+  await mkdir(dirname(databasePath), { recursive: true });
+  const adapter = new SqliteAdapter({ path: databasePath });
+  try {
+    if (!adapter.kv.has(REVIEW_RECORD_KEY)) {
+      const legacy = readLegacyReviewDocument(legacyPath);
+      if (legacy !== undefined) {
+        adapter.transaction(() => {
+          if (!adapter.kv.has(REVIEW_RECORD_KEY)) {
+            adapter.kv.set(REVIEW_RECORD_KEY, legacy);
+          }
+        }, "immediate");
+      }
+    }
+    return adapter;
+  } catch (error) {
+    adapter.close();
+    throw error;
+  }
+}
+
+function readLegacyReviewDocument(
+  legacyPath: string,
+): ReviewDocument | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(legacyPath, "utf8");
+  } catch (error) {
+    if (isMissingFile(error)) return undefined;
+    throw error;
+  }
+
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw reviewStoreCorruptError(legacyPath);
+  }
+  const document = parseReviewDocument(value);
+  if (document === undefined) throw reviewStoreCorruptError(legacyPath);
+  return document;
+}
+
+function readStoredDocument(
+  adapter: SqliteAdapter,
+  corruptionPath: string,
+): ReviewDocument {
+  const stored = readStoredValue(adapter, corruptionPath);
+  if (stored !== null) return parseStoredDocument(stored, corruptionPath);
+
+  const initial = createDraftArticleReviewDocument();
+  return adapter.transaction(() => {
+    const current = readStoredValue(adapter, corruptionPath);
+    if (current === null) {
+      adapter.kv.set(REVIEW_RECORD_KEY, initial);
+      return initial;
+    }
+    return parseStoredDocument(current, corruptionPath);
+  }, "immediate");
+}
+
+function readStoredDocumentInTransaction(
+  adapter: SqliteAdapter,
+  corruptionPath: string,
+): ReviewDocument {
+  const stored = readStoredValue(adapter, corruptionPath);
+  if (stored === null) {
+    const initial = createDraftArticleReviewDocument();
+    adapter.kv.set(REVIEW_RECORD_KEY, initial);
+    return initial;
+  }
+  return parseStoredDocument(stored, corruptionPath);
+}
+
+function readStoredValue(
+  adapter: SqliteAdapter,
+  corruptionPath: string,
+): unknown | null {
+  try {
+    return adapter.kv.get<unknown>(REVIEW_RECORD_KEY);
+  } catch {
+    throw reviewStoreCorruptError(corruptionPath);
+  }
+}
+
+function parseStoredDocument(
+  value: unknown,
+  corruptionPath: string,
+): ReviewDocument {
+  const document = parseReviewDocument(value);
+  if (document === undefined) throw reviewStoreCorruptError(corruptionPath);
+  return document;
+}
+
+function reviewStoreCorruptError(path: string): Error {
+  return new Error(
+    `Review store is corrupt at "${path}". Expected a review document with valid outline, passages, decisions, annotations, acceptance, and history arrays.`,
+  );
+}
+
+function resolveReviewLegacyPath(storePath: string): string {
+  return extname(storePath) === ".json"
+    ? storePath
+    : join(storePath, "review-document.json");
+}
+
+export function resolveReviewDatabasePath(
+  storePath = resolveReviewStorePath(),
+): string {
+  const directory =
+    extname(storePath) === ".json" ? dirname(storePath) : storePath;
+  return join(directory, "review.sqlite3");
 }
 
 export const reviewRepository = new FileReviewRepository();
@@ -592,6 +711,36 @@ export function resolveReviewStorePath(startDirectory = process.cwd()): string {
   });
 }
 
+function resolveWorkspaceDataPath(input: {
+  envPath?: string;
+  relativePath: string;
+  rootPackageName: string;
+  startDirectory?: string;
+}): string {
+  if (input.envPath) return resolve(input.envPath);
+  const startDirectory = input.startDirectory ?? process.cwd();
+  let directory = resolve(startDirectory);
+  while (true) {
+    const packagePath = join(directory, "package.json");
+    if (existsSync(packagePath)) {
+      try {
+        const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as {
+          name?: string;
+        };
+        if (packageJson.name === input.rootPackageName) {
+          return join(directory, input.relativePath);
+        }
+      } catch {
+        // Keep walking; an unrelated malformed package file is not the root.
+      }
+    }
+    const parent = dirname(directory);
+    if (parent === directory)
+      return join(resolve(startDirectory), input.relativePath);
+    directory = parent;
+  }
+}
+
 function parseReviewDocument(value: unknown): ReviewDocument | undefined {
   if (!isReviewDocumentShape(value, true)) return undefined;
   const normalized = normalizeReviewDocument(value as ReviewDocument);
@@ -630,6 +779,14 @@ function isReviewDocumentShape(value: unknown, allowLegacy: boolean): boolean {
     acceptanceValid &&
     historyValid
   );
+}
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function isReviewOutlineItem(value: unknown): boolean {

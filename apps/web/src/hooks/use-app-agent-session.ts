@@ -1,18 +1,18 @@
 import { useCallback, useMemo } from "react"
 
-import { useAgentRuntimeSession } from "@zigil/agent-react/session"
-import type { AgentRuntimeSession } from "@zigil/agent-surface/contracts"
-import { useAttention } from "@zigil/agent-react/attention"
 import {
   clearAttentionExclusions,
   clearContextDraft,
   clearTurnContextAttachments,
   getAttentionExclusions,
+  getAttentionPrivacyLevel,
   getContextDraftScope,
   getTurnContextAttachments,
   serializeAttentionDraft,
-} from "@zigil/agent-react/context-draft"
-import { getAttentionPrivacyLevel } from "@zigil/agent-react/context-privacy"
+  useAgentRuntimeSession,
+  useAttention,
+} from "@zigil/agent/react"
+import type { AgentRuntimeSession } from "@zigil/agent/contracts"
 
 import {
   getToolApprovalHeaderValue,

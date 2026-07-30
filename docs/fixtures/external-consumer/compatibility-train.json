@@ -5,14 +5,12 @@
     "@gonk/context": "0.3.1",
     "@gonk/scope": "0.3.1",
     "@gonk/tool-registry": "0.3.1",
-    "@gonk/tool-registry-mcp": "0.3.1",
-    "@zigil/agent-gonk": "0.1.0"
+    "@gonk/tool-registry-mcp": "0.3.1"
   },
   "applicationTrain": {
     "eveHost": "0.25.2",
     "webEveCompatibilityDependency": "0.24.4",
     "@zigil/agent-eve": "0.1.5",
-    "@zigil/agent-gonk": "0.1.0",
     "@zigil/agent-react": "0.1.1",
     "@zigil/agent-react-query": "0.1.1",
     "@zigil/agent-surface": "0.1.1",

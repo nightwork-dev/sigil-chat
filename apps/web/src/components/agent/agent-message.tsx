@@ -5,7 +5,7 @@ import type {
   AgentMessage,
   AgentMessagePart,
   AgentToolInputResponse,
-} from "@zigil/agent-surface/contracts"
+} from "@zigil/agent/contracts"
 import { ChatImage } from "@workspace/chat/components/chat-image"
 import { ChatMessage } from "@workspace/chat/components/chat-message"
 import { Card } from "@workspace/ui/components/card"

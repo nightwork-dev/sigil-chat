@@ -9,9 +9,11 @@ import { AlertTriangleIcon, WrenchIcon } from "lucide-react"
 import {
   isAgentSessionBusy,
   type AgentRuntimeSession,
-} from "@zigil/agent-surface/contracts"
-import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
-import { getContextDraftScope } from "@zigil/agent-react/context-draft"
+} from "@zigil/agent/contracts"
+import {
+  getContextDraftScope,
+  useAgentThreadControls,
+} from "@zigil/agent/react"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 import { ChatList } from "@workspace/chat/components/chat-list"
 import {

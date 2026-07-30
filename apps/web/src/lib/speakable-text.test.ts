@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import type { AgentMessagePart } from "@zigil/agent-surface"
+import type { AgentMessagePart } from "@zigil/agent"
 
 import {
   NON_SPEAKABLE_PARTS,
@@ -35,7 +35,7 @@ describe("speakableText", () => {
     expect(speakableText([{ type: "text", text: "   " }])).toBeUndefined()
   })
 
-  // Fails closed: the part union lives in @zigil/agent-surface and will gain
+  // Fails closed: the part union lives in @zigil/agent and will gain
   // members without us. An unknown part must be silence, not a leak.
   it("does not speak an unrecognized future part type", () => {
     const future = { type: "telemetry", text: SECRET } as unknown as AgentMessagePart

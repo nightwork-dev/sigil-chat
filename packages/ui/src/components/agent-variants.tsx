@@ -14,7 +14,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import type { AgentRuntimeSession } from "@zigil/agent-surface";
+import type { AgentRuntimeSession } from "@zigil/agent";
 
 import { AgentHudConversation } from "@workspace/ui/components/agent-hud";
 import {

@@ -6,7 +6,7 @@
 // ALLOW-list over message parts, not a deny-list.
 //
 // The distinction is load-bearing. A deny-list silently starts leaking the day
-// a new part type is added upstream — and @zigil/agent-surface owns that union,
+// a new part type is added upstream — and @zigil/agent owns that union,
 // so it will change without us. An allow-list fails closed instead: an
 // unrecognized part is simply not spoken.
 //
@@ -17,7 +17,7 @@
 // one aloud is fine, but the grant happens elsewhere), and file parts (a URL
 // read aloud is noise at best).
 
-import type { AgentMessagePart } from "@zigil/agent-surface"
+import type { AgentMessagePart } from "@zigil/agent"
 
 /** Parts whose content is addressed to the user and safe to synthesize. */
 const SPEAKABLE_PART_TYPES = ["text"] as const

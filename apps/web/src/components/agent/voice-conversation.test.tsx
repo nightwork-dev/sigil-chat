@@ -20,7 +20,7 @@ import { act, useState } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 
-import type { AgentMessage } from "@zigil/agent-surface/contracts"
+import type { AgentMessage } from "@zigil/agent/contracts"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 
 import { speakMessageParts } from "@/lib/agent-voice"

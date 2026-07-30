@@ -1,9 +1,16 @@
-import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { FileReviewRepository } from "./repository";
+import { SqliteAdapter } from "@mirk/store/sqlite";
+
+import { createDraftArticleReviewDocument } from "./sample";
+import {
+  FileReviewRepository,
+  REVIEW_RECORD_KEY,
+  resolveReviewDatabasePath,
+} from "./repository";
 
 const temporaryDirectories: string[] = [];
 
@@ -100,10 +107,7 @@ describe("FileReviewRepository", () => {
       )
     ).document;
     document = (
-      await repository.lockDecision(
-        "decision-draft-owner",
-        document.revision,
-      )
+      await repository.lockDecision("decision-draft-owner", document.revision)
     ).document;
     document = (
       await repository.setAcceptanceCheck(
@@ -156,42 +160,122 @@ describe("FileReviewRepository", () => {
     ).toMatchObject({ checked: false });
   });
 
-  it("reaps a lock held by a dead process without waiting for the hard stale age", async () => {
+  it("serializes competing lifecycle mutations from separate SQLite adapters", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-review-store-"));
     temporaryDirectories.push(directory);
-    const repository = new FileReviewRepository(join(directory, "review.json"));
-    const initial = await repository.get();
-    await writeFile(
-      `${repository.filePath}.lock`,
-      JSON.stringify({ pid: 999999, createdAt: Date.now() }),
-      "utf8",
-    );
+    const filePath = join(directory, "review.json");
+    const human = new FileReviewRepository(filePath);
+    const agent = new FileReviewRepository(filePath);
+    const initial = await human.get();
 
-    const result = await repository.lockDecision(
-      "decision-draft-owner",
-      initial.revision,
-    );
+    const results = await Promise.allSettled([
+      human.lockDecision("decision-draft-owner", initial.revision),
+      agent.setAcceptanceCheck("check-pressure", true, initial.revision),
+    ]);
 
-    expect(result.document.revision).toBe(initial.revision + 1);
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(
+      1,
+    );
+    expect(results.filter(({ status }) => status === "rejected")).toHaveLength(
+      1,
+    );
+    const rejected = results.find(({ status }) => status === "rejected");
+    expect(
+      rejected?.status === "rejected" ? rejected.reason : undefined,
+    ).toMatchObject({
+      message: `Review revision conflict: expected ${initial.revision}, current ${initial.revision + 1}.`,
+    });
+    expect((await human.get()).revision).toBe(initial.revision + 1);
   });
 
-  it("reaps an unparseable lock after the hard stale age", async () => {
+  it("does not lose a competing SQLite mutation from another repository instance", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-review-store-"));
+    temporaryDirectories.push(directory);
+    const filePath = join(directory, "review.json");
+    const first = new FileReviewRepository(filePath);
+    const second = new FileReviewRepository(filePath);
+    const initial = await first.get();
+
+    const results = await Promise.allSettled([
+      first.updatePassages(
+        [
+          {
+            id: "draft-02",
+            body: "First concurrent edit.",
+            expectedBody: initial.passages.find(({ id }) => id === "draft-02")!
+              .body,
+          },
+        ],
+        initial.revision,
+      ),
+      second.updatePassages(
+        [
+          {
+            id: "draft-02",
+            body: "Second concurrent edit.",
+            expectedBody: initial.passages.find(({ id }) => id === "draft-02")!
+              .body,
+          },
+        ],
+        initial.revision,
+      ),
+    ]);
+
+    expect(results).toHaveLength(2);
+    expect(results.every(({ status }) => status === "fulfilled")).toBe(true);
+    const updates = results.map((result) =>
+      result.status === "fulfilled" ? result.value : undefined,
+    );
+    expect(updates.filter((result) => result?.applied)).toHaveLength(1);
+    expect(updates.filter((result) => result?.applied === false)).toHaveLength(
+      1,
+    );
+    expect((await first.get()).revision).toBe(initial.revision + 1);
+  });
+
+  it("imports a legacy JSON document into an empty SQLite database without changing the JSON", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-review-store-"));
+    temporaryDirectories.push(directory);
+    const filePath = join(directory, "review.json");
+    const source = createDraftArticleReviewDocument();
+    const { acceptance: _acceptance, history: _history, ...legacy } = source;
+    const raw = `${JSON.stringify(legacy, null, 2)}\n`;
+    await writeFile(filePath, raw, "utf8");
+
+    const emptyDatabase = new SqliteAdapter({
+      path: resolveReviewDatabasePath(filePath),
+    });
+    expect(emptyDatabase.kv.has(REVIEW_RECORD_KEY)).toBe(false);
+    emptyDatabase.close();
+
+    const repository = new FileReviewRepository(filePath);
+    const imported = await repository.get();
+
+    expect(imported.id).toBe(source.id);
+    expect(imported.acceptance.checklist).toEqual(source.acceptance.checklist);
+    expect(imported.history).toEqual(source.history);
+    expect(await readFile(filePath, "utf8")).toBe(raw);
+  });
+
+  it("rolls back a SQLite mutation that throws after writing", async () => {
     const directory = await mkdtemp(join(tmpdir(), "sigil-review-store-"));
     temporaryDirectories.push(directory);
     const repository = new FileReviewRepository(join(directory, "review.json"));
-    const initial = await repository.get();
-    const lockPath = `${repository.filePath}.lock`;
-    const old = new Date(Date.now() - 61_000);
-    await writeFile(lockPath, "not-json", "utf8");
-    await utimes(lockPath, old, old);
+    const before = await repository.get();
+    const adapter = new SqliteAdapter({ path: repository.databasePath });
 
-    const result = await repository.setAcceptanceCheck(
-      "check-pressure",
-      true,
-      initial.revision,
-    );
+    expect(() =>
+      adapter.transaction(() => {
+        adapter.kv.set(REVIEW_RECORD_KEY, {
+          ...before,
+          title: "Transient title that must not persist",
+        });
+        throw new Error("mid-transaction failure");
+      }, "immediate"),
+    ).toThrow("mid-transaction failure");
+    adapter.close();
 
-    expect(result.document.revision).toBe(initial.revision + 1);
+    expect(await repository.get()).toEqual(before);
   });
 
   it("reports a corrupt review store with its file path", async () => {

@@ -1,5 +1,11 @@
 import { createServer } from "node:http";
-import { createAgentWebMcpHandler } from "@zigil/agent-gonk";
+import {
+  type AuthContext,
+  type AuthenticatedPrincipal,
+  isAuthenticatedPrincipal,
+} from "@gonk/auth";
+import { GONK_AUTH_INFO_PRINCIPAL } from "@gonk/tool-registry-mcp";
+import { checkBearer, createWebMcpHandler } from "@gonk/tool-registry-mcp/http";
 import { createFixtureRegistry } from "./registry.js";
 
 const port = Number(process.env.PORT ?? 4317);
@@ -7,12 +13,45 @@ const apiKey = process.env.GONK_MCP_KEY;
 
 if (!apiKey) throw new Error("GONK_MCP_KEY is required");
 
-const handler = createAgentWebMcpHandler({
+const principal: AuthenticatedPrincipal = {
+  id: "service:sigil-external-consumer-fixture",
+  kind: "service",
+  identity: {
+    issuer: "sigil-external-consumer-fixture",
+    subject: "sigil-external-consumer-fixture",
+    method: "api-key",
+  },
+  roles: ["service"],
+  scopes: ["fixture:mcp"],
+};
+
+const handler = createWebMcpHandler({
   source: createFixtureRegistry(),
   serverName: "sigil-external-consumer-fixture",
   serverVersion: "0.0.0",
-  apiKey,
-  authorize: () => ({ outcome: "allow", reason: "Fixture service bearer" }),
+  authenticate: (request) => {
+    if (!checkBearer(request.headers.get("authorization") ?? undefined, apiKey))
+      return null;
+    return {
+      token: apiKey,
+      clientId: principal.id,
+      scopes: [...principal.scopes],
+      extra: { [GONK_AUTH_INFO_PRINCIPAL]: principal },
+    };
+  },
+  makeAuthContext: (extra): AuthContext => {
+    const authenticated = extra.authInfo?.extra?.[GONK_AUTH_INFO_PRINCIPAL];
+    if (!isAuthenticatedPrincipal(authenticated)) {
+      throw new Error("Gonk MCP principal is required");
+    }
+    return {
+      principal: authenticated,
+      authorize: () => ({
+        outcome: "allow",
+        reason: "Fixture service bearer",
+      }),
+    };
+  },
   enableJsonResponse: true,
   writeToolPolicy: "permissive",
 });

@@ -7,7 +7,10 @@ const token = "fixture-smoke-key";
 const port = 4317;
 type RpcResponse = {
   headers: Headers;
-  result?: { structuredContent?: { value?: unknown } };
+  result?: {
+    structuredContent?: { value?: unknown };
+    tools?: Array<{ name?: string }>;
+  };
 };
 const tsxCli = fileURLToPath(
   new URL("../node_modules/tsx/dist/cli.mjs", import.meta.url),
@@ -19,8 +22,13 @@ const child = spawn(process.execPath, [tsxCli, "gonk/server.ts"], {
 });
 
 try {
+  await expectCatalogRequiresBearer();
   const sessionId = await initialize();
-  const call = await rpc(sessionId, 2, "tools/call", {
+  await expectCatalogRequiresBearer(sessionId);
+  const list = await rpc(sessionId, 2, "tools/list", {});
+  if (!list.result?.tools?.some((tool) => tool.name === "fixture-echo"))
+    throw new Error("Authenticated MCP catalog did not include fixture-echo");
+  const call = await rpc(sessionId, 3, "tools/call", {
     name: "fixture-echo",
     arguments: { message: "clean room" },
   });
@@ -99,6 +107,44 @@ async function notify(sessionId: string, method: string, params: unknown) {
     body: JSON.stringify({ jsonrpc: "2.0", method, params }),
   });
   if (!response.ok) throw new Error(`MCP ${method} failed: ${response.status}`);
+}
+
+async function expectCatalogRequiresBearer(sessionId?: string) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+          ...(sessionId ? { "mcp-session-id": sessionId } : {}),
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 0,
+          method: sessionId ? "tools/list" : "initialize",
+          params: sessionId
+            ? {}
+            : {
+                protocolVersion: "2025-03-26",
+                capabilities: {},
+                clientInfo: { name: "external-consumer-fixture", version: "0" },
+              },
+        }),
+      });
+      if (response.status !== 401) {
+        throw new Error(
+          `MCP catalog was disclosed without bearer: ${response.status}`,
+        );
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw lastError;
 }
 
 async function rpc(
