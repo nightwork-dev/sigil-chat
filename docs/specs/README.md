@@ -98,6 +98,14 @@ Currently authoritative for this product's design/implementation.
 Targets that Sigil Chat requires but whose upstream implementation ownership is
 not yet ratified.
 
+- [`WORLD-GROUNDING-STATEMENTS-SPEC.md`](WORLD-GROUNDING-STATEMENTS-SPEC.md) —
+  a contextualized statement-and-event substrate for truth, belief,
+  contradiction, provenance, branch/time, and actor-relative retrieval. Gonk
+  owns host-neutral contracts and projections, Mirk owns persistence and
+  indexing, Sigil Chat/Eve owns authorized prompt composition, and interactive
+  consumers own their referee/world policy. Consensus plan approved;
+  implementation not started.
+
 - [`APPLICATION-STORAGE-CONSOLIDATION-SPEC.md`](APPLICATION-STORAGE-CONSOLIDATION-SPEC.md) —
   one host-configured transactional application database with logical store
   namespaces, adjacent artifact bytes, and one ordinary `SIGIL_DATA_DIR`.
