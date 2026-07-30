@@ -12,9 +12,9 @@
 
 import { useMemo } from "react"
 
-import { useAgentRuntimeSession } from "@zigil/agent-react/session"
+import { useAgentRuntimeSession } from "@zigil/agent/react"
 import { getToolOutputData } from "@workspace/ui/components/tool-renderer-registry"
-import type { AgentToolCallPart } from "@zigil/agent-surface/contracts"
+import type { AgentToolCallPart } from "@zigil/agent/contracts"
 
 /** The annotation output shape produced by the Gonk annotation tools. */
 export interface AgentAnnotation {

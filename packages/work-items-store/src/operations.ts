@@ -1,5 +1,3 @@
-import { isRecord } from "@workspace/file-store-core";
-
 import type {
   BoardQueryItem,
   BoardQueryResult,
@@ -811,6 +809,10 @@ function isPositiveInteger(value: unknown): value is number {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function hasUniqueIds(values: readonly { id: string }[]): boolean {

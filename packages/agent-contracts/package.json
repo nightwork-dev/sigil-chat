@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zigil/agent-surface": "^0.1.1"
+    "@zigil/agent": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",

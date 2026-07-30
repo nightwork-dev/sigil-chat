@@ -3,8 +3,13 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import {
+  createSqliteCoordinator,
+  type AsyncCoordinator,
+  type CoordinationGuard,
+  type CoordinationRunOptions,
+} from "@mirk/store/coordination";
 import { MarkdownStore } from "@mirk/store-markdown";
-import { JsonFileStore } from "@workspace/file-store-core";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { resolveRoadmapDir } from "./markdown-repository.js";
@@ -177,6 +182,8 @@ const SPECS_DIRECTORY = "specs";
 const STATE_DIRECTORY = ".specs";
 const LOCK_DIRECTORY = ".locks";
 const STATE_FILE = "state.md";
+const COORDINATION_FILE = "coordination.sqlite";
+const COORDINATION_KEY = "specs";
 const GIT_IDENTITY = [
   "-c",
   "user.name=Sigil Roadmap",
@@ -189,23 +196,23 @@ export class MirkSpecsRepository implements SpecsRepository {
   private readonly now: () => string;
   private readonly gitEnabled: boolean;
   private readonly store: MarkdownStore;
-  private readonly writeLock: JsonFileStore<number>;
+  private readonly coordinationOptions?: CoordinationRunOptions;
+  private coordinator?: AsyncCoordinator;
+  private coordinatorReady?: Promise<void>;
   private queue: Promise<unknown> = Promise.resolve();
   private ready?: Promise<void>;
   private gitAvailable = false;
 
-  constructor(options?: { dir?: string; now?: () => string; git?: boolean }) {
+  constructor(options?: {
+    dir?: string;
+    now?: () => string;
+    git?: boolean;
+    coordination?: CoordinationRunOptions;
+  }) {
     this.root = resolveRoadmapDir(process.env.SIGIL_ROADMAP_DIR, options?.dir);
     this.now = options?.now ?? (() => new Date().toISOString());
     this.gitEnabled = options?.git ?? true;
-    this.writeLock = new JsonFileStore({
-      filePath: join(this.root, LOCK_DIRECTORY, "specs"),
-      lockLabel: "roadmap specs",
-      createInitial: () => 0,
-      parse: (value) => (typeof value === "number" ? value : undefined),
-      corruptError: (path) =>
-        new Error(`Spec write lock is corrupt at ${path}.`),
-    });
+    this.coordinationOptions = options?.coordination;
     this.store = new MarkdownStore({
       rootDir: this.root,
       git: false,
@@ -285,7 +292,7 @@ export class MirkSpecsRepository implements SpecsRepository {
     input: CreateSpecInput,
     expectedRevision?: number,
   ): Promise<SpecMutationResult> {
-    return this.mutate(async (revision) => {
+    return this.mutate(async (revision, guard) => {
       assertSafeSpecId(input.id);
       if ((await this.get(input.id)) !== undefined)
         throw new Error(`Spec id already exists: ${input.id}.`);
@@ -302,6 +309,7 @@ export class MirkSpecsRepository implements SpecsRepository {
         updatedAt: timestamp,
       };
       assertSpec(spec);
+      await this.assertOwned(guard);
       this.put(spec);
       return {
         nextRevision: revision + 1,
@@ -316,7 +324,7 @@ export class MirkSpecsRepository implements SpecsRepository {
     input: ReviseSpecInput,
     expectedRevision?: number,
   ): Promise<SpecMutationResult> {
-    return this.mutate(async (revision) => {
+    return this.mutate(async (revision, guard) => {
       const existing = await this.get(id);
       if (!existing) throw new Error(`Unknown spec id: ${id}.`);
       const spec: ProductSpec = {
@@ -330,6 +338,7 @@ export class MirkSpecsRepository implements SpecsRepository {
         updatedAt: this.now(),
       };
       assertSpec(spec);
+      await this.assertOwned(guard);
       this.put(spec);
       return {
         nextRevision: revision + 1,
@@ -344,12 +353,13 @@ export class MirkSpecsRepository implements SpecsRepository {
     status: SpecStatus,
     expectedRevision?: number,
   ): Promise<SpecMutationResult> {
-    return this.mutate(async (revision) => {
+    return this.mutate(async (revision, guard) => {
       const existing = await this.get(id);
       if (!existing) throw new Error(`Unknown spec id: ${id}.`);
       if (existing.status === status)
         return { nextRevision: revision, spec: existing, message: "" };
       const spec = { ...existing, status, updatedAt: this.now() };
+      await this.assertOwned(guard);
       this.put(spec);
       return {
         nextRevision: revision + 1,
@@ -360,7 +370,10 @@ export class MirkSpecsRepository implements SpecsRepository {
   }
 
   private async mutate(
-    operation: (revision: number) => Promise<{
+    operation: (
+      revision: number,
+      guard: CoordinationGuard,
+    ) => Promise<{
       nextRevision: number;
       spec: ProductSpec;
       message: string;
@@ -368,21 +381,30 @@ export class MirkSpecsRepository implements SpecsRepository {
     expectedRevision?: number,
   ): Promise<SpecMutationResult> {
     return this.runExclusive(async () => {
-      return this.writeLock.withWriteLock(async () => {
-        await this.ensureReady();
-        const revision = await this.readRevision();
-        assertExpectedRevision(revision, expectedRevision);
-        const change = await operation(revision);
-        if (change.nextRevision === revision)
-          return {
-            revision,
-            spec: structuredClone(change.spec),
-            changedIds: [],
-          };
-        await this.writeRevision(change.nextRevision);
-        this.commit(change.message);
-        return result(change.nextRevision, change.spec);
-      });
+      await this.ensureCoordinatorReady();
+      return this.requireCoordinator().runExclusive(
+        COORDINATION_KEY,
+        async (guard) => {
+          await this.ensureReady();
+          await this.assertOwned(guard);
+          await this.assertOwned(guard);
+          const revision = await this.readRevision();
+          assertExpectedRevision(revision, expectedRevision);
+          const change = await operation(revision, guard);
+          if (change.nextRevision === revision)
+            return {
+              revision,
+              spec: structuredClone(change.spec),
+              changedIds: [],
+            };
+          await this.assertOwned(guard);
+          await this.writeRevision(change.nextRevision);
+          await this.assertOwned(guard);
+          this.commit(change.message);
+          return result(change.nextRevision, change.spec);
+        },
+        this.coordinationOptions,
+      );
     });
   }
 
@@ -399,6 +421,29 @@ export class MirkSpecsRepository implements SpecsRepository {
   private async ensureReady(): Promise<void> {
     this.ready ??= this.initialize();
     await this.ready;
+  }
+
+  private async ensureCoordinatorReady(): Promise<void> {
+    this.coordinatorReady ??= this.initializeCoordinator();
+    await this.coordinatorReady;
+  }
+
+  private async initializeCoordinator(): Promise<void> {
+    await mkdir(join(this.root, LOCK_DIRECTORY), { recursive: true });
+    this.coordinator = createSqliteCoordinator({
+      path: join(this.root, LOCK_DIRECTORY, COORDINATION_FILE),
+      namespace: "work-items-specs",
+    });
+  }
+
+  private requireCoordinator(): AsyncCoordinator {
+    if (!this.coordinator)
+      throw new Error("Spec coordinator is not initialized yet.");
+    return this.coordinator;
+  }
+
+  private async assertOwned(guard: CoordinationGuard): Promise<void> {
+    await guard.assertOwned();
   }
 
   private async initialize(): Promise<void> {

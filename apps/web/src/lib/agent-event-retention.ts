@@ -1,4 +1,4 @@
-import type { BuildEveForkSeedInput } from "@zigil/agent-eve/session"
+import type { BuildEveForkSeedInput } from "@zigil/agent/eve/client"
 
 export type AgentRuntimeStreamEvent = BuildEveForkSeedInput["events"][number]
 

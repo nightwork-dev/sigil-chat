@@ -8,7 +8,7 @@
 // status the caller can ignore, and the chat surface renders exactly as if
 // voice did not exist.
 
-import type { AgentMessagePart } from "@zigil/agent-surface"
+import type { AgentMessagePart } from "@zigil/agent"
 
 import { AGENT_PERSONA_HEADER } from "./agent-session-scope"
 import { speakableText, type SpeakableOptions } from "./speakable-text"

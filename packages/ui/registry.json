@@ -25,8 +25,7 @@
       "name": "agent-hud",
       "type": "registry:ui",
       "dependencies": [
-        "@zigil/agent-react",
-        "@zigil/agent-surface"
+        "@zigil/agent"
       ],
       "registryDependencies": [
         "@sigil/button",
@@ -45,6 +44,24 @@
           "path": ".registry-staging/src/lib/agent-hud-state.ts",
           "type": "registry:lib",
           "target": "@lib/agent-hud-state.ts"
+        }
+      ]
+    },
+    {
+      "name": "agent-variants",
+      "type": "registry:ui",
+      "dependencies": [
+        "@zigil/agent"
+      ],
+      "registryDependencies": [
+        "@sigil/agent-hud",
+        "@sigil/popover"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/agent-variants.tsx",
+          "type": "registry:ui",
+          "target": "@ui/agent-variants.tsx"
         }
       ]
     },
@@ -86,7 +103,7 @@
       "name": "ambient-panel",
       "type": "registry:ui",
       "dependencies": [
-        "@zigil/agent-react"
+        "@zigil/agent"
       ],
       "registryDependencies": [
         "@sigil/utils"
@@ -2135,7 +2152,7 @@
       "name": "part-projection",
       "type": "registry:ui",
       "dependencies": [
-        "@zigil/agent-surface"
+        "@zigil/agent"
       ],
       "registryDependencies": [],
       "files": [
@@ -3481,7 +3498,7 @@
       "name": "tool-call",
       "type": "registry:ui",
       "dependencies": [
-        "@zigil/agent-surface",
+        "@zigil/agent",
         "lucide-react"
       ],
       "registryDependencies": [
@@ -3502,7 +3519,7 @@
       "name": "tool-renderer-registry",
       "type": "registry:ui",
       "dependencies": [
-        "@zigil/agent-surface"
+        "@zigil/agent"
       ],
       "registryDependencies": [],
       "files": [

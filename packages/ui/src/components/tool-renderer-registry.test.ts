@@ -1,4 +1,4 @@
-import type { AgentToolCallPart } from "@zigil/agent-surface/contracts"
+import type { AgentToolCallPart } from "@zigil/agent/contracts"
 import { describe, expect, it } from "vitest"
 
 import {

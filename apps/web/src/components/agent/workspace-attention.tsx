@@ -27,7 +27,7 @@ import {
   AttentionProvider,
   useAttention,
   type AttentionContext,
-} from "@zigil/agent-react/attention"
+} from "@zigil/agent/react"
 
 type PublishFn = (context: AttentionContext | null) => void
 

@@ -21,7 +21,7 @@
 
 import { useEffect, useRef } from "react"
 
-import type { AgentMessage } from "@zigil/agent-surface/contracts"
+import type { AgentMessage } from "@zigil/agent/contracts"
 
 import { speakMessageParts, type SpeakOutcome } from "./agent-voice"
 import { repliesToSpeak } from "./reply-speech"

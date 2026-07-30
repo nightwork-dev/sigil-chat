@@ -20,7 +20,6 @@
     "@gonk/scope": "0.3.1",
     "@gonk/tool-registry": "0.3.1",
     "@gonk/tool-registry-mcp": "0.3.1",
-    "@zigil/agent-gonk": "0.1.0",
     "eve": "0.25.2",
     "tsx": "4.21.0",
     "typescript": "5.9.3"

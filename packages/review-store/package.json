@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@workspace/file-store-core": "workspace:*",
+    "@mirk/store": "0.8.0",
     "@workspace/runtime-env": "workspace:*"
   },
   "scripts": {

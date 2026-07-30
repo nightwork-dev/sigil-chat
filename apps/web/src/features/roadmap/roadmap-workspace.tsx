@@ -27,8 +27,8 @@ import {
   useUpsertStory,
 } from "@/lib/work-items"
 import { isOwnerGate, Story, STORY_STATUS, STORY_STATUS_ORDER } from "@/components/roadmap/story"
-import { type AttentionContext, type AttentionSelection } from "@zigil/agent-react/attention"
-import { useAttentionTelemetry } from "@zigil/agent-react/attention-telemetry"
+import { type AttentionContext, type AttentionSelection } from "@zigil/agent/react"
+import { useAttentionTelemetry } from "@zigil/agent/react"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 import type {
   ReviewDecision,

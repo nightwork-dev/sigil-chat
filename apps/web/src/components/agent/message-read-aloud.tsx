@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Volume2Icon, SquareIcon } from "lucide-react"
 
-import type { AgentMessagePart } from "@zigil/agent-surface/contracts"
+import type { AgentMessagePart } from "@zigil/agent/contracts"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { speakMessageParts, type SpeakOutcome } from "@/lib/agent-voice"

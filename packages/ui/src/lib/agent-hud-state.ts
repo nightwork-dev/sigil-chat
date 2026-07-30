@@ -1,4 +1,4 @@
-import { formatAttentionLabel, type AttentionContext } from "@zigil/agent-react/attention";
+import { formatAttentionLabel, type AttentionContext } from "@zigil/agent/react";
 import {
   hasPendingApproval,
   isAgentSessionBusy,
@@ -6,7 +6,7 @@ import {
   type AgentForkIntent,
   type AgentRuntimeSession,
   type AgentTurnResult,
-} from "@zigil/agent-surface/contracts";
+} from "@zigil/agent/contracts";
 
 export type AgentHudTriggerState = "approval" | "busy" | "idle";
 

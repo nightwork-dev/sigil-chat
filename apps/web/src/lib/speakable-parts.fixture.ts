@@ -7,7 +7,7 @@
 // survives the whole path from a rendered message to the synth request. Adding
 // a NEW part kind upstream means adding one row here, and both layers cover it.
 
-import type { AgentMessagePart } from "@zigil/agent-surface"
+import type { AgentMessagePart } from "@zigil/agent"
 
 export const SPEECH_LEAK_CANARY = "LEAKCANARY"
 

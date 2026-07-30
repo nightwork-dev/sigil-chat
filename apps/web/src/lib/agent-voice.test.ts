@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import type { AgentMessagePart } from "@zigil/agent-surface"
+import type { AgentMessagePart } from "@zigil/agent"
 
 import { speakMessageParts, synthesizeSpeech } from "./agent-voice"
 

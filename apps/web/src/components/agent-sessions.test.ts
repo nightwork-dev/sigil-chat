@@ -4,12 +4,12 @@ import { act, createElement } from "react";
 import * as ReactRuntime from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { UseEveRuntimeSessionOptions } from "@zigil/agent-eve";
-import { useAgentRuntimeSession } from "@zigil/agent-react/session";
+import type { UseEveRuntimeSessionOptions } from "@zigil/agent/react/eve";
+import { useAgentRuntimeSession } from "@zigil/agent/react";
 import type {
   AgentRuntimeSession,
   AgentTurnResult,
-} from "@zigil/agent-surface/contracts";
+} from "@zigil/agent/contracts";
 
 import { AppAgentSessions } from "./agent-sessions";
 import {
@@ -54,7 +54,7 @@ const harness = vi.hoisted(() => ({
 let repository: AgentThreadRepository;
 const TEST_USER_ID = "session-test-user";
 
-vi.mock("@zigil/agent-eve", () => ({
+vi.mock("@zigil/agent/react/eve", () => ({
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
     harness.eveCallbacks = callbacks;
     return {

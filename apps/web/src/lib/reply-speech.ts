@@ -11,7 +11,7 @@
 // (echoing them back is noise), and anything already spoken (a re-render must
 // not replay the conversation).
 
-import type { AgentMessage } from "@zigil/agent-surface/contracts"
+import type { AgentMessage } from "@zigil/agent/contracts"
 
 export interface ReplySpeechInput {
   readonly messages: readonly AgentMessage[]

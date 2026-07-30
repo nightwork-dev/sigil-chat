@@ -12,7 +12,7 @@ import type {
   AgentReasoningPart,
   AgentTextPart,
   AgentToolCallPart,
-} from "@zigil/agent-surface";
+} from "@zigil/agent";
 
 import {
   DEFAULT_PROJECTION_MODE,

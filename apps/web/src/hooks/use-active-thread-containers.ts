@@ -1,4 +1,4 @@
-import { useAgentThreadControls } from "@zigil/agent-react/thread-controls"
+import { useAgentThreadControls } from "@zigil/agent/react"
 
 import { deriveThreadProjectId } from "@/lib/agent-thread-containers"
 import { useAgentThreads } from "@/lib/agent-threads"

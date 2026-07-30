@@ -38,7 +38,7 @@ import type {
   AgentReasoningPart,
   AgentTextPart,
   AgentToolCallPart,
-} from "@zigil/agent-surface";
+} from "@zigil/agent";
 
 // ─── Projection modes ──────────────────────────────────────────────────────
 

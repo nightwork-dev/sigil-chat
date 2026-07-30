@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import type { AgentMessage } from "@zigil/agent-surface/contracts"
+import type { AgentMessage } from "@zigil/agent/contracts"
 
 import { completedAgentReplies, repliesToSpeak } from "./reply-speech"
 

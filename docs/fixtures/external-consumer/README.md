@@ -1,6 +1,6 @@
 # External-consumer fixture
 
-This standalone generated-app-shaped consumer owns one `fixture-echo` tool and one `fixture-resource` context contributor. It uses released packages only; it does not import `@workspace/*`, Sigil Chat `apps/*`, or route output.
+This standalone generated-app-shaped consumer owns one `fixture-echo` tool and one `fixture-resource` context contributor. It mounts the Gonk MCP projection directly with `@gonk/tool-registry-mcp`, uses released packages only, and does not import `@workspace/*`, Sigil Chat `apps/*`, or route output.
 
 The fixture pins the publicly available subset of the current application
 train in `compatibility-train.json`. Install it from the public npm registry,
