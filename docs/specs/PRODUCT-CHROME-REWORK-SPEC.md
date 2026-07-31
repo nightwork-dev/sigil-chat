@@ -9,6 +9,10 @@
 > container becomes `ScopePerspective` (focus + via). Everything else — the
 > one-rail layout, `staticData.rail`, one-presentation-per-region, the
 > variant family, the omnibar — stands as written.
+> Terminology revised by
+> [`INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md`](INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md):
+> “one session, many presentations” now means one active interaction, many
+> presentations. Runtime sessions are private host continuity.
 > Builds on: PROJ.1 (registries + workspace tier) and PROJ.2 (thread binding +
 > project-aware chat nav), both on `dev`. This is the *product-level expression*
 > of that plumbing: the container hierarchy already exists in the domain; the

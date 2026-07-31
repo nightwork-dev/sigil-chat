@@ -24,10 +24,20 @@ Currently authoritative for this product's design/implementation.
 
 - [`PRODUCT-HOMES-IA-PROPOSAL.md`](PRODUCT-HOMES-IA-PROPOSAL.md) —
   the information-architecture response to the scope contract: Project Home,
-  Workspace Home, and Session as the three orientation layers; breadcrumbs as
-  a visibility-filtered via-path; home-oriented surface navigation; shared
-  workspace ownership cues; and the empty/loading/denied/archived/mobile/
-  keyboard state matrix. Design proposal for the SC.7 implementation slice.
+  Workspace Home, and the immediate interaction surface as the three
+  orientation layers; breadcrumbs as a visibility-filtered via-path;
+  home-oriented surface navigation; shared workspace ownership cues; and the
+  empty/loading/denied/archived/mobile/keyboard state matrix. Its user-facing
+  `Session` terminology is revised by
+  `INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md`. Design proposal for the
+  SC.7 implementation slice.
+
+- [`INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md`](INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md) —
+  separates durable interaction contexts and visible events from bounded runs,
+  causal traces/spans, host-private runtime sessions, artifacts, and versioned
+  agent assemblies. Defines participant versus execution-contributor
+  provenance, external channel adapters, trace inspection, and the migration
+  from the current bundled `AgentThread`. Proposed framework contract.
 
 - [`AGENT-SURFACE-COORDINATION-SPEC.md`](AGENT-SURFACE-COORDINATION-SPEC.md) —
   the spatial third of the attention/projection triangle: the agent's presence
@@ -49,12 +59,13 @@ Currently authoritative for this product's design/implementation.
 - [`PRODUCT-CHROME-REWORK-SPEC.md`](PRODUCT-CHROME-REWORK-SPEC.md) —
   make Projects/Workspaces the visible organizing center of the app shell
   (two-level chrome: container context + feature surface); elevate the Cmd+K
-  omnibar to fluid project/workspace/session switching _and_ as a direct agent
-  input (message mode); and define a family of agent chat-panel variants
-  (dock / sidecar / inline / omnibar / strip) so the one conversation can be
+  omnibar to fluid project/workspace/interaction switching _and_ as a direct
+  agent input (message mode); and define a family of agent chat-panel variants
+  (dock / sidecar / inline / omnibar / strip) so one active interaction can be
   presented where a surface needs it. Also closes the consistency gaps
   (doubled agent presentation on `/review`, Button/Link semantics, the
-  non-owner Agent dead-end). Draft product/UX spec; builds on PROJ.1/PROJ.2.
+  non-owner Agent dead-end). Its `session` naming is revised by the interaction
+  contract above. Draft product/UX spec; builds on PROJ.1/PROJ.2.
 
 - [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md) —
   Better Auth username/password accounts, user settings, channel membership,
@@ -71,8 +82,10 @@ Currently authoritative for this product's design/implementation.
   Sigil Chat. Draft product spec; `AGENT-EMBEDDING-SPEC.md` implements its
   surfaces.
 - [`AGENT-MULTI-SESSION-SPEC.md`](AGENT-MULTI-SESSION-SPEC.md) — multi-session
-  and forking. Implemented; the two defects found in review shipped fixes and
-  passed independent cross-model review closure.
+  and forking implementation record. The two defects found in review shipped
+  fixes and passed independent cross-model review closure. The interaction
+  contract above preserves this evidence while splitting its bundled thread,
+  runtime-session, run, and trace concerns.
 - [`AGENT-REACT-QUERY-STATE-SPEC.md`](AGENT-REACT-QUERY-STATE-SPEC.md) —
   agentic application state through React Query. Draft for independent
   review; owner is the Sigil Chat application.

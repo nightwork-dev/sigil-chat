@@ -9,10 +9,15 @@
 > [`PRODUCT-HOMES-IA-PROPOSAL.md`](PRODUCT-HOMES-IA-PROPOSAL.md),
 > [`AUTH-AND-USER-SETTINGS-SPEC.md`](AUTH-AND-USER-SETTINGS-SPEC.md),
 > [`PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md`](PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md),
-> and [`AGENT-SURFACE-COORDINATION-SPEC.md`](AGENT-SURFACE-COORDINATION-SPEC.md)
+> [`AGENT-SURFACE-COORDINATION-SPEC.md`](AGENT-SURFACE-COORDINATION-SPEC.md),
+> and
+> [`INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md`](INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md)
 > Supersedes: the strict containment and universal inheritance model in
 > `PROJECT-WORKSPACE-KNOWLEDGE-SPEC.md` sections 1–3. Its registry, knowledge,
 > and Gonk ownership decisions remain in force unless this spec says otherwise.
+> The interaction contract refines this document's user-facing `Session`
+> terminology without changing canonical home, composition, perspective, or
+> authorization rules.
 
 ## The decision
 

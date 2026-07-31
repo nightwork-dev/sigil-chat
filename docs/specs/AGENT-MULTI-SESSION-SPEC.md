@@ -12,6 +12,8 @@
 > Product persistence: Gonk Core store provider
 > Related:
 >
+> - `INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md` (successor vocabulary and
+>   record separation; this file remains the implementation evidence)
 > - `AGENT-EMBEDDING-SPEC.md` (session provider mounted above router swaps)
 > - `AGENT-CONTEXT-MANAGEMENT-SPEC.md` (provenance note; thread-scoped
 >   drafts now specified in the sigil-agent repository's

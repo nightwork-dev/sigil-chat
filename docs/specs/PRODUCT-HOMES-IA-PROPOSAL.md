@@ -5,6 +5,11 @@
 > [`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`](SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md)
 > (in `sigil-chat-scope-composition`). Design first — no implementation here.
 > Companion to, and partly revising, `PRODUCT-CHROME-REWORK-SPEC.md`.
+> Terminology revised by
+> [`INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md`](INTERACTIONS-RUNS-TRACES-AND-ASSEMBLIES-SPEC.md):
+> the neutral third orientation layer is an interaction context, presented with
+> a truthful product noun such as Conversation or Channel. Runtime sessions are
+> not homes.
 
 ## 0. The one-paragraph shape
 
