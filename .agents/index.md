@@ -145,8 +145,10 @@ Eve or add another transport adapter.
 
 ## Dev workflow
 
-Requires Node 24. All dependencies — including the `@gonk/*` and
-`@zigil/agent-*` packages — resolve from the public npm registry.
+Requires Node 24. The pinned `@gonk/*` train resolves from local Verdaccio at
+`http://localhost:4873`; `@zigil/agent-*` and all other dependencies resolve
+from public npm. A missing private Gonk train fails during preparation with the
+registry boundary and repair direction instead of falling through to runtime.
 
 ```bash
 pnpm dev

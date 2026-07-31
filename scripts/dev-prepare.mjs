@@ -50,6 +50,7 @@ function prepareDevelopmentInstance() {
     "Dependencies",
     ["install", "--frozen-lockfile", "--prefer-offline"],
     { CI: "1" },
+    "Gonk packages resolve from the private registry at http://localhost:4873. Start Verdaccio and publish the pinned Gonk train before retrying.",
   );
 
   prepareDevAgentBindingEnvironment(repoRoot);
@@ -63,14 +64,17 @@ function prepareDevelopmentInstance() {
   process.stdout.write(`  ✓ Ready as ${credentials.email}\n`);
 }
 
-function runStep(label, args, extraEnvironment = {}) {
+function runStep(label, args, extraEnvironment = {}, remediation) {
   const result = spawnSync("pnpm", args, {
     cwd: repoRoot,
     encoding: "utf8",
     env: { ...process.env, ...extraEnvironment },
   });
 
-  assertCommandSucceeded(result, `${label} preparation failed.`);
+  assertCommandSucceeded(
+    result,
+    `${label} preparation failed.${remediation ? `\n${remediation}` : ""}`,
+  );
   process.stdout.write(`  ✓ ${label}\n`);
 }
 

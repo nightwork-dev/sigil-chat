@@ -8,7 +8,11 @@ remote consumer; do not use it to reintroduce a gateway into the product.
 The consumer owns tools, context contributors, persistence, and application
 policy. It consumes released contracts only.
 
-The companion [clean-room fixture](../fixtures/external-consumer/) is the executable proof. It must never gain `workspace:`, `file:`, `@workspace/*`, or Sigil Chat `apps/*` dependencies.
+The companion [clean-room fixture](../fixtures/external-consumer/) is now the
+executable Verdaccio proof for Gonk Core `0.5.1` and MCP SDK v2. It must never
+gain `workspace:`, `file:`, `@workspace/*`, or Sigil Chat `apps/*`
+dependencies. The public-registry snapshot below remains historical evidence,
+not the fixture's current install source.
 
 ## Proof snapshot: 2026-07-20
 
@@ -84,7 +88,17 @@ passes the static contract and TypeScript checks, completes authenticated MCP
 `initialize` plus `tools/call`, compiles the application-owned context
 contributor, and boots Eve `0.25.2` independently.
 
-Public-registry lookups for the seven versions listed as “Not public” return
-`E404`. That is the current full-train blocker. No private-registry result,
-workspace link, local tarball, or older-version substitution is accepted as a
-replacement for that missing proof.
+At that snapshot, public-registry lookups for the seven versions listed as
+“Not public” returned `E404`; that was the full-train blocker. No
+private-registry result, workspace link, local tarball, or older-version
+substitution was accepted as a replacement for that missing public proof.
+
+## Current private-registry evidence — 2026-07-31
+
+The executable fixture now pins Gonk Core `0.5.1` and resolves the `@gonk/*`
+scope from local Verdaccio while leaving every other dependency on public npm.
+Its isolated frozen install, static contract check, TypeScript compile, and
+authenticated Streamable HTTP MCP smoke are the acceptance gate for the private
+train. The MCP runtime resolves `@modelcontextprotocol/client@2.0.0` and
+`@modelcontextprotocol/server@2.0.0`; public npm distribution remains
+intentionally deferred.

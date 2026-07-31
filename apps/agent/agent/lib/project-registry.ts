@@ -11,11 +11,8 @@ import {
 import { join } from "node:path"
 
 import { createScope } from "@gonk/scope"
-import {
-  createStoreProvider,
-  mirkBackendFactory,
-  resolveStoreDir,
-} from "@gonk/store"
+import { createStoreProvider, resolveStoreDir } from "@gonk/store"
+import { mirkBackendFactory } from "@gonk/store/sqlite"
 import type { KvStore } from "@gonk/store/types"
 
 const PROJECT_NAMESPACE = "sigil-chat.projects.v1"
