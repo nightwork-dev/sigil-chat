@@ -6,7 +6,7 @@
 > acceptance-with-changes review on 2026-07-30. This document refines the
 > product-facing meaning of `session` in the existing scope, home, chrome, and
 > multi-session specs; it does not retroactively rewrite their implementation
-> evidence.
+> evidence. Amendment history: see §15.
 >
 > Owner: Sigil Chat owns the application composition and product read model.
 > Sigil Agent and Eve own host-neutral runtime adapters and execution capture.
@@ -117,6 +117,7 @@ interface InteractionContext {
   status: "active" | "archived" | "closed";
   /** Canonical ownership/lifecycle location. Never an authorization grant. */
   homeScopeId: string;
+  historyPolicy: HistoryAccessPolicy;
   sourceBindings: InteractionSourceBinding[];
   parentId?: string;
   rootId: string;
@@ -194,6 +195,7 @@ participants.admit(request: {
   identity: InteractionParticipant["identity"];
   presence: InteractionParticipant["presence"];
   speakingPolicyId: string;
+  historyAccess?: HistoryAccessGrant;
   expectedContextRevision: number;
 }): ParticipantAdmissionReceipt;
 ```
@@ -287,6 +289,7 @@ interface ParticipantAdmissionReceipt {
   participantId: string;
   admittedByPrincipalId: string;
   speakingPolicyId: string;
+  historyAccess: HistoryAccessGrant;
   contextRevisionBefore: number;
   contextRevisionAfter: number;
   createdAt: string;
@@ -302,7 +305,43 @@ These shapes may graduate into upstream packages, but their distinctions are
 normative here. In particular, `ScopePerspective` is display/resource
 resolution context and never an authorization grant.
 
-## 2. Interaction events and transcript projections
+### 1.5 Join-time history access
+
+Every group-messaging product had to decide what a newly admitted member sees:
+Slack shows full channel history, WhatsApp historically showed nothing before
+the join, and Signal deliberately shares no prior history. Sigil makes that an
+explicit per-context policy rather than an accident of prompt compilation —
+and for an agent participant the question is sharper than for a human, because
+an agent "seeing" history means ingesting it into model context and possibly
+memory.
+
+```ts
+type HistoryAccessGrant =
+  | { kind: "full" }
+  | { kind: "from-admission" }
+  | { kind: "through-event"; lastEventId: string };
+
+interface HistoryAccessPolicy {
+  humanDefault: HistoryAccessGrant["kind"];
+  agentDefault: HistoryAccessGrant["kind"];
+  /** Whether an admitting principal may grant wider than the default. */
+  allowWiderGrant: boolean;
+}
+```
+
+Rules:
+
+1. Admission resolves a `HistoryAccessGrant` from the request and the context
+   policy and records it in the admission receipt. No participant has implicit
+   history access.
+2. For an agent participant, the grant bounds prompt compilation, retrieval and
+   search tools, and memory ingestion alike. A pre-admission event outside the
+   grant must not reach the agent through any of those paths, and
+   context-compile receipts record the enforced boundary.
+3. Widening a grant later is a new authorized admission operation with a new
+   receipt, never a silent policy edit.
+4. History access never overrides an event's `Audience` or a source adapter's
+   tombstone rules; it can only narrow what those already permit.
 
 ### 2.1 Canonical event envelope
 
@@ -948,6 +987,8 @@ trace projections.
 - message timestamp/id → source event identity.
 - edited messages → revisioned `edit` proposals.
 - deletion events → policy-governed tombstones and cache/search invalidation.
+- `reply_broadcast` → one canonical event in the thread mapping, surfaced in
+  the parent container by projection/relation, never a second canonical event.
 - Slack user/app identity → source actor reference, then authorized local
   principal/agent mapping where one exists.
 
@@ -1212,6 +1253,14 @@ secrets, or turn historical runtime events into newly admitted public events.
 17. A compacted source backfills from Eve when possible; otherwise it remains
     explicitly partial with its compaction receipt and missing interval rather
     than presenting a fabricated complete history.
+18. An event with a `participants` or `private` audience appears only in its
+    audience's projections; every other participant's transcript, search,
+    prompt compilation, and safe trace projection exclude it without a
+    placeholder revealing that a hidden event exists.
+19. An agent admitted with `from-admission` history access cannot surface a
+    pre-admission event through prompt compilation, retrieval or search tools,
+    or memory; its context-compile receipt records the enforced boundary, and
+    a later widening appears as a new admission receipt.
 
 ## 13. Non-goals
 
@@ -1226,6 +1275,22 @@ secrets, or turn historical runtime events into newly admitted public events.
   location, runtime-session possession, or trace visibility.
 - Choosing one permanent multi-agent topology before measuring quality, cost,
   latency, contradiction, and leakage.
+
+Three product layers are **deferred, not rejected**. They are named here so the
+model leaves room for them instead of having them bolted onto
+`InteractionContext` later:
+
+- **Per-user notification, unread, and mention state.** Read cursors, mention
+  flags, and mutes are per-principal-per-context state — neither an event nor
+  membership — and get their own record when the product needs them.
+- **A full agent activation-policy language.** When an agent speaks
+  (mention-only, always-on, topic-triggered) is product policy behind
+  `speakingPolicyId`; this contract only guarantees the hook exists per
+  participant.
+- **User-facing deletion of native events.** Source-adapter deletion rules in
+  §7 are the floor. Delete-for-everyone semantics for native content — and the
+  reconciliation of derived agent state (memory, beliefs, artifacts) with a
+  deletion — need their own contract before the product offers the control.
 
 ## 14. Reference models
 
@@ -1257,3 +1322,34 @@ This contract adapts rather than copies:
 The common lesson is narrow but decisive: the place where communication
 happens, the task being performed, its causal trace, and the runtime continuity
 used to perform it are related records, not synonyms.
+
+## 15. Amendment history
+
+- **Revision 1 (2026-07-30, `f959c6d5`).** Initial proposed contract.
+- **Revision 2 (2026-07-30, `2db51065`).** Repairs from the independent
+  acceptance-with-changes review: restored the immutable execution-authority
+  tuple as `AgentExecutionBinding` and demoted `InteractionContext.homeScopeId`
+  to canonical location only; separated the principal ACL
+  (`InteractionMembership`) from social presence (`InteractionParticipant`)
+  with an explicit admission operation; defined the previously missing
+  `EventActor`, `Audience`, `AgentSpan`, and shared value objects; required an
+  accountable actor on every run and added the `RunExecution` join between
+  runs, execution bindings, runtime sessions, and assembly instances; unified
+  disclosure into one `DisclosurePolicy` lattice with positive
+  `TraceAccessGrant`s; defined `AgentAssemblyInstance` and
+  `ComponentActivation` as the records minting the ids the game companion spec
+  consumes; added source-mutation handling (edits, deletions, Matrix
+  redaction) to the adapters; and made migration backfill from Eve's durable
+  stream or declare itself `partial` with a receipt.
+- **Revision 3 (2026-07-30, this change).** Comparable-product pass, treating
+  Slack, Discord, WhatsApp, and Signal as use-case precedents rather than
+  integrations: added §1.5 join-time history access (explicit per-context
+  policy and per-admission grant, with agent history access bounding prompt
+  compilation, retrieval, and memory ingestion alike); threaded
+  `historyAccess` through participant admission and its receipt; mapped Slack
+  `reply_broadcast` to one canonical event; added acceptance criteria 18
+  (audience-scoped/ephemeral events leak nothing to non-audience participants)
+  and 19 (agent history boundaries are enforced and widenings are receipted);
+  and named three deferred product layers in §13 — notification/unread state,
+  agent activation policy, and user-facing deletion including derived agent
+  state.
