@@ -241,9 +241,9 @@ Source identifiers and subject lines are provenance, not product authority.
 The Sigil interaction context retains its own stable identity and explicitly
 records whether it mirrors, mounts, or owns the source.
 
-### 1.4 Shared value objects
+### 1.4 Shared supporting types
 
-The examples in this contract use these value objects:
+The examples in this contract use these shared types:
 
 ```ts
 type InteractionCapability =
@@ -301,9 +301,9 @@ interface SecretReference {
 }
 ```
 
-These shapes may graduate into upstream packages, but their distinctions are
-normative here. In particular, `ScopePerspective` is display/resource
-resolution context and never an authorization grant.
+These shapes may graduate into upstream packages, but the distinctions they
+draw are part of this contract. In particular, `ScopePerspective` is
+display/resource resolution context and never an authorization grant.
 
 ### 1.5 Join-time history access
 
@@ -745,10 +745,10 @@ interface RuntimeSessionBinding {
 }
 ```
 
-`AgentExecutionBinding`'s authority tuple is immutable. Changing principal,
-persona, home scope, perspective, authorized context scopes, participant,
-assembly, or interaction mints a new binding id. Only the monotonic
-`active → revoked` lifecycle transition may update the record. Revocation
+The authority fields of an `AgentExecutionBinding` are immutable. Changing
+principal, persona, home scope, perspective, authorized context scopes,
+participant, assembly, or interaction creates a new binding id. The only
+permitted update is the one-way `active → revoked` status change. Revocation
 disables new executions but does not rewrite historical runs.
 
 The host validates at execution time that:
@@ -886,8 +886,8 @@ The assembly is versioned because a trace must be able to say which mechanism
 produced the visible behavior. Identity continuity does not require mechanism
 immutability, but mechanism changes must not be invisible in provenance.
 
-`AgentAssemblyInstance` is the record that mints `assemblyInstanceId`.
-`ComponentActivation` is the record that mints `componentActivationId` and
+`AgentAssemblyInstance` is the record that creates `assemblyInstanceId`.
+`ComponentActivation` is the record that creates `componentActivationId` and
 joins it to exactly one component span. An execution binding selects one
 assembly instance; a run execution activates zero or more of its components.
 
@@ -1189,8 +1189,8 @@ secrets, or turn historical runtime events into newly admitted public events.
 3. Participant admission never grants principal membership or resource access.
 4. Interaction canonical home never widens an execution binding.
 5. Runtime continuation references stay server-only.
-6. Traces use the one disclosure lattice, explicit grants, retention classes,
-   and audience-specific projections.
+6. Traces use the shared three-level disclosure order, explicit grants,
+   retention classes, and audience-specific projections.
 7. Raw execution traces are never shipped to participants as a substitute for
    a transcript.
 8. Source-adapter credentials and source-private metadata are not event
@@ -1238,8 +1238,8 @@ secrets, or turn historical runtime events into newly admitted public events.
 11. A participant-safe trace projection reveals useful status and artifacts
     without reasoning, secrets, hidden actor knowledge, or hidden-content
     counts; it is inaccessible without an explicit positive trace grant.
-12. An interaction fork records its parent event/snapshot boundary, mints new
-    mutable lineage, and copies no runtime continuation material.
+12. An interaction fork records its parent event/snapshot boundary, creates
+    new mutable lineage, and copies no runtime continuation material.
 13. A persona participant cannot satisfy an `InteractionMembership` principal
     ACL check, while a human represented by both records succeeds only through
     the membership record.
@@ -1319,26 +1319,26 @@ This contract adapts rather than copies:
   actor, context, audience, and reply relations for federated activity
   envelopes.
 
-The common lesson is narrow but decisive: the place where communication
-happens, the task being performed, its causal trace, and the runtime continuity
-used to perform it are related records, not synonyms.
+The common lesson: the place where communication happens, the task being
+performed, its causal trace, and the runtime continuity used to perform it are
+related records, not synonyms.
 
 ## 15. Amendment history
 
 - **Revision 1 (2026-07-30, `f959c6d5`).** Initial proposed contract.
 - **Revision 2 (2026-07-30, `2db51065`).** Repairs from the independent
   acceptance-with-changes review: restored the immutable execution-authority
-  tuple as `AgentExecutionBinding` and demoted `InteractionContext.homeScopeId`
+  fields as `AgentExecutionBinding` and demoted `InteractionContext.homeScopeId`
   to canonical location only; separated the principal ACL
   (`InteractionMembership`) from social presence (`InteractionParticipant`)
   with an explicit admission operation; defined the previously missing
-  `EventActor`, `Audience`, `AgentSpan`, and shared value objects; required an
+  `EventActor`, `Audience`, `AgentSpan`, and shared supporting types; required an
   accountable actor on every run and added the `RunExecution` join between
   runs, execution bindings, runtime sessions, and assembly instances; unified
-  disclosure into one `DisclosurePolicy` lattice with positive
+  disclosure into one three-level `DisclosurePolicy` order with positive
   `TraceAccessGrant`s; defined `AgentAssemblyInstance` and
-  `ComponentActivation` as the records minting the ids the game companion spec
-  consumes; added source-mutation handling (edits, deletions, Matrix
+  `ComponentActivation` as the records that create the ids the game companion
+  spec consumes; added source-mutation handling (edits, deletions, Matrix
   redaction) to the adapters; and made migration backfill from Eve's durable
   stream or declare itself `partial` with a receipt.
 - **Revision 3 (2026-07-30, this change).** Comparable-product pass, treating
