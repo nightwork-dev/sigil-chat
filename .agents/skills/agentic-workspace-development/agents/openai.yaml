@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agentic Workspace Development"
+  short_description: "Wire agent-aware Sigil workspaces end to end"
+  default_prompt: "Use $agentic-workspace-development to create or repair an agent-aware workspace end to end."

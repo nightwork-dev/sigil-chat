@@ -28,7 +28,10 @@ import { ModelsSection } from "./models-section"
 import { SecuritySection } from "./security-section"
 import { type AttentionContext } from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 
 export type SettingsSection =
   | "account"
@@ -88,6 +91,7 @@ export function SettingsPage({
     history: telemetry.history,
   }
   usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   return (
     // No page-level <h1>: the _app breadcrumb bar already names this place.

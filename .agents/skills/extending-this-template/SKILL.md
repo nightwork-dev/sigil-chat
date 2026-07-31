@@ -139,11 +139,15 @@ that workspace.
    Dashboard, `NetworkIcon` for Studio, `FileCheck2Icon` for Review, and so
    on), not decoration. Pick one that reads correctly at a glance.
 4. If the workspace needs to keep the agent informed of user selections
-   (a passage, a node, a row), wrap its content in `AttentionProvider` from
-   `@zigil/agent-surface/attention` and report selections through it — see
-   `docs/guides/building-workspaces.md` for the full attention/context-tray
-   loop and `features/review/review-workspace.tsx` for the real
-   implementation.
+   (a passage, a node, a row), publish its context through
+   `usePublishWorkspaceAttention` from
+   `@/components/agent/workspace-attention`. Never mount a workspace-local
+   `AttentionProvider`: the persistent HUD is above the route and cannot read
+   an isolated provider beneath it. Also call
+   `usePublishWorkspaceResourceScope` with either an authorized workspace
+   scope or `null` for a deliberate session fallback. See
+   `docs/guides/building-workspaces.md` and the
+   `agentic-workspace-development` skill for the complete loop.
 5. If a Gonk tool result should update this workspace's data, wire a
    domain-outcome handler rather than polling — see
    `docs/guides/building-workspaces.md`'s "domain-outcome loop" section and

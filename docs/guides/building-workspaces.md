@@ -160,15 +160,36 @@ const send = useCallback<AgentRuntimeSession["send"]>(
 )
 ```
 
-`attention` comes from `useAttention()` (`@zigil/agent-react`), which reads
-whatever the surrounding `AttentionProvider` publishes. A workspace opts in
-by wrapping its content in `AttentionProvider` and reporting selections
-through it — `apps/web/src/features/review/review-workspace.tsx` does this
-(`AttentionProvider`, `AttentionContext`, `AttentionSelection` all imported
-from `@zigil/agent-react`), so as the user selects a passage or
-annotation in the review UI, that selection becomes part of the next agent
-turn's `clientContext` automatically, with no per-call plumbing in the
-component that sends the message.
+`attention` comes from `useAttention()` (`@zigil/agent/react`), which reads the
+single `AttentionProvider` owned by the authenticated application shell. A
+workspace must not mount another provider: the persistent HUD is above the
+route and cannot read context isolated beneath it. Instead, publish the active
+workspace context with `usePublishWorkspaceAttention` and make the resource
+scope decision explicit with `usePublishWorkspaceResourceScope`:
+
+```tsx
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
+
+usePublishWorkspaceAttention({
+  application: "sigil-chat",
+  route: "/review",
+  workspace: { kind: "review", id: document.id, label: document.title },
+  selection: selectedPassage,
+  selections: selectedPassages,
+  history: telemetry.history,
+})
+
+// Use null deliberately when tools should fall back to the current session.
+usePublishWorkspaceResourceScope(null)
+```
+
+Both hooks clear their publications when the workspace unmounts, so context
+and scopes from the previous route cannot leak into the next one. Evidence and
+Artifacts publish authenticated project scopes; Review and Studio explicitly
+choose the session fallback.
 
 Selections describe current attention, so they accompany every turn while
 they remain selected unless the user excludes them. Activity is different:

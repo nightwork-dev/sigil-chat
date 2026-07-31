@@ -11,7 +11,10 @@ import {
   type AttentionSelection,
 } from "@zigil/agent/react";
 import { useAttentionTelemetry } from "@zigil/agent/react";
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention";
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { SkillListRow } from "@/features/skills-manager/skill-list-row";
@@ -87,6 +90,7 @@ function SkillsManagerBody({
     history: telemetry.history,
   };
   usePublishWorkspaceAttention(attention);
+  usePublishWorkspaceResourceScope(null);
 
   return (
     <>

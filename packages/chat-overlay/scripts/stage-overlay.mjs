@@ -128,6 +128,14 @@ export function assertOverlayCoverage() {
         missing.push(`doctor environment file not staged: ${entry.path}`);
       }
     }
+    for (const entry of doctor.sourceChecks ?? []) {
+      if (!entry || typeof entry.path !== "string") continue;
+      if (!existsSync(join(repositoryRoot, entry.path))) {
+        missing.push(`doctor sourceCheck target missing live path: ${entry.path}`);
+      } else if (!overlayIncludesPath(entry.path)) {
+        missing.push(`doctor sourceCheck target not staged: ${entry.path}`);
+      }
+    }
   } else {
     missing.push("doctor config missing live path: sigil.doctor.json");
   }
@@ -197,7 +205,6 @@ function isGeneratedPath(path) {
     .some((segment) =>
       [
         ".env",
-        ".agents",
         ".data",
         ".omc",
         ".git",

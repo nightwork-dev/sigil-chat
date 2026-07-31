@@ -38,7 +38,10 @@ import { CanvasControls } from "@/features/graph-canvas/canvas-controls"
 import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-nodes"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 import { useAgentAnnotationsByAnchor } from "@/lib/agent-annotations"
 import { StudioAmbientPanel } from "@/components/agent/studio-ambient-panel"
 import {
@@ -172,6 +175,7 @@ function ReducerStudioInner() {
       }
     : null
   usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   if (documentQuery.isPending) {
     return (

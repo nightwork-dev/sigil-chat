@@ -23,10 +23,13 @@ import {
 import { passageDraftReducer, projectPassageDraft } from "@/lib/passage-draft"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import {
-  AttentionProvider,
   type AttentionContext,
   type AttentionSelection,
 } from "@zigil/agent/react"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import {
   useMediaQuery,
@@ -497,10 +500,11 @@ export function ReviewWorkspace() {
     hover: telemetry.hover,
     history: telemetry.history,
   }
+  usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   return (
-    <AttentionProvider context={attention}>
-      <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
         <header className="flex min-h-12 items-center justify-between gap-3 border-b border-border px-3 py-2 md:px-4">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
@@ -718,9 +722,10 @@ export function ReviewWorkspace() {
                 className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
                 value="agent"
               >
-                {/* Bound to the selected passage through the AttentionProvider
-                    above — the passage-aware placeholder flows from attention,
-                    not a second mount (§4.1). */}
+                {/* Bound to the selected passage through the shell-owned
+                    workspace attention publisher — the passage-aware
+                    placeholder flows from attention, not a second mount
+                    (§4.1). */}
                 <AgentSidecar
                   className="min-h-0 flex-1 border-l-0 bg-transparent"
                   subject={selectedPassage.section}
@@ -763,8 +768,7 @@ export function ReviewWorkspace() {
             </Tabs>
           </aside>
         </div>
-      </div>
-    </AttentionProvider>
+    </div>
   )
 }
 

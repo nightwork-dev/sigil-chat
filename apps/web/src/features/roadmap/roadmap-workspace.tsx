@@ -29,7 +29,10 @@ import {
 import { isOwnerGate, Story, STORY_STATUS, STORY_STATUS_ORDER } from "@/components/roadmap/story"
 import { type AttentionContext, type AttentionSelection } from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 import type {
   ReviewDecision,
   ReviewItem,
@@ -167,6 +170,7 @@ export function RoadmapWorkspace({
     history: telemetry.history,
   }
   usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   // On phones the aside is a sheet; opening a story or the queue drives it.
   // On ≥md the aside is inline and `sheetOpen` is inert.

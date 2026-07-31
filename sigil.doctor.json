@@ -6,7 +6,11 @@
     { "path": "packages/agent-contracts/package.json" },
     { "path": "packages/runtime-env/package.json" },
     { "path": "fixtures/application/sigil-chat.yaml" },
-    { "path": "apps/web/src/routes/_app/chat.tsx" }
+    { "path": "apps/web/src/routes/_app/chat.tsx" },
+    {
+      "path": ".agents/skills/agentic-workspace-development/SKILL.md"
+    },
+    { "path": "docs/guides/building-workspaces.md" }
   ],
   "packageJson": [
     {
@@ -33,6 +37,93 @@
         { "name": "SIGIL_EVE_AUTH_JWKS_URL", "url": "http" },
         { "name": "SIGIL_AGENT_BINDING_SECRET" }
       ]
+    }
+  ],
+  "sourceChecks": [
+    {
+      "path": "apps/web/src/components/agent/workspace-attention.tsx",
+      "code": "SIGIL_WORKSPACE_ATTENTION_SHELL_MISSING",
+      "contains": [
+        "export function WorkspaceAttentionProvider",
+        "export function usePublishWorkspaceAttention",
+        "export function usePublishWorkspaceResourceScope"
+      ],
+      "message": "The shell-owned workspace attention seam is incomplete.",
+      "remediation": "Restore the Chat overlay workspace-attention implementation."
+    },
+    {
+      "path": "apps/web/src/features/review/review-workspace.tsx",
+      "code": "SIGIL_WORKSPACE_AGENT_INTEGRATION_INCOMPLETE",
+      "contains": [
+        "usePublishWorkspaceAttention(attention)",
+        "usePublishWorkspaceResourceScope(null)"
+      ],
+      "excludes": ["<AttentionProvider"],
+      "message": "Review is isolated from the shell-owned agent context.",
+      "remediation": "Publish Review attention and its explicit session-scope decision through the shell hooks."
+    },
+    {
+      "path": "apps/web/src/features/studio/reducer-studio.tsx",
+      "code": "SIGIL_WORKSPACE_AGENT_INTEGRATION_INCOMPLETE",
+      "contains": [
+        "usePublishWorkspaceAttention(attention)",
+        "usePublishWorkspaceResourceScope(null)"
+      ],
+      "message": "Studio does not publish a complete agent context decision.",
+      "remediation": "Publish Studio attention and its explicit session-scope decision through the shell hooks."
+    },
+    {
+      "path": "apps/web/src/features/evidence/evidence-room.tsx",
+      "code": "SIGIL_WORKSPACE_AGENT_INTEGRATION_INCOMPLETE",
+      "contains": [
+        "usePublishWorkspaceAttention(attention)",
+        "usePublishWorkspaceResourceScope(evidenceScope)"
+      ],
+      "message": "Evidence does not publish its attention and authorized resource scope.",
+      "remediation": "Restore Evidence attention and project-scope publication."
+    },
+    {
+      "path": "apps/web/src/features/artifacts/artifact-workspace.tsx",
+      "code": "SIGIL_WORKSPACE_AGENT_INTEGRATION_INCOMPLETE",
+      "contains": [
+        "usePublishWorkspaceAttention(attention)",
+        "usePublishWorkspaceResourceScope(scope)"
+      ],
+      "message": "Artifacts does not publish its attention and authorized resource scope.",
+      "remediation": "Restore Artifacts attention and resource-scope publication."
+    },
+    {
+      "path": "apps/web/src/lib/agent-domain-outcomes.tsx",
+      "code": "SIGIL_OUTCOME_RECONCILIATION_MISSING",
+      "contains": [
+        "AgentOutcomeReconciliationHandler",
+        "context.invalidate",
+        "createReactQueryOutcomeDispatcher"
+      ],
+      "message": "The agent domain-outcome reconciliation loop is incomplete.",
+      "remediation": "Restore typed outcome handlers that invalidate the owning domain query keys."
+    },
+    {
+      "path": ".agents/skills/agentic-workspace-development/SKILL.md",
+      "code": "SIGIL_AGENTIC_WORKSPACE_GUIDANCE_MISSING",
+      "contains": [
+        "route/navigation → workspace identity → attention → resource scope → tool → domain outcome → query reconciliation",
+        "usePublishWorkspaceAttention",
+        "usePublishWorkspaceResourceScope"
+      ],
+      "message": "Generated agents lack the complete agentic-workspace recipe.",
+      "remediation": "Restore the Chat-owned agentic-workspace-development skill."
+    },
+    {
+      "path": "docs/guides/building-workspaces.md",
+      "code": "SIGIL_AGENTIC_WORKSPACE_GUIDANCE_STALE",
+      "contains": [
+        "usePublishWorkspaceAttention",
+        "usePublishWorkspaceResourceScope",
+        "must not mount another provider"
+      ],
+      "message": "Workspace guidance contradicts or omits the shell-owned attention contract.",
+      "remediation": "Restore the current shell publication recipe."
     }
   ],
   "serviceProbes": [
