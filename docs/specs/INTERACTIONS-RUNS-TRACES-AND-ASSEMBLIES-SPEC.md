@@ -2,9 +2,11 @@
 
 > Date: 2026-07-30
 >
-> Status: Proposed framework contract. This document refines the product-facing
-> meaning of `session` in the existing scope, home, chrome, and multi-session
-> specs; it does not retroactively rewrite their implementation evidence.
+> Status: Proposed framework contract, amended after independent
+> acceptance-with-changes review on 2026-07-30. This document refines the
+> product-facing meaning of `session` in the existing scope, home, chrome, and
+> multi-session specs; it does not retroactively rewrite their implementation
+> evidence.
 >
 > Owner: Sigil Chat owns the application composition and product read model.
 > Sigil Agent and Eve own host-neutral runtime adapters and execution capture.
@@ -45,6 +47,23 @@ The central invariant is:
 > One interaction context may contain many runs. One run has one causal trace.
 > One trace may involve many agents and components. Runtime sessions are
 > private continuity bindings that may span or be replaced across runs.
+
+Four further invariants prevent that separation from widening authority:
+
+1. **Canonical home is not execution authority.** An interaction's
+   `homeScopeId` says where the container belongs. Every agent activation still
+   uses an immutable execution binding containing principal, persona, home
+   scope, initial perspective, and the exact authorized context-scope list.
+2. **Membership is not participation.** Membership is the principal ACL.
+   Participation is social presence. A persona, source actor, or component
+   cannot pass a principal authorization check merely because it appears in the
+   interaction.
+3. **Participation is not contribution.** A participant may speak or act in the
+   shared context. An execution contributor exists only in a run's trace unless
+   separately admitted as a participant.
+4. **A run is accountable and executable.** Every run names an accountable
+   actor and one or more execution records that join the immutable execution
+   binding, runtime session, assembly instance, and producing span.
 
 This vocabulary applies whether the visible context is a personal chat, a
 Slack thread, an email discussion, an editorial room, an evidence case, or a
@@ -96,8 +115,8 @@ interface InteractionContext {
   kind: InteractionKind;
   title: string;
   status: "active" | "archived" | "closed";
+  /** Canonical ownership/lifecycle location. Never an authorization grant. */
   homeScopeId: string;
-  participantIds: string[];
   sourceBindings: InteractionSourceBinding[];
   parentId?: string;
   rootId: string;
@@ -119,6 +138,71 @@ noun that tells the truth:
 The generic layer must not make every source pretend to be Slack, nor make
 every product surface say “interaction context.”
 
+Memberships and participants are separate records rather than arrays on the
+container:
+
+```ts
+interface InteractionMembership {
+  id: string;
+  contextId: string;
+  /** Only authenticated principals or authorized principal groups. */
+  subject:
+    | { kind: "principal"; principalId: string }
+    | { kind: "principal-group"; groupId: string };
+  role: "owner" | "member" | "observer";
+  capabilities: InteractionCapability[];
+  status: "active" | "revoked";
+  admittedByPrincipalId: string;
+  admittedAt: string;
+  revokedAt?: string;
+  revision: number;
+}
+
+interface InteractionParticipant {
+  id: string;
+  contextId: string;
+  identity:
+    | { kind: "human"; principalId: string }
+    | {
+        kind: "agent";
+        personaId: string;
+        assemblyInstanceId?: string;
+      }
+    | { kind: "source-actor"; sourceActor: SourceActorReference };
+  presence: "present" | "addressable" | "absent";
+  speakingPolicyId: string;
+  status: "admitted" | "removed";
+  admittedByPrincipalId: string;
+  admittedAt: string;
+  removedAt?: string;
+  revision: number;
+}
+```
+
+`InteractionMembership` is the successor to `AgentThread.members`. Every
+list/get/mutate/fork operation authorizes the authenticated principal against
+that record before resolving participants or events. Only
+`{ kind: "principal" }` and validated principal-group membership can satisfy
+the ACL. A human may have both a membership and a participant record, but the
+ids and checks remain distinct.
+
+Participants are admitted through an authorized operation:
+
+```ts
+participants.admit(request: {
+  contextId: string;
+  identity: InteractionParticipant["identity"];
+  presence: InteractionParticipant["presence"];
+  speakingPolicyId: string;
+  expectedContextRevision: number;
+}): ParticipantAdmissionReceipt;
+```
+
+Admission validates the caller's membership capability, the identity binding,
+the speaking policy, and the context revision. It creates a participant record
+and receipt; adding an id to a message, trace, or source import never admits a
+participant implicitly.
+
 ### 1.2 Context, thread, and reply relations
 
 An interaction context is the durable social container. Reply structure is a
@@ -138,6 +222,7 @@ after import without a migration receipt.
 
 ```ts
 interface InteractionSourceBinding {
+  id: string;
   adapter: "native" | "slack" | "email" | "matrix" | `extension:${string}`;
   sourceAccountId?: string;
   sourceContainerId: string;
@@ -145,12 +230,77 @@ interface InteractionSourceBinding {
   mountedAt: string;
   direction: "import" | "export" | "bidirectional";
   authority: "mirror" | "mounted" | "native";
+  mutationPolicyId: string;
+  revision: number;
 }
 ```
 
 Source identifiers and subject lines are provenance, not product authority.
 The Sigil interaction context retains its own stable identity and explicitly
 records whether it mirrors, mounts, or owns the source.
+
+### 1.4 Shared value objects
+
+The examples in this contract use these value objects:
+
+```ts
+type InteractionCapability =
+  | "read"
+  | "write"
+  | "run"
+  | "fork"
+  | "archive"
+  | "manage-participants"
+  | "manage-membership";
+
+interface ScopePerspective {
+  focusScopeId: string;
+  viaScopeIds: string[];
+}
+
+interface SourceActorReference {
+  bindingId: string;
+  sourceActorId: string;
+  displayName?: string;
+}
+
+type ContentPart =
+  | { kind: "text"; text: string }
+  | { kind: "artifact"; artifactId: string }
+  | { kind: "reference"; sourceRef: string }
+  | { kind: `extension:${string}`; payload: unknown };
+
+interface EventRelation {
+  kind: "reply" | "thread-root" | "quotes" | "supersedes" | "relates-to";
+  eventId: string;
+}
+
+interface InteractionFork {
+  sourceContextId: string;
+  sourceEventId?: string;
+  sourceRevision: number;
+}
+
+interface ParticipantAdmissionReceipt {
+  id: string;
+  contextId: string;
+  participantId: string;
+  admittedByPrincipalId: string;
+  speakingPolicyId: string;
+  contextRevisionBefore: number;
+  contextRevisionAfter: number;
+  createdAt: string;
+}
+
+interface SecretReference {
+  id: string;
+  provider: string;
+}
+```
+
+These shapes may graduate into upstream packages, but their distinctions are
+normative here. In particular, `ScopePerspective` is display/resource
+resolution context and never an authorization grant.
 
 ## 2. Interaction events and transcript projections
 
@@ -167,6 +317,30 @@ type InteractionEventKind =
   | "artifact-link"
   | "system"
   | `extension:${string}`;
+
+type EventActor =
+  | { kind: "participant"; participantId: string }
+  | { kind: "system"; systemId: string }
+  | {
+      kind: "source-actor";
+      sourceActor: SourceActorReference;
+      admittedParticipantId?: string;
+    };
+
+type Audience =
+  | { kind: "interaction"; contextId: string }
+  | { kind: "participants"; participantIds: string[] }
+  | { kind: "principals"; principalIds: string[] }
+  | { kind: "private"; principalId: string }
+  | { kind: "policy"; policyId: string };
+
+interface SourceEventReference {
+  bindingId: string;
+  sourceEventId: string;
+  sourceRevision?: string;
+  state: "active" | "edited" | "deleted" | "redacted";
+  observedAt: string;
+}
 
 interface InteractionEvent {
   id: string;
@@ -190,6 +364,12 @@ An interaction event is canonical only for what the product admits it to mean.
 A host stream callback is not automatically an interaction event. A game model
 proposal is not automatically a world-state change. An imported email is not
 automatically trusted merely because its source adapter parsed it.
+
+For a participant-authored event, `actor.kind` must be `"participant"` and the
+referenced participant must be admitted and allowed to speak under the current
+policy. A source actor does not become a participant until the source identity
+is resolved and a participant-admission receipt exists. `Audience` constrains
+projection; it never grants membership, trace access, or source access.
 
 ### 2.2 Public transcript versus execution evidence
 
@@ -217,14 +397,14 @@ transcript.
 
 ### 2.3 Participants and execution contributors
 
-Two sets must remain distinct:
+Participants are attached to `InteractionContext` through
+`InteractionParticipant`, author events through `EventActor`, and become
+accountable for runs through `AgentRun.accountableActor`.
 
-```ts
-interface Participation {
-  participantIds: string[]; // socially present or addressed
-  executionContributorIds: string[]; // performed work behind an event
-}
-```
+Execution contributors are attached to `AgentSpan.contributor` and, for
+assembly components, `ComponentActivation`. There is no free-floating
+`Participation` aggregate whose two arrays can drift away from the records they
+purport to describe.
 
 A visible participant:
 
@@ -255,8 +435,11 @@ interface AgentRun {
   contextId: string;
   initiatingEventId?: string;
   requestedBy: EventActor;
-  accountableParticipantId?: string;
-  assemblyRevisionId?: string;
+  /**
+   * Required. A participant for socially visible work, otherwise an explicit
+   * system actor. A visible output may never use an unaccountable component.
+   */
+  accountableActor: EventActor;
   status:
     | "queued"
     | "running"
@@ -268,10 +451,37 @@ interface AgentRun {
   authority: RunAuthority;
   budget: RunBudget;
   traceId: string;
+  executionIds: string[];
   outputEventIds: string[];
   artifactIds: string[];
   startedAt?: string;
   finishedAt?: string;
+}
+
+interface RunExecution {
+  id: string;
+  runId: string;
+  executionBindingId: string;
+  runtimeSessionId: string;
+  assemblyInstanceId: string;
+  rootSpanId: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+interface RunAuthority {
+  policyId: string;
+  allowedCapabilityIds: string[];
+  allowedResourceScopeIds: string[];
+  expiresAt?: string;
+}
+
+interface RunBudget {
+  maxCalls: number;
+  maxTokens: number;
+  maxWallTimeMs: number;
+  maxParallelExecutions: number;
 }
 ```
 
@@ -279,6 +489,11 @@ A run is the portable lifecycle unit. It may be a quick reply, a background
 research task, a scene-turn activation, or work delegated by a coordinator.
 The UI can therefore show progress, ask for approval, cancel work, and reopen
 results without treating the whole conversation as “running.”
+
+Every `executionIds` entry resolves to a `RunExecution`. That join is the
+testable answer to “which authorized persona, assembly, and runtime continuity
+actually performed this run?” Rotating a runtime session creates a later
+`RunExecution`; it never rewrites earlier execution evidence.
 
 ### 3.2 Run versus durable work item
 
@@ -310,12 +525,12 @@ interface AgentTrace {
   runId: string;
   contextId: string;
   rootSpanId: string;
-  linkedTraceIds: TraceLink[];
+  links: TraceLink[];
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;
   finishedAt?: string;
   retentionClass: string;
-  visibilityPolicyId: string;
+  disclosure: DisclosurePolicy;
 }
 
 type SpanKind =
@@ -329,6 +544,43 @@ type SpanKind =
   | "artifact"
   | "source-adapter"
   | `extension:${string}`;
+
+type SpanContributor =
+  | { kind: "participant"; participantId: string }
+  | { kind: "component"; componentActivationId: string }
+  | { kind: "tool"; toolId: string }
+  | { kind: "model"; provider: string; model: string }
+  | { kind: "system"; systemId: string };
+
+interface AgentSpan {
+  id: string;
+  traceId: string;
+  runId: string;
+  runExecutionId: string;
+  parentSpanId?: string;
+  kind: SpanKind;
+  name: string;
+  contributor: SpanContributor;
+  links: SpanLink[];
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  disclosure: DisclosurePolicy;
+  inputReceiptIds: string[];
+  outputReceiptIds: string[];
+  startedAt: string;
+  finishedAt?: string;
+  errorReceiptId?: string;
+}
+
+interface TraceLink {
+  traceId: string;
+  relationship: "caused-by" | "continued-by" | "retry-of" | "related";
+  reason: string;
+}
+
+interface SpanLink {
+  spanId: string;
+  relationship: "caused-by" | "continued-by" | "retry-of" | "related";
+}
 ```
 
 A trace answers: **what causally happened while this run was executed?**
@@ -359,14 +611,55 @@ The trace graph preserves both causality and lifecycle truth.
 
 ### 4.3 Trace visibility
 
-Trace access is permissioned and projected:
+All trace, component, packet, and receipt disclosure uses one policy shape:
 
-- **Participant view:** visible events, safe status, cited artifacts, and
+```ts
+type DisclosureLevel = "participant" | "operator" | "debug";
+
+interface DisclosurePolicy {
+  level: DisclosureLevel;
+  /** Empty for the level default; otherwise every policy must allow access. */
+  restrictionPolicyIds: string[];
+}
+
+interface TraceAccessGrant {
+  id: string;
+  principalId: string;
+  traceId: string;
+  maximumLevel: DisclosureLevel;
+  restrictionPolicyIds: string[];
+  grantedByPrincipalId: string;
+  reason: string;
+  grantedAt: string;
+  expiresAt?: string;
+  revokedAt?: string;
+}
+```
+
+The level order is `participant < operator < debug`. A derived value inherits
+the highest required level and the union of all input restrictions. There is no
+implicit lowering through summarization. A restriction policy may narrow a
+level but never broaden it.
+
+Trace access requires all of:
+
+1. principal membership authorizing access to the interaction;
+2. an active `TraceAccessGrant` for that trace and requested level;
+3. every referenced restriction policy; and
+4. the requested projection's own audience check.
+
+Owner membership does not automatically create an operator or debug grant.
+Deployments may have a server-authored policy that issues grants to a named
+operator role, but the positive grant and reason remain inspectable.
+
+The projections are:
+
+- **Participant:** visible events, safe status, cited artifacts, and
   deliberately exposed receipts.
-- **Owner/operator view:** agent/component tree, tool lifecycles, timing,
-  token/cost summaries, context compilation receipts, and safe errors.
-- **Privileged debug view:** source-adapter and host details permitted by
-  explicit debug scope.
+- **Operator:** agent/component tree, tool lifecycles, timing, token/cost
+  summaries, context compilation receipts, and safe errors.
+- **Debug:** source-adapter and host details permitted by explicit debug and
+  restriction policies.
 
 No view infers hidden content through counts, names, refusal wording, or
 redaction placeholders. A response may disclose that work was delegated
@@ -375,15 +668,35 @@ knowledge.
 
 ## 5. Runtime sessions
 
-Runtime sessions are host-private continuity bindings:
+Runtime sessions are host-private continuity bindings. They never replace the
+ratified execution authority:
 
 ```ts
+interface AgentExecutionBinding {
+  id: string;
+  /** Server-derived authenticated principal. */
+  principalId: string;
+  /** Exactly one durable persona. */
+  personaId: string;
+  /**
+   * Resolved and validated for this execution. It may equal the interaction's
+   * canonical home, but is never inherited from it as an authorization grant.
+   */
+  homeScopeId: string;
+  initialPerspective: ScopePerspective;
+  authorizedContextScopeIds: string[];
+  contextId: string;
+  participantId: string;
+  assemblyInstanceId: string;
+  status: "active" | "revoked";
+  createdAt: string;
+  revokedAt?: string;
+}
+
 interface RuntimeSessionBinding {
   id: string;
   host: string;
-  principalId: string;
-  personaId?: string;
-  assemblyInstanceId?: string;
+  executionBindingId: string;
   continuationReference?: SecretReference;
   cursor?: number;
   checkpointRevision?: string;
@@ -392,6 +705,25 @@ interface RuntimeSessionBinding {
   updatedAt: string;
 }
 ```
+
+`AgentExecutionBinding`'s authority tuple is immutable. Changing principal,
+persona, home scope, perspective, authorized context scopes, participant,
+assembly, or interaction mints a new binding id. Only the monotonic
+`active → revoked` lifecycle transition may update the record. Revocation
+disables new executions but does not rewrite historical runs.
+
+The host validates at execution time that:
+
+- the runtime session resolves to the named execution binding;
+- the binding's principal still holds the required interaction membership;
+- its participant is still admitted;
+- its persona and assembly instance still match;
+- its home scope and every authorized context scope remain authorized under
+  current policy; and
+- the run authority's resource scopes are a subset of the execution binding;
+  and
+- dynamic context selection is a subset of
+  `authorizedContextScopeIds`.
 
 Rules:
 
@@ -406,9 +738,15 @@ Rules:
    participate.
 7. Runtime-session identity appears in privileged trace evidence, not primary
    navigation.
+8. Every runtime session is joined to runs only through `RunExecution`; no run
+   infers authority from `InteractionContext.homeScopeId` or participant
+   presence.
 
-The existing `AgentRuntimeSessionState` is the migration source for this
-binding, not the future product noun.
+The existing `AgentThreadExecutionBinding` is the migration source for
+`AgentExecutionBinding`; its principal, persona, home scope, initial
+perspective, and additional context scopes must survive exactly. The existing
+`AgentRuntimeSessionState` is the migration source for `RuntimeSessionBinding`,
+not the future product noun.
 
 ## 6. Agent identity and assemblies
 
@@ -426,6 +764,47 @@ interface AgentAssemblyRevision {
   routes: AssemblyRoute[];
   policy: AssemblyPolicy;
   createdAt: string;
+}
+
+interface AssemblyRoute {
+  fromComponentId: string;
+  toComponentId: string;
+  schema: string;
+  maxRounds: number;
+}
+
+interface AssemblyPolicy {
+  maxTotalRounds: number;
+  maxParallelComponents: number;
+  stopOnCancellation: boolean;
+}
+
+interface AgentAssemblyInstance {
+  id: string;
+  personaId: string;
+  assemblyRevisionId: string;
+  status: "active" | "retired";
+  createdAt: string;
+  retiredAt?: string;
+}
+
+type ComponentTrigger =
+  | { kind: "run-start" }
+  | { kind: "event"; eventKinds: InteractionEventKind[] }
+  | { kind: "packet"; schemas: string[] };
+
+interface ComponentAuthority {
+  policyId: string;
+  readScopeIds: string[];
+  capabilityIds: string[];
+  mayEmitSchemas: string[];
+  mayWriteDurableState: boolean;
+}
+
+interface ComponentBudget {
+  maxCalls: number;
+  maxTokens: number;
+  maxWallTimeMs: number;
 }
 
 interface AgentComponentDefinition {
@@ -447,13 +826,31 @@ interface AgentComponentDefinition {
   trigger: ComponentTrigger;
   authority: ComponentAuthority;
   budget: ComponentBudget;
-  visibility: "internal" | "operator" | "participant";
+  disclosure: DisclosurePolicy;
+}
+
+interface ComponentActivation {
+  id: string;
+  assemblyInstanceId: string;
+  componentDefinitionId: string;
+  runExecutionId: string;
+  spanId: string;
+  triggerEventId?: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  stopReason?: string;
+  startedAt?: string;
+  finishedAt?: string;
 }
 ```
 
 The assembly is versioned because a trace must be able to say which mechanism
 produced the visible behavior. Identity continuity does not require mechanism
 immutability, but mechanism changes must not be invisible in provenance.
+
+`AgentAssemblyInstance` is the record that mints `assemblyInstanceId`.
+`ComponentActivation` is the record that mints `componentActivationId` and
+joins it to exactly one component span. An execution binding selects one
+assembly instance; a run execution activates zero or more of its components.
 
 ### 6.2 Component rules
 
@@ -480,13 +877,14 @@ interface ComponentPacket<T = unknown> {
   traceId: string;
   spanId: string;
   assemblyInstanceId: string;
-  componentId: string;
+  senderActivationId: string;
   recipientComponentId: string;
   schema: string;
   payload: T;
   sourceRefs: string[];
   confidence?: number;
   expiresAt?: string;
+  disclosure: DisclosurePolicy;
   createdAt: string;
 }
 ```
@@ -518,11 +916,38 @@ play rather than intuition.
 External sources keep their native identity while mapping into the neutral
 model.
 
+Every adapter emits revision-aware proposals:
+
+```ts
+interface SourceMutationProposal {
+  bindingId: string;
+  sourceEventId: string;
+  sourceRevision?: string;
+  operation: "create" | "edit" | "delete" | "redact";
+  actor: SourceActorReference;
+  observedAt: string;
+  replacementContent?: ContentPart[];
+  reason?: string;
+}
+```
+
+Admission is idempotent by binding, source event, source revision, and
+operation. Source edits create a new product event revision while retaining the
+prior source provenance. Deletes and redactions create tombstones; they do not
+erase the fact that an event existed from operator/audit storage unless the
+configured legal-retention policy requires erasure. Ordinary participant
+projections receive only the tombstone permitted by source and product policy.
+An adapter may not leave superseded or redacted content reachable through
+search, prompt compilation, cached rich parts, artifacts, or participant-safe
+trace projections.
+
 ### Slack
 
 - Slack conversation/channel id → source container.
 - `thread_ts` → reply root or child interaction, according to adapter policy.
 - message timestamp/id → source event identity.
+- edited messages → revisioned `edit` proposals.
+- deletion events → policy-governed tombstones and cache/search invalidation.
 - Slack user/app identity → source actor reference, then authorized local
   principal/agent mapping where one exists.
 
@@ -534,12 +959,19 @@ model.
   thread identity.
 - sender/recipient headers form source actors and audience, subject to
   identity resolution and privacy policy.
+- IMAP/provider flags, moves, and deletion observations do not rewrite reply
+  identity. The binding's mutation policy declares whether deletion is mirrored
+  as a tombstone, retained locally, or legally erased.
 
 ### Matrix
 
 - room id → source container.
 - event id → source event identity.
 - relation/thread metadata → event relations or child interaction mapping.
+- replacement relations → revisioned `edit` proposals.
+- redaction events → `redact` proposals that remove disallowed event content
+  from ordinary projections, prompt candidates, caches, and search while
+  retaining only the protocol- and policy-permitted tombstone/provenance.
 - room membership and encryption state remain source provenance and admission
   inputs; mounting a room does not bypass Sigil authorization.
 
@@ -550,8 +982,10 @@ model.
 - vocabulary compatibility does not imply shared authority or identity.
 
 Adapters produce normalized proposals. Product admission validates membership,
-audience, deduplication, source revision, and authorization before committing
-events or triggering runs.
+audience, deduplication, source revision, mutation ordering, and authorization
+before committing events or triggering runs. A delete or redaction cancels or
+invalidates downstream runs and artifacts only according to explicit policy;
+it never silently leaves the original content in model-visible derived state.
 
 ## 8. Product information architecture
 
@@ -609,6 +1043,15 @@ This contract revises the terminology of earlier active proposals:
 - A route such as `/sessions/:id` may remain as a compatibility alias while a
   canonical interaction route is introduced.
 
+It also explicitly revises the user-facing noun in the ratified
+`SCOPE-COMPOSITION-AND-SCOPED-WORK-SPEC.md`: its **Session view** becomes the
+product-named interaction home while retaining the same canonical home,
+composition, perspective, resource-resolution, commitment, and authorization
+rules. The currently shipped `/sessions/$threadId` route and `SessionHome`
+component are migration evidence, not a reason to preserve the ambiguous noun.
+They remain functional compatibility surfaces until the interaction route and
+home land.
+
 The project/workspace ownership and active-perspective rules in the scope
 contract are unchanged. This spec only stops making their child interaction
 surface double as a runtime-session concept.
@@ -623,23 +1066,55 @@ Migration is additive and receipt-bearing.
 - Rename user-facing “session” labels to conversation/channel as appropriate.
 - Call `runtime.session` a runtime session everywhere outside compatibility
   types.
+- Preserve `AgentThread.members` as the source ACL; never fold it into
+  participant ids.
+- Preserve every field of `AgentThreadExecutionBinding` as an immutable
+  execution binding.
 - Add `runId` and `traceId` correlation to newly captured event envelopes.
 
 ### Phase 2 — separate records
 
-- Move title, membership, scope, status, and fork lineage into
-  `InteractionContext`.
+- Move title, canonical home scope, status, and fork lineage into
+  `InteractionContext`; membership remains a separate ACL record.
+- Migrate `AgentThread.members` into `InteractionMembership` principal records
+  before authorizing any separated record.
+- Migrate each execution binding before creating its runtime session, assembly
+  instance, participant, or run-execution joins.
 - Move resumable host state into owner-scoped `RuntimeSessionBinding`.
 - Normalize visible messages/actions into `InteractionEvent`.
 - Persist runs and traces separately, with links from interaction events.
-- Retain the current bounded event projection as a versioned migration source,
-  not canonical history.
+- Backfill visible history from Eve's canonical durable stream when that stream
+  is available and the owner check succeeds.
+- Reconcile the backfill against the product projection by stream index and
+  event identity; never re-admit an event or restore redacted content.
+- When canonical backfill is unavailable, retain the bounded projection and its
+  compaction receipt, mark the migration `partial`, and expose the missing
+  interval only to authorized operators. Never invent history.
+
+Every migration emits:
+
+```ts
+interface InteractionMigrationReceipt {
+  sourceThreadId: string;
+  contextId: string;
+  membershipIds: string[];
+  participantIds: string[];
+  executionBindingIds: string[];
+  runtimeSessionIds: string[];
+  migratedThroughStreamIndex?: number;
+  sourceCompactionReceiptId?: string;
+  historyCompleteness: "complete" | "partial";
+  missingIntervals: Array<{ beforeStreamIndex: number; omittedCount?: number }>;
+  createdAt: string;
+}
+```
 
 ### Phase 3 — multi-participant and assemblies
 
 - Let one interaction context bind multiple persona participants.
 - Route each participant activation through its immutable persona/assembly
   binding.
+- Create `RunExecution` joins for every producing runtime session.
 - Record component and subagent spans without admitting them as participants.
 - Add per-message and per-run trace inspection.
 
@@ -658,45 +1133,54 @@ secrets, or turn historical runtime events into newly admitted public events.
 
 ## 10. Ownership
 
-| Layer             | Owns                                                                                                               | Must not own                                                           |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Mirk              | Physical persistence, transactions, indexes, migrations, artifact bytes.                                           | Social meaning, trace visibility policy, agent identity.               |
-| Gonk              | Principal/persona identity, authorization inputs, capability policy, portable receipts and provenance.             | Product navigation, game scenes, host continuation secrets.            |
-| Sigil Agent / Eve | Runtime-session adapters, run execution, trace/span capture, streaming, interruption, component activation hooks.  | Chat membership policy, game perception, canonical product transcript. |
-| Sigil Chat        | Interaction-context composition, membership, source admission, transcript/read-model projection, run and trace UX. | Game-specific scene/actor semantics or a competing tracing runtime.    |
-| Product extension | Domain-facing noun and policy: scene, case, room, editorial desk, and its event/admission semantics.               | Forked generic run/trace/session contracts.                            |
+| Layer             | Owns                                                                                                                                                    | Must not own                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Mirk              | Physical persistence, transactions, indexes, migrations, artifact bytes.                                                                                | Social meaning, trace visibility policy, agent identity.               |
+| Gonk              | Principal/persona identity, authorization inputs, capability policy, portable receipts and provenance.                                                  | Product navigation, game scenes, host continuation secrets.            |
+| Sigil Agent / Eve | Runtime-session adapters, run execution, trace/span capture, streaming, interruption, component activation hooks.                                       | Chat membership policy, game perception, canonical product transcript. |
+| Sigil Chat        | Interaction-context composition, principal membership ACL, participant admission, source admission, transcript/read-model projection, run and trace UX. | Game-specific scene/actor semantics or a competing tracing runtime.    |
+| Product extension | Domain-facing noun and policy: scene, case, room, editorial desk, and its event/admission semantics.                                                    | Forked generic run/trace/session contracts.                            |
 
 ## 11. Security, privacy, and retention
 
 1. Interaction membership never grants trace/debug access automatically.
 2. Tool approval never grants context, runtime-session, or trace ownership.
-3. Runtime continuation references stay server-only.
-4. Traces use explicit retention classes and audience-specific projections.
-5. Raw execution traces are never shipped to participants as a substitute for
+3. Participant admission never grants principal membership or resource access.
+4. Interaction canonical home never widens an execution binding.
+5. Runtime continuation references stay server-only.
+6. Traces use the one disclosure lattice, explicit grants, retention classes,
+   and audience-specific projections.
+7. Raw execution traces are never shipped to participants as a substitute for
    a transcript.
-6. Source-adapter credentials and source-private metadata are not event
+8. Source-adapter credentials and source-private metadata are not event
    content.
-7. Component packets inherit the strictest visibility of their inputs.
-8. Summaries retain provenance links and do not launder inaccessible material
-   into a broader audience.
-9. Redaction must not reveal hidden content through omitted counts, component
-   names, timing labels, or placeholder structure.
-10. Cancellation and revocation propagate to active child spans and prevent
+9. Component packets inherit the strictest disclosure level and every
+   restriction policy of their inputs.
+10. Summaries retain provenance links and do not launder inaccessible material
+    into a broader audience.
+11. Redaction must not reveal hidden content through omitted counts, component
+    names, timing labels, or placeholder structure.
+12. Cancellation and revocation propagate to active child spans and prevent
     later result admission; independently linked runs follow their own explicit
     cancellation policy.
+13. Source edits, deletions, and redactions invalidate every ordinary
+    projection that retained superseded content.
 
 ## 12. Acceptance criteria
 
 1. One conversation contains three runs without presenting three sessions.
 2. Rotating its runtime session preserves the conversation and visible
-   history.
+   history; the two runs resolve through distinct `RunExecution` records to the
+   old and new runtime sessions while retaining the same authorized execution
+   binding where policy permits.
 3. One run activates a subagent as a child span; the subagent is inspectable
    but never appears in the participant list or transcript.
 4. A dispatched background task receives its own linked run and trace, can be
    cancelled independently, and links its admitted result back to the
    initiating event.
 5. Two persona-bound agents participate in one channel, with producing-agent
-   provenance on each message and no cross-persona continuation leakage.
+   provenance on each message, distinct immutable execution bindings, and no
+   cross-persona authority or continuation leakage.
 6. One visible agent uses at least two internal components; authorized
    inspection shows their spans and packets while the participant transcript
    shows only the accountable agent.
@@ -707,13 +1191,27 @@ secrets, or turn historical runtime events into newly admitted public events.
    canonical identity.
 9. An email fixture preserves `Message-ID`, `In-Reply-To`, and `References`
    ancestry while deduplicating exact re-imports.
-10. A participant-safe trace projection reveals useful status and artifacts
+10. Slack edits/deletes and Matrix replacement/redaction fixtures revision or
+    tombstone the product event and remove superseded content from prompt,
+    search, cache, and participant-safe trace projections.
+11. A participant-safe trace projection reveals useful status and artifacts
     without reasoning, secrets, hidden actor knowledge, or hidden-content
-    counts.
-11. An interaction fork records its parent event/snapshot boundary, mints new
+    counts; it is inaccessible without an explicit positive trace grant.
+12. An interaction fork records its parent event/snapshot boundary, mints new
     mutable lineage, and copies no runtime continuation material.
-12. Existing `AgentThread` records migrate idempotently, remain reachable, and
+13. A persona participant cannot satisfy an `InteractionMembership` principal
+    ACL check, while a human represented by both records succeeds only through
+    the membership record.
+14. Revoking membership prevents new runs even when the participant, runtime
+    session, and interaction context still exist.
+15. A context shared by two persona participants preserves a different
+    principal/persona/home/perspective/authorized-context binding for each; no
+    context field widens either binding.
+16. Existing `AgentThread` records migrate idempotently, remain reachable, and
     retain a receipt identifying every separated record.
+17. A compacted source backfills from Eve when possible; otherwise it remains
+    explicitly partial with its compaction receipt and missing interval rather
+    than presenting a fabricated complete history.
 
 ## 13. Non-goals
 
