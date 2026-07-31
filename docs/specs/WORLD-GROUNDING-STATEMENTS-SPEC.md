@@ -135,6 +135,9 @@ explicit authority and projections.
 ### Value objects and projections
 
 - `Proposition`: normalized subject, predicate, and object inside a statement.
+  An object may reference another statement's identity, so a first-order
+  belief about another actor's knowledge is representable without
+  nested-possible-world semantics.
 - `Context`: world, branch, scope, actor, scene, and applicable time.
 - `Effect`: an event-attached mutation proposal, not an independent truth root.
 - `Perception`: an epistemic projection derived from an event, observer,
@@ -178,9 +181,16 @@ Semantics:
 - A second retraction with a new key fails because the branch head is already
   terminal.
 
+Authority is a four-state machine — `proposed` / `accepted` / `rejected` /
+`superseded` — and is orthogonal to provenance. Source-backed is a provenance
+quality, not an authority state: a fully-cited claim can still be proposed,
+contradicted, or superseded. Acceptance is an act of the authorized
+principal, never a side effect of extraction confidence or model fluency.
+
 Gonk defines the host-neutral contract and authorization inputs. One
-Mirk-backed adapter serializes the commits. A consumer asks for a mutation; it
-does not independently commit world truth.
+Mirk-backed adapter serializes the commits, built on the Mirk store's existing
+coordination primitives rather than a second bespoke serialization mechanism.
+A consumer asks for a mutation; it does not independently commit world truth.
 
 ## Time, branches, and contradiction
 
@@ -188,6 +198,13 @@ Every statement revision distinguishes:
 
 - **valid time**: when the proposition applies in the represented world;
 - **recorded time**: when the substrate admitted the revision.
+
+Valid time is interval-valued, and intervals may carry precision qualifiers.
+Learning, forgetting, correction, and repudiation are represented by opening
+and closing intervals, never by deleting records. The kernel must not require
+every valid time to resolve to comparable instants: a represented world may
+date a fact only partially ("before the reclamation"), and that partial order
+is preserved rather than fabricated into a precise date.
 
 Branch is part of the revision identity. One stable statement may therefore
 have distinct branch histories without merging those histories implicitly.
@@ -218,6 +235,25 @@ must preserve the underlying disagreement and explain its selection.
 - Returns source anchors, derivation, revision, quotation/attribution, and
   admission receipts.
 
+Three rules bind every lens implementation:
+
+- **Falsity is derived, never stored.** The substrate stores the belief —
+  proposition, holder, stance, time, provenance. No stored field asserts that
+  a belief is false; wrongness is always a query-time comparison between the
+  epistemic lens and the truth lens at the same time and branch. When world
+  truth is revised, every dependent wrongness answer changes with it, with no
+  stored annotations to chase.
+- **Lens answers are five-way, not boolean**: explicitly-knows /
+  explicitly-believes-or-suspects / explicitly-unaware / plausibly-available /
+  no-record. Absence of a record is not recorded unawareness, and
+  plausibility is not entitlement. A consumer-owned coarse competency policy
+  may mark a proposition plausibly available and guide retrieval; it never
+  entails knowledge of a specific proposition, and explicit records always
+  override it.
+- **No silent reconciliation.** No summarizer, compactor, scheduled job, or
+  import reconciles an actor-scoped statement toward world truth. Corrections
+  are durable events with before/after references.
+
 The first implementation need not model nested possible-world beliefs. It must
 model first-order actor belief and perception faithfully enough that an actor
 can be wrong without the prompt quietly correcting them.
@@ -246,6 +282,14 @@ The host owns ranking policy and prompt budget. Gonk owns the portable query,
 authorization-input, and receipt contracts. Mirk owns the efficient indexes
 used to answer the authorized query.
 
+The retrieval contributor is an instance of the shared authorized
+retrieval-source contract described in
+[`KB-DESIGN-RECOMMENDATION.md`](KB-DESIGN-RECOMMENDATION.md): one host
+coordinator, one evidence-packet and receipt schema, one prompt-budget
+scheduler, with statements and authored knowledge registered as separate
+sources. Whichever capability lands that contract first defines it; the
+second consumes it rather than forking a parallel injection path.
+
 ## Storage and compatibility projections
 
 Mirk owns:
@@ -266,8 +310,10 @@ subject + predicate + object
 
 The bare triple is intentionally lossy. Full modality, time, context, and
 provenance are recovered by canonical statement lookup through the pointer.
-The projection must never accept an authoritative write after the statements
-capability becomes canonical.
+The projection is read-only from the moment the `statements/v1` contract
+types exist (Stage 1), not merely after cutover: world-scoped data must never
+be written through a pre-existing triple surface, because such a write
+bypasses admission and every lens.
 
 Authored knowledge documents remain a second projection: useful narrative over
 statements and sources, not a replacement for either.
@@ -341,6 +387,11 @@ prompt, ordinary player UI, privileged referee/debug UI, and host receipt.
 - Freeze the migration crosswalk from existing claim/triple records.
 - Freeze the authorization/receipt audience matrix.
 - Freeze a benchmark corpus and query mix.
+- Name the shared retrieval-contributor contract and the Mirk coordination
+  primitive as imported dependencies of this capability, not new definitions.
+- Reconcile the kernel against the knowledge models of existing and named
+  future consumers, and record that crosswalk as Stage 0 evidence; ratify
+  `ontology-kernel/v1` only against the reconciled vocabulary.
 - Record clean/dirty checkout and worktree-isolation receipts for every repo.
 
 ### Stage 1 — contract-only Gonk surface
