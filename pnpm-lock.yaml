@@ -6768,6 +6768,12 @@ snapshots:
 
   '@acausal/scalr@3.0.0-alpha.3': {}
 
+  '@ai-sdk/anthropic@4.0.23(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.4
+      '@ai-sdk/provider-utils': 5.0.14(zod@4.4.3)
+      zod: 4.4.3
+
   '@ai-sdk/gateway@4.0.23(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
@@ -6776,17 +6782,17 @@ snapshots:
       zod: 3.25.76
     optional: true
 
-  '@ai-sdk/anthropic@4.0.23(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.4
-      '@ai-sdk/provider-utils': 5.0.14(zod@4.4.3)
-      zod: 4.4.3
-
   '@ai-sdk/gateway@4.0.23(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.11(zod@4.4.3)
       '@vercel/oidc': 3.2.0
+      zod: 4.4.3
+
+  '@ai-sdk/openai-compatible@3.0.16(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.4
+      '@ai-sdk/provider-utils': 5.0.14(zod@4.4.3)
       zod: 4.4.3
 
   '@ai-sdk/provider-utils@5.0.11(zod@3.25.76)':
@@ -6797,12 +6803,6 @@ snapshots:
       eventsource-parser: 3.1.0
       zod: 3.25.76
     optional: true
-
-  '@ai-sdk/openai-compatible@3.0.16(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.4
-      '@ai-sdk/provider-utils': 5.0.14(zod@4.4.3)
-      zod: 4.4.3
 
   '@ai-sdk/provider-utils@5.0.11(zod@4.4.3)':
     dependencies:

@@ -4,6 +4,10 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { AgentRuntimeSession } from "@zigil/agent/contracts"
+import {
+  AgentOutcomeProjector,
+  extractClientCommand,
+} from "./agent-outcome-projector"
 
 const commandMocks = vi.hoisted(() => ({
   dispatchAgentClientCommand: vi.fn(),
@@ -18,11 +22,6 @@ const domMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/agent-client-command", () => commandMocks)
 vi.mock("@/lib/agent-dom-effects", () => domMocks)
-
-import {
-  AgentOutcomeProjector,
-  extractClientCommand,
-} from "./agent-outcome-projector"
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true
