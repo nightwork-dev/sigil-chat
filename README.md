@@ -42,8 +42,9 @@ proof that remains open.
 ## Run locally
 
 Requires Node 24, [Portless](https://www.npmjs.com/package/portless)
-(`npm i -g portless`), and a one-time `codex login`. Everything else resolves
-from the repository and public npm.
+(`npm i -g portless`), a one-time `codex login`, and the pinned `@gonk/*`
+train in local Verdaccio at `http://localhost:4873`. All non-Gonk dependencies
+resolve from public npm.
 
 ```bash
 pnpm dev

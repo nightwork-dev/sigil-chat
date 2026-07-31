@@ -7,7 +7,8 @@ import {
   listWaitingMessages,
 } from "@gonk/comms";
 import { FsScopeStore } from "@gonk/scope";
-import { createStoreProvider, mirkBackendFactory } from "@gonk/store";
+import { createStoreProvider } from "@gonk/store";
+import { mirkBackendFactory } from "@gonk/store/sqlite";
 import { describe, expect, it } from "vitest";
 
 import {

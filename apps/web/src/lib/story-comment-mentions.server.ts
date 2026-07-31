@@ -8,9 +8,9 @@ import {
 import { createScope, FsScopeStore } from "@gonk/scope";
 import {
   createStoreProvider,
-  mirkBackendFactory,
   type Store,
 } from "@gonk/store";
+import { mirkBackendFactory } from "@gonk/store/sqlite";
 
 const SENDER_HOST = "sigil-chat";
 const PRESENCE_SESSION_ID = "sigil-chat-roadmap";
