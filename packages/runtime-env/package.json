@@ -6,7 +6,7 @@
   "private": true,
   "sideEffects": false,
   "dependencies": {
-    "@mirk/fixtures": "0.1.0",
+    "@mirk/fixtures": "catalog:",
     "yaml": "^2.9.0"
   },
   "files": [

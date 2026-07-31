@@ -9,11 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gonk/auth": "0.5.1",
-    "@gonk/image-gen": "0.5.0",
-    "@gonk/skills": "0.5.1",
-    "@gonk/tool-registry": "0.5.1",
-    "@mirk/store": "^0.7.0",
+    "@gonk/auth": "catalog:",
+    "@gonk/image-gen": "catalog:",
+    "@gonk/skills": "catalog:",
+    "@gonk/tool-registry": "catalog:",
+    "@mirk/store": "catalog:",
     "@workspace/agent-contracts": "workspace:*",
     "@workspace/artifact-store": "workspace:*",
     "@workspace/blackboard-store": "workspace:*",

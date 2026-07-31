@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mirk/artifact": "^0.1.0",
+    "@mirk/artifact": "catalog:",
     "@workspace/runtime-env": "workspace:*"
   },
   "devDependencies": {

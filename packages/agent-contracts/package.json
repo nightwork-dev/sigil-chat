@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zigil/agent": "0.1.0"
+    "@zigil/agent": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",

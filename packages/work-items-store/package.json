@@ -5,8 +5,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@mirk/store": "0.8.1",
-    "@mirk/store-markdown": "0.1.0",
+    "@mirk/store": "catalog:",
+    "@mirk/store-markdown": "catalog:",
     "yaml": "^2.9.0"
   },
   "scripts": {

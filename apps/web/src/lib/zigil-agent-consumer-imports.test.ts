@@ -51,6 +51,9 @@ describe("canonical @zigil/agent consumer imports", () => {
   })
 
   it("declares only the canonical SDK package in consumer manifests", () => {
+    const workspaceManifest = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8")
+    const catalogPinsCanonicalAgent =
+      /^\s{2}"@zigil\/agent": \d+\.\d+\.\d+\s*$/m.test(workspaceManifest)
     const manifests = [
       "apps/web/package.json",
       "packages/ui/package.json",
@@ -64,10 +67,12 @@ describe("canonical @zigil/agent consumer imports", () => {
       const invalidKeys = Object.keys(dependencies).filter(
         (name) => name.startsWith("@zigil/agent/") || name.startsWith("@zigil/agent-"),
       )
+      const declaredVersion = dependencies["@zigil/agent"]
       const invalidVersions =
-        dependencies["@zigil/agent"] === "0.1.0"
+        /^\d+\.\d+\.\d+$/.test(declaredVersion ?? "") ||
+        (declaredVersion === "catalog:" && catalogPinsCanonicalAgent)
           ? []
-          : [`${manifest} pins @zigil/agent to ${dependencies["@zigil/agent"] ?? "missing"}`]
+          : [`${manifest} pins @zigil/agent to ${declaredVersion ?? "missing"}`]
 
       return [...invalidKeys.map((name) => `${manifest} declares ${name}`), ...invalidVersions]
     })

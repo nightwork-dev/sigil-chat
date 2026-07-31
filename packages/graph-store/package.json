@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mirk/store": "0.8.0",
+    "@mirk/store": "catalog:",
     "@workspace/graph": "workspace:*",
     "@workspace/runtime-env": "workspace:*"
   },

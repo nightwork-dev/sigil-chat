@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@mirk/store-markdown": "0.1.0",
+    "@mirk/store-markdown": "catalog:",
     "@workspace/runtime-env": "workspace:*"
   },
   "scripts": {
