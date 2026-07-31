@@ -86,15 +86,23 @@ export function resolveSigilAgentModel(
     }
   }
 
-  const provider = createAnthropic({
-    apiKey,
-    fetch: options.fetch,
-  })
-  return {
-    contextWindowTokens,
-    display: display(model),
-    model: provider.messages(directHostedModelId(model)) as LanguageModel,
+  if (model.provider === "anthropic") {
+    const provider = createAnthropic({
+      apiKey,
+      fetch: options.fetch,
+    })
+    return {
+      contextWindowTokens,
+      display: display(model),
+      model: provider.messages(directHostedModelId(model)) as LanguageModel,
+    }
   }
+
+  return assertNeverProvider(model.provider)
+}
+
+function assertNeverProvider(provider: never): never {
+  throw new Error(`Unsupported model provider "${String(provider)}".`)
 }
 
 export async function hasConfiguredModelCredential(
@@ -106,9 +114,6 @@ export async function hasConfiguredModelCredential(
   const model = normalizeSigilAgentModelConfig(config)
   if (model.provider === "codex") {
     return options.hasCodexModelAuth?.() ?? false
-  }
-  if (model.provider === "openai-compatible") {
-    return hasConfiguredCredential(model, options.env)
   }
   return hasConfiguredCredential(model, options.env)
 }
