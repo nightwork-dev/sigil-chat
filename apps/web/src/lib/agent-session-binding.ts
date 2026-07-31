@@ -67,7 +67,7 @@ const issueAgentSessionBindingFn = createServerFn({ method: "POST" })
           initialPerspective: binding.initialPerspective,
           additionalContextScopeIds: binding.additionalContextScopeIds,
           ...(binding.eveSessionId
-            ? { eveSessionId: binding.eveSessionId }
+            ? { runtimeSessionId: binding.eveSessionId }
             : {}),
           subject: session.user.id,
           expiresAt,
@@ -149,7 +149,7 @@ const issueAgentParticipantSessionBindingFn = createServerFn({ method: "POST" })
             homeScopeId: target.homeScopeId,
             initialPerspective: target.initialPerspective,
             additionalContextScopeIds: target.additionalContextScopeIds,
-            ...(target.eveSessionId ? { eveSessionId: target.eveSessionId } : {}),
+            ...(target.eveSessionId ? { runtimeSessionId: target.eveSessionId } : {}),
             subject: session.user.id,
             expiresAt,
           },

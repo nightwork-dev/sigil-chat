@@ -1,12 +1,12 @@
 import type { AgentSessionBindingChannel } from "@workspace/agent-contracts/session-binding"
 
-export const AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID = "__pending__"
+export const AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID = "__pending__"
 
 export interface AgentParticipantChannelThreadBinding {
   readonly threadId: string
   readonly principalId: string
   readonly personaId: string
-  readonly eveSessionId?: string
+  readonly runtimeSessionId?: string
 }
 
 export function normalizeParticipantThreadIds(
@@ -41,12 +41,12 @@ export function agentParticipantPersonaParticipantId(
   return `persona:${threadId.trim()}`
 }
 
-export function agentParticipantEveSessionId(
+export function agentParticipantRuntimeSessionId(
   _threadId: string,
-  eveSessionId: string | undefined,
+  runtimeSessionId: string | undefined,
 ): string {
-  const normalized = eveSessionId?.trim()
-  return normalized || AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID
+  const normalized = runtimeSessionId?.trim()
+  return normalized || AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID
 }
 
 export function buildAgentParticipantChannel(input: {
@@ -80,12 +80,12 @@ export function buildAgentParticipantChannel(input: {
           participantId: agentParticipantPersonaParticipantId(thread.threadId),
           principalId: input.principalId,
           personaId: thread.personaId,
-          eveSessionId: agentParticipantEveSessionId(
+          runtimeSessionId: agentParticipantRuntimeSessionId(
             thread.threadId,
             input.sessionIds === "active-only" &&
               activeThreadId !== thread.threadId
               ? undefined
-              : thread.eveSessionId,
+              : thread.runtimeSessionId,
           ),
           applicationThreadId: thread.threadId,
           role: "participant" as const,

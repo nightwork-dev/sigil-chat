@@ -7,7 +7,7 @@ import type {
 import type {
   AgentSendInput,
   AgentTurnResult,
-} from "@zigil/agent-surface/contracts"
+} from "@zigil/agent/contracts"
 
 import {
   createParticipantChannelRuntime,
@@ -65,14 +65,14 @@ describe("participant channel runtime", () => {
         channelId: "channel-1",
         participantId: "persona-a",
         personaId: "agent-a",
-        eveSessionId: "eve-a",
+        runtimeSessionId: "eve-a",
         applicationThreadId: "thread-a",
         state: "active",
       },
       intended: {
         channelId: "channel-1",
         targetParticipantId: "persona-a",
-        targetEveSessionId: "eve-a",
+        targetRuntimeSessionId: "eve-a",
         targetApplicationThreadId: "thread-a",
       },
     })
@@ -102,7 +102,7 @@ describe("participant channel runtime", () => {
       payload: { id: "tool-call-a" },
       provenance: {
         applicationThreadId: "thread-a",
-        eveSessionId: "eve-a",
+        runtimeSessionId: "eve-a",
         participantId: "persona-a",
         personaId: "agent-a",
       },
@@ -184,7 +184,7 @@ describe("participant channel runtime", () => {
       channelId: "single-channel",
       principalId: "user-1",
       personaId: "agent-a",
-      eveSessionId: "eve-a",
+      runtimeSessionId: "eve-a",
       applicationThreadId: "thread-a",
     })
     const port = createFakePort("agent-a:session", "eve-a")
@@ -207,7 +207,7 @@ describe("participant channel runtime", () => {
       channelId: "single-channel",
       participantId: "agent-a:session",
       personaId: "agent-a",
-      eveSessionId: "eve-a",
+      runtimeSessionId: "eve-a",
       applicationThreadId: "thread-a",
       state: "active",
     })
@@ -257,7 +257,7 @@ function multiParticipantFixture(
 function participant(
   participantId: string,
   personaId: string,
-  eveSessionId: string,
+  runtimeSessionId: string,
   applicationThreadId: string,
 ): AgentChannelPersonaSessionParticipant {
   return {
@@ -265,7 +265,7 @@ function participant(
     participantId,
     principalId: "user-1",
     personaId,
-    eveSessionId,
+    runtimeSessionId,
     applicationThreadId,
     role: "participant",
     state: "dormant",

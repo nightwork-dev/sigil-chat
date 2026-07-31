@@ -1,1 +1,1 @@
-export * from "@zigil/agent-surface/session-binding";
+export * from "@zigil/agent/session-binding";

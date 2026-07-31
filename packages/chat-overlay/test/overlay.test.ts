@@ -165,7 +165,7 @@ describe("Sigil Chat overlay", () => {
     }
   }, 30_000);
 
-  it("is consumable as the hosted registry item by the Sigil Design CLI", () => {
+  it("is consumable with the registry payload by the Sigil Design CLI", () => {
     const cli = resolveOptionalDesignCli();
     if (!cli) return;
 
@@ -189,6 +189,8 @@ describe("Sigil Chat overlay", () => {
         "chat",
         "--registry",
         registryRoot,
+        "--overlay",
+        packageRoot,
         "--no-install",
         "--no-git",
       ],
@@ -208,16 +210,13 @@ describe("Sigil Chat overlay", () => {
       statSync(join(target, "apps/web/src/routes/_app/chat.tsx")).isFile(),
     ).toBe(true);
 
-    const provenance = JSON.parse(
-      readFileSync(join(target, ".sigil", "scaffold.json"), "utf8"),
-    ) as {
-      overlays: Array<{ registry: string; version: string; digest: string }>;
-    };
-    expect(provenance.overlays[0]).toEqual(
-      expect.objectContaining({
-        registry: join(registryRoot, "chat-overlay.json"),
+    expect(item.overlay.name).toBe("sigil-chat");
+    expect(item.digest).toBe(
+      digestRegistryItem({
+        name: item.name,
         version: item.version,
-        digest: item.digest,
+        overlay: item.overlay,
+        files: item.files,
       }),
     );
 

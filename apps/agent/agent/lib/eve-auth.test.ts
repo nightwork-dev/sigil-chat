@@ -368,7 +368,7 @@ describe("owned Eve channel", () => {
         { turnId: "turn-b" },
         "agent-b",
         {
-          eveSessionId: "session-b",
+          runtimeSessionId: "session-b",
           participantEveSessionId: "session-b",
           participantId: "participant-ada",
         },
@@ -483,7 +483,7 @@ describe("owned Eve channel", () => {
         channelId: "channel-1",
         participants: expect.arrayContaining([
           expect.objectContaining({
-            eveSessionId: "session-a",
+            runtimeSessionId: "session-a",
             participantId: "participant-ada",
             role: "participant",
           }),
@@ -498,7 +498,7 @@ describe("owned Eve channel", () => {
         channelId: "channel-1",
         participants: expect.arrayContaining([
           expect.objectContaining({
-            eveSessionId: "session-b",
+            runtimeSessionId: "session-b",
             participantId: "participant-beatrice",
             role: "participant",
           }),
@@ -517,7 +517,7 @@ describe("owned Eve channel", () => {
         { continuationToken: "eve:continuation-a", message: "Only Ada speaks" },
         "agent-a",
         {
-          eveSessionId: "session-a",
+          runtimeSessionId: "session-a",
           participantEveSessionId: "session-a",
           participantId: "participant-ada",
         },
@@ -530,7 +530,7 @@ describe("owned Eve channel", () => {
     expect(observedProvenance.at(-1)).toEqual({
       applicationThreadId: "thread-1",
       channelId: "channel-1",
-      eveSessionId: "session-a",
+      runtimeSessionId: "session-a",
       kind: "persona-session",
       participantId: "participant-ada",
       personaId: "agent-a",
@@ -551,7 +551,7 @@ describe("owned Eve channel", () => {
         },
         "agent-b",
         {
-          eveSessionId: "session-b",
+          runtimeSessionId: "session-b",
           participantEveSessionId: "session-b",
           participantId: "participant-ada",
         },
@@ -592,7 +592,7 @@ describe("owned Eve channel", () => {
         },
         "agent-a",
         {
-          eveSessionId: "session-dormant",
+          runtimeSessionId: "session-dormant",
           participantEveSessionId: "session-dormant",
           participantId: "participant-dormant",
           state: "dormant",
@@ -729,7 +729,7 @@ describe("owned Eve channel", () => {
       signedRequest(
         "POST",
         "/eve/v1/session/session-1",
-        signedSessionBinding({ eveSessionId: "session-1" }),
+        signedSessionBinding({ runtimeSessionId: "session-1" }),
         { continuationToken: "eve:continuation-1", message: "Continue" },
       ),
       routeArgs({ params: { sessionId: "session-1" } }),
@@ -751,7 +751,7 @@ describe("owned Eve channel", () => {
       signedRequest(
         "POST",
         "/eve/v1/session/session-1/cancel",
-        signedSessionBinding({ eveSessionId: "session-2" }),
+        signedSessionBinding({ runtimeSessionId: "session-2" }),
         { turnId: "turn-1" },
       ),
       routeArgs({ params: { sessionId: "session-1" } }),
@@ -799,7 +799,7 @@ describe("owned Eve channel", () => {
         "/eve/v1/session/session-1",
         signedSessionBinding({
           applicationThreadId: "thread-other",
-          eveSessionId: "session-1",
+          runtimeSessionId: "session-1",
         }),
         { continuationToken: "eve:continuation-1", message: "Continue" },
       ),
@@ -864,8 +864,8 @@ function makeSignedOwnedChannel(ownerStore: MemoryEveSessionOwnerStore) {
                   personaId: binding.personaId,
                 }),
                 sigilRequestedPersonaId: binding.personaId,
-                ...(binding.eveSessionId
-                  ? { sigilAttestedEveSessionId: binding.eveSessionId }
+                ...(binding.runtimeSessionId
+                  ? { sigilAttestedEveSessionId: binding.runtimeSessionId }
                   : {}),
               }
             : {},
@@ -891,15 +891,15 @@ function makeSignedOwnedChannel(ownerStore: MemoryEveSessionOwnerStore) {
 function signedSessionBinding(
   overrides: {
     applicationThreadId?: string
-    eveSessionId?: string
+    runtimeSessionId?: string
   } = {},
 ) {
   return issueAgentSessionBinding(
     {
       additionalContextScopeIds: [],
       applicationThreadId: overrides.applicationThreadId ?? "thread-1",
-      ...(overrides.eveSessionId
-        ? { eveSessionId: overrides.eveSessionId }
+      ...(overrides.runtimeSessionId
+        ? { runtimeSessionId: overrides.runtimeSessionId }
         : {}),
       expiresAt: SESSION_BINDING_NOW + 60,
       homeScopeId: "workspace-a",
@@ -998,7 +998,7 @@ function requestFor(
   body?: unknown,
   personaId?: string,
   binding?: {
-    eveSessionId?: string
+    runtimeSessionId?: string
     omitBinding?: boolean
     omitEveSessionId?: boolean
     participantEveSessionId?: string
@@ -1017,8 +1017,8 @@ function requestFor(
       ...(binding?.omitEveSessionId
         ? { "x-test-omit-eve-session-id": "1" }
         : {}),
-      ...(binding?.eveSessionId
-        ? { "x-test-eve-session-id": binding.eveSessionId }
+      ...(binding?.runtimeSessionId
+        ? { "x-test-eve-session-id": binding.runtimeSessionId }
         : {}),
       ...(binding?.participantId
         ? { "x-test-participant-id": binding.participantId }
@@ -1108,7 +1108,7 @@ function channelFor(
       },
       {
         applicationThreadId,
-        eveSessionId: participant.participantEveSessionId ?? "__pending__",
+        runtimeSessionId: participant.participantEveSessionId ?? "__pending__",
         kind: "persona-session",
         participantId: participant.participantId,
         personaId,

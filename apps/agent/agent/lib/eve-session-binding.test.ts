@@ -10,17 +10,17 @@ const secret = "test-session-binding-secret"
 const now = 1_750_000_000
 
 function proof({
-  eveSessionId,
+  runtimeSessionId,
   subject = "user-1",
 }: {
-  eveSessionId?: string
+  runtimeSessionId?: string
   subject?: string
 } = {}) {
   return issueAgentSessionBinding(
     {
       additionalContextScopeIds: ["workspace-b"],
       applicationThreadId: "thread-1",
-      ...(eveSessionId ? { eveSessionId } : {}),
+      ...(runtimeSessionId ? { runtimeSessionId } : {}),
       expiresAt: now + 60,
       homeScopeId: "personal:user-1",
       initialPerspective: {
@@ -46,7 +46,7 @@ describe("requireVerifiedEveSessionBinding", () => {
       requireVerifiedEveSessionBinding(
         request(
           "/eve/v1/session/session-1",
-          proof({ eveSessionId: "session-1" }),
+          proof({ runtimeSessionId: "session-1" }),
         ),
         "user-1",
         secret,
@@ -78,7 +78,7 @@ describe("requireVerifiedEveSessionBinding", () => {
       requireVerifiedEveSessionBinding(
         request(
           "/eve/v1/session/session-1",
-          proof({ eveSessionId: "session-2" }),
+          proof({ runtimeSessionId: "session-2" }),
         ),
         "user-1",
         secret,
@@ -92,14 +92,14 @@ describe("requireVerifiedEveSessionBinding", () => {
       requireVerifiedEveSessionBinding(
         request(
           "/eve/v1/session/session-1/cancel",
-          proof({ eveSessionId: "session-1" }),
+          proof({ runtimeSessionId: "session-1" }),
         ),
         "user-1",
         secret,
         now,
       ),
     ).toMatchObject({
-      eveSessionId: "session-1",
+      runtimeSessionId: "session-1",
       personaId: "personal-agent",
       subject: "user-1",
     })
@@ -121,7 +121,7 @@ describe("requireVerifiedEveSessionBinding", () => {
       requireVerifiedEveSessionBinding(
         request(
           "/eve/v1/session/session-1/cancel",
-          proof({ eveSessionId: "session-2" }),
+          proof({ runtimeSessionId: "session-2" }),
         ),
         "user-1",
         secret,
@@ -133,7 +133,7 @@ describe("requireVerifiedEveSessionBinding", () => {
   it("rejects an existing-session proof on the create route", () => {
     expect(() =>
       requireVerifiedEveSessionBinding(
-        request("/eve/v1/session", proof({ eveSessionId: "session-1" })),
+        request("/eve/v1/session", proof({ runtimeSessionId: "session-1" })),
         "user-1",
         secret,
         now,

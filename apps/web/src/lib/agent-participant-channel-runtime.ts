@@ -17,7 +17,7 @@ import {
 import type {
   AgentSendInput,
   AgentTurnResult,
-} from "@zigil/agent-surface/contracts"
+} from "@zigil/agent/contracts"
 
 export interface ParticipantCancelResult {
   readonly outcome?: "accepted" | "no-active-turn"
@@ -90,7 +90,7 @@ export interface ParticipantChannelRuntime {
 type PersonaSessionProvenance = AgentChannelParticipantProvenance & {
   readonly kind: "persona-session"
   readonly personaId: string
-  readonly eveSessionId: string
+  readonly runtimeSessionId: string
   readonly applicationThreadId: string
 }
 
@@ -212,7 +212,7 @@ export function createParticipantChannelRuntime({
       intended: {
         channelId: channel.channelId,
         targetParticipantId: target.participantId,
-        targetEveSessionId: target.eveSessionId,
+        targetRuntimeSessionId: target.runtimeSessionId,
         targetApplicationThreadId: target.applicationThreadId,
       },
       bounds: {
@@ -271,7 +271,7 @@ export function createParticipantChannelRuntime({
       state:
         states.get(participant.participantId) ?? participant.state ?? "dormant",
       personaId: participant.personaId,
-      eveSessionId: participant.eveSessionId,
+      runtimeSessionId: participant.runtimeSessionId,
       applicationThreadId: participant.applicationThreadId,
     }
   }
@@ -306,7 +306,7 @@ export function createParticipantChannelRuntime({
     if (
       provenance.kind !== "persona-session" ||
       !provenance.personaId ||
-      !provenance.eveSessionId ||
+      !provenance.runtimeSessionId ||
       !provenance.applicationThreadId
     ) {
       throw new Error("Expected persona-session provenance.")
@@ -337,7 +337,7 @@ export function createSingleSessionChannel(input: {
   readonly channelId: string
   readonly principalId: string
   readonly personaId: string
-  readonly eveSessionId: string
+  readonly runtimeSessionId: string
   readonly applicationThreadId: string
 }): AgentSessionChannel {
   return {
@@ -355,7 +355,7 @@ export function createSingleSessionChannel(input: {
         participantId: `${input.personaId}:session`,
         principalId: input.principalId,
         personaId: input.personaId,
-        eveSessionId: input.eveSessionId,
+        runtimeSessionId: input.runtimeSessionId,
         applicationThreadId: input.applicationThreadId,
         role: "participant",
         state: "active",

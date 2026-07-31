@@ -21,6 +21,7 @@ import {
   setTurnContextAttachmentRetention,
   useAttentionExclusions,
   useAttentionPrivacyLevel,
+  useAgentThreadControls,
   useTurnContextAttachments,
   type AttentionActivityEvent,
   type AttentionContext,

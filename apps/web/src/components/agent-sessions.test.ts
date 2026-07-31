@@ -728,7 +728,7 @@ describe("AppAgentSessions persistence call site", () => {
     for (const envelope of envelopes) {
       expect(envelope.provenance).toMatchObject({
         applicationThreadId: participant.id,
-        eveSessionId: "eve-a",
+        runtimeSessionId: "eve-a",
         participantId: participantIdForThread(participant.id),
         personaId: "agent-a",
       });

@@ -1,17 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import type {
-  AgentSessionBindingChannel,
-  AgentSessionBindingPayload,
-  AgentSessionBindingParticipant,
-  AgentSessionBindingPersonaParticipant,
-  AgentSessionExecutionBinding,
-  AgentSessionScopePerspective,
+import {
+  AGENT_SESSION_BINDING_VERSION,
+  type AgentSessionBindingChannel,
+  type AgentSessionBindingPayload,
+  type AgentSessionBindingParticipant,
+  type AgentSessionBindingPersonaParticipant,
+  type AgentSessionExecutionBinding,
+  type AgentSessionScopePerspective,
 } from "./session-binding";
 
 export function issueAgentSessionBinding(
   input: AgentSessionExecutionBinding & {
-    eveSessionId?: string;
+    runtimeSessionId?: string;
     expiresAt: number;
     subject: string;
   },
@@ -20,7 +21,7 @@ export function issueAgentSessionBinding(
   const payload: AgentSessionBindingPayload = {
     ...input,
     audience: "sigil-agent-session-binding",
-    version: 1,
+    version: AGENT_SESSION_BINDING_VERSION,
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${encoded}.${signature(encoded, secret)}`;
@@ -56,12 +57,12 @@ function isPayload(
 ): value is AgentSessionBindingPayload {
   return (
     value.audience === "sigil-agent-session-binding" &&
-    value.version === 1 &&
+    value.version === AGENT_SESSION_BINDING_VERSION &&
     isIdentifier(value.subject) &&
     isIdentifier(value.applicationThreadId) &&
     isIdentifier(value.personaId) &&
     isIdentifier(value.homeScopeId) &&
-    (value.eveSessionId === undefined || isIdentifier(value.eveSessionId)) &&
+    (value.runtimeSessionId === undefined || isIdentifier(value.runtimeSessionId)) &&
     (value.channel === undefined ||
       (isBindingChannel(value.channel) &&
         bindingSessionAppearsInChannel(value, value.channel))) &&
@@ -134,7 +135,7 @@ function isBindingParticipant(
   return (
     value.kind === "persona-session" &&
     isIdentifier(value.personaId) &&
-    isIdentifier(value.eveSessionId) &&
+    isIdentifier(value.runtimeSessionId) &&
     isIdentifier(value.applicationThreadId) &&
     (value.role === undefined ||
       value.role === "participant" ||
@@ -162,8 +163,8 @@ function personaParticipantMatchesBinding(
   return (
     participant.personaId === binding.personaId &&
     participant.applicationThreadId === binding.applicationThreadId &&
-    (binding.eveSessionId === undefined ||
-      participant.eveSessionId === binding.eveSessionId)
+    (binding.runtimeSessionId === undefined ||
+      participant.runtimeSessionId === binding.runtimeSessionId)
   );
 }
 

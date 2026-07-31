@@ -23,4 +23,4 @@ export {
   type AgentContextReceiptTokenEstimate,
   type AgentContextReceiptTokenQuality,
   type AgentContextVisibilityDecision,
-} from "@zigil/agent-surface/context-receipts"
+} from "@zigil/agent/context-receipts"

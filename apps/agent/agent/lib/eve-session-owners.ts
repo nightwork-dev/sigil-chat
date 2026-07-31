@@ -281,8 +281,8 @@ function normalizeExecutionBindingForSession(
       participant.principalId === subject &&
       participant.personaId === binding.personaId &&
       participant.applicationThreadId === binding.applicationThreadId &&
-      (participant.eveSessionId === sessionId ||
-        participant.eveSessionId === "__pending__"),
+      (participant.runtimeSessionId === sessionId ||
+        participant.runtimeSessionId === "__pending__"),
   )
   if (matchingParticipants.length !== 1) {
     throw new Error("Eve execution binding does not match this session.")
@@ -294,7 +294,7 @@ function normalizeExecutionBindingForSession(
       ...binding.channel,
       participants: binding.channel.participants.map((participant) =>
         participant === matched
-          ? { ...participant, eveSessionId: sessionId }
+          ? { ...participant, runtimeSessionId: sessionId }
           : participant,
       ),
     },
@@ -353,7 +353,7 @@ function isBindingParticipant(
   return (
     participant.kind === "persona-session" &&
     isIdentifier(participant.personaId) &&
-    isIdentifier(participant.eveSessionId) &&
+    isIdentifier(participant.runtimeSessionId) &&
     isIdentifier(participant.applicationThreadId) &&
     (participant.role === undefined ||
       participant.role === "participant" ||

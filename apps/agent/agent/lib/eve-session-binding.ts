@@ -34,11 +34,11 @@ export function requireVerifiedEveSessionBinding(
   }
   const requestedSessionId = sessionIdFromPath(pathname)
   if (
-    (requestedSessionId === undefined && binding.eveSessionId !== undefined) ||
-    (isCancelPath(pathname) && binding.eveSessionId !== requestedSessionId) ||
+    (requestedSessionId === undefined && binding.runtimeSessionId !== undefined) ||
+    (isCancelPath(pathname) && binding.runtimeSessionId !== requestedSessionId) ||
     (requestedSessionId !== undefined &&
-      binding.eveSessionId !== undefined &&
-      binding.eveSessionId !== requestedSessionId)
+      binding.runtimeSessionId !== undefined &&
+      binding.runtimeSessionId !== requestedSessionId)
   ) {
     throw new EveSessionBindingVerificationError()
   }

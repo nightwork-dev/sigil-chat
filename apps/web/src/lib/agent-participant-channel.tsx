@@ -18,10 +18,10 @@ import type {
   AgentRuntimeSession,
   AgentSendInput,
   AgentTurnResult,
-} from "@zigil/agent-surface/contracts"
+} from "@zigil/agent/contracts"
 
 import {
-  agentParticipantEveSessionId,
+  agentParticipantRuntimeSessionId,
   agentParticipantOwnerParticipantId,
   agentParticipantPersonaParticipantId,
   buildAgentParticipantChannel,
@@ -86,7 +86,7 @@ export interface AgentParticipantChannelValue {
 }
 
 export interface AgentParticipantSessionAdapter {
-  readonly eveSessionId: string
+  readonly runtimeSessionId: string
   readonly participantId: string
   readonly personaId: string
   readonly session: AgentRuntimeSession
@@ -149,7 +149,7 @@ export function AgentParticipantChannelProvider({
           threadId: adapter.threadId,
           principalId,
           personaId: adapter.personaId,
-          eveSessionId: adapter.eveSessionId,
+          runtimeSessionId: adapter.runtimeSessionId,
         }
       }),
     })
@@ -161,7 +161,7 @@ export function AgentParticipantChannelProvider({
     for (const adapter of adapters) {
       if (!participantThreadIds.includes(adapter.threadId)) continue
       const session = adapter.session as RuntimeSessionWithCancel
-      const sessionId = adapter.eveSessionId
+      const sessionId = adapter.runtimeSessionId
       const participantId = adapter.participantId
       const port: ParticipantChannelSessionPort = {
         get participantId() {
@@ -262,7 +262,7 @@ export function useParticipantSessionAdapter({
       }),
     [thread.id, threadIds],
   )
-  const eveSessionId = participantSessionId(thread)
+  const runtimeSessionId = participantSessionId(thread)
   const participantId = participantIdForThread(thread.id)
   const personaId = thread.personaId
   const threadId = thread.id
@@ -289,14 +289,14 @@ export function useParticipantSessionAdapter({
   )
   return useMemo(
     () => ({
-      eveSessionId,
+      runtimeSessionId,
       participantId,
       personaId,
       session,
       send,
       threadId,
     }),
-    [eveSessionId, participantId, personaId, send, session, threadId],
+    [runtimeSessionId, participantId, personaId, send, session, threadId],
   )
 }
 
@@ -311,7 +311,7 @@ export function participantBindingRequest(input: {
 }
 
 export function participantSessionId(thread: AgentThread): string {
-  return agentParticipantEveSessionId(
+  return agentParticipantRuntimeSessionId(
     thread.id,
     thread.runtime.session.sessionId,
   )

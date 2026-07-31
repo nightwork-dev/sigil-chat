@@ -8,7 +8,7 @@ import {
 const secret = "test-session-binding-secret";
 const binding = {
   applicationThreadId: "thread-a",
-  eveSessionId: "eve-session-a",
+  runtimeSessionId: "eve-session-a",
   personaId: "agent-a",
   homeScopeId: "workspace-a",
   initialPerspective: {
@@ -26,7 +26,7 @@ describe("agent session binding attestation", () => {
     expect(readAgentSessionBinding(proof, 100, secret)).toEqual({
       ...binding,
       audience: "sigil-agent-session-binding",
-      version: 1,
+      version: 2,
     });
   });
 
@@ -48,7 +48,7 @@ describe("agent session binding attestation", () => {
             participantId: "participant-agent-a",
             principalId: "user-a",
             personaId: "agent-a",
-            eveSessionId: "eve-session-a",
+            runtimeSessionId: "eve-session-a",
             applicationThreadId: "thread-a",
           },
           {
@@ -56,7 +56,7 @@ describe("agent session binding attestation", () => {
             participantId: "participant-agent-b",
             principalId: "user-a",
             personaId: "agent-b",
-            eveSessionId: "eve-session-b",
+            runtimeSessionId: "eve-session-b",
             applicationThreadId: "thread-b",
             state: "dormant",
           },
@@ -69,7 +69,7 @@ describe("agent session binding attestation", () => {
     expect(readAgentSessionBinding(proof, 100, secret)).toEqual({
       ...channelBinding,
       audience: "sigil-agent-session-binding",
-      version: 1,
+      version: 2,
     });
   });
 
@@ -92,7 +92,7 @@ describe("agent session binding attestation", () => {
               participantId: "participant-agent-b",
               principalId: "user-a",
               personaId: "agent-b",
-              eveSessionId: "eve-session-b",
+              runtimeSessionId: "eve-session-b",
               applicationThreadId: "thread-b",
             },
           ],
@@ -123,7 +123,7 @@ describe("agent session binding attestation", () => {
               participantId: "participant-human-a",
               principalId: "user-a",
               personaId: "agent-a",
-              eveSessionId: "eve-session-a",
+              runtimeSessionId: "eve-session-a",
               applicationThreadId: "thread-a",
             },
           ],

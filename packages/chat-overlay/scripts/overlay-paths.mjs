@@ -56,7 +56,6 @@ export const requiredWorkspacePackages = Object.freeze([
   "packages/blackboard-store",
   "packages/chat",
   "packages/data",
-  "packages/file-store-core",
   "packages/graph",
   "packages/graph-store",
   "packages/review",

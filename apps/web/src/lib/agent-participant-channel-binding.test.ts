@@ -5,7 +5,7 @@ import {
 } from "@workspace/agent-contracts/session-binding.server"
 
 import {
-  AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID,
+  AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
   agentParticipantPersonaParticipantId,
   buildAgentParticipantChannel,
 } from "./agent-participant-channel-binding"
@@ -20,7 +20,7 @@ describe("agent participant channel binding", () => {
           threadId: "thread-a",
           principalId: "user-1",
           personaId: "agent-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
         },
         {
           threadId: "thread-b",
@@ -40,19 +40,19 @@ describe("agent participant channel binding", () => {
       expect.arrayContaining([
         expect.objectContaining({
           applicationThreadId: "thread-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
           participantId: agentParticipantPersonaParticipantId("thread-a"),
           state: "dormant",
         }),
         expect.objectContaining({
           applicationThreadId: "thread-b",
-          eveSessionId: AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID,
+          runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
           participantId: agentParticipantPersonaParticipantId("thread-b"),
           state: "active",
         }),
         expect.objectContaining({
           applicationThreadId: "thread-c",
-          eveSessionId: AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID,
+          runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
           participantId: agentParticipantPersonaParticipantId("thread-c"),
           state: "dormant",
         }),
@@ -69,7 +69,7 @@ describe("agent participant channel binding", () => {
           threadId: "thread-a",
           principalId: "user-1",
           personaId: "agent-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
         },
         {
           threadId: "thread-b",
@@ -104,7 +104,7 @@ describe("agent participant channel binding", () => {
           participants: expect.arrayContaining([
             expect.objectContaining({
               applicationThreadId: "thread-b",
-              eveSessionId: AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID,
+              runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
               state: "active",
             }),
             expect.objectContaining({
@@ -115,7 +115,7 @@ describe("agent participant channel binding", () => {
         },
         personaId: "agent-b",
       })
-    expect(payload).not.toHaveProperty("eveSessionId")
+    expect(payload).not.toHaveProperty("runtimeSessionId")
   })
 
   it("round-trips a continuation target proof against that target's real Eve session id", () => {
@@ -127,13 +127,13 @@ describe("agent participant channel binding", () => {
           threadId: "thread-a",
           principalId: "user-1",
           personaId: "agent-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
         },
         {
           threadId: "thread-b",
           principalId: "user-1",
           personaId: "agent-b",
-          eveSessionId: "eve-b",
+          runtimeSessionId: "eve-b",
         },
       ],
     })
@@ -143,7 +143,7 @@ describe("agent participant channel binding", () => {
         additionalContextScopeIds: [],
         applicationThreadId: "thread-b",
         channel,
-        eveSessionId: "eve-b",
+        runtimeSessionId: "eve-b",
         expiresAt: 1_750_000_060,
         homeScopeId: "personal:user-1",
         initialPerspective: {
@@ -159,7 +159,7 @@ describe("agent participant channel binding", () => {
     expect(readAgentSessionBinding(proof, 1_750_000_000, "secret")).toMatchObject(
       {
         applicationThreadId: "thread-b",
-        eveSessionId: "eve-b",
+        runtimeSessionId: "eve-b",
         personaId: "agent-b",
       },
     )
@@ -175,7 +175,7 @@ describe("agent participant channel binding", () => {
           threadId: "thread-a",
           principalId: "user-1",
           personaId: "agent-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
         },
         {
           threadId: "thread-b",
@@ -193,13 +193,13 @@ describe("agent participant channel binding", () => {
           threadId: "thread-a",
           principalId: "user-1",
           personaId: "agent-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
         },
         {
           threadId: "thread-b",
           principalId: "user-1",
           personaId: "agent-b",
-          eveSessionId: "eve-b",
+          runtimeSessionId: "eve-b",
         },
       ],
     })
@@ -212,13 +212,13 @@ describe("agent participant channel binding", () => {
           threadId: "thread-a",
           principalId: "user-1",
           personaId: "agent-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
         },
         {
           threadId: "thread-b",
           principalId: "user-1",
           personaId: "agent-b",
-          eveSessionId: "eve-b",
+          runtimeSessionId: "eve-b",
         },
       ],
     })
@@ -228,12 +228,12 @@ describe("agent participant channel binding", () => {
       expect.arrayContaining([
         expect.objectContaining({
           applicationThreadId: "thread-a",
-          eveSessionId: "eve-a",
+          runtimeSessionId: "eve-a",
           state: "active",
         }),
         expect.objectContaining({
           applicationThreadId: "thread-b",
-          eveSessionId: AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID,
+          runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
           state: "dormant",
         }),
       ]),
@@ -242,12 +242,12 @@ describe("agent participant channel binding", () => {
       expect.arrayContaining([
         expect.objectContaining({
           applicationThreadId: "thread-a",
-          eveSessionId: AGENT_PARTICIPANT_PENDING_EVE_SESSION_ID,
+          runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
           state: "dormant",
         }),
         expect.objectContaining({
           applicationThreadId: "thread-b",
-          eveSessionId: "eve-b",
+          runtimeSessionId: "eve-b",
           state: "active",
         }),
       ]),

@@ -1,6 +1,7 @@
 import { blackboardRepository } from "@workspace/blackboard-store"
 import { createScope } from "@gonk/scope"
-import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
+import { createStoreProvider } from "@gonk/store"
+import { mirkBackendFactory } from "@gonk/store/sqlite"
 import { MirkAgentContextReceiptRepository } from "@workspace/agent-tools/context-receipts"
 import {
   createDefaultSigilContextCompiler,
@@ -175,8 +176,11 @@ const channel = createOwnedEveChannel({
                 additionalContextScopeIds:
                   sessionBinding.additionalContextScopeIds,
               }),
-              ...(sessionBinding.eveSessionId
-                ? { sigilAttestedEveSessionId: sessionBinding.eveSessionId }
+              ...(sessionBinding.runtimeSessionId
+                ? {
+                    sigilAttestedEveSessionId:
+                      sessionBinding.runtimeSessionId,
+                  }
                 : {}),
             }
           : {}),

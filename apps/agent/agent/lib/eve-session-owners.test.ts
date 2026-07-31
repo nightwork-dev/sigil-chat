@@ -146,7 +146,7 @@ describe("EveSessionOwnerStore", () => {
   })
 })
 
-function channelFor(participantId: string, eveSessionId: string) {
+function channelFor(participantId: string, runtimeSessionId: string) {
   return {
     channelId: "channel-1",
     ownerPrincipalId: "user-1",
@@ -159,7 +159,7 @@ function channelFor(participantId: string, eveSessionId: string) {
       },
       {
         applicationThreadId: "thread-1",
-        eveSessionId,
+        runtimeSessionId,
         kind: "persona-session",
         participantId,
         personaId: "agent-a",

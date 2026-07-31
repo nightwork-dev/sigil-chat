@@ -1,1 +1,1 @@
-export * from "@zigil/agent-surface/participant-channel";
+export * from "@zigil/agent/participant-channel";

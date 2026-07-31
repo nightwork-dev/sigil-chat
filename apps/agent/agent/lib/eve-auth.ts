@@ -471,7 +471,7 @@ function isBindingParticipant(
   return (
     participant.kind === "persona-session" &&
     isNonEmptyString(participant.personaId) &&
-    isNonEmptyString(participant.eveSessionId) &&
+    isNonEmptyString(participant.runtimeSessionId) &&
     isNonEmptyString(participant.applicationThreadId) &&
     (participant.role === undefined ||
       participant.role === "participant" ||
@@ -534,7 +534,7 @@ function participantProvenanceForTurn({
   return {
     applicationThreadId: execution.applicationThreadId,
     channelId: channel.channelId,
-    eveSessionId: sessionId,
+    runtimeSessionId: sessionId,
     kind: "persona-session",
     participantId: participant.participantId,
     personaId: execution.personaId,
@@ -556,7 +556,7 @@ function sessionParticipantForBinding(
       participant.principalId === principalId &&
       participant.personaId === binding.personaId &&
       participant.applicationThreadId === binding.applicationThreadId &&
-      participant.eveSessionId === sessionId,
+      participant.runtimeSessionId === sessionId,
   )
 }
 

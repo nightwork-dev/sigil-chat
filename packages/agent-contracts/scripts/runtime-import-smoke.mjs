@@ -40,7 +40,7 @@ assert.equal(
         participantId: "participant-eve-a",
         principalId: "user-a",
         personaId: "persona-a",
-        eveSessionId: "eve-session-a",
+        runtimeSessionId: "eve-session-a",
         applicationThreadId: "thread-a",
       },
     ],
