@@ -1,5 +1,6 @@
 import { createScope } from "@gonk/scope"
-import { createStoreProvider, mirkBackendFactory } from "@gonk/store"
+import { createStoreProvider } from "@gonk/store"
+import { mirkBackendFactory } from "@gonk/store/sqlite"
 import type { KvStore } from "@gonk/store/types"
 
 import {

@@ -40,7 +40,8 @@ const handler = createWebMcpHandler({
     };
   },
   makeAuthContext: (extra): AuthContext => {
-    const authenticated = extra.authInfo?.extra?.[GONK_AUTH_INFO_PRINCIPAL];
+    const authenticated =
+      extra.http?.authInfo?.extra?.[GONK_AUTH_INFO_PRINCIPAL];
     if (!isAuthenticatedPrincipal(authenticated)) {
       throw new Error("Gonk MCP principal is required");
     }

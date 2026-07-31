@@ -33,32 +33,32 @@ importers:
   apps/agent:
     dependencies:
       '@gonk/auth':
-        specifier: 0.3.1
-        version: 0.3.1
+        specifier: 0.5.1
+        version: 0.5.1
       '@gonk/context':
-        specifier: 0.3.1
-        version: 0.3.1
+        specifier: 0.5.1
+        version: 0.5.1
       '@gonk/eve-host':
-        specifier: 0.7.0
-        version: 0.7.0(@gonk/scope@0.3.1)(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(zod@4.4.3)
+        specifier: 0.8.0
+        version: 0.8.0(@gonk/scope@0.5.1)(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))
       '@gonk/memory':
-        specifier: 0.6.0
-        version: 0.6.0
+        specifier: 0.7.0
+        version: 0.7.0
       '@gonk/persona':
-        specifier: 0.6.0
-        version: 0.6.0
+        specifier: 0.7.0
+        version: 0.7.0
       '@gonk/scope':
-        specifier: 0.3.1
-        version: 0.3.1
+        specifier: 0.5.1
+        version: 0.5.1
       '@gonk/skills':
-        specifier: 0.3.1
-        version: 0.3.1(sqlite-vec@0.1.9)
+        specifier: 0.5.1
+        version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/store':
-        specifier: 0.3.1
-        version: 0.3.1(sqlite-vec@0.1.9)
+        specifier: 0.5.1
+        version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/tool-registry':
-        specifier: 0.3.1
-        version: 0.3.1(@gonk/scope@0.3.1)
+        specifier: 0.5.1
+        version: 0.5.1(@gonk/scope@0.5.1)
       '@workspace/agent-contracts':
         specifier: workspace:*
         version: link:../../packages/agent-contracts
@@ -121,23 +121,23 @@ importers:
         specifier: ^1.3.0
         version: 1.6.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@gonk/auth':
-        specifier: 0.3.1
-        version: 0.3.1
+        specifier: 0.5.1
+        version: 0.5.1
       '@gonk/comms':
         specifier: 0.5.0
         version: 0.5.0(sqlite-vec@0.1.9)
       '@gonk/memory':
-        specifier: 0.6.0
-        version: 0.6.0
+        specifier: 0.7.0
+        version: 0.7.0
       '@gonk/persona':
-        specifier: 0.6.0
-        version: 0.6.0
+        specifier: 0.7.0
+        version: 0.7.0
       '@gonk/scope':
-        specifier: 0.3.1
-        version: 0.3.1
+        specifier: 0.5.1
+        version: 0.5.1
       '@gonk/store':
-        specifier: 0.3.1
-        version: 0.3.1(sqlite-vec@0.1.9)
+        specifier: 0.5.1
+        version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@libsql/client':
         specifier: ^0.15.15
         version: 0.15.15
@@ -282,7 +282,7 @@ importers:
     dependencies:
       '@zigil/agent':
         specifier: 0.1.0
-        version: 0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)
+        version: 0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.13(ai@7.0.31(zod@4.4.3))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
@@ -297,17 +297,17 @@ importers:
   packages/agent-tools:
     dependencies:
       '@gonk/auth':
-        specifier: 0.3.1
-        version: 0.3.1
+        specifier: 0.5.1
+        version: 0.5.1
       '@gonk/image-gen':
         specifier: 0.5.0
         version: 0.5.0
       '@gonk/skills':
-        specifier: 0.3.1
-        version: 0.3.1(sqlite-vec@0.1.9)
+        specifier: 0.5.1
+        version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/tool-registry':
-        specifier: 0.3.1
-        version: 0.3.1(@gonk/scope@0.3.1)
+        specifier: 0.5.1
+        version: 0.5.1(@gonk/scope@0.5.1)
       '@mirk/store':
         specifier: ^0.7.0
         version: 0.7.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -592,7 +592,7 @@ importers:
         version: 3.28.0
       '@zigil/agent':
         specifier: 0.1.0
-        version: 0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@3.25.76))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)
+        version: 0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.13(ai@7.0.31(zod@3.25.76))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1363,46 +1363,60 @@ packages:
   '@gonk/auth@0.3.1':
     resolution: {integrity: sha512-LTLUCxRRA2bqqp+B69OPyapSjXWhZgGM4XuK9ujrIb1Aj9dfzH1ch0UgXPEYdIfAWP5uboZywaNB4yKu0CcyqQ==}
 
+  '@gonk/auth@0.5.1':
+    resolution: {integrity: sha512-PPR0+8oj1oqoq4O/asRBlmepnfnx+Yv81Oez7EovjSBWx3BUW2JPBs5ggMqKzsC8243PKDakU4xCmRinwPcnKQ==}
+
   '@gonk/channel@0.3.1':
     resolution: {integrity: sha512-BAw4SmINWhI1u68p0vFIo9E0Ytd1/yTqZCMIe5KZVyj/rqJFMcfqfUhLvUkw64q7UkLSolMAXo2dS3BE3cOGNQ==}
 
   '@gonk/comms@0.5.0':
     resolution: {integrity: sha512-cP2TFFuSWy1U35nuMgCvd3UKg/rrZDOShbCDYVCljOB3WM4HqjHxz84lqelDR5Iadwx4WTwc4SFxfIdf4mvBtw==}
 
-  '@gonk/context@0.3.1':
-    resolution: {integrity: sha512-uxMwkTQOMf31EXBmQC+LRruivV4NsTWTYuMUKUlTbOijpHEttcEnLzSWV/ij48ja+oEgnKv0yvx3Hln+8D9ofA==}
+  '@gonk/context@0.5.1':
+    resolution: {integrity: sha512-jBIEjfhc75PxFlNDKvISiWmQ6YxlXUs6TaidaWLfc5gDENId4J63Jjtu4DU5u+UNGsmGFXo6e9UIZukjx+Xfhw==}
 
   '@gonk/embedding@0.5.0':
     resolution: {integrity: sha512-LCjzu8TeWLwcSpWdd8qr9A6TpszwTJufQ5yUBaqc50giZEfkrUNzB+xlA34cwBwAQJLuntLVs6CDfno4GmIJZA==}
 
-  '@gonk/eve-host@0.7.0':
-    resolution: {integrity: sha512-qc1ygqWaYYcEv4J5pnkHdBduQoLQ4wBtw2KJuwcE4MLgSZz0Sx/pFsYV9BfdfSViyyylwfq5C0SpVM6hHeCk+A==}
+  '@gonk/eve-host@0.8.0':
+    resolution: {integrity: sha512-laNW6VRyxOecaruwiuDQZRfKWp/VeolyjGqRAUFb1CSsW2OQfCtixMKgGKnc39n7qvBnZ0++Z54OEpev9266RQ==}
     peerDependencies:
       eve: '*'
 
   '@gonk/image-gen@0.5.0':
     resolution: {integrity: sha512-DphBQst1Dxk0UUJWU2U5gH5EYdoStATQUWqj3T695A869O9H2A7WLzZAEv2iPoqxp8gumtZk9JOdOtMdxM+5Mg==}
 
-  '@gonk/memory@0.6.0':
-    resolution: {integrity: sha512-PCY4mGo/6mHF+1bUt7pVg1tqgnyKZ0Ob04hqAP5O7Z2DHPKq6x1Z7S/OAYl2+RHwhO4hVbE0iju6tVC/c5VL6Q==}
+  '@gonk/memory@0.7.0':
+    resolution: {integrity: sha512-f2ZPxWBA9zAmoquQSAPh5YvUMiM89QxM3/3849bjWDFJ0XlrsHtb2TGM4W6OtB4ICDbrd5oKx2zlqpRq5aJgVQ==}
 
-  '@gonk/persona@0.6.0':
-    resolution: {integrity: sha512-8yMwVRRUA2BaJyo36CVbm0v7ZgUWDQLbYDgJCuPQcN9223Of3o0kGaCOmM+1OwaobcMtm3iZWC0sEx5fwNKqhw==}
+  '@gonk/persona@0.7.0':
+    resolution: {integrity: sha512-HPjTcv6jt/C6aPIm321UXYi6ABJITDsUIdjbY3o2MQyzLfLW0Maj4x3uvmAzX4McoFFYEiJw02AhmmvRzJH2Rw==}
 
   '@gonk/scope@0.3.1':
     resolution: {integrity: sha512-/QVfPn5XImVQat6GsThXbo1fRLPx2ULKylDqiE8AUCyVQf1RiV7cX91m0DjAn0dYuqwcnw/I+NSibFHDf9u5Wg==}
 
-  '@gonk/skills@0.3.1':
-    resolution: {integrity: sha512-bMP1EA/lm97i/aWtLG/1wUBPamaFNqPpmeoduOpECANHgt450CtdSJC/lnBKtfBdge0lgcdWRlrGRbx4ErchTw==}
+  '@gonk/scope@0.5.1':
+    resolution: {integrity: sha512-mMtc1I29lcjly4ohwwrD8nTEhqjgG0MxfMKzltl9mMOGjIUSmO23+6XKyJ55+AObFINFJBzcQd+yjtlQu0xAuQ==}
+
+  '@gonk/skills@0.5.1':
+    resolution: {integrity: sha512-6zeK74onZz1ulwyaN/oOUIBdJ7qFn3pDKtqJfckfKCDDZdA+DJndpBAj4WSaCHlWfU5TOHnRba2A+lDmupSo1w==}
 
   '@gonk/store@0.3.1':
     resolution: {integrity: sha512-yz4qDkjMOcappXk1dw17AzK0+dVp8/1BFdtkGA09D8aRwBiJ6ky60VgPWRsHWUKxn+L759rU3B7aPa1QHP06GQ==}
 
-  '@gonk/tool-orchestrator@0.3.1':
-    resolution: {integrity: sha512-SnTWz1ZkaTFxyThCs+8j/KwIXu+ZjKOSkcxne9QQZgAhlPNrn8zF49tYr0dHcw/FGScMDrWPgjLpXY+rfmHkow==}
+  '@gonk/store@0.5.1':
+    resolution: {integrity: sha512-9KziXypKYoCerEZNMbNvPSdFBejPsRx/uZakwG8oU4mbwETgvJCRexRiaLtu3g4fHq3Gea3BYuzoOs8YRzUnAw==}
+    peerDependencies:
+      better-sqlite3: '>=11 <13'
+    peerDependenciesMeta:
+      better-sqlite3:
+        optional: true
 
-  '@gonk/tool-registry-mcp@0.3.1':
-    resolution: {integrity: sha512-+qnrd69Hnb+rm69+gXjGZyTq5/uhlyf4pdJq2TVqzSsCS9n2UD+vovDTIZiMm4uvNW2aWeIJDKr6qKkVpsGGIw==}
+  '@gonk/tool-orchestrator@0.5.1':
+    resolution: {integrity: sha512-AZanykZhAyAJWN/iT03M9FnQ/9fnTAoJ6z/l53LxYvCS+12acHQeZ4dRWKpo1upwWtH0OualuhxEQjrz2RkdIQ==}
+
+  '@gonk/tool-registry-mcp@0.5.1':
+    resolution: {integrity: sha512-q5NKhn6mAewas2aGE0MnWknzutQFET3t9LcOZ8p8xq8maLF5V9UQup/iQ9c3wr0xzr4MRw5ty9WKNGJ5CQV8lQ==}
     hasBin: true
 
   '@gonk/tool-registry@0.3.1':
@@ -1413,8 +1427,19 @@ packages:
       '@gonk/scope':
         optional: true
 
+  '@gonk/tool-registry@0.5.1':
+    resolution: {integrity: sha512-e5tkcnQvfvG6aJioy7yu2VegcBJWDV/FkFcPFLIY0NQmMmCFZ82ng419Rz/I5qTyXVfu4WwNk/hMyVNeVbFcsg==}
+    peerDependencies:
+      '@gonk/scope': '>=0.1.0 <1'
+    peerDependenciesMeta:
+      '@gonk/scope':
+        optional: true
+
   '@gonk/utils@0.3.1':
     resolution: {integrity: sha512-XzJpc+uyZf+p65sRoPt22c3+IJu7w1jXv6jQxrclIpT7l7DohFjzRcAmffR/nPwEpf/SS7+uwCHo6i0ORnRmNw==}
+
+  '@gonk/utils@0.5.1':
+    resolution: {integrity: sha512-wS6UQED1BiyCuwbzOJM+0RY/ANZ+t3r1n/+x1K7vzil1/nhPi+5aw0so4YrcdhItGa6caTwL3hmF4MUVslJiOw==}
 
   '@hono/node-server@1.19.14':
     resolution: {integrity: sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw==}
@@ -1727,6 +1752,14 @@ packages:
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
 
+  '@modelcontextprotocol/client@2.0.0':
+    resolution: {integrity: sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.0.0':
+    resolution: {integrity: sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==}
+    engines: {node: '>=20'}
+
   '@modelcontextprotocol/sdk@1.29.0':
     resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
     engines: {node: '>=18'}
@@ -1736,6 +1769,10 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@modelcontextprotocol/server@2.0.0':
+    resolution: {integrity: sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw==}
+    engines: {node: '>=20'}
 
   '@mongodb-js/zstd@7.0.0':
     resolution: {integrity: sha512-mQ2s0pYYiav+tzCDR05Zptem8Ey2v8s11lri5RKGhTtL4COVCvVCk5vtyRYNT+9L8qSfyOqqefF9UtnW8mC5jA==}
@@ -7169,6 +7206,8 @@ snapshots:
 
   '@gonk/auth@0.3.1': {}
 
+  '@gonk/auth@0.5.1': {}
+
   '@gonk/channel@0.3.1':
     dependencies:
       '@gonk/scope': 0.3.1
@@ -7184,48 +7223,45 @@ snapshots:
     transitivePeerDependencies:
       - sqlite-vec
 
-  '@gonk/context@0.3.1':
+  '@gonk/context@0.5.1':
     dependencies:
-      '@gonk/auth': 0.3.1
+      '@gonk/auth': 0.5.1
       '@standard-schema/spec': 1.1.0
 
   '@gonk/embedding@0.5.0':
     dependencies:
       '@gonk/scope': 0.3.1
 
-  '@gonk/eve-host@0.7.0(@gonk/scope@0.3.1)(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(zod@4.4.3)':
+  '@gonk/eve-host@0.8.0(@gonk/scope@0.5.1)(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))':
     dependencies:
-      '@gonk/auth': 0.3.1
-      '@gonk/memory': 0.6.0
-      '@gonk/persona': 0.6.0
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
-      '@gonk/tool-registry-mcp': 0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)
+      '@gonk/auth': 0.5.1
+      '@gonk/memory': 0.7.0
+      '@gonk/persona': 0.7.0
+      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
+      '@gonk/tool-registry-mcp': 0.5.1(@gonk/scope@0.5.1)
       eve: 0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
-      - '@cfworker/json-schema'
       - '@gonk/scope'
-      - supports-color
-      - zod
 
   '@gonk/image-gen@0.5.0':
     dependencies:
       '@gonk/scope': 0.3.1
 
-  '@gonk/memory@0.6.0':
+  '@gonk/memory@0.7.0':
     dependencies:
       '@gonk/embedding': 0.5.0
-      '@gonk/scope': 0.3.1
-      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
+      '@gonk/scope': 0.5.1
+      '@gonk/store': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@types/better-sqlite3': 7.6.13
       better-sqlite3: 12.10.0
     optionalDependencies:
       sqlite-vec: 0.1.9
 
-  '@gonk/persona@0.6.0':
+  '@gonk/persona@0.7.0':
     dependencies:
-      '@gonk/scope': 0.3.1
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@gonk/scope': 0.5.1
+      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
       acausal: 3.0.0-alpha.3
       yaml: 2.9.0
 
@@ -7234,16 +7270,22 @@ snapshots:
       '@gonk/utils': 0.3.1
       yaml: 2.9.0
 
-  '@gonk/skills@0.3.1(sqlite-vec@0.1.9)':
+  '@gonk/scope@0.5.1':
     dependencies:
-      '@gonk/auth': 0.3.1
-      '@gonk/context': 0.3.1
-      '@gonk/scope': 0.3.1
-      '@gonk/store': 0.3.1(sqlite-vec@0.1.9)
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@gonk/utils': 0.5.1
+      yaml: 2.9.0
+
+  '@gonk/skills@0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/auth': 0.5.1
+      '@gonk/context': 0.5.1
+      '@gonk/scope': 0.5.1
+      '@gonk/store': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
       '@standard-schema/spec': 1.1.0
       yaml: 2.9.0
     transitivePeerDependencies:
+      - better-sqlite3
       - sqlite-vec
 
   '@gonk/store@0.3.1(sqlite-vec@0.1.9)':
@@ -7255,24 +7297,32 @@ snapshots:
     transitivePeerDependencies:
       - sqlite-vec
 
-  '@gonk/tool-orchestrator@0.3.1(@gonk/scope@0.3.1)':
+  '@gonk/store@0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     dependencies:
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
+      '@gonk/scope': 0.5.1
+      '@gonk/utils': 0.5.1
+      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+    optionalDependencies:
+      better-sqlite3: 12.10.0
+    transitivePeerDependencies:
+      - sqlite-vec
+
+  '@gonk/tool-orchestrator@0.5.1(@gonk/scope@0.5.1)':
+    dependencies:
+      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
       '@standard-schema/spec': 1.1.0
     transitivePeerDependencies:
       - '@gonk/scope'
 
-  '@gonk/tool-registry-mcp@0.3.1(@gonk/scope@0.3.1)(zod@4.4.3)':
+  '@gonk/tool-registry-mcp@0.5.1(@gonk/scope@0.5.1)':
     dependencies:
-      '@gonk/auth': 0.3.1
-      '@gonk/tool-orchestrator': 0.3.1(@gonk/scope@0.3.1)
-      '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@gonk/auth': 0.5.1
+      '@gonk/tool-orchestrator': 0.5.1(@gonk/scope@0.5.1)
+      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
+      '@modelcontextprotocol/client': 2.0.0
+      '@modelcontextprotocol/server': 2.0.0
     transitivePeerDependencies:
-      - '@cfworker/json-schema'
       - '@gonk/scope'
-      - supports-color
-      - zod
 
   '@gonk/tool-registry@0.3.1(@gonk/scope@0.3.1)':
     dependencies:
@@ -7281,7 +7331,16 @@ snapshots:
     optionalDependencies:
       '@gonk/scope': 0.3.1
 
+  '@gonk/tool-registry@0.5.1(@gonk/scope@0.5.1)':
+    dependencies:
+      '@gonk/auth': 0.5.1
+      '@standard-schema/spec': 1.1.0
+    optionalDependencies:
+      '@gonk/scope': 0.5.1
+
   '@gonk/utils@0.3.1': {}
+
+  '@gonk/utils@0.5.1': {}
 
   '@hono/node-server@1.19.14(hono@4.12.31)':
     dependencies:
@@ -7569,6 +7628,20 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
+  '@modelcontextprotocol/client@2.0.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.0.0
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.1.0
+      jose: 6.2.3
+      pkce-challenge: 5.0.1
+      zod: 4.4.3
+
+  '@modelcontextprotocol/core@2.0.0':
+    dependencies:
+      zod: 4.4.3
+
   '@modelcontextprotocol/sdk@1.29.0(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.31)
@@ -7591,27 +7664,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
+  '@modelcontextprotocol/server@2.0.0':
     dependencies:
-      '@hono/node-server': 1.19.14(hono@4.12.31)
-      ajv: 8.20.0
-      ajv-formats: 3.0.1(ajv@8.20.0)
-      content-type: 1.0.5
-      cors: 2.8.6
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.1.0
-      express: 5.2.1
-      express-rate-limit: 8.6.0(express@5.2.1)
-      hono: 4.12.31
-      jose: 6.2.3
-      json-schema-typed: 8.0.2
-      pkce-challenge: 5.0.1
-      raw-body: 3.0.2
+      '@modelcontextprotocol/core': 2.0.0
       zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
-    transitivePeerDependencies:
-      - supports-color
 
   '@mongodb-js/zstd@7.0.0':
     dependencies:
@@ -8991,20 +9047,20 @@ snapshots:
       eve: 0.27.13(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
       react: 19.2.7
 
-  '@zigil/agent@0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@3.25.76))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)':
+  '@zigil/agent@0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.13(ai@7.0.31(zod@3.25.76))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)':
     dependencies:
       '@standard-schema/spec': 1.1.0
     optionalDependencies:
       '@tanstack/react-query': 5.101.3(react@19.2.7)
-      eve: 0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@3.25.76))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
+      eve: 0.27.13(ai@7.0.31(zod@3.25.76))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
       react: 19.2.7
 
-  '@zigil/agent@0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)':
+  '@zigil/agent@0.1.0(@tanstack/react-query@5.101.3(react@19.2.7))(eve@0.27.13(ai@7.0.31(zod@4.4.3))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(react@19.2.7)':
     dependencies:
       '@standard-schema/spec': 1.1.0
     optionalDependencies:
       '@tanstack/react-query': 5.101.3(react@19.2.7)
-      eve: 0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
+      eve: 0.27.13(ai@7.0.31(zod@4.4.3))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
       react: 19.2.7
 
   acausal@3.0.0-alpha.3:
@@ -9922,10 +9978,60 @@ snapshots:
       - xml2js
       - zephyr-agent
 
-  eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@3.25.76))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)):
+  eve@0.27.13(ai@7.0.31(zod@3.25.76))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.31(zod@3.25.76)
       nitro: 3.0.260610-beta(@libsql/client@0.15.15)(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
+      undici: 8.9.0
+    optionalDependencies:
+      just-bash: 3.1.0
+      microsandbox: 0.6.6
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@netlify/blobs'
+      - '@netlify/runtime'
+      - '@planetscale/database'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/functions'
+      - '@vercel/kv'
+      - '@vercel/queue'
+      - aws4fetch
+      - better-sqlite3
+      - chokidar
+      - dotenv
+      - drizzle-orm
+      - giget
+      - idb-keyval
+      - ioredis
+      - jiti
+      - lru-cache
+      - miniflare
+      - mongodb
+      - mysql2
+      - rollup
+      - sqlite3
+      - uploadthing
+      - vite
+      - wrangler
+      - xml2js
+      - zephyr-agent
+    optional: true
+
+  eve@0.27.13(ai@7.0.31(zod@4.4.3))(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)):
+    dependencies:
+      ai: 7.0.31(zod@4.4.3)
+      nitro: 3.0.260610-beta(@libsql/client@0.15.15)(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
+      undici: 8.9.0
     optionalDependencies:
       just-bash: 3.1.0
       microsandbox: 0.6.6
@@ -10016,54 +10122,6 @@ snapshots:
       - wrangler
       - xml2js
       - zephyr-agent
-
-  eve@0.27.5(@libsql/client@0.15.15)(ai@7.0.31(zod@4.4.3))(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(lru-cache@11.5.2)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)):
-    dependencies:
-      ai: 7.0.31(zod@4.4.3)
-      nitro: 3.0.260610-beta(@libsql/client@0.15.15)(better-sqlite3@12.10.0)(chokidar@5.0.0)(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.2)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
-    optionalDependencies:
-      just-bash: 3.1.0
-      microsandbox: 0.6.6
-    transitivePeerDependencies:
-      - '@azure/app-configuration'
-      - '@azure/cosmos'
-      - '@azure/data-tables'
-      - '@azure/identity'
-      - '@azure/keyvault-secrets'
-      - '@azure/storage-blob'
-      - '@capacitor/preferences'
-      - '@deno/kv'
-      - '@electric-sql/pglite'
-      - '@libsql/client'
-      - '@netlify/blobs'
-      - '@netlify/runtime'
-      - '@planetscale/database'
-      - '@upstash/redis'
-      - '@vercel/blob'
-      - '@vercel/functions'
-      - '@vercel/kv'
-      - '@vercel/queue'
-      - aws4fetch
-      - better-sqlite3
-      - chokidar
-      - dotenv
-      - drizzle-orm
-      - giget
-      - idb-keyval
-      - ioredis
-      - jiti
-      - lru-cache
-      - miniflare
-      - mongodb
-      - mysql2
-      - rollup
-      - sqlite3
-      - uploadthing
-      - vite
-      - wrangler
-      - xml2js
-      - zephyr-agent
-    optional: true
 
   eventemitter3@5.0.4: {}
 
@@ -11239,7 +11297,7 @@ snapshots:
       rolldown: 1.2.0
       srvx: 0.11.22
       unenv: 2.0.0-rc.24
-      unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4(@libsql/client@0.15.15))(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3)
+      unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4(@libsql/client@0.15.15)(better-sqlite3@12.10.0))(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
       dotenv: 17.4.2
       jiti: 2.7.0
@@ -12382,7 +12440,7 @@ snapshots:
       '@unrs/resolver-binding-win32-ia32-msvc': 1.12.2
       '@unrs/resolver-binding-win32-x64-msvc': 1.12.2
 
-  unstorage@2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4(@libsql/client@0.15.15))(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3):
+  unstorage@2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4(@libsql/client@0.15.15)(better-sqlite3@12.10.0))(lru-cache@11.5.2)(ofetch@2.0.0-alpha.3):
     optionalDependencies:
       chokidar: 5.0.0
       db0: 0.3.4(@libsql/client@0.15.15)(better-sqlite3@12.10.0)
@@ -12649,10 +12707,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:
       zod: 3.25.76
-
-  zod-to-json-schema@3.25.2(zod@4.4.3):
-    dependencies:
-      zod: 4.4.3
 
   zod-validation-error@4.0.2(zod@4.4.3):
     dependencies:

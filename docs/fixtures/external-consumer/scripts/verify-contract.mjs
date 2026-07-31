@@ -9,7 +9,7 @@ const compatibilityTrain = JSON.parse(
   await readFile(join(root, "compatibility-train.json"), "utf8"),
 );
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
-const exactDependencies = compatibilityTrain.verifiedPublicBoundary;
+const exactDependencies = compatibilityTrain.verifiedVerdaccioBoundary;
 
 for (const [name, version] of Object.entries(exactDependencies)) {
   if (packageJson.dependencies[name] !== version)
