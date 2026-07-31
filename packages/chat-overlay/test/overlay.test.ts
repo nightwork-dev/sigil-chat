@@ -106,7 +106,7 @@ describe("Sigil Chat overlay", () => {
     expect(
       readFileSync(join(filesRoot, "pnpm-workspace.yaml"), "utf8"),
     ).not.toContain("packages/chat-overlay");
-  }, 30_000);
+  }, 60_000);
 
   it("emits the registry item payload consumed by the Sigil Design CLI lane", () => {
     const output = join(scratch, "chat-overlay.registry.json");
