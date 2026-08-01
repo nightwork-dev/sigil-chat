@@ -9,6 +9,10 @@ import type {
   GonkToolDiscoveryRequest,
   GonkToolInvocationContextRequest,
 } from "@gonk/eve-host/tools"
+import {
+  fabricExecutionBindingDigest,
+  type EveFabricToolHostContext,
+} from "@gonk/eve-host/fabric"
 import type { DynamicResolveContext } from "eve/tools"
 
 import {
@@ -17,6 +21,7 @@ import {
   scopeGrantPolicy,
   threadScopeOwners,
 } from "./application-services"
+import type { EveSessionBinding } from "./eve-session-owners"
 import { personalScopeId } from "./personal-scope"
 import { toolApprovalModeFor } from "./tool-approval-preference"
 
@@ -44,6 +49,18 @@ export async function makeGonkToolContext(
     binding.homeScopeId === personalScopeId(current.principalId)
       ? "principal"
       : "scope"
+  const turnId = request.eve.session.turn.id
+  const fabric = binding
+    ? createFabricToolHostContext({
+        binding,
+        callId: request.eve.callId,
+        eveSessionId: request.dynamic.session.id,
+        principalId: current.principalId,
+        resourceScope,
+        subject: current.subject,
+        turnId,
+      })
+    : undefined
   return {
     auth: createGonkAuthContext(request.dynamic),
     cwd: process.cwd(),
@@ -55,10 +72,57 @@ export async function makeGonkToolContext(
         current.attributes.sigilExecutionBinding,
       )?.applicationThreadId,
       personaId: stringAttribute(current.attributes.sigilPersonaId),
+      ...(fabric ? { fabric } : {}),
     },
     log: silentLogger,
     signal: request.eve.abortSignal,
   }
+}
+
+export function createFabricToolHostContext(input: {
+  binding: EveSessionBinding
+  callId: string
+  eveSessionId: string
+  principalId: string
+  resourceScope?: string
+  subject?: string
+  turnId: string
+  restrictionPolicyRefs?: readonly string[]
+}): NonNullable<EveFabricToolHostContext["fabric"]> {
+  const executionBindingDigest = fabricExecutionBindingDigest({
+    principalId: input.principalId,
+    subject: input.subject,
+    binding: input.binding,
+    resourceScope: input.resourceScope,
+  })
+  return {
+    executionContext: {
+      runId: `sigil-chat:thread:${input.binding.applicationThreadId}`,
+      runExecutionId:
+        `sigil-chat:eve:${input.eveSessionId}:turn:${input.turnId}`,
+      traceId: `sigil-chat:turn:${input.turnId}`,
+      parentSpanId: `sigil-chat:tool:${input.callId}`,
+      executionBindingId: `sigil-chat:${executionBindingDigest}`,
+      executionBindingDigest,
+      runtimeSessionBindingId:
+        `sigil-chat:eve:${input.eveSessionId}:${executionBindingDigest}`,
+    },
+    observedTurnId: input.turnId,
+    restrictionPolicyRefs: [
+      ...(input.restrictionPolicyRefs ?? fabricRestrictionPolicyRefs()),
+    ],
+    statePartitionRef: `sigil-chat:${executionBindingDigest}`,
+  }
+}
+
+export function fabricRestrictionPolicyRefs(
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const configured = env.GONK_FABRIC_RESTRICTION_POLICY_REFS
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+  return configured?.length ? [...new Set(configured)] : ["private-local"]
 }
 
 export function approvalForGonkTool(input: {

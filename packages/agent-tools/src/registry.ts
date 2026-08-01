@@ -1,4 +1,9 @@
 import { ToolRegistry } from "@gonk/tool-registry"
+import type { ToolDefinition } from "@gonk/tool-registry"
+import type {
+  ImageGenerateInput,
+  ImageGenerateOutput,
+} from "@gonk/image-gen"
 import type { SessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { GraphRepository } from "@workspace/graph-store/repository"
 import type { ReviewRepository } from "@workspace/review-store"
@@ -38,6 +43,10 @@ export interface SigilAgentToolDependencies {
   sessions?: ResourceUniverseRegistries["sessions"]
   skills: SkillRegistryResolver
   personaVoice?: PersonaVoiceResolver
+  portableImageGeneration?: ToolDefinition<
+    ImageGenerateInput,
+    ImageGenerateOutput
+  >
 }
 
 export function createSigilAgentToolRegistry(
@@ -65,6 +74,7 @@ export function createSigilAgentToolRegistry(
     process.env.SIGIL_LOCAL_CODEX_IMAGE_GENERATION === "disabled"
       ? null
       : undefined,
+    dependencies.portableImageGeneration,
   )
   registerSpeechTools(
     registry,

@@ -77,6 +77,72 @@ SIGIL_IMAGE_EDIT_GATEWAY_KEY=
 SIGIL_IMAGE_EDIT_DOWNLOAD_ORIGINS=https://assets.example
 ```
 
+### Portable compute through Gonk Fabric
+
+Sigil Chat can dispatch the canonical `image_generate@1` capability to an
+enrolled llm-service worker without importing Fabric into the product or the
+browser. The optional integration lives in the server-only Eve host adapter.
+When `GONK_FABRIC_RELAY_URL` is absent, the adapter is not created and the
+portable image capability is not registered.
+
+For loopback development, create the dispatcher, worker, and relay enrollment
+bundle in one command:
+
+```bash
+pnpm --package @gonk/fabric@0.3.7 dlx \
+  gonk-fabric-bootstrap .data/fabric-local
+```
+
+The command refuses to overwrite its target and writes private material with
+owner-only permissions. Source `.data/fabric-local/sigil-chat.env` into the
+agent process, use `relay-config.json` for the Gonk relay, and source
+`compute-worker.env` in llm-service. The generated `ws://` endpoint and
+insecure flags work only on loopback; deployments use `wss://` and mounted TLS
+material.
+
+The Eve host needs:
+
+| Variable | Purpose |
+| --- | --- |
+| `GONK_FABRIC_RELAY_URL` | Encrypted relay endpoint; setting it enables the adapter |
+| `GONK_FABRIC_STATE_DIR` | Durable replay state, normally below `SIGIL_DATA_DIR` |
+| `GONK_FABRIC_DISPATCHER_IDENTITY_FILE` | Dispatcher signing/encryption private identity |
+| `GONK_FABRIC_DISPATCHER_CERTIFICATE_FILE` | Authority-signed dispatcher certificate |
+| `GONK_FABRIC_WORKER_CERTIFICATE_FILE` | Exact enrolled image worker certificate |
+| `GONK_FABRIC_AUTHORITY_PRIVATE_KEY_FILE` | Grant-signing authority private key |
+| `GONK_FABRIC_AUTHORITY_KEY_ID` | Key id named by both endpoint certificates |
+| `GONK_FABRIC_RESTRICTION_POLICY_REFS` | Signed worker restriction refs, default `private-local` |
+| `GONK_FABRIC_IMAGE_PROVIDER` | Allowed provider, default `comfyui` |
+| `GONK_FABRIC_IMAGE_MODEL_ID` | Allowed model, default `local/chroma` |
+
+Each tool call reuses the authenticated principal, immutable Eve session
+binding, resource scope, turn id, and application thread to derive its
+execution and state-partition bindings. The request grants only one declared
+image output slot, bounded runtime/events/bytes, the exact provider/model, and
+the `private-local` worker policy. The relay sees only authenticated encrypted
+envelopes; Gonk remains the job, lease, cancellation, authorization, and
+terminal-commit authority.
+
+The llm-service worker can also host the Codex OAuth image provider used by
+Sigil Game's Novelty character studio. That path is locally invoked but sends
+the prompt to OpenAI; it is not local inference. Using it through Fabric
+requires all three explicit settings:
+
+```dotenv
+GONK_FABRIC_RESTRICTION_POLICY_REFS=cloud-openai
+GONK_FABRIC_IMAGE_PROVIDER=codex
+GONK_FABRIC_IMAGE_MODEL_ID=gpt-5.6-terra
+```
+
+The worker rejects `private-local` grants when its selected backend is Codex.
+
+Keep `GONK_FABRIC_STATE_DIR` under `SIGIL_DATA_DIR` in development if
+`pnpm dev:reset` should quarantine it with the rest of disposable application
+state. The generated `.data/fabric-local` bundle contains credentials and is
+not itself reset or committed; delete and re-enroll it deliberately when
+rotating the local authority. Existing application threads and session-owner
+bindings are governed by their own store/reset contract, not by the relay.
+
 Its `preset` and `quality` live in the Mirk fixture. `agent.model` selects the
 Eve turn model. The old bare string form still works and maps to
 `provider: codex`:

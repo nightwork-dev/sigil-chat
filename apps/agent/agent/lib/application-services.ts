@@ -1,6 +1,18 @@
 import { createScope } from "@gonk/scope"
 import { createStoreProvider } from "@gonk/store"
 import { mirkBackendFactory } from "@gonk/store/sqlite"
+import {
+  IMAGE_GENERATE_CAPABILITY,
+  createImageGenerateCapability,
+} from "@gonk/image-gen"
+import {
+  createEveFabricHostFromEnvironment,
+  fabricCapabilityCoordinate,
+  fabricExecutionBindingDigest,
+  type EveFabricToolHostContext,
+  type FabricDispatchMetadataV1,
+} from "@gonk/eve-host/fabric"
+import type { ToolContext } from "@gonk/tool-registry"
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
 import {
@@ -71,6 +83,18 @@ export const artifactStore = createFileSessionArtifactStore({
     canPrincipalAccessArtifactScope(principal?.id, scope, action),
 })
 
+export const eveFabricHost = await createEveFabricHostFromEnvironment({
+  scopeOrStore: usageStore,
+})
+
+const portableImageGeneration = eveFabricHost?.bind(
+  createImageGenerateCapability(async () => {
+    throw new Error("The Fabric image implementation was not bound")
+  }),
+  fabricCapabilityCoordinate(IMAGE_GENERATE_CAPABILITY),
+  resolveFabricImageMetadata,
+)
+
 export const agentToolRegistry = createSigilAgentToolRegistry({
   artifacts: artifactStore,
   containers: projectWorkspaceRegistries,
@@ -85,7 +109,88 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   specs: specsRepository,
   workItems: workItemsRepository,
   personaVoice: resolvePersonaVoice,
+  ...(portableImageGeneration ? { portableImageGeneration } : {}),
 })
+
+async function resolveFabricImageMetadata(
+  _input: unknown,
+  context: ToolContext,
+): Promise<FabricDispatchMetadataV1> {
+  if (!eveFabricHost) throw new Error("Gonk Fabric is not configured")
+  const principal = context.auth?.principal
+  const fabric = (context.host as EveFabricToolHostContext | undefined)?.fabric
+  if (!principal || !fabric) {
+    throw new Error(
+      "Fabric image generation requires an authenticated Eve run execution",
+    )
+  }
+  const authorization = await context.auth!.authorize({
+    action: "tool.invoke",
+    resource: {
+      kind: "tool",
+      target: IMAGE_GENERATE_CAPABILITY.capabilityId,
+    },
+  })
+  if (authorization.outcome !== "allow") {
+    throw new Error("Fabric image generation authorization was denied")
+  }
+  const now = Date.now()
+  const expiresAt = now + 5 * 60_000
+  const authorizationReceiptRef = [
+    "gonk-authz",
+    authorization.policyId,
+    fabricExecutionBindingDigest({
+      principalId: principal.id,
+      capabilityId: IMAGE_GENERATE_CAPABILITY.capabilityId,
+      runExecutionId: fabric.executionContext.runExecutionId,
+    }),
+  ].join(":")
+  return {
+    installationId: eveFabricHost.installationId,
+    principalId: principal.id,
+    audienceWorkerId: eveFabricHost.workerId,
+    authorizationReceiptRef,
+    executionPolicy: {
+      policyRef: "sigil-chat:image-generation:v1",
+      restrictionPolicyRefs: [...fabric.restrictionPolicyRefs],
+      retrySafety: "safe",
+      continuity: { mode: "stateless" },
+      model: {
+        provider: process.env.GONK_FABRIC_IMAGE_PROVIDER ?? "comfyui",
+        modelId: process.env.GONK_FABRIC_IMAGE_MODEL_ID ?? "local/chroma",
+        allowedFallbacks: [],
+      },
+    },
+    executionContext: structuredClone(fabric.executionContext),
+    observedTurnId: fabric.observedTurnId,
+    scopeContextDigest: fabricExecutionBindingDigest({
+      principalId: principal.id,
+      scopes: principal.scopes,
+      executionBindingDigest:
+        fabric.executionContext.executionBindingDigest,
+    }),
+    artifactAccess: [{
+      accessRef: [
+        "fabric-artifact-write",
+        fabric.executionContext.runExecutionId,
+        "image",
+      ].join(":"),
+      outputSlot: "image",
+      operation: "write",
+      maxBytes: 25 * 1024 * 1024,
+      expiresAt: new Date(expiresAt).toISOString(),
+    }],
+    limits: {
+      notBefore: new Date(now - 5_000).toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(),
+      maxRuntimeMs: 4 * 60_000,
+      maxProgressEvents: 240,
+      maxOutputEvents: 8,
+      maxInlineOutputBytes: 64 * 1024,
+      maxArtifactBytes: 25 * 1024 * 1024,
+    },
+  }
+}
 
 /**
  * The action is threaded through to the grant policy rather than pinned to

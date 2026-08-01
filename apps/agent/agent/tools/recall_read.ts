@@ -1,4 +1,5 @@
 import { defineTool } from "eve/tools"
+import { toSafeProjectionReceipt } from "@gonk/memory"
 import { z } from "zod"
 import { memoryTurn, personaHost, sessionPersonaId } from "../lib/memory"
 
@@ -25,7 +26,10 @@ export default defineTool({
       ok: true,
       matches,
       count: matches.length,
-      receipt: result.receipt,
+      receipt: toSafeProjectionReceipt(
+        result.privilegedReceipt,
+        matches.map((match) => match.id),
+      ),
     }
   },
 })

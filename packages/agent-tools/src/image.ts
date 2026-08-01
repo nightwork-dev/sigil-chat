@@ -1,10 +1,25 @@
-import { shape, type ToolRegistry } from "@gonk/tool-registry";
+import { createHash } from "node:crypto";
+
+import {
+  shape,
+  type ToolDefinition,
+  type ToolRegistry,
+} from "@gonk/tool-registry";
+import {
+  createImageGenerateCapability,
+  imageGenerateInputJsonSchema,
+  type ImageGenerateInput,
+  type ImageGenerateOutput,
+} from "@gonk/image-gen";
+import type {
+  ImageArtifactDescriptor,
+} from "@gonk/image-gen";
 import {
   artifactPublicUrl,
   getSessionArtifactStore,
   type SessionArtifactStore,
 } from "@workspace/artifact-store/repository";
-import { generateCodexImage } from "./image-provider.js";
+import { codexImageModelId, generateCodexImage } from "./image-provider.js";
 import {
   editImageThroughGateway,
   type ImageEditProvider,
@@ -51,7 +66,17 @@ export function registerImageTools(
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
   editImage: ImageEditProvider = editImageThroughGateway,
   generateImage: ImageGenerationProvider | null = generateCodexImage,
+  portableImageGeneration?: ToolDefinition<
+    ImageGenerateInput,
+    ImageGenerateOutput
+  >,
 ): void {
+  const portable =
+    portableImageGeneration ??
+    (generateImage
+      ? createPortableImageGenerationTool(artifacts, generateImage)
+      : undefined);
+  if (portable) registry.register(withPortableImageProjection(portable));
   if (generateImage)
     registry.register({
       name: "sigil-generate-image",
@@ -80,6 +105,7 @@ export function registerImageTools(
         const image = await generateImage({
           prompt: input.prompt,
           size: `${width}x${height}`,
+          signal: ctx.signal,
         });
 
         const scope = requireResourceScope(undefined, ctx);
@@ -229,6 +255,81 @@ export function registerImageTools(
       };
     },
   });
+}
+
+export function createPortableImageGenerationTool(
+  artifacts: SessionArtifactStore,
+  generateImage: ImageGenerationProvider = generateCodexImage,
+): ToolDefinition<ImageGenerateInput, ImageGenerateOutput> {
+  return createImageGenerateCapability(async (input, ctx) => {
+    const width = input.width ?? 1024;
+    const height = input.height ?? 1024;
+    const image = await generateImage({
+      prompt: input.prompt,
+      size: `${width}x${height}`,
+      signal: ctx.signal,
+    });
+    const scope = requireResourceScope(undefined, ctx);
+    const stored = await artifacts.putFile(
+      {
+        bytes: image.bytes,
+        filename: `${input.filenamePrefix ?? "generated-image"}.${imageExtension(image.mimeType)}`,
+        mediaType: image.mimeType,
+        scope,
+      },
+      ctx.auth?.principal,
+    );
+    const descriptor: ImageArtifactDescriptor = {
+      id: stored.id,
+      mediaType: stored.mediaType,
+      sizeBytes: stored.size,
+      digest: {
+        algorithm: "sha256",
+        value: createHash("sha256").update(image.bytes).digest("hex"),
+      },
+      kind: "image",
+      filename: stored.filename,
+      createdAt: Date.parse(stored.createdAt),
+      producer: {
+        system: "sigil-chat.local-image-provider",
+        operation: "image_generate",
+      },
+    };
+    return {
+      data: {
+        artifacts: [descriptor],
+        usage: {
+          provider: "codex",
+          modelId: codexImageModelId(),
+        },
+      },
+    };
+  });
+}
+
+function imageExtension(mediaType: string): string {
+  if (mediaType === "image/jpeg") return "jpg";
+  if (mediaType === "image/webp") return "webp";
+  return "png";
+}
+
+function withPortableImageProjection(
+  definition: ToolDefinition<ImageGenerateInput, ImageGenerateOutput>,
+): ToolDefinition<ImageGenerateInput, ImageGenerateOutput> {
+  return {
+    ...definition,
+    inputJsonSchema: imageGenerateInputJsonSchema,
+    hints: {
+      mcp: {
+        annotations: {
+          readOnly: false,
+          destructive: false,
+          idempotent: true,
+          openWorld: true,
+        },
+      },
+    },
+  };
 }
 
 function isEditImageInput(value: unknown): value is EditImageInput {
