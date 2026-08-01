@@ -369,17 +369,17 @@ describe("the unified canvas (epics and stories at one altitude)", () => {
     expect(depthOf(open)).toEqual({ a: 0, b: 1 })
   })
 
-  it("columns an open epic by its own internal dependencies", () => {
+  it("stacks an open lane's stories by its own internal dependencies", () => {
     const result = canvas(["a", "b"])
     const byId = new Map(result.stories.map((s) => [s.id, s]))
 
-    // A2 depends on A1 inside the lane, so it sits one column right of it —
-    // and B1 starts its own lane's grid at column 0 rather than inheriting
-    // lane a's depth.
-    expect(byId.get("A1")?.column).toBe(0)
-    expect(byId.get("A2")?.column).toBe(1)
-    expect(byId.get("B1")?.column).toBe(0)
-    expect(result.epics.find((epic) => epic.id === "a")?.columns).toBe(2)
+    // A2 depends on A1 inside the lane, so it sits one row below it — and B1
+    // starts its own lane at row 0 rather than inheriting lane a's depth,
+    // because cross-lane sequencing is carried by the arrow between columns.
+    expect(byId.get("A1")?.row).toBe(0)
+    expect(byId.get("A2")?.row).toBe(1)
+    expect(byId.get("B1")?.row).toBe(0)
+    expect(result.epics.find((epic) => epic.id === "a")?.rows).toBe(2)
   })
 
   it("reports a collapsed lane's blocked stories so it can never look clear", () => {

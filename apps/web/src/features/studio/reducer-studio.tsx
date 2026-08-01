@@ -3,7 +3,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
   type SubmitEvent,
 } from "react"
 import {
@@ -11,10 +10,8 @@ import {
   BackgroundVariant,
   Handle,
   MiniMap,
-  Panel,
   Position,
   ReactFlow,
-  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -24,16 +21,11 @@ import {
 } from "@xyflow/react"
 import {
   CircleAlertIcon,
-  FocusIcon,
-  LockIcon,
   PlayIcon,
   PlusIcon,
   Redo2Icon,
   Trash2Icon,
-  UnlockIcon,
   XIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
 } from "lucide-react"
 
 import {
@@ -42,6 +34,7 @@ import {
   useReducerGraphRun,
   useReducerGraphUndo,
 } from "@/features/studio/reducer-data"
+import { CanvasControls } from "@/features/graph-canvas/canvas-controls"
 import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-nodes"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
@@ -93,11 +86,6 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { PropertyPanel } from "@workspace/ui/components/blocks/property-panel"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Separator } from "@workspace/ui/components/separator"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip"
 import { createBuiltinReducerRegistry } from "@workspace/graph/builtins"
 import { DataKind } from "@workspace/graph/data-kinds"
 import {
@@ -535,7 +523,7 @@ function ReducerCanvas({
           style={{ height: 92, width: 140 }}
           zoomable
         />
-        <StudioCanvasControls
+        <CanvasControls
           editingEnabled={editingEnabled}
           onEditingEnabledChange={setEditingEnabled}
         />
@@ -569,85 +557,6 @@ function ReducerCanvas({
           or streaming. */}
       <StudioAmbientPanel />
     </div>
-  )
-}
-
-function StudioCanvasControls({
-  editingEnabled,
-  onEditingEnabledChange,
-}: {
-  editingEnabled: boolean
-  onEditingEnabledChange: (enabled: boolean) => void
-}) {
-  const { fitView, zoomIn, zoomOut } = useReactFlow<ReducerFlowNode>()
-
-  return (
-    <Panel className="m-3!" position="bottom-left">
-      <div
-        aria-label="Canvas controls"
-        className="flex items-center gap-0.5 rounded-md border border-border bg-background/90 p-0.5 shadow-md backdrop-blur"
-        role="toolbar"
-      >
-        <CanvasControlButton
-          label="Zoom in"
-          onClick={() => void zoomIn({ duration: 120 })}
-        >
-          <ZoomInIcon />
-        </CanvasControlButton>
-        <CanvasControlButton
-          label="Zoom out"
-          onClick={() => void zoomOut({ duration: 120 })}
-        >
-          <ZoomOutIcon />
-        </CanvasControlButton>
-        <CanvasControlButton
-          label="Fit graph"
-          onClick={() =>
-            void fitView({ duration: 180, maxZoom: 1.1, padding: 0.18 })
-          }
-        >
-          <FocusIcon />
-        </CanvasControlButton>
-        <Separator className="mx-0.5 h-4!" orientation="vertical" />
-        <CanvasControlButton
-          active={!editingEnabled}
-          label={editingEnabled ? "Lock graph editing" : "Unlock graph editing"}
-          onClick={() => onEditingEnabledChange(!editingEnabled)}
-        >
-          {editingEnabled ? <LockIcon /> : <UnlockIcon />}
-        </CanvasControlButton>
-      </div>
-    </Panel>
-  )
-}
-
-function CanvasControlButton({
-  active = false,
-  children,
-  label,
-  onClick,
-}: {
-  active?: boolean
-  children: ReactNode
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            aria-label={label}
-            onClick={onClick}
-            size="icon-sm"
-            variant={active ? "secondary" : "ghost"}
-          />
-        }
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
   )
 }
 

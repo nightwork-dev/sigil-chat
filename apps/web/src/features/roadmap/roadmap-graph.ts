@@ -517,8 +517,7 @@ export interface RoadmapCanvasEpic {
   depth: number
   /** Position within that layer, top to bottom. */
   order: number
-  /** Internal extent when expanded, counted in story cells. */
-  columns: number
+  /** How many stories the open column holds. One card wide, always. */
   rows: number
   /** Stories here whose blockers have not all shipped. */
   blockedCount: number
@@ -532,8 +531,7 @@ export interface RoadmapCanvasStory {
   isBlocked: boolean
   hiddenBlockers: number
   hiddenBlocked: number
-  /** Cell within the parent epic's internal grid. */
-  column: number
+  /** Row within the parent epic's column, top to bottom. */
   row: number
 }
 
@@ -589,15 +587,12 @@ export function buildRoadmapCanvas(
   for (const epic of graph.epics) {
     const own = members.get(epic.id) ?? []
     const expanded = options.expandedEpics.has(epic.id)
-    let columns = 1
     let rows = 1
 
     if (expanded) {
-      const cells = internalLayout(own)
-      columns = Math.max(1, ...[...cells.values()].map((cell) => cell.column + 1))
-      rows = Math.max(1, ...[...cells.values()].map((cell) => cell.row + 1))
+      const order = internalOrder(own)
+      rows = Math.max(1, own.length)
       for (const node of own) {
-        const cell = cells.get(node.id) ?? { column: 0, row: 0 }
         presentation.set(node.id, node.id)
         stories.push({
           id: node.id,
@@ -607,8 +602,7 @@ export function buildRoadmapCanvas(
           isBlocked: node.isBlocked,
           hiddenBlockers: node.hiddenBlockers,
           hiddenBlocked: node.hiddenBlocked,
-          column: cell.column,
-          row: cell.row,
+          row: order.get(node.id) ?? 0,
         })
       }
     } else {
@@ -624,7 +618,6 @@ export function buildRoadmapCanvas(
       expanded,
       depth: epicDepth.get(epic.id) ?? 0,
       order: epicOrder.get(epic.id) ?? 0,
-      columns,
       rows,
       blockedCount: own.filter((node) => node.isBlocked).length,
     })
@@ -678,16 +671,19 @@ function aggregateEdges(
 }
 
 /**
- * Where each story sits inside its own epic's container.
+ * Where each story sits inside its own lane's column.
  *
- * Columns come from dependencies WITHIN the epic, so a lane reads left to
- * right on its own terms rather than inheriting a column from work in some
- * other lane. Row order keeps the global barycenter order the base layout
- * already worked out, so opening an epic doesn't scramble what was on screen.
+ * A lane is one card wide and stories stack down it, so this is a single
+ * ordering rather than a grid: dependencies WITHIN the lane run top to bottom,
+ * and stories at the same internal depth keep the global barycenter order the
+ * base layout already worked out, so opening a lane doesn't scramble what was
+ * on screen.
+ *
+ * The lane is ordered on its OWN internal depth rather than inheriting a rank
+ * from work in some other lane — cross-lane sequencing is carried by the
+ * arrows between columns, which is the whole point of separating the two axes.
  */
-function internalLayout(
-  own: readonly RoadmapGraphNode[],
-): Map<string, { column: number; row: number }> {
+function internalOrder(own: readonly RoadmapGraphNode[]): Map<string, number> {
   const ids = new Set(own.map((node) => node.id))
   const localBlockers = new Map(
     own.map((node) => [node.id, node.blockedBy.filter((id) => ids.has(id))]),
@@ -705,22 +701,17 @@ function internalLayout(
     ids,
   )
 
-  const byColumn = new Map<number, RoadmapGraphNode[]>()
-  for (const node of own) {
-    const column = depth.get(node.id) ?? 0
-    const bucket = byColumn.get(column)
-    if (bucket) bucket.push(node)
-    else byColumn.set(column, [node])
-  }
-
-  const cells = new Map<string, { column: number; row: number }>()
-  for (const [column, bucket] of byColumn) {
-    bucket
-      .slice()
-      .sort((left, right) => left.lane - right.lane || left.id.localeCompare(right.id))
-      .forEach((node, row) => cells.set(node.id, { column, row }))
-  }
-  return cells
+  const order = new Map<string, number>()
+  own
+    .slice()
+    .sort(
+      (left, right) =>
+        (depth.get(left.id) ?? 0) - (depth.get(right.id) ?? 0) ||
+        left.lane - right.lane ||
+        left.id.localeCompare(right.id),
+    )
+    .forEach((node, row) => order.set(node.id, row))
+  return order
 }
 
 /**

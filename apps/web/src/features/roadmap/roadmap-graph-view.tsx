@@ -33,17 +33,15 @@
 //     than red text on every card — with dozens blocked, red everywhere stops
 //     being a signal. Status is quiet text at every status.
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Background,
   BackgroundVariant,
-  Controls,
   Handle,
-  MarkerType,
   Position,
   ReactFlow,
   ReactFlowProvider,
-  type Edge,
+  useReactFlow,
   type Node,
   type NodeTypes,
 } from "@xyflow/react"
@@ -54,30 +52,25 @@ import { Label } from "@workspace/ui/components/label"
 import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { CanvasControls } from "@/features/graph-canvas/canvas-controls"
 import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-nodes"
 
+import {
+  HANDLE,
+  layoutCanvas,
+  routeEdges,
+  STORY_HEIGHT,
+  STORY_WIDTH,
+} from "./roadmap-graph-layout"
 import {
   blockingChain,
   buildRoadmapCanvas,
   buildRoadmapGraph,
   defaultExpandedEpics,
-  type RoadmapCanvas,
   type RoadmapGraphStory,
 } from "./roadmap-graph"
 
 import "@xyflow/react/dist/style.css"
-
-const STORY_WIDTH = 232
-const STORY_HEIGHT = 52
-const STORY_COLUMN_GAP = 56
-const STORY_ROW_GAP = 10
-/** Container chrome: the header strip, and air around the cards inside. */
-const PAD_X = 12
-const PAD_TOP = 30
-const PAD_BOTTOM = 12
-const EPIC_HEIGHT = 68
-const EPIC_COLUMN_GAP = 140
-const EPIC_ROW_GAP = 36
 
 interface StoryNodeData extends Record<string, unknown> {
   label: string
@@ -244,16 +237,16 @@ export function RoadmapGraphView({
     return {
       // Containers first so they paint behind the cards they hold.
       nodes: [...containers, ...cards],
-      edges: canvas.edges.map((edge) =>
-        toFlowEdge(
-          edge,
-          chain ? edge.underlying.some((id) => chain.edges.has(id)) : true,
-        ),
-      ),
+      edges: routeEdges(canvas, layout, chain ? chain.edges : null),
     }
   }, [canvas, layout, chain, selected])
 
   const { nodes, onNodesChange } = useStableFlowNodes<GraphNode>(derived.nodes)
+
+  // What the viewport must be re-fitted for: which lanes are open, and how
+  // much is on the canvas. Not the selection — tracing a chain shouldn't move
+  // the map under the cursor.
+  const layoutSignature = `${[...expanded].sort().join(",")}|${derived.nodes.length}`
 
   const allExpanded = canvas.epics.every((epic) => epic.expanded)
   const hiddenTotal = graph.nodes.reduce(
@@ -373,7 +366,8 @@ export function RoadmapGraphView({
               size={1}
               color="var(--color-border)"
             />
-            <Controls showInteractive={false} />
+            <CanvasControls />
+            <FitOnLayout signature={layoutSignature} />
           </ReactFlow>
         </ReactFlowProvider>
       </div>
@@ -381,135 +375,65 @@ export function RoadmapGraphView({
   )
 }
 
-interface Box {
-  x: number
-  y: number
-  width: number
-  height: number
+/**
+ * Re-fit the viewport when the layout changes shape.
+ *
+ * React Flow's `fitView` prop fits once, at init. Expanding or collapsing a
+ * lane rewrites the whole layout underneath a viewport that no longer frames
+ * it, which is what left a screen of dead space beside the content. This is an
+ * effect because the viewport is the library's imperative state, not ours.
+ */
+function FitOnLayout({ signature }: { signature: string }) {
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    void fitView({ duration: 220, padding: 0.12, maxZoom: 1.1 })
+  }, [signature, fitView])
+  return null
 }
 
 /**
- * Pixels for the whole canvas: lanes laid out in layers, stories inside them.
- *
- * The projection decided each lane's layer and its order within that layer, and
- * each story's cell inside its lane. This turns that into coordinates: a layer
- * is as wide as its widest lane, and every story sits at an absolute position
- * derived from its container's box rather than being parented to it.
+ * Four sides, each with a job: left and right carry cross-lane traffic, top and
+ * bottom carry the hops down a lane, and `rightIn` receives the detour that
+ * skips a card. All invisible — nothing here is connectable by hand.
  */
-function layoutCanvas(canvas: RoadmapCanvas): {
-  epics: Map<string, Box>
-  stories: Map<string, { x: number; y: number }>
-} {
-  const sized = canvas.epics.map((epic) => ({
-    epic,
-    width: epic.expanded
-      ? epic.columns * STORY_WIDTH +
-        (epic.columns - 1) * STORY_COLUMN_GAP +
-        PAD_X * 2
-      : STORY_WIDTH,
-    height: epic.expanded
-      ? epic.rows * STORY_HEIGHT +
-        (epic.rows - 1) * STORY_ROW_GAP +
-        PAD_TOP +
-        PAD_BOTTOM
-      : EPIC_HEIGHT,
-  }))
-
-  const layers = new Map<number, typeof sized>()
-  for (const entry of sized) {
-    const bucket = layers.get(entry.epic.depth)
-    if (bucket) bucket.push(entry)
-    else layers.set(entry.epic.depth, [entry])
-  }
-
-  const epics = new Map<string, Box>()
-  let x = 0
-  for (const depth of [...layers.keys()].sort((a, b) => a - b)) {
-    const bucket = (layers.get(depth) ?? [])
-      .slice()
-      .sort((left, right) => left.epic.order - right.epic.order)
-    let y = 0
-    for (const entry of bucket) {
-      epics.set(entry.epic.id, { x, y, width: entry.width, height: entry.height })
-      y += entry.height + EPIC_ROW_GAP
-    }
-    x += Math.max(...bucket.map((entry) => entry.width)) + EPIC_COLUMN_GAP
-  }
-
-  const stories = new Map<string, { x: number; y: number }>()
-  for (const story of canvas.stories) {
-    const box = epics.get(story.epicId)
-    if (!box) continue
-    stories.set(story.id, {
-      x: box.x + PAD_X + story.column * (STORY_WIDTH + STORY_COLUMN_GAP),
-      y: box.y + PAD_TOP + story.row * (STORY_HEIGHT + STORY_ROW_GAP),
-    })
-  }
-
-  return { epics, stories }
-}
-
-function toFlowEdge(
-  edge: {
-    id: string
-    source: string
-    target: string
-    binding: boolean
-    count: number
-  },
-  active: boolean,
-): Edge {
-  return {
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    type: "smoothstep",
-    animated: false,
-    // The count only earns ink when one line stands for several dependencies.
-    ...(edge.count > 1
-      ? {
-          label: `×${edge.count}`,
-          labelShowBg: true,
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 3,
-          labelStyle: {
-            fill: "var(--color-muted-foreground)",
-            fontSize: 10,
-          },
-          labelBgStyle: { fill: "var(--color-background)" },
-        }
-      : {}),
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      width: 14,
-      height: 14,
-      color: "var(--color-muted-foreground)",
-    },
-    // A satisfied dependency is history, not a live constraint — it stays
-    // visible so the chain is complete, but dashed so it stops competing.
-    style: {
-      stroke: active ? "var(--color-muted-foreground)" : "var(--color-border)",
-      strokeWidth: edge.binding ? 1.4 : 1,
-      strokeDasharray: edge.binding ? undefined : "4 4",
-      opacity: active ? (edge.binding ? 0.75 : 0.4) : 0.15,
-    },
-  }
-}
-
 function EdgeHandles() {
+  const hidden = "h-1! w-1! border-0! bg-transparent! opacity-0"
   return (
     <>
       <Handle
+        id={HANDLE.left}
         type="target"
         position={Position.Left}
         isConnectable={false}
-        className="h-1! w-1! border-0! bg-transparent! opacity-0"
+        className={hidden}
       />
       <Handle
+        id={HANDLE.top}
+        type="target"
+        position={Position.Top}
+        isConnectable={false}
+        className={hidden}
+      />
+      <Handle
+        id={HANDLE.rightIn}
+        type="target"
+        position={Position.Right}
+        isConnectable={false}
+        className={hidden}
+      />
+      <Handle
+        id={HANDLE.right}
         type="source"
         position={Position.Right}
         isConnectable={false}
-        className="h-1! w-1! border-0! bg-transparent! opacity-0"
+        className={hidden}
+      />
+      <Handle
+        id={HANDLE.bottom}
+        type="source"
+        position={Position.Bottom}
+        isConnectable={false}
+        className={hidden}
       />
     </>
   )
