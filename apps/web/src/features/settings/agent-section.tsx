@@ -5,7 +5,7 @@
 // while the existing localStorage store keeps working as the fast local
 // mirror the agent chat reads synchronously.
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import {
   CheckIcon,
@@ -34,10 +34,10 @@ import {
 } from "@workspace/ui/components/tooltip"
 
 import { setSpeakReplies, useSpeakReplies } from "@/lib/agent-speak-replies"
+import { useAdoptedAgentPreferences } from "@/lib/agent-preferences"
 import {
   ACCOUNT_WIDE_AGENT_KEY,
   effectiveToolApprovalOverrides,
-  normalizePerAgentOverrides,
   setToolApprovalMode,
   setToolApprovalOverrides,
   useToolApprovalMode,
@@ -47,7 +47,7 @@ import {
 } from "@/lib/agent-tool-approval"
 import { useAgentCatalog } from "@/lib/agent-catalog"
 import { groupApplicationTools } from "@/lib/capability-model"
-import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
+import { useSetUserSetting } from "@/lib/user-settings"
 import {
   SettingsAsyncState,
   SettingsNote,
@@ -102,60 +102,26 @@ const OPTIONS: {
 export function AgentSection({ userId }: { userId: string }) {
   const localMode = useToolApprovalMode()
   const localOverrides = useToolApprovalOverrides()
-  const registryDefault = useUserSetting(userId, "agent.toolApprovalDefault")
+  // The durable copies, with the local mirrors this surface edits already
+  // adopted — the adopt-once rule belongs to the store, not to this page.
+  const {
+    toolApprovalDefault: registryDefault,
+    speakReplies: registrySpeakReplies,
+  } = useAdoptedAgentPreferences(userId)
   const setRegistryDefault = useSetUserSetting(
     userId,
     "agent.toolApprovalDefault",
-  )
-  const registryOverrides = useUserSetting(
-    userId,
-    "agent.toolApprovalOverrides",
   )
   const setRegistryOverrides = useSetUserSetting(
     userId,
     "agent.toolApprovalOverrides",
   )
   const localSpeakReplies = useSpeakReplies()
-  const registrySpeakReplies = useUserSetting(userId, "agent.speakReplies")
   const setRegistrySpeakReplies = useSetUserSetting(
     userId,
     "agent.speakReplies",
   )
   const catalog = useAgentCatalog()
-
-  // One-time sync on load: if the registry already has a value for this
-  // account and the local client store hasn't been set yet this session,
-  // adopt it so a returning user on a fresh browser sees their preference.
-  useEffect(() => {
-    if (registryDefault.data && registryDefault.data.source !== "default") {
-      setToolApprovalMode(registryDefault.data.value)
-    }
-    // Only ever want this on the initial resolved fetch, not every refetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registryDefault.data?.source])
-
-  useEffect(() => {
-    if (registryOverrides.data && registryOverrides.data.source !== "default") {
-      // The stored value may still be the pre-MA.4 flat map; normalize
-      // migrates it into the "*" layer.
-      setToolApprovalOverrides(
-        normalizePerAgentOverrides(registryOverrides.data.value),
-      )
-    }
-    // Only adopt the durable value once per resolved account fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registryOverrides.data?.source])
-
-  useEffect(() => {
-    if (
-      registrySpeakReplies.data &&
-      registrySpeakReplies.data.source !== "default"
-    ) {
-      setSpeakReplies(registrySpeakReplies.data.value)
-    }
-    // Only adopt the durable value once per resolved account fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registrySpeakReplies.data?.source])
 
   function handleSpeakRepliesChange(next: boolean) {
     setSpeakReplies(next)
