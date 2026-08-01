@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import {
   AtSignIcon,
   CheckIcon,
@@ -63,6 +63,7 @@ import {
   EmptyTitle,
 } from "@workspace/ui/components/empty"
 import { Input } from "@workspace/ui/components/input"
+import { SectionHeader } from "@workspace/ui/components/section-header"
 import {
   Select,
   SelectContent,
@@ -555,34 +556,6 @@ function ReviewQueue({
 }
 
 /**
- * The eyebrow that names a field in the story detail pane.
- *
- * `as="label"` where the eyebrow actually labels a form control, so the
- * association is real and not just visual; `span` everywhere else, because a
- * <label> pointing at nothing is a lie to a screen reader.
- */
-function FieldLabel({
-  as: Tag = "span",
-  className,
-  children,
-}: {
-  as?: "span" | "label"
-  className?: string
-  children: ReactNode
-}) {
-  return (
-    <Tag
-      className={cn(
-        "text-[0.625rem] font-medium tracking-[0.12em] text-muted-foreground uppercase",
-        className,
-      )}
-    >
-      {children}
-    </Tag>
-  )
-}
-
-/**
  * A completed review's verdict. Renders nothing for a review with no decision
  * on record — an absent verdict is not a third outcome to label.
  */
@@ -759,7 +732,7 @@ function StoryDetail({
       </div>
 
       <div className="space-y-1.5">
-        <FieldLabel as="label">Title</FieldLabel>
+        <SectionHeader>Title</SectionHeader>
         <Input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -768,18 +741,21 @@ function StoryDetail({
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <FieldLabel>Intent</FieldLabel>
-          <Button
-            onClick={() => setEditingIntent((current) => !current)}
-            size="xs"
-            type="button"
-            variant="ghost"
-          >
-            {editingIntent ? <EyeIcon /> : <PencilLineIcon />}
-            {editingIntent ? "Preview" : "Edit"}
-          </Button>
-        </div>
+        <SectionHeader
+          action={
+            <Button
+              onClick={() => setEditingIntent((current) => !current)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              {editingIntent ? <EyeIcon /> : <PencilLineIcon />}
+              {editingIntent ? "Preview" : "Edit"}
+            </Button>
+          }
+        >
+          Intent
+        </SectionHeader>
         {editingIntent ? (
           <Textarea
             value={intent}
@@ -805,7 +781,7 @@ function StoryDetail({
       </div>
 
       <div className="space-y-1.5 border-t border-border pt-4">
-        <FieldLabel as="label">Status</FieldLabel>
+        <SectionHeader>Status</SectionHeader>
         <Select
           value={story.status}
           onValueChange={(value) => void move(value as StoryStatus)}
@@ -825,13 +801,13 @@ function StoryDetail({
       </div>
 
       <div className="space-y-2 border-t border-border pt-4">
-        <FieldLabel>Acceptance criteria</FieldLabel>
+        <SectionHeader>Acceptance criteria</SectionHeader>
         <Story.AcceptanceList />
       </div>
 
       {story.deps.length > 0 ? (
         <div className="space-y-2 border-t border-border pt-4">
-          <FieldLabel>Depends on</FieldLabel>
+          <SectionHeader>Depends on</SectionHeader>
           <div className="flex flex-wrap gap-1.5">
             {story.deps.map((dep) => (
               <Button
@@ -851,7 +827,7 @@ function StoryDetail({
 
       {dependents.length > 0 ? (
         <div className="space-y-2 border-t border-border pt-4">
-          <FieldLabel>Required by</FieldLabel>
+          <SectionHeader>Required by</SectionHeader>
           <div className="flex flex-wrap gap-1.5">
             {dependents.map((dependent) => (
               <Button
@@ -945,15 +921,20 @@ function StoryComments({ story }: { story: StoryData }) {
 
   return (
     <div className="space-y-3 border-t border-border pt-4">
-      <div className="flex items-center gap-1.5">
-        <MessageSquareIcon className="size-3.5 text-muted-foreground" />
-        <FieldLabel>Feedback</FieldLabel>
-        {thread.length > 0 ? (
-          <span className="font-mono text-[0.625rem] text-muted-foreground">
-            {thread.length}
-          </span>
-        ) : null}
-      </div>
+      <SectionHeader
+        action={
+          thread.length > 0 ? (
+            <span className="font-mono text-[0.625rem] text-muted-foreground">
+              {thread.length}
+            </span>
+          ) : null
+        }
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <MessageSquareIcon className="size-3.5" />
+          Feedback
+        </span>
+      </SectionHeader>
 
       {comments.isLoading ? (
         <p className="text-xs text-muted-foreground">Loading feedback…</p>

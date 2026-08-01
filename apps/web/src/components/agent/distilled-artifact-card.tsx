@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { FileTextIcon, SparklesIcon } from "lucide-react"
 
+import { SectionHeader } from "@workspace/ui/components/section-header"
 import { ToolCall } from "@workspace/ui/components/tool-call"
 import {
   getToolOutputData,
@@ -68,7 +69,7 @@ export function DistilledCard({ distilled }: { distilled: DistilledArtifact }) {
 
         {distilled.references.length > 0 ? (
           <div className="space-y-1">
-            <FieldLabel>References</FieldLabel>
+            <SectionHeader>References</SectionHeader>
             <ul className="space-y-1">
               {distilled.references.map((reference, index) => (
                 <li
@@ -98,14 +99,6 @@ export function DistilledCard({ distilled }: { distilled: DistilledArtifact }) {
   )
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-      {children}
-    </p>
-  )
-}
-
 function Field({
   label,
   emphasis,
@@ -117,7 +110,7 @@ function Field({
 }) {
   return (
     <div className="space-y-0.5">
-      <FieldLabel>{label}</FieldLabel>
+      <SectionHeader>{label}</SectionHeader>
       <p
         className={cn(
           "break-words text-foreground/90",
