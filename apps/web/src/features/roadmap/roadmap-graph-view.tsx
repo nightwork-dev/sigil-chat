@@ -642,13 +642,13 @@ function Legend({
         {hasSelection ? (
           <ul className="flex items-center gap-2.5 border-t border-border pt-1">
             <li className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <span aria-hidden className="text-chart-1">
+              <span aria-hidden className="text-chart-5">
                 &#9473;
               </span>
               blocks it
             </li>
             <li className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <span aria-hidden className="text-chart-5">
+              <span aria-hidden className="text-chart-1">
                 &#9473;
               </span>
               waits on it
@@ -745,8 +745,8 @@ function StoryFlowNode({ id, data }: { id: string; data: StoryNodeData }) {
               : data.blocked
                 ? "border-border/50 saturate-50"
                 : "border-border",
-        data.direction === "upstream" && "border-chart-1",
-        data.direction === "downstream" && "border-chart-5",
+        data.direction === "upstream" && "border-chart-5",
+        data.direction === "downstream" && "border-chart-1",
         data.onChain &&
           !data.selected &&
           !data.onPath &&
@@ -832,8 +832,8 @@ function EpicRollupNode({ data }: { data: EpicNodeData }) {
               : data.blockedCount > 0
                 ? "border-border/50 saturate-50"
                 : "border-border",
-        data.direction === "upstream" && "border-chart-1",
-        data.direction === "downstream" && "border-chart-5",
+        data.direction === "upstream" && "border-chart-5",
+        data.direction === "downstream" && "border-chart-1",
         data.onChain && !data.onPath && !data.direction && "border-primary/50",
         data.dimmed ? "opacity-20" : data.aside && "opacity-60",
       )}

@@ -38,10 +38,15 @@ const EPIC_ROW_GAP = 36
  * therefore carried on the value axis the tokens actually provide: chart-1 is
  * the brightest member of the family, chart-5 the deepest, and they are the
  * most separable pair in every theme. The legend names both.
+ *
+ * The bright tint goes to what the selection UNLOCKS (downstream): blockers
+ * already speak through the frontier red, so upstream takes the deep tint
+ * rather than double-spending emphasis on what red already says (David,
+ * 2026-07-31).
  */
 export type ChainDirection = "upstream" | "downstream"
-const UPSTREAM_COLOR = "var(--color-chart-1)"
-const DOWNSTREAM_COLOR = "var(--color-chart-5)"
+const UPSTREAM_COLOR = "var(--color-chart-5)"
+const DOWNSTREAM_COLOR = "var(--color-chart-1)"
 
 /** A gutter is at least this wide, and widens with the traffic through it. */
 const GUTTER_BASE = 68
