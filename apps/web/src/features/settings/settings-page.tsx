@@ -153,7 +153,7 @@ export function SettingsPage({
             <AppearanceSection userId={user.id} />
           </TabsContent>
           <TabsContent value="agent">
-            <AgentSection userId={user.id} />
+            <AgentSection />
           </TabsContent>
           {isOwner ? (
             <TabsContent value="models">

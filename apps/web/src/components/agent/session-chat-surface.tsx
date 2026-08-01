@@ -40,9 +40,9 @@ import {
   useSetActiveAgentThread,
 } from "@/lib/agent-threads"
 import {
-  setToolApprovalMode,
+  useSetToolApprovalMode,
   useToolApprovalMode,
-} from "@/lib/agent-tool-approval"
+} from "@/lib/agent-preferences"
 import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
 
@@ -63,6 +63,7 @@ export function SessionChatSurface({
   compact?: boolean
 }) {
   const approvalMode = useToolApprovalMode()
+  const setApprovalMode = useSetToolApprovalMode()
   const preference = useActiveAgentThreadPreference()
   const setActiveThread = useSetActiveAgentThread()
   const attention = useAttention()
@@ -119,7 +120,7 @@ export function SessionChatSurface({
           <AgentChat
             approvalMode={approvalMode}
             hideHeader
-            onApprovalModeChange={setToolApprovalMode}
+            onApprovalModeChange={setApprovalMode.set}
             placeholder="Ask the agent, or tell it to use an application tool…"
             showNewSession={false}
           />

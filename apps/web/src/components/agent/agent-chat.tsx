@@ -63,7 +63,7 @@ import {
 import { useModelEndpoints } from "@/lib/model-endpoints"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import { appendDictationDraft } from "@/lib/voice-dictation"
-import { useSpeakReplies } from "@/lib/agent-speak-replies"
+import { useSpeakReplies } from "@/lib/agent-preferences"
 import { useSpokenAgentReplies } from "@/lib/spoken-replies"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"

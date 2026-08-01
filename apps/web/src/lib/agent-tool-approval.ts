@@ -1,4 +1,17 @@
-import { useSyncExternalStore } from "react"
+// The tool-approval preference's contract: its wire format, its layering
+// rules, and the browser-local mirror the app can read before a query has
+// resolved.
+//
+// The preference itself lives in the user-settings registry — see
+// ./agent-preferences for the hooks that read and write it. What is left here
+// is everything that must work without React: the header name and its
+// serialization (Eve parses this exact shape), the MA.4 layer resolution, and
+// the localStorage mirror.
+//
+// The mirror is a mirror and nothing more. It is written from the query layer
+// and read only before that layer has an answer — first paint, and the moment
+// after hydration. It has no listeners and no subscribers, because a second
+// set of writers is how the durable value and the local one drifted apart.
 
 export type ToolApprovalMode = "ask" | "always"
 /** One agent's layer: tool id → mode. */
@@ -26,27 +39,32 @@ const OVERRIDES_STORAGE_KEY = "sigil-chat:tool-approval-overrides"
 const MAX_TOOL_APPROVAL_AGENTS = 16
 const MAX_TOOL_APPROVAL_OVERRIDES = 64
 const MAX_TOOL_NAME_LENGTH = 160
-const listeners = new Set<() => void>()
+
+export const EMPTY_TOOL_APPROVAL_OVERRIDES: PerAgentToolApprovalOverrides = {}
+
+// Parsed once per browser session and refreshed on write. Referential
+// stability matters: the mirror is read through useSyncExternalStore, which
+// compares snapshots by identity.
 let cachedMode: ToolApprovalMode | undefined
 let cachedOverrides: PerAgentToolApprovalOverrides | undefined
-let listeningForStorage = false
 
-export function getToolApprovalMode(): ToolApprovalMode {
+export function readToolApprovalModeMirror(): ToolApprovalMode {
   if (typeof window === "undefined") return "ask"
-  if (cachedMode === undefined)
+  if (cachedMode === undefined) {
     cachedMode = parseMode(window.localStorage.getItem(STORAGE_KEY))
+  }
   return cachedMode
 }
 
-export function setToolApprovalMode(mode: ToolApprovalMode): void {
+export function writeToolApprovalModeMirror(mode: ToolApprovalMode): void {
   cachedMode = mode
-  if (typeof window !== "undefined")
+  if (typeof window !== "undefined") {
     window.localStorage.setItem(STORAGE_KEY, mode)
-  listeners.forEach((listener) => listener())
+  }
 }
 
-export function getToolApprovalOverrides(): PerAgentToolApprovalOverrides {
-  if (typeof window === "undefined") return {}
+export function readToolApprovalOverridesMirror(): PerAgentToolApprovalOverrides {
+  if (typeof window === "undefined") return EMPTY_TOOL_APPROVAL_OVERRIDES
   if (cachedOverrides === undefined) {
     cachedOverrides = parseOverrides(
       window.localStorage.getItem(OVERRIDES_STORAGE_KEY),
@@ -55,7 +73,7 @@ export function getToolApprovalOverrides(): PerAgentToolApprovalOverrides {
   return cachedOverrides
 }
 
-export function setToolApprovalOverrides(
+export function writeToolApprovalOverridesMirror(
   overrides: PerAgentToolApprovalOverrides,
 ): void {
   cachedOverrides = normalizePerAgentOverrides(overrides)
@@ -65,7 +83,6 @@ export function setToolApprovalOverrides(
       JSON.stringify(cachedOverrides),
     )
   }
-  listeners.forEach((listener) => listener())
 }
 
 /**
@@ -131,16 +148,6 @@ function normalizeLayer(value: unknown): ToolApprovalOverrides {
   ) as ToolApprovalOverrides
 }
 
-export function getToolApprovalHeaderValue(): string {
-  // The header carries the account-wide view: today Eve is the only
-  // interactive agent and the settings surface writes only "*". When the
-  // multi-agent track lands, the session layer passes its agent name here.
-  return serializeToolApprovalPreference(
-    getToolApprovalMode(),
-    effectiveToolApprovalOverrides(getToolApprovalOverrides()),
-  )
-}
-
 export function serializeToolApprovalPreference(
   defaultMode: ToolApprovalMode,
   overrides: ToolApprovalOverrides,
@@ -150,60 +157,19 @@ export function serializeToolApprovalPreference(
     : JSON.stringify({ default: defaultMode, tools: overrides })
 }
 
-export function useToolApprovalMode(): ToolApprovalMode {
-  return useSyncExternalStore(
-    subscribeToolApprovalMode,
-    getToolApprovalMode,
-    () => "ask",
-  )
-}
-
-export function useToolApprovalOverrides(): PerAgentToolApprovalOverrides {
-  return useSyncExternalStore(
-    subscribeToolApprovalMode,
-    getToolApprovalOverrides,
-    () => EMPTY_OVERRIDES,
-  )
-}
-
-const EMPTY_OVERRIDES: PerAgentToolApprovalOverrides = {}
-
-export function subscribeToolApprovalMode(listener: () => void): () => void {
-  listeners.add(listener)
-  if (typeof window !== "undefined" && !listeningForStorage) {
-    window.addEventListener("storage", handleStorage)
-    listeningForStorage = true
-  }
-  return () => {
-    listeners.delete(listener)
-    if (
-      typeof window !== "undefined" &&
-      listeningForStorage &&
-      listeners.size === 0
-    ) {
-      window.removeEventListener("storage", handleStorage)
-      listeningForStorage = false
-    }
-  }
-}
-
-function handleStorage(event: StorageEvent): void {
-  if (event.key === STORAGE_KEY) cachedMode = parseMode(event.newValue)
-  else if (event.key === OVERRIDES_STORAGE_KEY) {
-    cachedOverrides = parseOverrides(event.newValue)
-  } else return
-  listeners.forEach((registered) => registered())
-}
-
-function parseMode(value: string | null): ToolApprovalMode {
+export function parseToolApprovalMode(value: unknown): ToolApprovalMode {
   return value === "always" ? "always" : "ask"
 }
 
+function parseMode(value: string | null): ToolApprovalMode {
+  return parseToolApprovalMode(value)
+}
+
 function parseOverrides(value: string | null): PerAgentToolApprovalOverrides {
-  if (!value) return {}
+  if (!value) return EMPTY_TOOL_APPROVAL_OVERRIDES
   try {
     return normalizePerAgentOverrides(JSON.parse(value))
   } catch {
-    return {}
+    return EMPTY_TOOL_APPROVAL_OVERRIDES
   }
 }

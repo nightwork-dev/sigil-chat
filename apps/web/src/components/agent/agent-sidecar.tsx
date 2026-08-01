@@ -12,9 +12,9 @@ import { ArrowUpRightIcon } from "lucide-react"
 import { AgentSidecar as AgentSidecarShell } from "@workspace/ui/components/agent-variants"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import {
-  setToolApprovalMode,
+  useSetToolApprovalMode,
   useToolApprovalMode,
-} from "@/lib/agent-tool-approval"
+} from "@/lib/agent-preferences"
 
 export interface AgentSidecarProps {
   /** What this sidecar is about (the subject). Shown in the header. */
@@ -38,6 +38,7 @@ export function AgentSidecar({
 }: AgentSidecarProps) {
   const session = useAppAgentSession()
   const approvalMode = useToolApprovalMode()
+  const setApprovalMode = useSetToolApprovalMode()
 
   return (
     <AgentSidecarShell
@@ -45,7 +46,7 @@ export function AgentSidecar({
       footer={
         <ApprovalModeToggle
           mode={approvalMode}
-          onChange={setToolApprovalMode}
+          onChange={setApprovalMode.set}
         />
       }
       headerAction={

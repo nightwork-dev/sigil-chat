@@ -1,9 +1,9 @@
 // Settings → Agent: default tool-consent preference. Consent UI ONLY — never
-// an authorization grant (spec). Reflects + persists the existing
-// useToolApprovalMode client store into the registry-backed
-// agent.toolApprovalDefault so it survives across devices for this account,
-// while the existing localStorage store keeps working as the fast local
-// mirror the agent chat reads synchronously.
+// an authorization grant (spec).
+//
+// This page edits the registry-backed settings directly through the
+// agent-preferences hooks — it holds no copy of its own and knows nothing
+// about the pre-hydration mirror those hooks maintain.
 
 import { useState } from "react"
 
@@ -34,21 +34,22 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip"
 
-import { setSpeakReplies, useSpeakReplies } from "@/lib/agent-speak-replies"
-import { useAdoptedAgentPreferences } from "@/lib/agent-preferences"
+import {
+  useSetSpeakReplies,
+  useSetToolApprovalMode,
+  useSetToolApprovalOverrides,
+  useSpeakReplies,
+  useToolApprovalMode,
+  useToolApprovalOverrides,
+} from "@/lib/agent-preferences"
 import {
   ACCOUNT_WIDE_AGENT_KEY,
   effectiveToolApprovalOverrides,
-  setToolApprovalMode,
-  setToolApprovalOverrides,
-  useToolApprovalMode,
-  useToolApprovalOverrides,
   type PerAgentToolApprovalOverrides,
   type ToolApprovalMode,
 } from "@/lib/agent-tool-approval"
 import { useAgentCatalog } from "@/lib/agent-catalog"
 import { groupApplicationTools } from "@/lib/capability-model"
-import { useSetUserSetting } from "@/lib/user-settings"
 import {
   SettingsAsyncState,
   SettingsPanel,
@@ -99,57 +100,19 @@ const OPTIONS: {
   },
 ]
 
-export function AgentSection({ userId }: { userId: string }) {
-  const localMode = useToolApprovalMode()
-  const localOverrides = useToolApprovalOverrides()
-  // The durable copies, with the local mirrors this surface edits already
-  // adopted — the adopt-once rule belongs to the store, not to this page.
-  const {
-    toolApprovalDefault: registryDefault,
-    speakReplies: registrySpeakReplies,
-  } = useAdoptedAgentPreferences(userId)
-  const setRegistryDefault = useSetUserSetting(
-    userId,
-    "agent.toolApprovalDefault",
-  )
-  const setRegistryOverrides = useSetUserSetting(
-    userId,
-    "agent.toolApprovalOverrides",
-  )
-  const localSpeakReplies = useSpeakReplies()
-  const setRegistrySpeakReplies = useSetUserSetting(
-    userId,
-    "agent.speakReplies",
-  )
+export function AgentSection() {
+  const mode = useToolApprovalMode()
+  const overrides = useToolApprovalOverrides()
+  const speakReplies = useSpeakReplies()
+  const setMode = useSetToolApprovalMode()
+  const setOverrides = useSetToolApprovalOverrides()
+  const setSpeakReplies = useSetSpeakReplies()
   const catalog = useAgentCatalog()
-
-  function handleSpeakRepliesChange(next: boolean) {
-    setSpeakReplies(next)
-    setRegistrySpeakReplies.mutate({
-      scopeKind: "user",
-      scopeId: "",
-      value: next,
-      expectedRevision: registrySpeakReplies.data?.revision ?? undefined,
-    })
-  }
-
-  function handleChange(next: ToolApprovalMode) {
-    setToolApprovalMode(next)
-    setRegistryDefault.mutate({
-      scopeKind: "user",
-      scopeId: "",
-      value: next,
-      expectedRevision:
-        registryDefault.data?.revision === null
-          ? undefined
-          : registryDefault.data?.revision,
-    })
-  }
 
   // This surface edits the account-wide "*" layer. Per-agent layers arrive
   // with the multi-agent track (MA.4 gates the UI on a second interactive
   // agent existing).
-  const accountLayer = effectiveToolApprovalOverrides(localOverrides)
+  const accountLayer = effectiveToolApprovalOverrides(overrides)
 
   const [toolQuery, setToolQuery] = useState("")
   const toolGroups = groupApplicationTools(catalog.data?.tools ?? [], toolQuery)
@@ -162,18 +125,13 @@ export function AgentSection({ userId }: { userId: string }) {
     if (next === "default") delete layer[toolId]
     else layer[toolId] = next
     const updated: PerAgentToolApprovalOverrides = {
-      ...localOverrides,
+      ...overrides,
       [ACCOUNT_WIDE_AGENT_KEY]: layer,
     }
     if (Object.keys(layer).length === 0) {
       delete updated[ACCOUNT_WIDE_AGENT_KEY]
     }
-    setToolApprovalOverrides(updated)
-    setRegistryOverrides.mutate({
-      scopeKind: "user",
-      scopeId: "",
-      value: updated,
-    })
+    setOverrides.set(updated)
   }
 
   return (
@@ -181,8 +139,8 @@ export function AgentSection({ userId }: { userId: string }) {
       <SettingsSection>
         <SectionHeader>Default tool consent</SectionHeader>
         <RadioGroup
-          value={localMode}
-          onValueChange={(value) => handleChange(value as ToolApprovalMode)}
+          value={mode}
+          onValueChange={(value) => setMode.set(value as ToolApprovalMode)}
           className="flex flex-col gap-3"
         >
           {OPTIONS.map((option) => (
@@ -221,10 +179,10 @@ export function AgentSection({ userId }: { userId: string }) {
           </FieldDescription>
         </div>
         <Switch
-          checked={localSpeakReplies}
-          disabled={setRegistrySpeakReplies.isPending}
+          checked={speakReplies}
+          disabled={setSpeakReplies.isPending}
           id="speak-replies"
-          onCheckedChange={handleSpeakRepliesChange}
+          onCheckedChange={setSpeakReplies.set}
         />
       </SettingsSection>
 

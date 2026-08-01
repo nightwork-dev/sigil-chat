@@ -21,10 +21,10 @@ import {
   type CapabilityItem,
 } from "@/lib/capability-model"
 import {
-  effectiveToolApprovalOverrides,
   useToolApprovalMode,
   useToolApprovalOverrides,
-} from "@/lib/agent-tool-approval"
+} from "@/lib/agent-preferences"
+import { effectiveToolApprovalOverrides } from "@/lib/agent-tool-approval"
 
 /**
  * An explanatory surface over the authenticated catalogs. Settings remains the
