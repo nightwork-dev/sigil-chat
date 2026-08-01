@@ -1,0 +1,13 @@
+# apps/agent is mixed-style on purpose (see CLAUDE.md "Formatting") — match the
+# file you're editing there rather than reformatting the app.
+apps/agent
+
+# Generated and disposable
+**/routeTree.gen.ts
+**/.output
+**/.nitro
+**/.data
+**/.eve
+**/dist
+**/node_modules
+pnpm-lock.yaml
