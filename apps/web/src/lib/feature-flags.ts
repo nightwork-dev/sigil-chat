@@ -31,6 +31,7 @@ import {
   parseRequiredBoolean,
   RequestRefusedError,
 } from "./request-refusal"
+import { verificationQueueKeys } from "./verification-queue"
 
 // ─── Policy (pure) ──────────────────────────────────────────────────────────
 
@@ -159,6 +160,13 @@ export function useSetFeatureFlag(): UseMutationResult<
       setFeatureFlag({ data: input }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: featureFlagKeys.all() })
+      // Flag-DEPENDENT queries answer "what does this flag mean for me" and
+      // live under their own key families — a flip must reach them too, or a
+      // gated surface stays cached-absent until its next natural refetch
+      // (found live: the verification-queue overlay after enabling its flag).
+      queryClient.invalidateQueries({
+        queryKey: verificationQueueKeys.access(),
+      })
     },
   })
 }
