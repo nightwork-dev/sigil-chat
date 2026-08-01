@@ -21,6 +21,8 @@ import { createStoreProvider } from "@gonk/store"
 import { mirkBackendFactory } from "@gonk/store/sqlite"
 import type { KvStore } from "@gonk/store/types"
 
+import { resolveSigilProjectRoot } from "@workspace/runtime-env/project-root"
+
 /** Kept in sync with InstallationSettingsStore's NAMESPACE in apps/web. */
 const NAMESPACE = "sigil-chat.installation-settings.v1"
 /** Kept in sync with DISCOVERED_MODELS_KEY in apps/web's registry.ts. */
@@ -63,10 +65,27 @@ export function readDiscoveredModelCache(
 
 let sharedKv: KvStore<unknown> | undefined
 
+/**
+ * `projectRoot` MUST be explicit here, not left to `createScope`'s own
+ * `cwd`-relative discovery: a cwd with no project marker (a scratch tmpdir —
+ * the cold-boot smoke script boots Eve from exactly one) makes `createScope`
+ * resolve no project home and `scopeStateHome` silently falls back to the
+ * REAL `homedir()`, durably writing/reading this cache from the operator's
+ * actual home directory instead of the deployment's own store. This is the
+ * second (production, not just test-helper) vector of the landmine flagged
+ * in SC.16 — fixed the same way as apps/agent's application-services.ts
+ * (mdl3-usage-metering, 14b1f005).
+ */
 function projectKv(): KvStore<unknown> {
-  sharedKv ??= createStoreProvider(createScope({ cwd: process.cwd() }), {
-    backendFactory: mirkBackendFactory(createScope({ cwd: process.cwd() })),
-  }).kv("project", NAMESPACE)
+  if (!sharedKv) {
+    const scope = createScope({
+      cwd: process.cwd(),
+      projectRoot: resolveSigilProjectRoot(process.cwd()),
+    })
+    sharedKv = createStoreProvider(scope, {
+      backendFactory: mirkBackendFactory(scope),
+    }).kv("project", NAMESPACE)
+  }
   return sharedKv
 }
 
