@@ -136,6 +136,38 @@ export function applicationToolGroup(name: string): {
 export const APPLICATION_TOOL_GROUP_ORDER: readonly string[] =
   Object.keys(GROUPS)
 
+/**
+ * Filter tools by a free-text query and bucket them under their capability
+ * groups, in display order. Pure derivation — callers use it directly in
+ * render, no memo required at this collection size.
+ */
+export function groupApplicationTools<
+  T extends { id: string; name: string; description: string },
+>(
+  tools: readonly T[],
+  query: string,
+): { id: string; title: string; tools: T[] }[] {
+  const needle = query.trim().toLowerCase()
+  const matching = needle
+    ? tools.filter((tool) =>
+        `${tool.name} ${tool.id} ${tool.description}`
+          .toLowerCase()
+          .includes(needle),
+      )
+    : tools
+  const byGroup = new Map<string, { id: string; title: string; tools: T[] }>()
+  for (const tool of matching) {
+    const group = applicationToolGroup(tool.name || tool.id)
+    const existing = byGroup.get(group.id)
+    if (existing) existing.tools.push(tool)
+    else byGroup.set(group.id, { ...group, tools: [tool] })
+  }
+  return APPLICATION_TOOL_GROUP_ORDER.flatMap((groupId) => {
+    const group = byGroup.get(groupId)
+    return group ? [group] : []
+  })
+}
+
 function groupForApplicationTool(name: string): string {
   if (name.startsWith("sigil-graph-") || name === "sigil-reducer-catalog")
     return "graph"

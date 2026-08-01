@@ -5,7 +5,7 @@
 // while the existing localStorage store keeps working as the fast local
 // mirror the agent chat reads synchronously.
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   CheckIcon,
@@ -43,10 +43,7 @@ import {
   type ToolApprovalMode,
 } from "@/lib/agent-tool-approval"
 import { useAgentCatalog } from "@/lib/agent-catalog"
-import {
-  APPLICATION_TOOL_GROUP_ORDER,
-  applicationToolGroup,
-} from "@/lib/capability-model"
+import { groupApplicationTools } from "@/lib/capability-model"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 
 const TOOL_MODES: {
@@ -161,31 +158,7 @@ export function AgentSection({ userId }: { userId: string }) {
   const accountLayer = effectiveToolApprovalOverrides(localOverrides)
 
   const [toolQuery, setToolQuery] = useState("")
-  const toolGroups = useMemo(() => {
-    const tools = catalog.data?.tools ?? []
-    const query = toolQuery.trim().toLowerCase()
-    const matching = query
-      ? tools.filter((tool) =>
-          `${tool.name} ${tool.id} ${tool.description}`
-            .toLowerCase()
-            .includes(query),
-        )
-      : tools
-    const byGroup = new Map<
-      string,
-      { title: string; tools: (typeof matching)[number][] }
-    >()
-    for (const tool of matching) {
-      const group = applicationToolGroup(tool.name || tool.id)
-      const existing = byGroup.get(group.id)
-      if (existing) existing.tools.push(tool)
-      else byGroup.set(group.id, { title: group.title, tools: [tool] })
-    }
-    return APPLICATION_TOOL_GROUP_ORDER.flatMap((groupId) => {
-      const group = byGroup.get(groupId)
-      return group ? [group] : []
-    })
-  }, [catalog.data?.tools, toolQuery])
+  const toolGroups = groupApplicationTools(catalog.data?.tools ?? [], toolQuery)
 
   function handleToolChange(toolId: string, next: "default" | ToolApprovalMode) {
     const layer = { ...accountLayer }
