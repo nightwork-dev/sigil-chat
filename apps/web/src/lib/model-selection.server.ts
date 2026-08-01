@@ -11,18 +11,107 @@ import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"
 import {
   loadSigilConfigFixture,
   normalizeSigilAgentModelPresets,
+  normalizeSigilAgentProviders,
   type NormalizedSigilAgentModelPreset,
 } from "@workspace/runtime-env/config"
 
-import { ENABLED_MODELS_KEY } from "./installation-settings/registry"
+import {
+  DISCOVERED_MODELS_KEY,
+  ENABLED_MODELS_KEY,
+  type DiscoveredModelRecord,
+} from "./installation-settings/registry"
 import { installationSettings } from "./installation-settings/store"
 import { isModelEnabledForNewSessions } from "./model-enablement"
 
 const { value: sigilConfig } = await loadSigilConfigFixture()
 
+/**
+ * Kept in sync with apps/agent's own `DEFAULT_CONTEXT_WINDOW_TOKENS`
+ * (model-provider.ts) — not imported across the app boundary, since
+ * apps/web and apps/agent are separate deployables. Both exist only as a
+ * last-resort fallback when neither a discovered entry nor its provider
+ * states a context window.
+ */
+const DEFAULT_CONTEXT_WINDOW_TOKENS = 200_000
+
 /** Every preset the fixture authors, deployment default first. */
 export function authoredModelPresets(): NormalizedSigilAgentModelPreset[] {
   return normalizeSigilAgentModelPresets(sigilConfig.agent)
+}
+
+/**
+ * Presets synthesized from MDL.2's discovery cache: a model Eve's live
+ * catalog fetch reported that the fixture did not author.
+ *
+ * The cache (../discovered-models.server.ts) deliberately does not carry a
+ * `baseUrl` or credential — those belong to the PROVIDER, so this looks the
+ * authored provider up by `providerId` and borrows its transport facts. A
+ * cached entry whose provider has since been removed or disabled from the
+ * fixture is dropped rather than resolved against stale assumptions.
+ */
+export function discoveredModelPresets(
+  cached: readonly DiscoveredModelRecord[] = installationSettings().get(
+    DISCOVERED_MODELS_KEY,
+  ),
+): NormalizedSigilAgentModelPreset[] {
+  const providers = normalizeSigilAgentProviders(sigilConfig.agent)
+  return cached.flatMap((entry) => synthesizeDiscoveredPreset(entry, providers))
+}
+
+function synthesizeDiscoveredPreset(
+  entry: DiscoveredModelRecord,
+  providers: ReturnType<typeof normalizeSigilAgentProviders>,
+): NormalizedSigilAgentModelPreset[] {
+  const provider = providers.find((candidate) => candidate.id === entry.providerId)
+  if (!provider || !provider.enabled) return []
+  return [
+    {
+      id: entry.id,
+      label: entry.label,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      provider: provider.kind,
+      model: entry.model,
+      capability: "chat",
+      // No fixture veto exists for a model the fixture never authored — the
+      // installation allow-list (checked separately, see
+      // isSelectableModelPreset below) is the only thing standing between
+      // this and a new session.
+      enabled: true,
+      isDeploymentDefault: false,
+      source: "object",
+      ...(provider.baseUrl !== undefined ? { baseUrl: provider.baseUrl } : {}),
+      ...(provider.apiKeyEnv !== undefined
+        ? { apiKeyEnv: provider.apiKeyEnv }
+        : {}),
+      contextWindowTokens:
+        entry.contextWindowTokens ??
+        provider.models[0]?.contextWindowTokens ??
+        DEFAULT_CONTEXT_WINDOW_TOKENS,
+    },
+  ]
+}
+
+/**
+ * Every preset a session may be created against: authored, plus whatever
+ * MDL.2's discovery cache currently holds. Authored wins on an id collision —
+ * unreachable in practice since a discovered id is only ever minted for a
+ * model the fixture did NOT author (see model-endpoints.ts's
+ * `authoredModelStrings` guard), but a duplicate concat is the wrong failure
+ * mode if that ever changes, so authored is listed first and any duplicate
+ * id from the cache is dropped.
+ */
+export function allModelPresets(
+  cached?: readonly DiscoveredModelRecord[],
+): NormalizedSigilAgentModelPreset[] {
+  const authored = authoredModelPresets()
+  const authoredIds = new Set(authored.map((preset) => preset.id))
+  const discovered =
+    cached === undefined ? discoveredModelPresets() : discoveredModelPresets(cached)
+  return [
+    ...authored,
+    ...discovered.filter((preset) => !authoredIds.has(preset.id)),
+  ]
 }
 
 /**
@@ -58,13 +147,20 @@ export function isSelectableModelPreset(
  */
 export function resolveSelectableModelPreset(
   presetId: string,
+  enabledIds?: readonly string[],
+  discoveredCache?: readonly DiscoveredModelRecord[],
 ): BoundAgentModel | undefined {
   const trimmed = presetId.trim()
   if (!trimmed) return undefined
-  const preset = authoredModelPresets().find(
+  const preset = allModelPresets(discoveredCache).find(
     (candidate) => candidate.id === trimmed,
   )
-  if (!preset || !isSelectableModelPreset(preset)) return undefined
+  if (!preset) return undefined
+  const selectable =
+    enabledIds === undefined
+      ? isSelectableModelPreset(preset)
+      : isSelectableModelPreset(preset, enabledIds)
+  if (!selectable) return undefined
   return {
     presetId: preset.id,
     provider: preset.provider,

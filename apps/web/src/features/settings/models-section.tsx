@@ -44,6 +44,7 @@ import {
   suggestProviderId,
   useModelEndpoints,
   useProbeModelEndpoint,
+  type ModelCatalogStatus,
   type ModelEndpointCredentialStatus,
   type ModelEndpointRecord,
   type ModelProviderRecord,
@@ -287,6 +288,7 @@ function ProviderBlock({
             </p>
           ) : null}
           <CredentialLine credential={provider.credential} />
+          <CatalogLine catalog={provider.catalog} />
           <p className="text-xs text-muted-foreground">
             {availableCount} of {provider.models.length} available to new chats
           </p>
@@ -346,6 +348,14 @@ function ModelRow({
           <span className="text-xs text-muted-foreground">
             {formatContextWindow(model.contextWindowTokens)}
           </span>
+          {model.discovered ? (
+            <span
+              className="rounded-sm border border-border px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              title="Not in the application fixture — found by a live catalog check of this provider."
+            >
+              Discovered
+            </span>
+          ) : null}
         </div>
         {locked ? (
           <p className="text-xs text-muted-foreground">
@@ -356,6 +366,12 @@ function ModelRow({
                 // it cannot be switched off from here.
                 "Always available: chats with no model of their own run this one."
               : "Turned off in the application fixture."}
+          </p>
+        ) : model.discovered ? (
+          <p className="text-xs text-muted-foreground">
+            Not yet in the application fixture — turning this on is enough to
+            use it, but it will offer again after every restart until it is
+            authored there too.
           </p>
         ) : null}
       </div>
@@ -402,6 +418,39 @@ function CredentialLine({
       <span className="font-mono">{credential.envName}</span> is not set.
     </p>
   )
+}
+
+/**
+ * Whether Eve's live catalog check found anything new — and whether it even
+ * ran at all. Absent `catalog` (no field on the provider) means discovery was
+ * never attempted for this provider (no baseUrl, or a kind it does not
+ * support) and renders nothing; a failed attempt renders honestly rather than
+ * looking identical to "nothing new to report".
+ */
+function CatalogLine({ catalog }: { catalog?: ModelCatalogStatus }) {
+  if (!catalog) return null
+  if (catalog.error) {
+    return (
+      <p className="text-xs text-destructive">Catalog check failed: {catalog.error}</p>
+    )
+  }
+  return (
+    <p className="text-xs text-muted-foreground">
+      Catalog checked {formatRelativeTime(catalog.checkedAt)}.
+    </p>
+  )
+}
+
+function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return "recently"
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000))
+  if (seconds < 5) return "just now"
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  return `${hours}h ago`
 }
 
 function AddEndpointSection() {

@@ -26,18 +26,24 @@ import {
   type ModelEnablementCandidate,
   type SetModelEnabledRequest,
 } from "./model-enablement"
-import { authoredModelPresets } from "./model-selection.server"
+import { allModelPresets } from "./model-selection.server"
 
 export interface ModelEnablementDependencies {
   store: InstallationSettingsStore
-  /** Every model the fixture authors, provider-level `enabled` resolved. */
+  /**
+   * Every model this deployment CAN offer: fixture-authored, plus whatever
+   * MDL.2's catalog discovery has cached. A discovered id must appear here
+   * for `applyModelEnablement` to accept enabling it — otherwise a
+   * discovered model would render as a toggle in Settings → Models that
+   * always refuses the very click it invites.
+   */
   presets(): readonly ModelEnablementCandidate[]
 }
 
 function defaultDependencies(): ModelEnablementDependencies {
   return {
     store: installationSettings(),
-    presets: authoredModelPresets,
+    presets: allModelPresets,
   }
 }
 

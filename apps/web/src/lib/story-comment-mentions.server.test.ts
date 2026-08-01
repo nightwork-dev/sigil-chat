@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -45,6 +45,9 @@ describe("story comment comms deposit", () => {
   it("writes the reference envelope through the canonical durable inbox seam", () => {
     const root = mkdtempSync(join(tmpdir(), "sigil-comment-inbox-"));
     try {
+      // Without a project marker the project tier falls back to the real home
+      // directory — durable cross-run state. Keep the tier inside the tmpdir.
+      mkdirSync(join(root, ".agents"));
       const scope = new FsScopeStore({
         cwd: root,
         homeRoot: root,

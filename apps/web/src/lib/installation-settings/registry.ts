@@ -62,6 +62,102 @@ function isModelPresetIdList(value: unknown): value is string[] {
 /** The one key the model allow-list uses. Exported so callers never spell it. */
 export const ENABLED_MODELS_KEY = "models.enabled"
 
+/**
+ * `provider/model`, matching MODEL_PRESET_ID's compound form ONLY — a
+ * discovered entry always names a provider it hangs off of, never the
+ * single-segment reserved deployment-default id.
+ */
+const DISCOVERED_MODEL_ID =
+  /^[a-z][a-z0-9]*(-[a-z0-9]+)*\/[a-z][a-z0-9]*(-[a-z0-9]+)*$/
+
+const MAX_DISCOVERED_MODELS = 256
+const MAX_DISCOVERED_LABEL_LENGTH = 200
+const MAX_DISCOVERED_MODEL_STRING_LENGTH = 200
+
+/**
+ * One row of MDL.2's discovery cache (../discovered-models.server.ts): a
+ * model Eve's live catalog fetch reported that the fixture did not author.
+ *
+ * Deliberately thin — no `baseUrl`/`apiKeyEnv`/credential of any kind. Those
+ * belong to the PROVIDER, which is already authored in the fixture;
+ * `providerId` is how a consumer looks the rest up rather than a second copy
+ * drifting out of sync with it.
+ */
+export interface DiscoveredModelRecord {
+  /** `<providerId>/<slug>` — same grammar `models.enabled` validates. */
+  id: string
+  providerId: string
+  /** The raw model string Eve's catalog fetch reported, sent to the API as-is. */
+  model: string
+  label: string
+  contextWindowTokens?: number
+}
+
+function isDiscoveredModelRecord(value: unknown): value is DiscoveredModelRecord {
+  if (typeof value !== "object" || value === null) return false
+  const entry = value as Record<string, unknown>
+  if (typeof entry.id !== "string" || !DISCOVERED_MODEL_ID.test(entry.id)) {
+    return false
+  }
+  if (
+    typeof entry.providerId !== "string" ||
+    entry.providerId.length === 0 ||
+    entry.providerId.length > MAX_MODEL_PRESET_ID_LENGTH
+  ) {
+    return false
+  }
+  if (!entry.id.startsWith(`${entry.providerId}/`)) return false
+  if (
+    typeof entry.model !== "string" ||
+    entry.model.length === 0 ||
+    entry.model.length > MAX_DISCOVERED_MODEL_STRING_LENGTH
+  ) {
+    return false
+  }
+  if (
+    typeof entry.label !== "string" ||
+    entry.label.length === 0 ||
+    entry.label.length > MAX_DISCOVERED_LABEL_LENGTH
+  ) {
+    return false
+  }
+  if (
+    entry.contextWindowTokens !== undefined &&
+    (typeof entry.contextWindowTokens !== "number" ||
+      !Number.isFinite(entry.contextWindowTokens) ||
+      entry.contextWindowTokens <= 0)
+  ) {
+    return false
+  }
+  const allowedKeys = new Set([
+    "id",
+    "providerId",
+    "model",
+    "label",
+    "contextWindowTokens",
+  ])
+  return Object.keys(entry).every((key) => allowedKeys.has(key))
+}
+
+function isDiscoveredModelList(value: unknown): value is DiscoveredModelRecord[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_DISCOVERED_MODELS &&
+    value.every(isDiscoveredModelRecord) &&
+    new Set(value.map((entry) => (entry as DiscoveredModelRecord).id)).size ===
+      value.length
+  )
+}
+
+/**
+ * Cache of models Eve's live catalog fetch has reported that the fixture did
+ * not author (MDL.2). Written only by ../discovered-models.server.ts as a
+ * side effect of the owner viewing Settings → Models; read by the
+ * create-time allow-list gate so a discovered-and-enabled model resolves
+ * without a synchronous network call.
+ */
+export const DISCOVERED_MODELS_KEY = "models.discovered"
+
 export const INSTALLATION_SETTINGS_REGISTRY = {
   // The explicitly-ENABLED set of model preset ids. Anything absent from it is
   // unselectable — including a provider the fixture authors and a model a
@@ -72,6 +168,11 @@ export const INSTALLATION_SETTINGS_REGISTRY = {
     key: ENABLED_MODELS_KEY,
     defaultValue: [],
     isValid: isModelPresetIdList,
+  }),
+  [DISCOVERED_MODELS_KEY]: defineInstallationSetting<DiscoveredModelRecord[]>({
+    key: DISCOVERED_MODELS_KEY,
+    defaultValue: [],
+    isValid: isDiscoveredModelList,
   }),
 } as const satisfies Record<string, InstallationSettingDefinition<unknown>>
 
