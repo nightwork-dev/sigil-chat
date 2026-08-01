@@ -258,3 +258,30 @@ function hostOf(baseUrl: string): string {
     return "local"
   }
 }
+
+/**
+ * When Eve last checked a provider's catalog, in words.
+ *
+ * Coarse on purpose: the reader's question is "is this recent" and a precise
+ * timestamp invites treating a cached answer as live. An unparseable time
+ * says "recently" rather than printing a broken date.
+ */
+export function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return "recently"
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000))
+  if (seconds < 5) return "just now"
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  return `${hours}h ago`
+}
+
+/** A model's context window as a row-width label. Zero means undeclared. */
+export function formatContextWindow(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) return "context window unknown"
+  return tokens >= 1_000
+    ? `${Math.round(tokens / 1_000)}K context`
+    : `${tokens} context`
+}

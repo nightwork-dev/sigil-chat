@@ -17,10 +17,10 @@ import {
 import {
   formatTokenCount,
   formatUsd,
+  modelLabelLookup,
   useUsage,
   type UsageAggregateBucket,
   type UsageAggregateEntry,
-  type UsageModelDescriptor,
 } from "@/lib/usage"
 import {
   SettingsNote,
@@ -92,19 +92,6 @@ export function UsageSection() {
       />
     </SettingsPanel>
   )
-}
-
-function modelLabelLookup(
-  models: readonly UsageModelDescriptor[],
-): (presetId: string) => string {
-  const byId = new Map(models.map((model) => [model.presetId, model]))
-  return (presetId) => {
-    const model = byId.get(presetId)
-    if (!model) return presetId
-    return model.isDeploymentDefault
-      ? `${model.label} (deployment default)`
-      : model.label
-  }
 }
 
 function TotalsRow({ bucket }: { bucket: UsageAggregateBucket }) {

@@ -85,3 +85,23 @@ export function formatUsd(micros: number): string {
 export function formatTokenCount(tokens: number): string {
   return tokens.toLocaleString()
 }
+
+/**
+ * Preset id → the label to print for it, from one payload's model list.
+ *
+ * A preset the payload does not describe prints its raw id rather than being
+ * dropped: the ledger recorded turns against it, and a retired or unknown
+ * model is exactly what a reader needs to see.
+ */
+export function modelLabelLookup(
+  models: readonly UsageModelDescriptor[],
+): (presetId: string) => string {
+  const byId = new Map(models.map((model) => [model.presetId, model]))
+  return (presetId) => {
+    const model = byId.get(presetId)
+    if (!model) return presetId
+    return model.isDeploymentDefault
+      ? `${model.label} (deployment default)`
+      : model.label
+  }
+}

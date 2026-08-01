@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import {
   AtSignIcon,
   CheckIcon,
@@ -554,8 +554,40 @@ function ReviewQueue({
   )
 }
 
-function decisionBadge(decision: ReviewDecision | undefined) {
-  if (decision === "approved")
+/**
+ * The eyebrow that names a field in the story detail pane.
+ *
+ * `as="label"` where the eyebrow actually labels a form control, so the
+ * association is real and not just visual; `span` everywhere else, because a
+ * <label> pointing at nothing is a lie to a screen reader.
+ */
+function FieldLabel({
+  as: Tag = "span",
+  className,
+  children,
+}: {
+  as?: "span" | "label"
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <Tag
+      className={cn(
+        "text-[0.625rem] font-medium tracking-[0.12em] text-muted-foreground uppercase",
+        className,
+      )}
+    >
+      {children}
+    </Tag>
+  )
+}
+
+/**
+ * A completed review's verdict. Renders nothing for a review with no decision
+ * on record — an absent verdict is not a third outcome to label.
+ */
+function DecisionBadge({ decision }: { decision: ReviewDecision | undefined }) {
+  if (decision === "approved") {
     return (
       <Badge
         variant="outline"
@@ -565,7 +597,8 @@ function decisionBadge(decision: ReviewDecision | undefined) {
         Approved
       </Badge>
     )
-  if (decision === "changes-requested")
+  }
+  if (decision === "changes-requested") {
     return (
       <Badge
         variant="outline"
@@ -575,6 +608,7 @@ function decisionBadge(decision: ReviewDecision | undefined) {
         Changes requested
       </Badge>
     )
+  }
   return null
 }
 
@@ -628,7 +662,7 @@ function ReviewQueueRow({
       <Story.Meta />
       {review.completed ? (
         <div className="flex items-center gap-2">
-          {decisionBadge(review.decision)}
+          <DecisionBadge decision={review.decision} />
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -725,9 +759,7 @@ function StoryDetail({
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Title
-        </label>
+        <FieldLabel as="label">Title</FieldLabel>
         <Input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -737,9 +769,7 @@ function StoryDetail({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Intent
-          </span>
+          <FieldLabel>Intent</FieldLabel>
           <Button
             onClick={() => setEditingIntent((current) => !current)}
             size="xs"
@@ -775,9 +805,7 @@ function StoryDetail({
       </div>
 
       <div className="space-y-1.5 border-t border-border pt-4">
-        <label className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Status
-        </label>
+        <FieldLabel as="label">Status</FieldLabel>
         <Select
           value={story.status}
           onValueChange={(value) => void move(value as StoryStatus)}
@@ -797,17 +825,13 @@ function StoryDetail({
       </div>
 
       <div className="space-y-2 border-t border-border pt-4">
-        <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Acceptance criteria
-        </span>
+        <FieldLabel>Acceptance criteria</FieldLabel>
         <Story.AcceptanceList />
       </div>
 
       {story.deps.length > 0 ? (
         <div className="space-y-2 border-t border-border pt-4">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Depends on
-          </span>
+          <FieldLabel>Depends on</FieldLabel>
           <div className="flex flex-wrap gap-1.5">
             {story.deps.map((dep) => (
               <Button
@@ -827,9 +851,7 @@ function StoryDetail({
 
       {dependents.length > 0 ? (
         <div className="space-y-2 border-t border-border pt-4">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Required by
-          </span>
+          <FieldLabel>Required by</FieldLabel>
           <div className="flex flex-wrap gap-1.5">
             {dependents.map((dependent) => (
               <Button
@@ -925,9 +947,7 @@ function StoryComments({ story }: { story: StoryData }) {
     <div className="space-y-3 border-t border-border pt-4">
       <div className="flex items-center gap-1.5">
         <MessageSquareIcon className="size-3.5 text-muted-foreground" />
-        <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Feedback
-        </span>
+        <FieldLabel>Feedback</FieldLabel>
         {thread.length > 0 ? (
           <span className="font-mono text-[0.625rem] text-muted-foreground">
             {thread.length}

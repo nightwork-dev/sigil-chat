@@ -41,6 +41,8 @@ import { Switch } from "@workspace/ui/components/switch"
 import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 
 import {
+  formatContextWindow,
+  formatRelativeTime,
   providerFixtureSnippet,
   suggestProviderId,
   useModelEndpoints,
@@ -446,18 +448,6 @@ function CatalogLine({ catalog }: { catalog?: ModelCatalogStatus }) {
   )
 }
 
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime()
-  if (!Number.isFinite(then)) return "recently"
-  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000))
-  if (seconds < 5) return "just now"
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  return `${hours}h ago`
-}
-
 function AddEndpointSection() {
   const probe = useProbeModelEndpoint()
   const [baseUrl, setBaseUrl] = useState("")
@@ -609,11 +599,4 @@ function AddEndpointSection() {
       ) : null}
     </SettingsSection>
   )
-}
-
-function formatContextWindow(tokens: number): string {
-  if (!Number.isFinite(tokens) || tokens <= 0) return "context window unknown"
-  return tokens >= 1_000
-    ? `${Math.round(tokens / 1_000)}K context`
-    : `${tokens} context`
 }
