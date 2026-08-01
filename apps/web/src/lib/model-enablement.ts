@@ -27,6 +27,12 @@ import {
 } from "@tanstack/react-query"
 import { createServerFn } from "@tanstack/react-start"
 
+import {
+  parseExactObject,
+  parseRequiredBoolean,
+  RequestRefusedError,
+} from "./request-refusal"
+
 // ─── Policy (pure) ──────────────────────────────────────────────────────────
 
 /** The facts about a model the allow-list decision needs, and no others. */
@@ -38,14 +44,15 @@ export interface ModelEnablementCandidate {
   readonly isDeploymentDefault: boolean
 }
 
-export class ModelEnablementRefusedError extends Error {
-  readonly status = 400
-
+export class ModelEnablementRefusedError extends RequestRefusedError {
   constructor(message: string) {
     super(message)
     this.name = "ModelEnablementRefusedError"
   }
 }
+
+const refuseModelEnablement = (message: string) =>
+  new ModelEnablementRefusedError(message)
 
 /**
  * Whether the deployment default may be turned off.
@@ -154,21 +161,12 @@ export const setModelEnabled = createServerFn({ method: "POST" })
 export function parseSetModelEnabledRequest(
   input: unknown,
 ): SetModelEnabledRequest {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    throw new ModelEnablementRefusedError("A request must be an object.")
-  }
-  const entry = input as Record<string, unknown>
-  const unexpected = Object.keys(entry).filter(
-    (key) => key !== "presetIds" && key !== "enabled",
+  const entry = parseExactObject(
+    input,
+    ["presetIds", "enabled"],
+    refuseModelEnablement,
   )
-  if (unexpected.length > 0) {
-    throw new ModelEnablementRefusedError(
-      `Unsupported fields: ${unexpected.join(", ")}.`,
-    )
-  }
-  if (typeof entry.enabled !== "boolean") {
-    throw new ModelEnablementRefusedError("`enabled` must be a boolean.")
-  }
+  const enabled = parseRequiredBoolean(entry, "enabled", refuseModelEnablement)
   if (
     !Array.isArray(entry.presetIds) ||
     entry.presetIds.length === 0 ||
@@ -187,7 +185,7 @@ export function parseSetModelEnabledRequest(
   if (new Set(presetIds).size !== presetIds.length) {
     throw new ModelEnablementRefusedError("Model ids must be distinct.")
   }
-  return { presetIds, enabled: entry.enabled }
+  return { presetIds, enabled }
 }
 
 // ─── React Query ────────────────────────────────────────────────────────────

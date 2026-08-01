@@ -26,6 +26,11 @@ import {
   FEATURE_FLAG_REGISTRY,
   isKnownFeatureFlagId,
 } from "./feature-flags/registry"
+import {
+  parseExactObject,
+  parseRequiredBoolean,
+  RequestRefusedError,
+} from "./request-refusal"
 
 // ─── Policy (pure) ──────────────────────────────────────────────────────────
 
@@ -37,14 +42,15 @@ export interface FeatureFlagState {
   readonly enabled: boolean
 }
 
-export class FeatureFlagRefusedError extends Error {
-  readonly status = 400
-
+export class FeatureFlagRefusedError extends RequestRefusedError {
   constructor(message: string) {
     super(message)
     this.name = "FeatureFlagRefusedError"
   }
 }
+
+const refuseFeatureFlag = (message: string) =>
+  new FeatureFlagRefusedError(message)
 
 /**
  * Whether a flag reads on, given the installation's stored overrides.
@@ -91,21 +97,8 @@ export interface SetFeatureFlagRequest {
 export function parseSetFeatureFlagRequest(
   input: unknown,
 ): SetFeatureFlagRequest {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    throw new FeatureFlagRefusedError("A request must be an object.")
-  }
-  const entry = input as Record<string, unknown>
-  const unexpected = Object.keys(entry).filter(
-    (key) => key !== "id" && key !== "enabled",
-  )
-  if (unexpected.length > 0) {
-    throw new FeatureFlagRefusedError(
-      `Unsupported fields: ${unexpected.join(", ")}.`,
-    )
-  }
-  if (typeof entry.enabled !== "boolean") {
-    throw new FeatureFlagRefusedError("`enabled` must be a boolean.")
-  }
+  const entry = parseExactObject(input, ["id", "enabled"], refuseFeatureFlag)
+  const enabled = parseRequiredBoolean(entry, "enabled", refuseFeatureFlag)
   if (typeof entry.id !== "string" || entry.id.trim().length === 0) {
     throw new FeatureFlagRefusedError("`id` must be a non-empty string.")
   }
@@ -113,7 +106,7 @@ export function parseSetFeatureFlagRequest(
   if (!isKnownFeatureFlagId(id)) {
     throw new FeatureFlagRefusedError(`"${id}" is not a declared feature flag.`)
   }
-  return { id, enabled: entry.enabled }
+  return { id, enabled }
 }
 
 // ─── Server fns ─────────────────────────────────────────────────────────────
