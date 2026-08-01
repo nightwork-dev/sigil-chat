@@ -1,14 +1,15 @@
 "use client"
 
 import { Link } from "@tanstack/react-router"
-import { FileTextIcon, LayoutDashboardIcon } from "lucide-react"
+import { FileTextIcon, LayoutDashboardIcon, NetworkIcon } from "lucide-react"
 
+import { RoadmapGraphWorkspace } from "@/features/roadmap/roadmap-graph-workspace"
 import { RoadmapWorkspace } from "@/features/roadmap/roadmap-workspace"
 import { SpecsWorkspace } from "@/features/roadmap/specs-workspace"
 import type { CurrentSessionUser } from "@/lib/auth/route-guard"
 import { Button } from "@workspace/ui/components/button"
 
-export type RoadmapView = "board" | "specs"
+export type RoadmapView = "board" | "graph" | "specs"
 
 export function RoadmapHub({
   viewer,
@@ -36,6 +37,16 @@ export function RoadmapHub({
         </Button>
         <Button
           size="sm"
+          variant={view === "graph" ? "secondary" : "ghost"}
+          aria-current={view === "graph" ? "page" : undefined}
+          nativeButton={false}
+          render={<Link to="/roadmap" search={{ view: "graph" }} />}
+        >
+          <NetworkIcon />
+          Graph
+        </Button>
+        <Button
+          size="sm"
           variant={view === "specs" ? "secondary" : "ghost"}
           aria-current={view === "specs" ? "page" : undefined}
           nativeButton={false}
@@ -47,6 +58,8 @@ export function RoadmapHub({
       </nav>
       {view === "specs" ? (
         <SpecsWorkspace initialSelectedId={initialSpecId} />
+      ) : view === "graph" ? (
+        <RoadmapGraphWorkspace />
       ) : (
         <RoadmapWorkspace viewer={viewer} initialSelectedId={initialStoryId} />
       )}
