@@ -20,12 +20,26 @@ export default defineAgent({
   // resolver reads the model from the session's VERIFIED binding attributes
   // (see lib/session-model.ts for the trust argument) and returns null —
   // meaning this compiled fallback — for any session that made no choice.
-  // Resolving at session.started keeps the model stable for the session's
-  // life, which is what keeps the prompt cache intact.
+  //
+  // `step.started`, NOT `session.started`, and this is load-bearing rather
+  // than a preference. Eve requires session- and turn-scoped selections to be
+  // SERIALIZABLE — it durably records them as a model-id reference — so a
+  // resolver that returns a provider object at those events is rejected with
+  // a logged error and the selection is discarded (see eve's
+  // dynamic-model-lifecycle: "session- and turn-scoped model selections must
+  // be serializable. Return a model id string for this scope, or use
+  // step.started"). Our providers are real AI SDK instances built from the
+  // fixture — a codex or LM Studio model is not an AI Gateway id string — so
+  // the object-valued path is the only correct one, and step scope is where
+  // eve permits it. The guard test in agent-definition.test.ts pins this.
+  //
+  // Cost: the resolver runs per step rather than once per session. It is pure
+  // fixture lookup plus provider construction, and the resulting model id and
+  // parameters are identical every step, so the prompt cache is unaffected.
   model: defineDynamic({
     fallback: sigilModel.model,
     events: {
-      "session.started": (_event, ctx) => {
+      "step.started": (_event, ctx) => {
         const selection = resolveSessionModelFromAuth(
           sigilConfig.agent,
           readResolveContextAttributes(ctx),

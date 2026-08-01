@@ -22,7 +22,7 @@ export default defineAgent({
   model: defineDynamic({
     fallback: sigilModel.model,
     events: {
-      "session.started": (_event, ctx) => {
+      "step.started": (_event, ctx) => {
         const selection = resolveSessionModelFromAuth(
           sigilConfig.agent,
           readResolveContextAttributes(ctx),

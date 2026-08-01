@@ -90,10 +90,10 @@ export function SettingsPage({
   usePublishWorkspaceAttention(attention)
 
   return (
+    // No page-level <h1>: the _app breadcrumb bar already names this place.
+    // Restating "Settings" directly beneath it reads as two places, and the
+    // section rail below names which part of Settings you are in.
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-border px-4 py-3">
-        <h1 className="text-sm font-medium">Settings</h1>
-      </div>
       <Tabs
         orientation="vertical"
         value={activeSection}
