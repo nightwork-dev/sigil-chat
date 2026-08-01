@@ -1,8 +1,8 @@
 import {
+  useCallback,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
   type SubmitEvent,
 } from "react"
 import {
@@ -10,10 +10,8 @@ import {
   BackgroundVariant,
   Handle,
   MiniMap,
-  Panel,
   Position,
   ReactFlow,
-  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -23,16 +21,11 @@ import {
 } from "@xyflow/react"
 import {
   CircleAlertIcon,
-  FocusIcon,
-  LockIcon,
   PlayIcon,
   PlusIcon,
   Redo2Icon,
   Trash2Icon,
-  UnlockIcon,
   XIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
 } from "lucide-react"
 
 import {
@@ -41,6 +34,8 @@ import {
   useReducerGraphRun,
   useReducerGraphUndo,
 } from "@/features/studio/reducer-data"
+import { CanvasControls } from "@/features/graph-canvas/canvas-controls"
+import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-nodes"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
@@ -91,11 +86,6 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { PropertyPanel } from "@workspace/ui/components/blocks/property-panel"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Separator } from "@workspace/ui/components/separator"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip"
 import { createBuiltinReducerRegistry } from "@workspace/graph/builtins"
 import { DataKind } from "@workspace/graph/data-kinds"
 import {
@@ -383,22 +373,29 @@ function ReducerCanvas({
     () => projectNodes(document, run, selection),
     [document, run, selection],
   )
-  // Only in-progress drag positions live in state. They're merged over the
-  // derived nodes below; once a drag ends, node.move is sent and the
-  // committed document (reflected in baseNodes) takes back over — there is
-  // nothing left here to reconcile with an effect.
+  // Drag positions live in state and are merged over the derived nodes below.
+  // The overlay is held until the COMMITTED document reports the same position,
+  // not dropped the instant the drag ends: `node.move` is an async mutation, so
+  // releasing early snapped every dragged node back to where it started for as
+  // long as the round trip took. The merge below drops each entry the moment
+  // the document agrees with it, so this reconciles itself without an effect.
   const [dragPositions, setDragPositions] = useState<
     Record<string, { x: number; y: number }>
   >({})
-  const nodes = useMemo(
+  const merged = useMemo(
     () =>
       Object.keys(dragPositions).length === 0
         ? baseNodes
-        : baseNodes.map((node) =>
-            dragPositions[node.id]
-              ? { ...node, position: dragPositions[node.id] }
-              : node,
-          ),
+        : baseNodes.map((node) => {
+            const dragged = dragPositions[node.id]
+            if (
+              !dragged ||
+              (dragged.x === node.position.x && dragged.y === node.position.y)
+            ) {
+              return node
+            }
+            return { ...node, position: dragged }
+          }),
     [baseNodes, dragPositions],
   )
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -415,18 +412,30 @@ function ReducerCanvas({
     selected: selection?.kind === "edge" && selection.id === edge.id,
   }))
 
-  const onNodesChange = (changes: NodeChange<ReducerFlowNode>[]) => {
-    const positionChanges = changes.filter(
-      (change): change is Extract<typeof change, { type: "position" }> =>
-        change.type === "position" && change.position !== undefined,
-    )
-    if (positionChanges.length === 0) return
-    setDragPositions((current) => {
-      const next = { ...current }
-      for (const change of positionChanges) next[change.id] = change.position!
-      return next
-    })
-  }
+  const recordDragPositions = useCallback(
+    (changes: NodeChange<ReducerFlowNode>[]) => {
+      const positionChanges = changes.filter(
+        (change): change is Extract<typeof change, { type: "position" }> =>
+          change.type === "position" && change.position !== undefined,
+      )
+      if (positionChanges.length === 0) return
+      setDragPositions((current) => {
+        const next = { ...current }
+        for (const change of positionChanges) next[change.id] = change.position!
+        return next
+      })
+    },
+    [],
+  )
+
+  // Carries React Flow's measurements across re-derivation. Nodes are derived
+  // from the document rather than held in React Flow's state, so without this
+  // every selection and every drag frame handed it unmeasured node objects and
+  // it blanked the whole canvas for a frame while it re-measured them.
+  const { nodes, onNodesChange } = useStableFlowNodes<ReducerFlowNode>(
+    merged,
+    recordDragPositions,
+  )
 
   const onConnect = (connection: Connection) => {
     if (
@@ -486,12 +495,9 @@ function ReducerCanvas({
           onSelectionChange({ kind: "node", id: node.id })
         }
         onNodeDragStop={(_, node) => {
-          setDragPositions((current) => {
-            if (!(node.id in current)) return current
-            const next = { ...current }
-            delete next[node.id]
-            return next
-          })
+          // The overlay stays until the committed document reports this
+          // position; the merge above retires it then. Dropping it here would
+          // snap the node home until the mutation landed.
           onCommand({
             type: "node.move",
             id: node.id,
@@ -517,7 +523,7 @@ function ReducerCanvas({
           style={{ height: 92, width: 140 }}
           zoomable
         />
-        <StudioCanvasControls
+        <CanvasControls
           editingEnabled={editingEnabled}
           onEditingEnabledChange={setEditingEnabled}
         />
@@ -551,85 +557,6 @@ function ReducerCanvas({
           or streaming. */}
       <StudioAmbientPanel />
     </div>
-  )
-}
-
-function StudioCanvasControls({
-  editingEnabled,
-  onEditingEnabledChange,
-}: {
-  editingEnabled: boolean
-  onEditingEnabledChange: (enabled: boolean) => void
-}) {
-  const { fitView, zoomIn, zoomOut } = useReactFlow<ReducerFlowNode>()
-
-  return (
-    <Panel className="m-3!" position="bottom-left">
-      <div
-        aria-label="Canvas controls"
-        className="flex items-center gap-0.5 rounded-md border border-border bg-background/90 p-0.5 shadow-md backdrop-blur"
-        role="toolbar"
-      >
-        <CanvasControlButton
-          label="Zoom in"
-          onClick={() => void zoomIn({ duration: 120 })}
-        >
-          <ZoomInIcon />
-        </CanvasControlButton>
-        <CanvasControlButton
-          label="Zoom out"
-          onClick={() => void zoomOut({ duration: 120 })}
-        >
-          <ZoomOutIcon />
-        </CanvasControlButton>
-        <CanvasControlButton
-          label="Fit graph"
-          onClick={() =>
-            void fitView({ duration: 180, maxZoom: 1.1, padding: 0.18 })
-          }
-        >
-          <FocusIcon />
-        </CanvasControlButton>
-        <Separator className="mx-0.5 h-4!" orientation="vertical" />
-        <CanvasControlButton
-          active={!editingEnabled}
-          label={editingEnabled ? "Lock graph editing" : "Unlock graph editing"}
-          onClick={() => onEditingEnabledChange(!editingEnabled)}
-        >
-          {editingEnabled ? <LockIcon /> : <UnlockIcon />}
-        </CanvasControlButton>
-      </div>
-    </Panel>
-  )
-}
-
-function CanvasControlButton({
-  active = false,
-  children,
-  label,
-  onClick,
-}: {
-  active?: boolean
-  children: ReactNode
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            aria-label={label}
-            onClick={onClick}
-            size="icon-sm"
-            variant={active ? "secondary" : "ghost"}
-          />
-        }
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
   )
 }
 

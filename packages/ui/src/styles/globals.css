@@ -123,6 +123,17 @@
   --color-input: var(--color-input);
   --color-ring: var(--color-ring);
 
+  /* The chart series had theme values in every palette but no utility
+     mapping, so `text-chart-1` and friends generated nothing. Mapped here so
+     the data-series tokens are usable from components, not just from inline
+     `var()`. */
+  --color-chart-1: var(--color-chart-1);
+  --color-chart-2: var(--color-chart-2);
+  --color-chart-3: var(--color-chart-3);
+  --color-chart-4: var(--color-chart-4);
+  --color-chart-5: var(--color-chart-5);
+  --color-chart-err: var(--color-chart-err);
+
   --color-sidebar: var(--color-sidebar);
   --color-sidebar-foreground: var(--color-sidebar-foreground);
   --color-sidebar-primary: var(--color-sidebar-primary);

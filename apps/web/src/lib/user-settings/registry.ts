@@ -310,6 +310,33 @@ export const SETTINGS_REGISTRY = {
         ) &&
         value.length <= 129),
   }),
+  // Stories the viewer has pinned as goals on the roadmap graph. A goal is a
+  // personal lens on shared data — "what am I trying to reach" — not a property
+  // of the story, so it lives here rather than in the roadmap store where it
+  // would leak one person's focus onto everyone's board.
+  //
+  // `replace`, not `set-union`: unpinning has to stick. A union would let a
+  // contributed default resurrect a goal the viewer just cleared.
+  "roadmap.goalStoryIds": defineSetting<string[]>({
+    key: "roadmap.goalStoryIds",
+    allowedScopes: ["user"],
+    allowedScopeKinds: ["personal"],
+    allowedContributingLinkKinds: [],
+    mergeMode: "replace",
+    allowsPersonalOverride: true,
+    affectsSecurity: false,
+    defaultValue: [],
+    isValid: (value): value is string[] =>
+      Array.isArray(value) &&
+      value.length <= 64 &&
+      value.every(
+        (id) =>
+          typeof id === "string" &&
+          id.length > 0 &&
+          id.length <= 64 &&
+          /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id),
+      ),
+  }),
   "agent.activeChannelId": defineSetting<string | null>({
     key: "agent.activeChannelId",
     allowedScopes: ["user"],

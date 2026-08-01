@@ -98,3 +98,36 @@ describe("SETTINGS_REGISTRY", () => {
     ).toThrow(/cannot permit personal or linked contributions/)
   })
 })
+
+describe("roadmap.goalStoryIds", () => {
+  it("accepts a list of story ids and rejects anything else", () => {
+    expect(validateSettingValue("roadmap.goalStoryIds", [])).toBe(true)
+    expect(validateSettingValue("roadmap.goalStoryIds", ["SC.15", "MEM.5"])).toBe(
+      true,
+    )
+
+    expect(validateSettingValue("roadmap.goalStoryIds", "SC.15")).toBe(false)
+    expect(validateSettingValue("roadmap.goalStoryIds", [42])).toBe(false)
+    expect(validateSettingValue("roadmap.goalStoryIds", [""])).toBe(false)
+  })
+
+  it("rejects ids that could escape the roadmap store's directory", () => {
+    // The same shape the store's own id guard enforces: these are used to look
+    // up stories, so a traversal-ish id must never survive validation.
+    expect(validateSettingValue("roadmap.goalStoryIds", ["../secret"])).toBe(
+      false,
+    )
+    expect(validateSettingValue("roadmap.goalStoryIds", ["a/b"])).toBe(false)
+    expect(validateSettingValue("roadmap.goalStoryIds", ["__proto__"])).toBe(
+      false,
+    )
+  })
+
+  it("caps how many goals may be pinned", () => {
+    const many = Array.from({ length: 65 }, (_, index) => `S${index}`)
+    expect(validateSettingValue("roadmap.goalStoryIds", many.slice(0, 64))).toBe(
+      true,
+    )
+    expect(validateSettingValue("roadmap.goalStoryIds", many)).toBe(false)
+  })
+})
