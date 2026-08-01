@@ -17,6 +17,7 @@ import {
   type CapabilityItem,
 } from "@/lib/capability-model"
 import {
+  effectiveToolApprovalOverrides,
   useToolApprovalMode,
   useToolApprovalOverrides,
 } from "@/lib/agent-tool-approval"
@@ -36,7 +37,11 @@ export function CapabilitiesWorkspace() {
   if (catalog.isError) return <UnavailableState />
 
   const groups = filterCapabilityGroups(
-    projectCapabilityGroups(catalog.data, defaultMode, overrides),
+    projectCapabilityGroups(
+      catalog.data,
+      defaultMode,
+      effectiveToolApprovalOverrides(overrides),
+    ),
     query,
   )
   const itemCount = groups.reduce((total, group) => total + group.items.length, 0)

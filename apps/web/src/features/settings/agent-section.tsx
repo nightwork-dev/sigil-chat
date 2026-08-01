@@ -26,10 +26,14 @@ import {
 
 import { setSpeakReplies, useSpeakReplies } from "@/lib/agent-speak-replies"
 import {
+  ACCOUNT_WIDE_AGENT_KEY,
+  effectiveToolApprovalOverrides,
+  normalizePerAgentOverrides,
   setToolApprovalMode,
   setToolApprovalOverrides,
   useToolApprovalMode,
   useToolApprovalOverrides,
+  type PerAgentToolApprovalOverrides,
   type ToolApprovalMode,
 } from "@/lib/agent-tool-approval"
 import { useAgentCatalog } from "@/lib/agent-catalog"
@@ -102,7 +106,11 @@ export function AgentSection({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (registryOverrides.data && registryOverrides.data.source !== "default") {
-      setToolApprovalOverrides(registryOverrides.data.value)
+      // The stored value may still be the pre-MA.4 flat map; normalize
+      // migrates it into the "*" layer.
+      setToolApprovalOverrides(
+        normalizePerAgentOverrides(registryOverrides.data.value),
+      )
     }
     // Only adopt the durable value once per resolved account fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,10 +145,22 @@ export function AgentSection({ userId }: { userId: string }) {
     })
   }
 
+  // This surface edits the account-wide "*" layer. Per-agent layers arrive
+  // with the multi-agent track (MA.4 gates the UI on a second interactive
+  // agent existing).
+  const accountLayer = effectiveToolApprovalOverrides(localOverrides)
+
   function handleToolChange(toolId: string, next: "default" | ToolApprovalMode) {
-    const updated = { ...localOverrides }
-    if (next === "default") delete updated[toolId]
-    else updated[toolId] = next
+    const layer = { ...accountLayer }
+    if (next === "default") delete layer[toolId]
+    else layer[toolId] = next
+    const updated: PerAgentToolApprovalOverrides = {
+      ...localOverrides,
+      [ACCOUNT_WIDE_AGENT_KEY]: layer,
+    }
+    if (Object.keys(layer).length === 0) {
+      delete updated[ACCOUNT_WIDE_AGENT_KEY]
+    }
     setToolApprovalOverrides(updated)
     setRegistryOverrides.mutate({
       scopeKind: "user",
@@ -230,7 +250,7 @@ export function AgentSection({ userId }: { userId: string }) {
                     ) : null}
                   </div>
                   <ToggleGroup
-                    value={[localOverrides[tool.id] ?? "default"]}
+                    value={[accountLayer[tool.id] ?? "default"]}
                     onValueChange={(group) => {
                       // Re-clicking the active segment reports an empty group;
                       // one mode is always in force, so ignore the deselect.

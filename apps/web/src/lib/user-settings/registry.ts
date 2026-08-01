@@ -115,17 +115,22 @@ const APPEARANCE_MODES = ["light", "dark", "system"] as const
 export type RegisteredAppearanceMode = (typeof APPEARANCE_MODES)[number]
 
 const TOOL_APPROVAL_DEFAULTS = ["ask", "always"] as const
+const MAX_TOOL_APPROVAL_AGENTS = 16
 const MAX_TOOL_APPROVAL_OVERRIDES = 64
 const MAX_TOOL_NAME_LENGTH = 160
 export type RegisteredToolApprovalDefault = (typeof TOOL_APPROVAL_DEFAULTS)[number]
+/**
+ * MA.4 per-agent shape: agent name (or `"*"` for account-wide) → tool id →
+ * mode. The legacy flat map (tool id → mode) remains VALID stored data —
+ * readers migrate it into the `"*"` layer via `normalizePerAgentOverrides`
+ * in `../agent-tool-approval` — so existing records never turn invalid.
+ */
 export type RegisteredToolApprovalOverrides = Record<
   string,
-  RegisteredToolApprovalDefault
+  RegisteredToolApprovalDefault | Record<string, RegisteredToolApprovalDefault>
 >
 
-function isToolApprovalOverrides(
-  value: unknown,
-): value is RegisteredToolApprovalOverrides {
+function isToolApprovalLayer(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false
   }
@@ -137,6 +142,28 @@ function isToolApprovalOverrides(
         toolName.length > 0 &&
         toolName.length <= MAX_TOOL_NAME_LENGTH &&
         (TOOL_APPROVAL_DEFAULTS as readonly unknown[]).includes(mode),
+    )
+  )
+}
+
+function isToolApprovalOverrides(
+  value: unknown,
+): value is RegisteredToolApprovalOverrides {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const entries = Object.entries(value)
+  // Legacy flat map: every value is a mode string.
+  if (entries.every(([, mode]) => typeof mode === "string")) {
+    return isToolApprovalLayer(value)
+  }
+  return (
+    entries.length <= MAX_TOOL_APPROVAL_AGENTS &&
+    entries.every(
+      ([agentKey, layer]) =>
+        agentKey.length > 0 &&
+        agentKey.length <= MAX_TOOL_NAME_LENGTH &&
+        isToolApprovalLayer(layer),
     )
   )
 }
