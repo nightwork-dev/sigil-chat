@@ -6,6 +6,7 @@ import {
   buildRoadmapEpicGraph,
   buildRoadmapGraph,
   defaultExpandedEpics,
+  goalPaths,
   rollupStatus,
   type RoadmapGraphStory,
   type StoryStatus,
@@ -402,5 +403,64 @@ describe("the unified canvas (epics and stories at one altitude)", () => {
 
     expect(graph.nodes.find((node) => node.id === "C1")?.isBlocked).toBe(true)
     expect([...defaultExpandedEpics(graph)]).toEqual(["a"])
+  })
+})
+
+describe("goal paths", () => {
+  it("lights everything upstream of a goal, and nothing downstream", () => {
+    const result = goalPaths(buildRoadmapGraph(MEMORY_LANE), ["MIG.1"])
+
+    // Reaching the game migration means finishing MEM.5 and WGS.1 before it.
+    // MEM.4 and the rest hang off MEM.5 but are not on the way to MIG.1.
+    expect([...result.path].sort()).toEqual(["MEM.5", "MIG.1", "WGS.1"])
+    expect([...result.edges].sort()).toEqual(["MEM.5->MIG.1", "WGS.1->MEM.5"])
+  })
+
+  it("unions the paths of several goals rather than intersecting them", () => {
+    const graph = buildRoadmapGraph([
+      story("ROOT"),
+      story("LEFT", { deps: ["ROOT"] }),
+      story("RIGHT", { deps: ["ROOT"] }),
+      story("ELSEWHERE"),
+    ])
+
+    const one = goalPaths(graph, ["LEFT"])
+    const both = goalPaths(graph, ["LEFT", "RIGHT"])
+
+    // Pinning a second goal can only add work, never remove it.
+    expect([...one.path].sort()).toEqual(["LEFT", "ROOT"])
+    expect([...both.path].sort()).toEqual(["LEFT", "RIGHT", "ROOT"])
+    expect(both.path.has("ELSEWHERE")).toBe(false)
+  })
+
+  it("names the stories on the path that are themselves stuck", () => {
+    const result = goalPaths(buildRoadmapGraph(MEMORY_LANE), ["MIG.1"])
+
+    // WGS.1 is in-progress and gates MEM.5, so MEM.5 and MIG.1 are both
+    // waiting on something. WGS.1 itself has no blockers, so it is the front
+    // of the work rather than a thing that is stuck.
+    expect([...result.blockers].sort()).toEqual(["MEM.5", "MIG.1"])
+  })
+
+  it("ignores a pinned id that no longer names a visible story", () => {
+    const graph = buildRoadmapGraph([story("A")])
+    const result = goalPaths(graph, ["A", "DELETED"])
+
+    expect([...result.goals]).toEqual(["A"])
+    expect(result.path.has("DELETED")).toBe(false)
+  })
+
+  it("survives an authored cycle in a goal's ancestry", () => {
+    const graph = buildRoadmapGraph([
+      story("A", { deps: ["B"] }),
+      story("B", { deps: ["A"] }),
+      story("GOAL", { deps: ["A"] }),
+    ])
+
+    expect([...goalPaths(graph, ["GOAL"]).path].sort()).toEqual([
+      "A",
+      "B",
+      "GOAL",
+    ])
   })
 })

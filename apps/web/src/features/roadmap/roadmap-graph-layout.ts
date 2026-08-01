@@ -176,6 +176,7 @@ export function routeEdges(
   canvas: RoadmapCanvas,
   place: Placement,
   chainEdges: ReadonlySet<string> | null,
+  goalEdges: ReadonlySet<string> | null = null,
 ): Edge[] {
   const yOfNode = (id: string) =>
     place.stories.get(id)?.y ?? place.epics.get(id)?.y ?? 0
@@ -208,6 +209,11 @@ export function routeEdges(
     const active = chainEdges
       ? edge.underlying.some((id) => chainEdges.has(id))
       : true
+    // On the way to a pinned goal. Persistent, unlike the selection chain, and
+    // the only thing on the canvas that draws in the accent colour.
+    const onGoalPath = goalEdges
+      ? edge.underlying.some((id) => goalEdges.has(id))
+      : false
 
     let sourceHandle: string = HANDLE.right
     let targetHandle: string = HANDLE.left
@@ -267,17 +273,21 @@ export function routeEdges(
         type: MarkerType.ArrowClosed,
         width: 14,
         height: 14,
-        color: "var(--color-muted-foreground)",
+        color: onGoalPath
+          ? "var(--color-primary)"
+          : "var(--color-muted-foreground)",
       },
       // A satisfied dependency is history, not a live constraint — it stays
       // visible so the chain is complete, but dashed so it stops competing.
       style: {
-        stroke: active
-          ? "var(--color-muted-foreground)"
-          : "var(--color-border)",
-        strokeWidth: edge.binding ? 1.4 : 1,
+        stroke: onGoalPath
+          ? "var(--color-primary)"
+          : active
+            ? "var(--color-muted-foreground)"
+            : "var(--color-border)",
+        strokeWidth: onGoalPath ? 1.8 : edge.binding ? 1.4 : 1,
         strokeDasharray: edge.binding ? undefined : "4 4",
-        opacity: active ? (edge.binding ? 0.75 : 0.4) : 0.15,
+        opacity: active ? (onGoalPath ? 0.95 : edge.binding ? 0.75 : 0.4) : 0.15,
       },
     }
   })

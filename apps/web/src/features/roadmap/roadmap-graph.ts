@@ -788,3 +788,56 @@ export function defaultExpandedEpics(graph: RoadmapGraph): Set<string> {
   }
   return expanded
 }
+
+export interface RoadmapGoalPaths {
+  /** The pinned goals that exist in this graph. */
+  goals: ReadonlySet<string>
+  /** Goals plus everything upstream of them: the work required to reach one. */
+  path: ReadonlySet<string>
+  /** Edges along that work. */
+  edges: ReadonlySet<string>
+  /** Path stories that are themselves stuck — what to look at first. */
+  blockers: ReadonlySet<string>
+}
+
+/**
+ * Everything that has to happen before the pinned goals can be reached.
+ *
+ * The same ancestor walk `blockingChain` does, in one direction and over
+ * several starting points at once: a goal's path is what gates it, transitively,
+ * and several goals give the UNION of their paths rather than an intersection —
+ * pinning a second goal can only ever add work, never remove it.
+ *
+ * Goal paths are persistent, which is what separates them from a selection.
+ * Selecting a story asks "what does this touch, right now"; pinning a goal
+ * says "this is what I'm working toward" and stays lit until it's unpinned.
+ */
+export function goalPaths(
+  graph: RoadmapGraph,
+  goalIds: Iterable<string>,
+): RoadmapGoalPaths {
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+  const goals = new Set([...goalIds].filter((id) => byId.has(id)))
+
+  const path = new Set<string>(goals)
+  const queue = [...goals]
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    for (const upstream of byId.get(id)?.blockedBy ?? []) {
+      if (path.has(upstream)) continue // also terminates on an authored cycle
+      path.add(upstream)
+      queue.push(upstream)
+    }
+  }
+
+  const edges = new Set(
+    graph.edges
+      .filter((edge) => path.has(edge.source) && path.has(edge.target))
+      .map((edge) => edge.id),
+  )
+  const blockers = new Set(
+    [...path].filter((id) => byId.get(id)?.isBlocked === true),
+  )
+
+  return { goals, path, edges, blockers }
+}

@@ -33,11 +33,18 @@
 //     than red text on every card — with dozens blocked, red everywhere stops
 //     being a signal. Status is quiet text at every status.
 
-import { useEffect, useMemo, useState } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 import {
   Background,
   BackgroundVariant,
   Handle,
+  Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -53,6 +60,7 @@ import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { CanvasControls } from "@/features/graph-canvas/canvas-controls"
+import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-nodes"
 
 import {
@@ -64,6 +72,7 @@ import {
 } from "./roadmap-graph-layout"
 import {
   blockingChain,
+  goalPaths,
   buildRoadmapCanvas,
   buildRoadmapGraph,
   defaultExpandedEpics,
@@ -71,6 +80,39 @@ import {
 } from "./roadmap-graph"
 
 import "@xyflow/react/dist/style.css"
+
+/**
+ * The glyph vocabulary. Small on purpose: a glyph marks a NOTABLE state, and
+ * its absence means "ordinary", which is why idea/spec/ready have none. The
+ * status word stays on every card — the glyph is there to be scannable at a
+ * zoom where the word is not.
+ *
+ * Colour stays a three-way budget no matter how many glyphs exist: accent is
+ * on-a-goal-path, destructive is blocked, everything else is muted. Status
+ * variety lives in these shapes, never in a per-status palette.
+ */
+const GLYPH = {
+  goal: "\u25ce",
+  blocked: "\u25cf",
+  inProgress: "\u25d0",
+  shipped: "\u2713",
+} as const
+
+function statusGlyph(status: string, blocked: boolean): string | null {
+  if (blocked) return GLYPH.blocked
+  if (status === "in-progress" || status === "verify") return GLYPH.inProgress
+  if (status === "shipped") return GLYPH.shipped
+  return null
+}
+
+/**
+ * Pinning is an action, not data, so it travels by context rather than through
+ * node `data` — a callback there would change identity on every render and
+ * undo the node-stability work that stopped the canvas flickering.
+ */
+const GoalActionsContext = createContext<{
+  toggle: (storyId: string) => void
+} | null>(null)
 
 interface StoryNodeData extends Record<string, unknown> {
   label: string
@@ -82,6 +124,14 @@ interface StoryNodeData extends Record<string, unknown> {
   dimmed: boolean
   onChain: boolean
   selected: boolean
+  /** Pinned as something to reach. */
+  goal: boolean
+  /** On the way to a pinned goal. */
+  onPath: boolean
+  /** On the way to a goal AND stuck: the strongest mark on the canvas. */
+  pathBlocker: boolean
+  /** Stepped back because goals are pinned and this is not on the way. */
+  aside: boolean
 }
 
 interface EpicNodeData extends Record<string, unknown> {
@@ -92,6 +142,10 @@ interface EpicNodeData extends Record<string, unknown> {
   blockedCount: number
   dimmed: boolean
   onChain: boolean
+  goalCount: number
+  onPath: boolean
+  pathBlockedCount: number
+  aside: boolean
 }
 
 interface ContainerNodeData extends Record<string, unknown> {
@@ -100,6 +154,8 @@ interface ContainerNodeData extends Record<string, unknown> {
   total: number
   blockedCount: number
   dimmed: boolean
+  goalCount: number
+  onPath: boolean
 }
 
 type GraphNode =
@@ -117,10 +173,13 @@ const nodeTypes: NodeTypes = {
 
 export function RoadmapGraphView({
   stories,
+  viewerId,
   initialStoryId,
   onSelectStory,
 }: {
   stories: readonly RoadmapGraphStory[]
+  /** Goals are a personal lens, so they are stored against the viewer. */
+  viewerId: string
   initialStoryId?: string
   onSelectStory?: (storyId: string | null) => void
 }) {
@@ -150,6 +209,31 @@ export function RoadmapGraphView({
     () => (selected ? blockingChain(graph, selected) : null),
     [graph, selected],
   )
+
+  const goalSetting = useUserSetting(viewerId, "roadmap.goalStoryIds")
+  const setGoals = useSetUserSetting(viewerId, "roadmap.goalStoryIds")
+  const pinned = useMemo(() => goalSetting.data?.value ?? [], [goalSetting.data])
+  const goals = useMemo(() => goalPaths(graph, pinned), [graph, pinned])
+  // `mutate` rather than the mutation object: React Query hands back a new
+  // object every render, and this value is the context every card reads.
+  const mutateGoals = setGoals.mutate
+  const goalRevision = goalSetting.data?.revision ?? undefined
+  const goalActions = useMemo(
+    () => ({
+      toggle: (storyId: string) => {
+        const next = pinned.includes(storyId)
+          ? pinned.filter((id) => id !== storyId)
+          : [...pinned, storyId]
+        mutateGoals({
+          scopeKind: "user",
+          scopeId: "",
+          value: next,
+          expectedRevision: goalRevision,
+        })
+      },
+    }),
+    [pinned, mutateGoals, goalRevision],
+  )
   const layout = useMemo(() => layoutCanvas(canvas), [canvas])
 
   const derived = useMemo(() => {
@@ -168,6 +252,11 @@ export function RoadmapGraphView({
       const box = layout.epics.get(epic.id)
       if (!box) continue
       const total = Object.values(epic.counts).reduce((a, b) => a + b, 0)
+      const goalCount = epic.storyIds.filter((id) => goals.goals.has(id)).length
+      const onPath = epic.storyIds.some((id) => goals.path.has(id))
+      const pathBlockedCount = epic.storyIds.filter((id) =>
+        goals.blockers.has(id),
+      ).length
 
       if (!epic.expanded) {
         cards.push({
@@ -184,6 +273,10 @@ export function RoadmapGraphView({
             blockedCount: epic.blockedCount,
             dimmed: lit ? !lit.has(epic.id) : false,
             onChain: lit ? lit.has(epic.id) : false,
+            goalCount,
+            onPath,
+            pathBlockedCount,
+            aside: goals.path.size > 0 && !onPath,
           },
         })
         continue
@@ -206,6 +299,8 @@ export function RoadmapGraphView({
           total,
           blockedCount: epic.blockedCount,
           dimmed: lit ? !epic.storyIds.some((id) => lit.has(id)) : false,
+          goalCount,
+          onPath,
         },
       })
     }
@@ -230,6 +325,10 @@ export function RoadmapGraphView({
           dimmed: lit ? !lit.has(story.id) : false,
           onChain: lit ? lit.has(story.id) : false,
           selected: story.id === selected,
+          goal: goals.goals.has(story.id),
+          onPath: goals.path.has(story.id),
+          pathBlocker: goals.blockers.has(story.id),
+          aside: goals.path.size > 0 && !goals.path.has(story.id),
         },
       })
     }
@@ -237,9 +336,14 @@ export function RoadmapGraphView({
     return {
       // Containers first so they paint behind the cards they hold.
       nodes: [...containers, ...cards],
-      edges: routeEdges(canvas, layout, chain ? chain.edges : null),
+      edges: routeEdges(
+        canvas,
+        layout,
+        chain ? chain.edges : null,
+        goals.edges.size > 0 ? goals.edges : null,
+      ),
     }
-  }, [canvas, layout, chain, selected])
+  }, [canvas, layout, chain, selected, goals])
 
   const { nodes, onNodesChange } = useStableFlowNodes<GraphNode>(derived.nodes)
 
@@ -294,6 +398,40 @@ export function RoadmapGraphView({
           </Label>
         </div>
 
+        {goals.goals.size > 0 ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              <span aria-hidden className="text-primary">
+                {GLYPH.goal}
+              </span>{" "}
+              {goals.goals.size} goal{goals.goals.size === 1 ? "" : "s"} ·{" "}
+              {goals.path.size - goals.goals.size} to finish first
+              {goals.blockers.size > 0 ? (
+                <>
+                  {" · "}
+                  <span className="text-destructive">
+                    {goals.blockers.size} stuck
+                  </span>
+                </>
+              ) : null}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                mutateGoals({
+                  scopeKind: "user",
+                  scopeId: "",
+                  value: [],
+                  expectedRevision: goalRevision,
+                })
+              }
+            >
+              Clear goals
+            </Button>
+          </div>
+        ) : null}
+
         {chain && selected ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>
@@ -329,7 +467,8 @@ export function RoadmapGraphView({
       </div>
 
       <div className="min-h-0 flex-1">
-        <ReactFlowProvider>
+        <GoalActionsContext.Provider value={goalActions}>
+          <ReactFlowProvider>
           <ReactFlow<GraphNode>
             nodes={nodes}
             edges={derived.edges}
@@ -367,11 +506,49 @@ export function RoadmapGraphView({
               color="var(--color-border)"
             />
             <CanvasControls />
+            <Legend hasGoals={goals.goals.size > 0} />
             <FitOnLayout signature={layoutSignature} />
           </ReactFlow>
-        </ReactFlowProvider>
+          </ReactFlowProvider>
+        </GoalActionsContext.Provider>
       </div>
     </div>
+  )
+}
+
+/**
+ * The key to the glyphs, so the vocabulary explains itself.
+ *
+ * A canvas is a glanceable surface, so this is a key and not prose: one mark
+ * and one word each. The goal row appears only once goals exist, because a
+ * legend entry for something not on screen defines nothing.
+ */
+function Legend({ hasGoals }: { hasGoals: boolean }) {
+  const entries = [
+    { glyph: GLYPH.blocked, label: "blocked", tone: "text-destructive" },
+    { glyph: GLYPH.inProgress, label: "in flight", tone: "text-muted-foreground" },
+    { glyph: GLYPH.shipped, label: "shipped", tone: "text-muted-foreground" },
+    ...(hasGoals
+      ? [{ glyph: GLYPH.goal, label: "goal", tone: "text-primary" }]
+      : []),
+  ]
+
+  return (
+    <Panel className="m-3!" position="bottom-right">
+      <ul className="flex items-center gap-2.5 rounded-md border border-border bg-background/90 px-2 py-1 backdrop-blur">
+        {entries.map((entry) => (
+          <li
+            key={entry.label}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground"
+          >
+            <span aria-hidden className={entry.tone}>
+              {entry.glyph}
+            </span>
+            {entry.label}
+          </li>
+        ))}
+      </ul>
+    </Panel>
   )
 }
 
@@ -439,25 +616,41 @@ function EdgeHandles() {
   )
 }
 
-function StoryFlowNode({ data }: { data: StoryNodeData }) {
+function StoryFlowNode({ id, data }: { id: string; data: StoryNodeData }) {
+  const actions = useContext(GoalActionsContext)
+  const glyph = statusGlyph(data.status, data.blocked)
   return (
     <div
       className={cn(
-        "flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
-        // Blocked is the tinted edge of the card, not a shouted label.
-        data.blocked ? "border-destructive/40" : "border-border",
-        data.onChain && !data.selected && "border-primary/50",
+        "group flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
+        // Border precedence, strongest first: stuck ON the way to a goal is the
+        // thing to look at, then merely stuck, then merely on the way.
+        data.pathBlocker
+          ? "border-destructive ring-1 ring-destructive/40"
+          : data.blocked
+            ? "border-destructive/40"
+            : data.onPath
+              ? "border-primary/60"
+              : "border-border",
+        data.onChain && !data.selected && !data.onPath && "border-primary/50",
         data.selected && "border-primary ring-1 ring-primary",
-        data.dimmed && "opacity-20",
+        // Two strengths of receding: a transient selection pushes everything
+        // else right back, pinned goals only step the rest aside.
+        data.dimmed ? "opacity-20" : data.aside && "opacity-60",
       )}
     >
       <EdgeHandles />
       <div className="flex items-center gap-1.5">
-        {data.blocked ? (
+        {glyph ? (
           <span
             aria-hidden
-            className="size-1.5 shrink-0 rounded-full bg-destructive/70"
-          />
+            className={cn(
+              "shrink-0 text-[10px] leading-none",
+              data.blocked ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {glyph}
+          </span>
         ) : null}
         <span className="truncate font-mono text-xs font-medium text-foreground">
           {data.label}
@@ -473,6 +666,26 @@ function StoryFlowNode({ data }: { data: StoryNodeData }) {
             +{data.hidden}
           </span>
         ) : null}
+        {/* State and affordance in one mark: it shows whether this is a goal,
+            and it is how you make it one. Quiet until hovered unless pinned. */}
+        <button
+          type="button"
+          aria-label={data.goal ? "Unpin goal" : "Pin as goal"}
+          aria-pressed={data.goal}
+          title={data.goal ? "Unpin goal" : "Pin as goal"}
+          onClick={(event) => {
+            event.stopPropagation()
+            actions?.toggle(id)
+          }}
+          className={cn(
+            "shrink-0 rounded-sm text-[11px] leading-none transition-opacity",
+            data.goal
+              ? "text-primary opacity-100"
+              : "text-muted-foreground opacity-0 group-hover:opacity-70",
+          )}
+        >
+          {GLYPH.goal}
+        </button>
       </div>
       <p className="truncate text-xs text-muted-foreground">{data.detail}</p>
     </div>
@@ -485,9 +698,15 @@ function EpicRollupNode({ data }: { data: EpicNodeData }) {
     <div
       className={cn(
         "flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
-        data.blockedCount > 0 ? "border-destructive/40" : "border-border",
-        data.onChain && "border-primary/50",
-        data.dimmed && "opacity-20",
+        data.pathBlockedCount > 0
+          ? "border-destructive ring-1 ring-destructive/40"
+          : data.blockedCount > 0
+            ? "border-destructive/40"
+            : data.onPath
+              ? "border-primary/60"
+              : "border-border",
+        data.onChain && !data.onPath && "border-primary/50",
+        data.dimmed ? "opacity-20" : data.aside && "opacity-60",
       )}
     >
       <EdgeHandles />
@@ -496,6 +715,16 @@ function EpicRollupNode({ data }: { data: EpicNodeData }) {
         <span className="truncate font-mono text-xs font-medium text-foreground">
           {data.label}
         </span>
+        {data.goalCount > 0 ? (
+          <span
+            aria-hidden
+            className="shrink-0 text-[10px] leading-none text-primary"
+            title={`${data.goalCount} pinned goal${data.goalCount === 1 ? "" : "s"} in this lane`}
+          >
+            {GLYPH.goal}
+            {data.goalCount > 1 ? data.goalCount : null}
+          </span>
+        ) : null}
         <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
           {data.status}
         </span>
@@ -521,6 +750,7 @@ function EpicContainerNode({ data }: { data: ContainerNodeData }) {
       className={cn(
         "pointer-events-none size-full rounded-lg border border-dashed bg-muted/20 transition-opacity",
         data.blockedCount > 0 ? "border-destructive/25" : "border-border/60",
+        data.onPath && "border-primary/40",
         data.dimmed && "opacity-40",
       )}
     >
@@ -532,6 +762,11 @@ function EpicContainerNode({ data }: { data: ContainerNodeData }) {
         <span className="truncate text-[10px] text-muted-foreground">
           {data.title}
         </span>
+        {data.goalCount > 0 ? (
+          <span aria-hidden className="shrink-0 text-[10px] text-primary">
+            {GLYPH.goal}
+          </span>
+        ) : null}
         <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
           {data.total}
           {data.blockedCount > 0 ? (

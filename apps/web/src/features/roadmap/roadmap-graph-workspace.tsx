@@ -13,8 +13,10 @@ import { RoadmapGraphView } from "./roadmap-graph-view"
 import type { RoadmapGraphStory } from "./roadmap-graph"
 
 export function RoadmapGraphWorkspace({
+  viewerId,
   initialStoryId,
 }: {
+  viewerId: string
   initialStoryId?: string
 }) {
   const navigate = useNavigate({ from: "/roadmap" })
@@ -59,6 +61,7 @@ export function RoadmapGraphWorkspace({
   return (
     <RoadmapGraphView
       stories={graphStories}
+      viewerId={viewerId}
       initialStoryId={initialStoryId}
       onSelectStory={(storyId) =>
         // `replace` so tracing a chain doesn't bury the board under a dozen
