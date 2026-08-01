@@ -1,6 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
+  isBoundAgentModel,
+  type BoundAgentModel,
+} from "./model-binding";
+import {
   AGENT_SESSION_BINDING_VERSION,
   type AgentSessionBindingChannel,
   type AgentSessionBindingPayload,
@@ -10,15 +14,33 @@ import {
   type AgentSessionScopePerspective,
 } from "./session-binding";
 
+/**
+ * Extra binding fields Sigil Chat signs on top of the neutral
+ * `AgentSessionExecutionBinding` contract from `@zigil/agent`.
+ *
+ * Deliberately carried here rather than upstream: `@zigil/agent`'s own
+ * `readAgentSessionExecutionBinding` reconstructs a fixed key whitelist and
+ * would DROP an unknown field. This module's `readAgentSessionBinding` returns
+ * the verified payload verbatim, so an application-owned field survives the
+ * round trip — verified by reading both implementations, and by the
+ * round-trip test in session-binding.test.ts. If a future @zigil/agent version
+ * is adopted for verification, this field has to move upstream with it.
+ */
+export interface SigilSessionBindingExtras {
+  /** Model the thread is bound to; absent means the deployment default. */
+  model?: BoundAgentModel;
+}
+
 export function issueAgentSessionBinding(
-  input: AgentSessionExecutionBinding & {
-    runtimeSessionId?: string;
-    expiresAt: number;
-    subject: string;
-  },
+  input: AgentSessionExecutionBinding &
+    SigilSessionBindingExtras & {
+      runtimeSessionId?: string;
+      expiresAt: number;
+      subject: string;
+    },
   secret: string,
 ): string {
-  const payload: AgentSessionBindingPayload = {
+  const payload: AgentSessionBindingPayload & SigilSessionBindingExtras = {
     ...input,
     audience: "sigil-agent-session-binding",
     version: AGENT_SESSION_BINDING_VERSION,
@@ -31,7 +53,7 @@ export function readAgentSessionBinding(
   token: string,
   now: number,
   secret: string,
-): AgentSessionBindingPayload | undefined {
+): (AgentSessionBindingPayload & SigilSessionBindingExtras) | undefined {
   const [encoded, suppliedSignature, extra] = token.split(".");
   if (!encoded || !suppliedSignature || extra !== undefined) return undefined;
   const expectedSignature = signature(encoded, secret);
@@ -44,7 +66,7 @@ export function readAgentSessionBinding(
   try {
     const payload = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8"),
-    ) as Partial<AgentSessionBindingPayload>;
+    ) as Partial<AgentSessionBindingPayload> & SigilSessionBindingExtras;
     return isPayload(payload, now) ? payload : undefined;
   } catch {
     return undefined;
@@ -68,6 +90,8 @@ function isPayload(
         bindingSessionAppearsInChannel(value, value.channel))) &&
     isPerspective(value.initialPerspective) &&
     isIdentifierList(value.additionalContextScopeIds) &&
+    ((value as SigilSessionBindingExtras).model === undefined ||
+      isBoundAgentModel((value as SigilSessionBindingExtras).model)) &&
     typeof value.expiresAt === "number" &&
     Number.isSafeInteger(value.expiresAt) &&
     value.expiresAt > now

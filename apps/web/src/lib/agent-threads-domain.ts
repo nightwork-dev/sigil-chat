@@ -5,6 +5,11 @@ import {
   type PersistedAgentEvent,
 } from "./agent-event-retention";
 import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts";
+import {
+  cloneBoundAgentModel,
+  isBoundAgentModel,
+  type BoundAgentModel,
+} from "@workspace/agent-contracts/model-binding";
 
 export type AgentThreadStatus = "active" | "archived";
 
@@ -48,6 +53,13 @@ export interface AgentThreadExecutionBinding {
   initialPerspective: ScopePerspective;
   /** Ordered, deduped, server-authorized context scope ids. */
   additionalContextScopeIds: string[];
+  /**
+   * Model this session runs, chosen once at creation. Absent means the
+   * deployment default, which is what every thread created before per-session
+   * selection existed carries — so an absent model is a normal state, not a
+   * migration gap.
+   */
+  model?: BoundAgentModel;
 }
 
 export interface AgentThread {
@@ -850,6 +862,12 @@ function normalizeExecutionBinding(
     additionalContextScopeIds: dedupeScopeIds(
       binding.additionalContextScopeIds,
     ),
+    // Immutable once written: normalization copies the recorded snapshot and
+    // never re-derives it from current config, so a fixture edit cannot
+    // retroactively change what an existing session is running.
+    ...(isBoundAgentModel(binding.model)
+      ? { model: cloneBoundAgentModel(binding.model) }
+      : {}),
   };
 }
 

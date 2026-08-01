@@ -66,6 +66,9 @@ const issueAgentSessionBindingFn = createServerFn({ method: "POST" })
           homeScopeId: binding.homeScopeId,
           initialPerspective: binding.initialPerspective,
           additionalContextScopeIds: binding.additionalContextScopeIds,
+          // The model travels inside the SIGNED proof, reconstructed from the
+          // immutable thread binding — never read from browser input.
+          ...(binding.model ? { model: binding.model } : {}),
           ...(binding.eveSessionId
             ? { runtimeSessionId: binding.eveSessionId }
             : {}),
@@ -149,6 +152,7 @@ const issueAgentParticipantSessionBindingFn = createServerFn({ method: "POST" })
             homeScopeId: target.homeScopeId,
             initialPerspective: target.initialPerspective,
             additionalContextScopeIds: target.additionalContextScopeIds,
+            ...(target.model ? { model: target.model } : {}),
             ...(target.eveSessionId ? { runtimeSessionId: target.eveSessionId } : {}),
             subject: session.user.id,
             expiresAt,

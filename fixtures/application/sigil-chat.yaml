@@ -15,6 +15,14 @@ agent:
   # documented default and can drift — Settings → Models → Probe lists what a
   # given endpoint actually serves, which is the way to confirm it.
   presets:
+    # David's first per-session use: same Codex subscription as the default,
+    # different model. No new credential, so selecting it needs nothing beyond
+    # the `codex login` the deployment already has.
+    - id: luna
+      label: GPT-5.6 Luna (Codex subscription)
+      provider: codex
+      model: gpt-5.6-luna
+
     - id: lmstudio-local
       label: LM Studio (local)
       provider: openai-compatible

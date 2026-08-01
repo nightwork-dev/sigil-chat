@@ -1,6 +1,9 @@
 import type { AgentSessionBindingPayload } from "@workspace/agent-contracts/session-binding"
 import { AGENT_SESSION_BINDING_HEADER } from "@workspace/agent-contracts/session-binding"
-import { readAgentSessionBinding } from "@workspace/agent-contracts/session-binding.server"
+import {
+  readAgentSessionBinding,
+  type SigilSessionBindingExtras,
+} from "@workspace/agent-contracts/session-binding.server"
 
 const EVE_SESSION_PATH = /^\/eve\/v1\/session(?:\/|$)/
 
@@ -20,7 +23,7 @@ export function requireVerifiedEveSessionBinding(
   principalId: string,
   secretValue: string | undefined,
   now = Math.floor(Date.now() / 1_000),
-): AgentSessionBindingPayload | undefined {
+): (AgentSessionBindingPayload & SigilSessionBindingExtras) | undefined {
   const pathname = new URL(request.url).pathname
   if (!EVE_SESSION_PATH.test(pathname)) return undefined
 

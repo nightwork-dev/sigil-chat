@@ -39,11 +39,9 @@ export function ModelsSection({ userId }: { userId: string }) {
   const preferred = useUserSetting(userId, "agent.modelPresetId")
   const setPreferred = useSetUserSetting(userId, "agent.modelPresetId")
 
-  // Selecting a model for a session is a real choice with no runtime behind
-  // it yet, so it is labelled as such below rather than mimed. The durable
-  // contract it is waiting on is `AgentThreadExecutionBinding.model` in
-  // docs/specs/MODEL-ADMINISTRATION-AND-USAGE-SPEC.md — a field the binding
-  // does not carry today.
+  // This selection is now live: it is applied by useCreateAgentThread to every
+  // new session, resolved server-side against the fixture presets, and written
+  // into the thread's immutable `AgentThreadExecutionBinding.model`.
   //
   // Switching model *mid-session* is the slice after that, and this is where
   // its UI would live. Two constraints have to be visible at the moment of
@@ -96,9 +94,9 @@ export function ModelsSection({ userId }: { userId: string }) {
         )}
 
         <p className="text-xs text-muted-foreground">
-          Your selection is saved to your account, but sessions do not carry a
-          model yet: every session runs the entry marked Active until
-          per-session model binding ships.
+          New sessions you start run this model. It is bound when the session is
+          created and stays fixed for that conversation, so sessions already
+          open keep the model they began with.
         </p>
       </section>
 

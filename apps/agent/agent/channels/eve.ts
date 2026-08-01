@@ -176,7 +176,16 @@ const channel = createOwnedEveChannel({
                 initialPerspective: sessionBinding.initialPerspective,
                 additionalContextScopeIds:
                   sessionBinding.additionalContextScopeIds,
+                // Per-session model, carried through the verified proof. The
+                // dynamic model resolver in agent.ts reads it from here, so it
+                // is trusted exactly as far as the HMAC above.
+                ...(sessionBinding.model
+                  ? { model: sessionBinding.model }
+                  : {}),
               }),
+              ...(sessionBinding.model
+                ? { sigilModelPresetId: sessionBinding.model.presetId }
+                : {}),
               ...(sessionBinding.runtimeSessionId
                 ? {
                     sigilAttestedEveSessionId:

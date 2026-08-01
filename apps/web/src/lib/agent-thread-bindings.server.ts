@@ -1,4 +1,5 @@
 import type { ScopeAuthorizationPolicy } from "@workspace/agent-contracts/scope-authorization";
+import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding";
 
 import type { PersonalScopeRegistry } from "../../../agent/agent/lib/personal-scope";
 import type { ProjectWorkspaceRegistries } from "../../../agent/agent/lib/project-workspace-registries";
@@ -46,6 +47,17 @@ export interface ThreadBindingDependencies {
     nav: ProjectWorkspaceNav,
   ): { perspective: ScopePerspective } | undefined;
   policy?: ScopeAuthorizationPolicy;
+  /**
+   * Resolve a requested model preset id into the snapshot to bind, or
+   * undefined when the id may not be selected.
+   *
+   * Deliberately ONE function for every refusal reason — unknown id,
+   * owner-disabled, and not-yet-enabled all return undefined and therefore
+   * take the identical rejection path. That is what stops a disabled model
+   * from being reachable by hand-crafting a create request: there is no
+   * branch where a rejected id resolves anyway.
+   */
+  resolveModelPreset?(presetId: string): BoundAgentModel | undefined;
 }
 
 export interface ThreadBindingCreationInput {
@@ -55,6 +67,13 @@ export interface ThreadBindingCreationInput {
   sessionKind?: "workspace" | "personal";
   initialPerspective?: ScopePerspective;
   additionalContextScopeIds?: string[];
+  /**
+   * Optional fixture preset id. An ID ONLY — the browser never supplies a
+   * base URL, provider, or credential reference; the server looks up what that
+   * id resolves to. Absent means the deployment default, which is the
+   * pre-existing behavior for every caller that does not opt in.
+   */
+  modelPresetId?: string;
 }
 
 export interface ResolvedThreadBinding {
@@ -156,6 +175,23 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
     return authorized;
   }
 
+  /**
+   * Validate a requested model preset id server-side.
+   *
+   * Throws rather than silently falling back: a user who picked luna and
+   * quietly got the default would have no way to tell, and MDL.2's whole
+   * point is that the choice is honest.
+   */
+  function resolveBoundModel(
+    input: ThreadBindingCreationInput,
+  ): BoundAgentModel | undefined {
+    const presetId = input.modelPresetId?.trim();
+    if (!presetId) return undefined;
+    const resolved = dependencies.resolveModelPreset?.(presetId);
+    if (!resolved) throw new Error("EVE_MODEL_PRESET_NOT_SELECTABLE");
+    return resolved;
+  }
+
   function resolveCreation(
     principalId: string,
     input: ThreadBindingCreationInput,
@@ -188,6 +224,7 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
       if (initialPerspective.focusScopeId !== workspaceId) {
         throw new Error("Agent thread initial perspective is not valid.");
       }
+      const boundModel = resolveBoundModel(input);
       return {
         workspaceId,
         executionBinding: {
@@ -199,6 +236,7 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
             principalId,
             input.additionalContextScopeIds ?? [],
           ),
+          ...(boundModel ? { model: boundModel } : {}),
         },
       };
     }
@@ -213,6 +251,7 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
         focusScopeId: personalScope.id,
         viaScopeIds: [],
       };
+    const personalBoundModel = resolveBoundModel(input);
     return {
       executionBinding: {
         principalId,
@@ -227,6 +266,7 @@ export function createThreadBindingService(dependencies: ThreadBindingDependenci
           principalId,
           input.additionalContextScopeIds ?? [],
         ),
+        ...(personalBoundModel ? { model: personalBoundModel } : {}),
       },
     };
   }

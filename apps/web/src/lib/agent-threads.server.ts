@@ -6,6 +6,7 @@ import { MirkAgentContextReceiptRepository } from "@workspace/agent-tools/contex
 import { AgentThreadRepository } from "@/lib/agent-threads-domain";
 import type { AgentThreadExecutionBinding } from "@/lib/agent-threads-domain";
 import { createThreadBindingService } from "@/lib/agent-thread-bindings.server";
+import { resolveSelectableModelPreset } from "@/lib/model-selection.server";
 import {
   loadProjectWorkspaceNav,
   resolveScopePerspective,
@@ -30,6 +31,8 @@ export const agentContextReceiptRepository =
   });
 
 export const agentThreadBindingService = createThreadBindingService({
+  resolveModelPreset: (presetId) =>
+    resolveSelectableModelPreset(presetId),
   repository: agentThreadRepository,
   registries: getProjectWorkspaceRegistries(),
   loadNav: loadProjectWorkspaceNav,
