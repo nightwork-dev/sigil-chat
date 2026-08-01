@@ -6,6 +6,7 @@
 
 import {
   BoxesIcon,
+  FlagIcon,
   KeyRoundIcon,
   PaletteIcon,
   SlidersHorizontalIcon,
@@ -24,6 +25,7 @@ import type { LoginMethods } from "@/lib/auth/login-methods"
 import { AccountSection } from "./account-section"
 import { AgentSection } from "./agent-section"
 import { AppearanceSection } from "./appearance-section"
+import { FlagsSection } from "./flags-section"
 import { ModelsSection } from "./models-section"
 import { SecuritySection } from "./security-section"
 import { type AttentionContext } from "@zigil/agent/react"
@@ -36,6 +38,7 @@ export type SettingsSection =
   | "appearance"
   | "agent"
   | "models"
+  | "flags"
 
 const SETTINGS_TABS: {
   value: SettingsSection
@@ -47,6 +50,7 @@ const SETTINGS_TABS: {
   { value: "appearance", label: "Appearance", icon: PaletteIcon },
   { value: "agent", label: "Agent", icon: SlidersHorizontalIcon },
   { value: "models", label: "Models", icon: BoxesIcon },
+  { value: "flags", label: "Flags", icon: FlagIcon },
 ]
 
 export function SettingsPage({
@@ -67,9 +71,15 @@ export function SettingsPage({
   // Models reads deployment-wide model configuration and credential status,
   // which the server functions behind it already restrict to the owner. The
   // tab follows that restriction so a member is never shown a section whose
-  // only possible content is a permission error.
+  // only possible content is a permission error. Flags is owner-only for the
+  // same reason even though the read itself is open to any principal
+  // (FLAG.1): only the owner can flip a switch here, and a member would see
+  // nothing but disabled controls.
   const isOwner = user.role === "owner"
-  const tabs = SETTINGS_TABS.filter((tab) => tab.value !== "models" || isOwner)
+  const OWNER_ONLY_SECTIONS: readonly SettingsSection[] = ["models", "flags"]
+  const tabs = SETTINGS_TABS.filter(
+    (tab) => !OWNER_ONLY_SECTIONS.includes(tab.value) || isOwner,
+  )
   const activeSection = tabs.some((tab) => tab.value === section)
     ? section
     : "account"
@@ -142,6 +152,11 @@ export function SettingsPage({
           {isOwner ? (
             <TabsContent value="models">
               <ModelsSection userId={user.id} />
+            </TabsContent>
+          ) : null}
+          {isOwner ? (
+            <TabsContent value="flags">
+              <FlagsSection />
             </TabsContent>
           ) : null}
         </div>
