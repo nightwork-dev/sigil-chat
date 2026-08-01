@@ -167,12 +167,14 @@ export function SettingsPage({
             </TabsContent>
           ) : null}
           {isOwner ? (
-            <TabsContent value="flags">
-              <FlagsSection />
-            </TabsContent>
-            <TabsContent value="usage">
-              <UsageSection />
-            </TabsContent>
+            <>
+              <TabsContent value="flags">
+                <FlagsSection />
+              </TabsContent>
+              <TabsContent value="usage">
+                <UsageSection />
+              </TabsContent>
+            </>
           ) : null}
         </div>
       </Tabs>

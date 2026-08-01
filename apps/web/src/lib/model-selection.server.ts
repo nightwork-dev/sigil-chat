@@ -72,6 +72,9 @@ function synthesizeDiscoveredPreset(
       providerLabel: provider.label,
       provider: provider.kind,
       model: entry.model,
+      // No fixture declaration behind a discovered model, so no fast mode
+      // and no reasoning levels (MDL.4: declared, never sniffed).
+      fastMode: false,
       capability: "chat",
       // No fixture veto exists for a model the fixture never authored — the
       // installation allow-list (checked separately, see

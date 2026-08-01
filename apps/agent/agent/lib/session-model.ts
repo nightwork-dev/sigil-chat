@@ -168,6 +168,9 @@ function synthesizeDiscoveredPreset(
     capability: "chat",
     enabled: true,
     isDeploymentDefault: false,
+    // No fixture declaration behind a discovered model, so no fast mode and
+    // no reasoning levels (MDL.4: declared, never sniffed).
+    fastMode: false,
     source: "object",
     ...(provider.baseUrl !== undefined ? { baseUrl: provider.baseUrl } : {}),
     ...(provider.apiKeyEnv !== undefined

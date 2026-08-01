@@ -277,6 +277,7 @@ describe("model catalog discovery", () => {
         enabled: true,
         contextWindowTokens: 200_000,
         isDeploymentDefault: false,
+        fastMode: false,
       },
       {
         id: "lmstudio-local/gemma-3-27b-it",
@@ -287,6 +288,7 @@ describe("model catalog discovery", () => {
         contextWindowTokens: 200_000,
         isDeploymentDefault: false,
         discovered: true,
+        fastMode: false,
       },
     ])
   })

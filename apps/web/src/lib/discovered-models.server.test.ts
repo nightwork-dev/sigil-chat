@@ -47,6 +47,7 @@ const AUTHORED_MODEL: ModelProviderRecord["models"][number] = {
   enabled: true,
   contextWindowTokens: 65_536,
   isDeploymentDefault: false,
+  fastMode: false,
 }
 
 const DISCOVERED_MODEL: ModelProviderRecord["models"][number] = {
@@ -58,6 +59,7 @@ const DISCOVERED_MODEL: ModelProviderRecord["models"][number] = {
   contextWindowTokens: 65_536,
   isDeploymentDefault: false,
   discovered: true,
+  fastMode: false,
 }
 
 const PROVIDERS: ModelProviderRecord[] = [
@@ -85,6 +87,7 @@ const PROVIDERS: ModelProviderRecord[] = [
         enabled: true,
         contextWindowTokens: 200_000,
         isDeploymentDefault: true,
+        fastMode: false,
       },
     ],
   },
