@@ -12,6 +12,10 @@ import type { GeneratedImage, ImageFormat } from "@gonk/image-gen/types";
 
 const DEFAULT_MODEL = "gpt-5.6-terra";
 
+export function codexImageModelId(): string {
+  return process.env.CODEX_IMAGE_MODEL ?? DEFAULT_MODEL;
+}
+
 interface CodexAuthFile {
   tokens?: {
     access_token?: string;
@@ -35,7 +39,7 @@ export interface GenerateCodexImageOptions {
 export async function generateCodexImage(
   options: GenerateCodexImageOptions,
 ): Promise<GeneratedImage> {
-  const model = options.model ?? process.env.CODEX_IMAGE_MODEL ?? DEFAULT_MODEL;
+  const model = options.model ?? codexImageModelId();
   const provider = new CodexImageProvider(
     { type: "codex", model },
     { resolveCredentials: () => resolveCodexCredentials(model) },

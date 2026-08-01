@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest"
 import {
   approvalForGonkTool,
   authorizeGonkRequest,
+  createFabricToolHostContext,
   createGonkAuthContext,
+  fabricRestrictionPolicyRefs,
 } from "./gonk-tool-context"
 
 const principal: AuthenticatedPrincipal = {
@@ -80,6 +82,56 @@ describe("native Gonk tool context", () => {
         }),
       }),
     ).toBe("not-applicable")
+  })
+
+  it("projects the immutable Eve binding into an exact Fabric execution seam", () => {
+    const fabric = createFabricToolHostContext({
+      binding: {
+        applicationThreadId: "thread-1",
+        personaId: "agent-a",
+        homeScopeId: "workspace-a",
+        initialPerspective: {
+          focusScopeId: "workspace-a",
+          viaScopeIds: ["project-a"],
+        },
+        additionalContextScopeIds: ["workspace-b"],
+        subject: "owner-1",
+      },
+      callId: "call-3",
+      eveSessionId: "eve-session-1",
+      principalId: "owner-1",
+      resourceScope: "session:thread-1",
+      subject: "owner-1",
+      turnId: "turn-7",
+    })
+
+    expect(fabric).toMatchObject({
+      executionContext: {
+        runId: "sigil-chat:thread:thread-1",
+        runExecutionId: "sigil-chat:eve:eve-session-1:turn:turn-7",
+        traceId: "sigil-chat:turn:turn-7",
+        parentSpanId: "sigil-chat:tool:call-3",
+        executionBindingId: expect.stringMatching(/^sigil-chat:/),
+        runtimeSessionBindingId: expect.stringMatching(
+          /^sigil-chat:eve:eve-session-1:/,
+        ),
+      },
+      observedTurnId: "turn-7",
+      restrictionPolicyRefs: ["private-local"],
+    })
+    expect(fabric.statePartitionRef).toBe(
+      `sigil-chat:${fabric.executionContext.executionBindingDigest}`,
+    )
+  })
+
+  it("requires an explicit policy change before a worker may use cloud inference", () => {
+    expect(fabricRestrictionPolicyRefs({})).toEqual(["private-local"])
+    expect(
+      fabricRestrictionPolicyRefs({
+        GONK_FABRIC_RESTRICTION_POLICY_REFS:
+          " cloud-openai, audit-required,cloud-openai ",
+      }),
+    ).toEqual(["cloud-openai", "audit-required"])
   })
 })
 

@@ -64,6 +64,14 @@ const catalog: AgentCatalog = {
   ],
   tools: [
     {
+      id: "image_generate",
+      name: "image_generate",
+      description: "Generate portable image artifacts.",
+      origin: "application",
+      availability: "available",
+      runtimeStatus: "discoverable",
+    },
+    {
       id: "sigil-generate-image",
       name: "sigil-generate-image",
       description: "Generate a new image.",
@@ -103,10 +111,18 @@ describe("capability presentation model", () => {
     ])
     expect(groups.find((group) => group.id === "images")?.items).toEqual([
       expect.objectContaining({
+        id: "sigil-generate-image",
         name: "Generate Image",
         source: "Application tool",
         availability: "Discoverable",
         consent: "Runs without a prompt",
+      }),
+      expect.objectContaining({
+        id: "image_generate",
+        name: "Image Generate",
+        source: "Application tool",
+        scope: "Active resource scope",
+        consent: "Asks before running",
       }),
     ])
     expect(

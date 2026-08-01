@@ -1,4 +1,5 @@
 import { shape, ToolRegistry } from "@gonk/tool-registry"
+import { createImageGenerateCapability } from "@gonk/image-gen"
 import { describe, expect, it } from "vitest"
 
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
@@ -90,5 +91,46 @@ describe("application tool catalog route", () => {
     expect(
       tools.find((tool) => tool.name === "sigil-synthesize-speech"),
     ).toMatchObject({ runtimeStatus: "discoverable" })
+  })
+
+  it("projects the canonical portable image capability when the host binds it", async () => {
+    const route = createApplicationToolCatalogRoute(
+      () =>
+        Promise.resolve({
+          attributes: {},
+          authenticator: "test",
+          principalId: "owner-1",
+          principalType: "user",
+        }),
+      createSigilAgentToolRegistry({
+        artifacts: {} as never,
+        containers: { projects: {} as never, workspaces: {} as never },
+        graph: {} as never,
+        reviews: {} as never,
+        skills: {} as never,
+        workItems: new MemoryWorkItemsRepository(),
+        portableImageGeneration: createImageGenerateCapability(async () => ({
+          data: {
+            artifacts: [],
+            usage: {
+              durationMs: 1,
+              provider: "comfyui",
+              modelId: "local/chroma",
+            },
+          },
+        })),
+      }),
+    )
+
+    const response = await route.handler(
+      new Request("http://agent.test/sigil/v1/application-tools"),
+      {} as never,
+    )
+    const { tools } = (await response.json()) as {
+      tools: Array<{ name: string; runtimeStatus: string }>
+    }
+    expect(tools.find((tool) => tool.name === "image_generate")).toMatchObject({
+      runtimeStatus: "discoverable",
+    })
   })
 })

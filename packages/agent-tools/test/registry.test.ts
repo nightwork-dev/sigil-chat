@@ -113,7 +113,63 @@ describe("Sigil Chat Gonk registry", () => {
     const names = registry.list().map((tool) => tool.name);
 
     expect(names).not.toContain("sigil-generate-image");
+    expect(names).not.toContain("image_generate");
     expect(names).toContain("sigil-edit-image");
+  });
+
+  it("keeps the canonical image capability local when Fabric is not configured", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-portable-image-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(
+      registry,
+      artifacts,
+      undefined,
+      async () => ({
+        bytes: new Uint8Array([1, 2, 3]),
+        mimeType: "image/png",
+      }),
+    );
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "image_generate",
+        { prompt: "a portable moon", filenamePrefix: "moon" },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "session:portable-image"),
+          host: { resourceScope: "session:portable-image" },
+        }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        artifacts: [
+          {
+            id: expect.stringMatching(/^uploads\//),
+            mediaType: "image/png",
+            sizeBytes: 3,
+            digest: {
+              algorithm: "sha256",
+              value: expect.stringMatching(/^[0-9a-f]{64}$/),
+            },
+            filename: "moon.png",
+            producer: {
+              system: "sigil-chat.local-image-provider",
+              operation: "image_generate",
+            },
+          },
+        ],
+        usage: {
+          provider: "codex",
+          modelId: expect.any(String),
+        },
+      },
+    });
   });
 
   it("bounds the session blackboard at the tool and store boundary", async () => {

@@ -1005,6 +1005,34 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "image_generate",
+    description:
+      "Generate image artifacts using the exact provider and model selected by execution policy.",
+    visibility: "on-demand",
+    approval: "exec",
+    schema: {
+      type: "object",
+      required: ["prompt"],
+      properties: [
+        "prompt",
+        "negativePrompt",
+        "width",
+        "height",
+        "seed",
+        "steps",
+        "guidanceScale",
+        "filenamePrefix",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: true,
+      openWorld: true,
+    },
+  },
+  {
     name: "sigil-generate-image",
     description:
       "Generate an image from a text prompt using the local Codex login (the same ChatGPT session the agent runs on — no separate API key). Returns the image inline in the chat. Use when the user asks to see an illustration, mockup, diagram sketch, or concept art.",
