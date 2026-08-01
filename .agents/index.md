@@ -272,7 +272,11 @@ product branch or a bespoke folder:
 
 Local-only files/dirs are named `*.local` / `*.local.*` and gitignored by that
 pattern in every repo (except repos that are themselves local-only). Never
-`mkdir` a new coordination folder — use the homes above.
+`mkdir` a new coordination folder — use the homes above. **Never create
+`*.local` content inside a linked worktree** (David, 2026-07-31): ignored
+files die with the worktree — a ratified contract was lost exactly this way.
+Local notes belong to the primary checkout; ratified material gets a tracked
+path.
 
 ## Skills
 
