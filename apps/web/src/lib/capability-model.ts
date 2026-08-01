@@ -175,7 +175,11 @@ function groupForApplicationTool(name: string): string {
   if (name.startsWith("sigil-story-")) return "roadmap"
   if (name.startsWith("sigil-skill-")) return "skills"
   if (name.startsWith("sigil-blackboard-")) return "planning"
-  if (name === "sigil-generate-image" || name === "sigil-edit-image")
+  if (
+    name === "image_generate" ||
+    name === "sigil-generate-image" ||
+    name === "sigil-edit-image"
+  )
     return "images"
   if (
     name === "sigil-list-session-files" ||
@@ -198,7 +202,11 @@ function scopeForApplicationTool(name: string): string {
   if (name.startsWith("sigil-story-")) return "Shared roadmap"
   if (name.startsWith("sigil-skill-")) return "Global to session"
   if (name.startsWith("sigil-blackboard-")) return "Current session"
-  if (name === "sigil-generate-image" || name === "sigil-edit-image")
+  if (
+    name === "image_generate" ||
+    name === "sigil-generate-image" ||
+    name === "sigil-edit-image"
+  )
     return "Active resource scope"
   if (name === "sigil-list-session-files" || name === "sigil-read-file")
     return "Session, project, or persona"
