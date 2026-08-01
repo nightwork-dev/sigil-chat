@@ -22,24 +22,29 @@ import {
   type UsageAggregateEntry,
   type UsageModelDescriptor,
 } from "@/lib/usage"
+import {
+  SettingsNote,
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 
 export function UsageSection() {
   const usage = useUsage()
 
   if (usage.isPending) {
     return (
-      <div className="flex max-w-3xl flex-col gap-6 p-4">
-        <p className="text-xs text-muted-foreground">Loading usage…</p>
-      </div>
+      <SettingsPanel width="3xl">
+        <SettingsNote>Loading usage…</SettingsNote>
+      </SettingsPanel>
     )
   }
   if (usage.isError) {
     return (
-      <div className="flex max-w-3xl flex-col gap-6 p-4">
-        <p className="text-xs text-destructive">
+      <SettingsPanel width="3xl">
+        <SettingsNote tone="error">
           The agent runtime did not answer. Usage is unavailable until it does.
-        </p>
-      </div>
+        </SettingsNote>
+      </SettingsPanel>
     )
   }
 
@@ -47,11 +52,11 @@ export function UsageSection() {
   const modelLabel = modelLabelLookup(models)
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6 p-4">
-      <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsPanel width="3xl">
+      <SettingsSection>
         <SectionHeader>Usage</SectionHeader>
         <TotalsRow bucket={aggregates.app} />
-        <p className="text-xs text-muted-foreground">
+        <SettingsNote>
           Every row below is metered from provider-reported token counts on
           completed turns. A turn the provider reported no usage for counts
           toward turns, not tokens — it is never estimated.{" "}
@@ -61,8 +66,8 @@ export function UsageSection() {
               {aggregates.app.turnCount} recorded turns had no usage reported.
             </>
           ) : null}
-        </p>
-      </section>
+        </SettingsNote>
+      </SettingsSection>
 
       <BreakdownSection
         title="By model"
@@ -85,7 +90,7 @@ export function UsageSection() {
         keyLabel={(key) => key}
         monospaceKey
       />
-    </div>
+    </SettingsPanel>
   )
 }
 
@@ -158,10 +163,10 @@ function BreakdownSection({
   monospaceKey?: boolean
 }) {
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsSection>
       <SectionHeader>{title}</SectionHeader>
       {entries.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No usage recorded yet.</p>
+        <SettingsNote>No usage recorded yet.</SettingsNote>
       ) : (
         <Table>
           <TableHeader>
@@ -202,6 +207,6 @@ function BreakdownSection({
           </TableBody>
         </Table>
       )}
-    </section>
+    </SettingsSection>
   )
 }

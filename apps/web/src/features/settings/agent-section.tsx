@@ -48,6 +48,12 @@ import {
 import { useAgentCatalog } from "@/lib/agent-catalog"
 import { groupApplicationTools } from "@/lib/capability-model"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
+import {
+  SettingsAsyncState,
+  SettingsNote,
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 
 const TOOL_MODES: {
   value: "default" | ToolApprovalMode
@@ -205,8 +211,8 @@ export function AgentSection({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6 p-4">
-      <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsPanel>
+      <SettingsSection>
         <SectionHeader>Default tool consent</SectionHeader>
         <RadioGroup
           value={localMode}
@@ -233,20 +239,20 @@ export function AgentSection({ userId }: { userId: string }) {
             </div>
           ))}
         </RadioGroup>
-      </section>
+      </SettingsSection>
 
       {/* One switch, one sentence: the title already says what it does, so
           the supporting line is spent on the two things a user cannot see —
           that it waits for the turn to finish, and that nothing about the
           written transcript changes. */}
-      <section className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+      <SettingsSection layout="row">
         <div className="flex flex-col gap-0.5">
           <Label htmlFor="speak-replies">Speak replies aloud</Label>
-          <p className="text-xs text-muted-foreground">
+          <SettingsNote>
             Read each of Eve&apos;s replies once the turn finishes. The written
             transcript is unchanged, and tool calls, reasoning, and approvals
             are never spoken.
-          </p>
+          </SettingsNote>
         </div>
         <Switch
           checked={localSpeakReplies}
@@ -254,28 +260,24 @@ export function AgentSection({ userId }: { userId: string }) {
           id="speak-replies"
           onCheckedChange={handleSpeakRepliesChange}
         />
-      </section>
+      </SettingsSection>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+      <SettingsSection>
         <div className="flex flex-col gap-1">
           <SectionHeader>Tool permissions</SectionHeader>
-          <p className="text-xs text-muted-foreground">
+          <SettingsNote>
             Per-tool consent defaults are convenience preferences. Server policy
             still enforces authorization and always denies exec-tier tools.
-          </p>
+          </SettingsNote>
         </div>
 
-        {catalog.isPending ? (
-          <p className="text-xs text-muted-foreground">Loading tools…</p>
-        ) : catalog.isError ? (
-          <p className="text-xs text-destructive">
-            The authenticated tool catalog is unavailable.
-          </p>
-        ) : catalog.data.tools.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            No tools are available.
-          </p>
-        ) : (
+        <SettingsAsyncState
+          query={catalog}
+          pending="Loading tools…"
+          error="The authenticated tool catalog is unavailable."
+          isEmpty={(catalog.data?.tools.length ?? 0) === 0}
+          empty="No tools are available."
+        >
           <TooltipProvider delay={200}>
             <div className="relative">
               <SearchIcon
@@ -286,7 +288,7 @@ export function AgentSection({ userId }: { userId: string }) {
                 type="search"
                 value={toolQuery}
                 onChange={(event) => setToolQuery(event.target.value)}
-                placeholder={`Search ${catalog.data.tools.length} tools…`}
+                placeholder={`Search ${catalog.data?.tools.length ?? 0} tools…`}
                 aria-label="Search tools"
                 className="h-8 pl-8 text-xs"
               />
@@ -359,8 +361,8 @@ export function AgentSection({ userId }: { userId: string }) {
               </div>
             ))}
           </TooltipProvider>
-        )}
-      </section>
-    </div>
+        </SettingsAsyncState>
+      </SettingsSection>
+    </SettingsPanel>
   )
 }

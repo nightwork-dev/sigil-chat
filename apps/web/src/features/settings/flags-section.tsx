@@ -14,29 +14,32 @@ import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Switch } from "@workspace/ui/components/switch"
 
 import { useFeatureFlags, useSetFeatureFlag } from "@/lib/feature-flags"
+import {
+  SettingsAsyncState,
+  SettingsNote,
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 
 export function FlagsSection() {
   const flags = useFeatureFlags()
   const setFlag = useSetFeatureFlag()
+  const declared = flags.data?.flags ?? []
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6 p-4">
-      <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsPanel>
+      <SettingsSection>
         <SectionHeader>Flags</SectionHeader>
 
-        {flags.isPending ? (
-          <p className="text-xs text-muted-foreground">Loading flags…</p>
-        ) : flags.isError ? (
-          <p className="text-xs text-destructive">
-            Declared flags are unavailable until the agent runtime answers.
-          </p>
-        ) : flags.data.flags.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            No flags are declared yet.
-          </p>
-        ) : (
+        <SettingsAsyncState
+          query={flags}
+          pending="Loading flags…"
+          error="Declared flags are unavailable until the agent runtime answers."
+          isEmpty={declared.length === 0}
+          empty="No flags are declared yet."
+        >
           <div className="divide-y divide-border">
-            {flags.data.flags.map((flag) => (
+            {declared.map((flag) => (
               <div
                 key={flag.id}
                 className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
@@ -66,23 +69,23 @@ export function FlagsSection() {
               </div>
             ))}
           </div>
-        )}
+        </SettingsAsyncState>
 
         {setFlag.isError ? (
-          <p className="text-xs text-destructive">
+          <SettingsNote tone="error">
             {setFlag.error instanceof Error
               ? setFlag.error.message
               : "That change was refused."}
-          </p>
+          </SettingsNote>
         ) : null}
 
-        <p className="text-xs text-muted-foreground">
+        <SettingsNote>
           Flags are declared in{" "}
           <code className="font-mono">lib/feature-flags/registry.ts</code> and
           take effect for every principal immediately — no deploy required. A
           flag id nobody declared always evaluates default-off.
-        </p>
-      </section>
-    </div>
+        </SettingsNote>
+      </SettingsSection>
+    </SettingsPanel>
   )
 }

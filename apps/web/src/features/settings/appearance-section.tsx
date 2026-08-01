@@ -9,6 +9,11 @@ import { Label } from "@workspace/ui/components/label"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 
 import { ThemePickerExpanded } from "@/components/theme-picker"
+import {
+  SettingsNote,
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 
 // Toggling a DOM class on <html> from a resolved preference is a DOM/external
@@ -38,19 +43,21 @@ export function AppearanceSection({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="flex max-w-xl flex-col gap-6 p-4">
+    <SettingsPanel width="xl">
+      {/* Borderless on purpose: the theme picker is its own bordered grid, and
+          a block around it would double the frame. */}
       <section className="flex flex-col gap-2">
         <SectionHeader>Theme &amp; mode</SectionHeader>
         <ThemePickerExpanded />
       </section>
 
-      <section className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+      <SettingsSection layout="row">
         <div className="flex flex-col gap-0.5">
           <Label htmlFor="reduced-motion">Reduce motion</Label>
-          <p className="text-xs text-muted-foreground">
+          <SettingsNote>
             Turn off color and layout transitions across the app, independent of
             your OS setting.
-          </p>
+          </SettingsNote>
         </div>
         <Switch
           id="reduced-motion"
@@ -58,7 +65,7 @@ export function AppearanceSection({ userId }: { userId: string }) {
           disabled={reducedMotion.isLoading || setReducedMotion.isPending}
           onCheckedChange={handleToggle}
         />
-      </section>
-    </div>
+      </SettingsSection>
+    </SettingsPanel>
   )
 }

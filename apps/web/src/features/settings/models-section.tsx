@@ -57,6 +57,12 @@ import {
   useSetModelEnabled,
 } from "@/lib/model-enablement"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
+import {
+  SettingsAsyncState,
+  SettingsNote,
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 
 export function ModelsSection({ userId }: { userId: string }) {
   const endpoints = useModelEndpoints()
@@ -104,18 +110,15 @@ export function ModelsSection({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6 p-4">
-      <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsPanel>
+      <SettingsSection>
         <SectionHeader>Models</SectionHeader>
 
-        {endpoints.isPending ? (
-          <p className="text-xs text-muted-foreground">Loading providers…</p>
-        ) : endpoints.isError ? (
-          <p className="text-xs text-destructive">
-            The agent runtime did not answer. Provider status is unavailable
-            until it does.
-          </p>
-        ) : (
+        <SettingsAsyncState
+          query={endpoints}
+          pending="Loading providers…"
+          error="The agent runtime did not answer. Provider status is unavailable until it does."
+        >
           <>
             <NewChatModelPicker
               providers={providers}
@@ -136,11 +139,11 @@ export function ModelsSection({ userId }: { userId: string }) {
                   isModelEnabledForNewSessions(model, enabledIds),
               ),
             ) ? (
-              <p className="text-xs text-destructive">
+              <SettingsNote tone="error">
                 New chats are set to{" "}
                 <span className="font-mono">{preferredId}</span>, which is no
                 longer available. Choose another to start chats again.
-              </p>
+              </SettingsNote>
             ) : null}
             <div className="divide-y divide-border">
               {providers.map((provider: ModelProviderRecord) => (
@@ -154,26 +157,26 @@ export function ModelsSection({ userId }: { userId: string }) {
               ))}
             </div>
             {setEnabled.isError ? (
-              <p className="text-xs text-destructive">
+              <SettingsNote tone="error">
                 {setEnabled.error instanceof Error
                   ? setEnabled.error.message
                   : "That change was refused."}
-              </p>
+              </SettingsNote>
             ) : null}
-            <p className="text-xs text-muted-foreground">
+            <SettingsNote>
               Providers come from{" "}
               <code className="font-mono">agent.providers</code> in the
               application fixture; a model becomes available to new chats only
               when you turn it on here, and stays unavailable until you do.
               Credentials stay in the agent runtime&apos;s environment — this
               page can see whether a variable is set, never what it contains.
-            </p>
+            </SettingsNote>
           </>
-        )}
-      </section>
+        </SettingsAsyncState>
+      </SettingsSection>
 
       <AddEndpointSection />
-    </div>
+    </SettingsPanel>
   )
 }
 
@@ -473,7 +476,7 @@ function AddEndpointSection() {
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsSection>
       <div className="flex flex-col gap-1">
         <SectionHeader>Add a provider</SectionHeader>
         <p className="text-xs text-muted-foreground">
@@ -604,7 +607,7 @@ function AddEndpointSection() {
           ) : null}
         </div>
       ) : null}
-    </section>
+    </SettingsSection>
   )
 }
 
