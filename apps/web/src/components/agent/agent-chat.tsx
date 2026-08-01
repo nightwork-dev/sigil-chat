@@ -38,12 +38,12 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AddMenu } from "@/components/agent/add-menu"
+import { ComposerChip } from "@/components/agent/composer-chip"
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
@@ -422,19 +422,13 @@ function ApprovalChip({
       }}
       value={mode}
     >
-      <SelectTrigger
+      <ComposerChip.Trigger
         aria-label="Tool approval mode"
-        className={cn(
-          "h-6 gap-1 rounded-full border px-2 text-[11px] max-sm:h-11",
-          alwaysAllow
-            ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            : "border-border bg-muted/50 text-muted-foreground",
-        )}
-        size="sm"
         title="Tool approval mode"
+        tone={alwaysAllow ? "warning" : "neutral"}
       >
         <SelectValue />
-      </SelectTrigger>
+      </ComposerChip.Trigger>
       <SelectContent align="start">
         <SelectItem value="ask">Ask</SelectItem>
         <SelectItem value="always">Always allow</SelectItem>
@@ -502,14 +496,12 @@ function ReasoningControls({ thread }: { thread: AgentThread }) {
           }}
           value={current?.reasoningLevel ?? record.reasoning.default}
         >
-          <SelectTrigger
+          <ComposerChip.Trigger
             aria-label="Reasoning level"
-            className="h-6 gap-1 rounded-full border border-border bg-muted/50 px-2 text-[11px] text-muted-foreground max-sm:h-11"
-            size="sm"
             title="Reasoning level"
           >
             <SelectValue />
-          </SelectTrigger>
+          </ComposerChip.Trigger>
           <SelectContent align="start">
             {record.reasoning.levels.map((level) => (
               <SelectItem key={level} value={level}>
@@ -520,22 +512,16 @@ function ReasoningControls({ thread }: { thread: AgentThread }) {
         </Select>
       ) : null}
       {record.fastMode ? (
-        <button
+        <ComposerChip.Toggle
           aria-label="Fast mode"
           aria-pressed={current?.fastMode === true}
-          className={cn(
-            "h-6 shrink-0 rounded-full border px-2 text-[11px] max-sm:h-11",
-            current?.fastMode === true
-              ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-              : "border-border bg-muted/50 text-muted-foreground",
-          )}
           disabled={setRequestOptions.isPending}
           onClick={() => apply({ fastMode: !current?.fastMode })}
           title="Fast mode"
-          type="button"
+          tone={current?.fastMode === true ? "info" : "neutral"}
         >
           Fast
-        </button>
+        </ComposerChip.Toggle>
       ) : null}
     </>
   )
