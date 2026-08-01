@@ -118,6 +118,24 @@ const MEMORY_RUNTIME_TOOLS = new Set([
   "forget-memory",
 ])
 
+/**
+ * The human grouping for one application tool, for surfaces that list tools
+ * outside the capability catalog (Settings → Tool permissions). Same
+ * categorization the /skills page uses, so a tool never files under two
+ * different headings in different parts of the app.
+ */
+export function applicationToolGroup(name: string): {
+  id: string
+  title: string
+} {
+  const group = GROUPS[groupForApplicationTool(name)] ?? GROUPS.other
+  return { id: group.id, title: group.title }
+}
+
+/** GROUPS declaration order — the display order for grouped tool lists. */
+export const APPLICATION_TOOL_GROUP_ORDER: readonly string[] =
+  Object.keys(GROUPS)
+
 function groupForApplicationTool(name: string): string {
   if (name.startsWith("sigil-graph-") || name === "sigil-reducer-catalog")
     return "graph"

@@ -5,10 +5,16 @@
 // while the existing localStorage store keeps working as the fast local
 // mirror the agent chat reads synchronously.
 
-import { useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 
-import { CheckIcon, CircleDashedIcon, CircleHelpIcon } from "lucide-react"
+import {
+  CheckIcon,
+  CircleDashedIcon,
+  CircleHelpIcon,
+  SearchIcon,
+} from "lucide-react"
 
+import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
 import { SectionHeader } from "@workspace/ui/components/section-header"
@@ -37,6 +43,10 @@ import {
   type ToolApprovalMode,
 } from "@/lib/agent-tool-approval"
 import { useAgentCatalog } from "@/lib/agent-catalog"
+import {
+  APPLICATION_TOOL_GROUP_ORDER,
+  applicationToolGroup,
+} from "@/lib/capability-model"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 
 const TOOL_MODES: {
@@ -150,6 +160,33 @@ export function AgentSection({ userId }: { userId: string }) {
   // agent existing).
   const accountLayer = effectiveToolApprovalOverrides(localOverrides)
 
+  const [toolQuery, setToolQuery] = useState("")
+  const toolGroups = useMemo(() => {
+    const tools = catalog.data?.tools ?? []
+    const query = toolQuery.trim().toLowerCase()
+    const matching = query
+      ? tools.filter((tool) =>
+          `${tool.name} ${tool.id} ${tool.description}`
+            .toLowerCase()
+            .includes(query),
+        )
+      : tools
+    const byGroup = new Map<
+      string,
+      { title: string; tools: (typeof matching)[number][] }
+    >()
+    for (const tool of matching) {
+      const group = applicationToolGroup(tool.name || tool.id)
+      const existing = byGroup.get(group.id)
+      if (existing) existing.tools.push(tool)
+      else byGroup.set(group.id, { title: group.title, tools: [tool] })
+    }
+    return APPLICATION_TOOL_GROUP_ORDER.flatMap((groupId) => {
+      const group = byGroup.get(groupId)
+      return group ? [group] : []
+    })
+  }, [catalog.data?.tools, toolQuery])
+
   function handleToolChange(toolId: string, next: "default" | ToolApprovalMode) {
     const layer = { ...accountLayer }
     if (next === "default") delete layer[toolId]
@@ -233,8 +270,32 @@ export function AgentSection({ userId }: { userId: string }) {
           <p className="text-xs text-muted-foreground">No tools are available.</p>
         ) : (
           <TooltipProvider delay={200}>
-            <div className="divide-y divide-border">
-              {catalog.data.tools.map((tool) => (
+            <div className="relative">
+              <SearchIcon
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="search"
+                value={toolQuery}
+                onChange={(event) => setToolQuery(event.target.value)}
+                placeholder={`Search ${catalog.data.tools.length} tools…`}
+                aria-label="Search tools"
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+            {toolGroups.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No tools match “{toolQuery.trim()}”.
+              </p>
+            ) : null}
+            {toolGroups.map((group) => (
+              <div key={group.title} className="flex flex-col gap-1">
+                <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                  {group.title}
+                </p>
+                <div className="divide-y divide-border">
+                  {group.tools.map((tool) => (
                 <div
                   key={tool.id}
                   className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
@@ -281,11 +342,13 @@ export function AgentSection({ userId }: { userId: string }) {
                           {label} — {hint}
                         </TooltipContent>
                       </Tooltip>
-                    ))}
-                  </ToggleGroup>
+                        ))}
+                      </ToggleGroup>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </TooltipProvider>
         )}
       </section>
