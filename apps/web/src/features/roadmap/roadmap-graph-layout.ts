@@ -14,15 +14,35 @@ import type { RoadmapCanvas } from "./roadmap-graph"
 
 export const STORY_WIDTH = 232
 export const STORY_HEIGHT = 52
-const STORY_ROW_GAP = 10
+const STORY_ROW_GAP = 22
+const STORY_COLUMN_GAP = 20
 /** Column chrome: the header strip, and air around the cards inside. */
 const PAD_X = 12
 const PAD_TOP = 30
 const PAD_BOTTOM = 12
 const COLUMN_WIDTH = STORY_WIDTH + PAD_X * 2
+
+/** Width of a lane holding `columns` stories side by side. */
+function laneWidth(columns: number): number {
+  return columns * STORY_WIDTH + (columns - 1) * STORY_COLUMN_GAP + PAD_X * 2
+}
 const EPIC_HEIGHT = 68
 /** Air between two lanes stacked in the same depth band. */
 const EPIC_ROW_GAP = 36
+/**
+ * Which side of a selection something sits on.
+ *
+ * The design system is single-hue by construction — every theme's chart tokens
+ * are tints of that theme's primary — so there is no warm/cool pair to reach
+ * for without inventing a colour that belongs to no theme. Direction is
+ * therefore carried on the value axis the tokens actually provide: chart-1 is
+ * the brightest member of the family, chart-5 the deepest, and they are the
+ * most separable pair in every theme. The legend names both.
+ */
+export type ChainDirection = "upstream" | "downstream"
+const UPSTREAM_COLOR = "var(--color-chart-1)"
+const DOWNSTREAM_COLOR = "var(--color-chart-5)"
+
 /** A gutter is at least this wide, and widens with the traffic through it. */
 const GUTTER_BASE = 68
 const GUTTER_LANE_STEP = 16
@@ -58,6 +78,7 @@ export interface Placement {
   /** Lane id for every node on the canvas, story or collapsed epic. */
   laneOf: Map<string, string>
   rowOf: Map<string, number>
+  columnOf: Map<string, number>
 }
 
 /**
@@ -78,10 +99,12 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
   const levelOf = new Map(canvas.epics.map((epic) => [epic.id, epic.depth]))
   const laneOf = new Map<string, string>()
   const rowOf = new Map<string, number>()
+  const columnOf = new Map<string, number>()
   for (const epic of canvas.epics) laneOf.set(epic.id, epic.id)
   for (const story of canvas.stories) {
     laneOf.set(story.id, story.epicId)
     rowOf.set(story.id, story.row)
+    columnOf.set(story.id, story.column)
   }
 
   // Heights and the vertical stack within each band: independent of x, so this
@@ -93,6 +116,8 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
         PAD_TOP +
         PAD_BOTTOM
       : EPIC_HEIGHT
+  const widthOf = (epic: RoadmapCanvas["epics"][number]) =>
+    epic.expanded ? laneWidth(epic.columns) : STORY_WIDTH
 
   const bands = new Map<number, RoadmapCanvas["epics"][number][]>()
   for (const epic of canvas.epics) {
@@ -124,12 +149,22 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
     }
   }
 
+  // A band is as wide as its widest lane; the gutter after it scales with the
+  // traffic crossing that seam. Tight inside a lane, generous between them.
+  const bandWidth = new Map<number, number>()
+  for (const epic of canvas.epics) {
+    bandWidth.set(
+      epic.depth,
+      Math.max(bandWidth.get(epic.depth) ?? COLUMN_WIDTH, widthOf(epic) + PAD_X * 2),
+    )
+  }
+
   const xOf = new Map<number, number>()
   let x = 0
   for (const level of levels) {
     xOf.set(level, x)
     const lanes = Math.min(traffic.get(level) ?? 0, GUTTER_MAX_LANES)
-    x += COLUMN_WIDTH + GUTTER_BASE + lanes * GUTTER_LANE_STEP
+    x += (bandWidth.get(level) ?? COLUMN_WIDTH) + GUTTER_BASE + lanes * GUTTER_LANE_STEP
   }
 
   const epics = new Map<string, Box>()
@@ -141,7 +176,7 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
       // collapsing a lane doesn't nudge it sideways.
       x: epic.expanded ? left : left + PAD_X,
       y: yOf.get(epic.id) ?? 0,
-      width: epic.expanded ? COLUMN_WIDTH : STORY_WIDTH,
+      width: widthOf(epic),
       height: heightOf(epic),
     })
   }
@@ -151,12 +186,12 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
     const box = epics.get(story.epicId)
     if (!box) continue
     stories.set(story.id, {
-      x: box.x + PAD_X,
+      x: box.x + PAD_X + story.column * (STORY_WIDTH + STORY_COLUMN_GAP),
       y: box.y + PAD_TOP + story.row * (STORY_HEIGHT + STORY_ROW_GAP),
     })
   }
 
-  return { epics, stories, levelOf, laneOf, rowOf }
+  return { epics, stories, levelOf, laneOf, rowOf, columnOf }
 }
 
 /**
@@ -177,6 +212,7 @@ export function routeEdges(
   place: Placement,
   chainEdges: ReadonlySet<string> | null,
   goalEdges: ReadonlySet<string> | null = null,
+  chainDirection: ReadonlyMap<string, ChainDirection> | null = null,
 ): Edge[] {
   const yOfNode = (id: string) =>
     place.stories.get(id)?.y ?? place.epics.get(id)?.y ?? 0
@@ -206,6 +242,7 @@ export function routeEdges(
   return canvas.edges.map((edge) => {
     const sourceLane = place.laneOf.get(edge.source)
     const targetLane = place.laneOf.get(edge.target)
+    const crossLane = Boolean(sourceLane && targetLane && sourceLane !== targetLane)
     const active = chainEdges
       ? edge.underlying.some((id) => chainEdges.has(id))
       : true
@@ -220,24 +257,24 @@ export function routeEdges(
     let offset = CROSS_OFFSET
 
     if (sourceLane && sourceLane === targetLane) {
-      const from = place.rowOf.get(edge.source)
-      const to = place.rowOf.get(edge.target)
-      if (from !== undefined && to !== undefined && to - from === 1) {
-        sourceHandle = HANDLE.bottom
-        targetHandle = HANDLE.top
-        offset = STORY_ROW_GAP / 2
-      } else {
-        // Skipping a card: hug the outside of the column rather than drawing a
-        // line through the stories in between.
-        const seen = detourCount.get(sourceLane) ?? 0
-        detourCount.set(sourceLane, seen + 1)
-        sourceHandle = HANDLE.right
-        targetHandle = HANDLE.rightIn
-        // Cycled, not accumulated: a lane with a dozen skips would otherwise
-        // push its last detour clear across the gutter and into the next
-        // column. Bounded overlap beats an edge that leaves its own lane.
-        offset = DETOUR_OFFSET + (seen % DETOUR_LANES) * DETOUR_STEP
-      }
+      // Inside a lane the tree runs downward, so the natural route is out the
+      // bottom and into the top. When the two cards do not sit in the same
+      // column the run would clip whatever is between them, so it leaves
+      // sideways instead — still an output port, still entering an input port.
+      const sameColumn =
+        place.columnOf.get(edge.source) === place.columnOf.get(edge.target)
+      const adjacent =
+        (place.rowOf.get(edge.target) ?? 0) -
+          (place.rowOf.get(edge.source) ?? 0) ===
+        1
+      sourceHandle = sameColumn && adjacent ? HANDLE.bottom : HANDLE.right
+      targetHandle = HANDLE.top
+      const seen = detourCount.get(sourceLane) ?? 0
+      detourCount.set(sourceLane, seen + 1)
+      offset =
+        sameColumn && adjacent
+          ? STORY_ROW_GAP / 2
+          : DETOUR_OFFSET + (seen % DETOUR_LANES) * DETOUR_STEP
     } else {
       // Same reasoning as the detours: the gutter is only so wide, so lanes
       // cycle within it rather than marching past the target column.
@@ -246,48 +283,55 @@ export function routeEdges(
         ((lane.get(edge.id) ?? 0) % GUTTER_MAX_LANES) * GUTTER_LANE_STEP
     }
 
+    const direction = chainDirection?.get(edge.id) ?? null
+    const stroke = onGoalPath
+      ? "var(--color-primary)"
+      : direction === "upstream"
+        ? UPSTREAM_COLOR
+        : direction === "downstream"
+          ? DOWNSTREAM_COLOR
+          : active
+            ? "var(--color-muted-foreground)"
+            : "var(--color-border)"
+
     return {
       id: edge.id,
       source: edge.source,
       target: edge.target,
       sourceHandle,
       targetHandle,
-      type: "smoothstep",
+      // Cross-lane links are the structural edges of the map, so they get a
+      // component of their own that can carry an aggregation count on the line
+      // itself. Within a lane the edge is a short hop that should stay quiet.
+      type: crossLane ? "cross-lane" : "smoothstep",
       animated: false,
       pathOptions: { offset, borderRadius: 12 },
-      // The count only earns ink when one line stands for several dependencies.
-      ...(edge.count > 1
-        ? {
-            label: `×${edge.count}`,
-            labelShowBg: true,
-            labelBgPadding: [4, 2] as [number, number],
-            labelBgBorderRadius: 3,
-            labelStyle: {
-              fill: "var(--color-muted-foreground)",
-              fontSize: 10,
-            },
-            labelBgStyle: { fill: "var(--color-background)" },
-          }
-        : {}),
+      data: {
+        count: edge.count,
+        stroke,
+        binding: edge.binding,
+        emphasis: onGoalPath || direction !== null,
+        faded: !active,
+      },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 14,
         height: 14,
-        color: onGoalPath
-          ? "var(--color-primary)"
-          : "var(--color-muted-foreground)",
+        color: stroke,
       },
       // A satisfied dependency is history, not a live constraint — it stays
       // visible so the chain is complete, but dashed so it stops competing.
       style: {
-        stroke: onGoalPath
-          ? "var(--color-primary)"
-          : active
-            ? "var(--color-muted-foreground)"
-            : "var(--color-border)",
-        strokeWidth: onGoalPath ? 1.8 : edge.binding ? 1.4 : 1,
+        stroke,
+        strokeWidth: onGoalPath || direction !== null ? 1.8 : edge.binding ? 1.4 : 1,
         strokeDasharray: edge.binding ? undefined : "4 4",
-        opacity: active ? (onGoalPath ? 0.95 : edge.binding ? 0.75 : 0.4) : 0.15,
+        opacity: active
+          ? onGoalPath || direction !== null
+            ? 0.95
+            : edge.binding
+              ? 0.75
+              : 0.4
+          : 0.15,
       },
     }
   })

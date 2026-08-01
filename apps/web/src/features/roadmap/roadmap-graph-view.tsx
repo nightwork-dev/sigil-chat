@@ -49,6 +49,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type EdgeTypes,
   type Node,
   type NodeTypes,
 } from "@xyflow/react"
@@ -60,6 +61,7 @@ import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { CanvasControls } from "@/features/graph-canvas/canvas-controls"
+import { CrossLaneEdge } from "./roadmap-cross-lane-edge"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-nodes"
 
@@ -69,6 +71,7 @@ import {
   routeEdges,
   STORY_HEIGHT,
   STORY_WIDTH,
+  type ChainDirection,
 } from "./roadmap-graph-layout"
 import {
   blockingChain,
@@ -94,14 +97,22 @@ import "@xyflow/react/dist/style.css"
 const GLYPH = {
   goal: "\u25ce",
   blocked: "\u25cf",
+  inaccessible: "\u25cb",
   inProgress: "\u25d0",
   shipped: "\u2713",
 } as const
 
-function statusGlyph(status: string, blocked: boolean): string | null {
-  if (blocked) return GLYPH.blocked
-  if (status === "in-progress" || status === "verify") return GLYPH.inProgress
-  if (status === "shipped") return GLYPH.shipped
+function statusGlyph(data: {
+  status: string
+  blocked: boolean
+  frontier: boolean
+}): string | null {
+  if (data.frontier) return GLYPH.blocked
+  if (data.blocked) return GLYPH.inaccessible
+  if (data.status === "in-progress" || data.status === "verify") {
+    return GLYPH.inProgress
+  }
+  if (data.status === "shipped") return GLYPH.shipped
   return null
 }
 
@@ -121,6 +132,12 @@ interface StoryNodeData extends Record<string, unknown> {
   /** Rendered as "+n" when the shipped collapse hid dependencies of this node. */
   hidden: number
   blocked: boolean
+  /** Blocked and where the line stalls — the only thing that reads as red. */
+  frontier: boolean
+  /** In flight right now. */
+  live: boolean
+  /** Which side of the current selection this sits on, if any. */
+  direction: ChainDirection | null
   dimmed: boolean
   onChain: boolean
   selected: boolean
@@ -140,6 +157,9 @@ interface EpicNodeData extends Record<string, unknown> {
   status: string
   total: number
   blockedCount: number
+  frontierCount: number
+  liveCount: number
+  direction: ChainDirection | null
   dimmed: boolean
   onChain: boolean
   goalCount: number
@@ -165,6 +185,10 @@ type GraphNode =
 
 // Hoisted: React Flow treats a new nodeTypes object as a type-table change and
 // remounts every node, which is an independent source of flicker.
+// Hoisted for the same reason as nodeTypes: a fresh object is a type-table
+// change and remounts every edge.
+const edgeTypes: EdgeTypes = { "cross-lane": CrossLaneEdge }
+
 const nodeTypes: NodeTypes = {
   story: StoryFlowNode,
   epic: EpicRollupNode,
@@ -236,12 +260,44 @@ export function RoadmapGraphView({
   )
   const layout = useMemo(() => layoutCanvas(canvas), [canvas])
 
+  // Which side of the selection each thing sits on. Selecting a story has to
+  // answer "what does this wait for" and "what waits for this" as two visibly
+  // different answers, not one undifferentiated halo.
+  const direction = useMemo(() => {
+    if (!chain) return null
+    const nodes = new Map<string, ChainDirection>()
+    for (const id of chain.upstream) nodes.set(id, "upstream")
+    for (const id of chain.downstream) nodes.set(id, "downstream")
+    return nodes
+  }, [chain])
+
   const derived = useMemo(() => {
     // A chain is expressed in story ids, and on this canvas some of those
     // stories are currently a lane. Light whatever stands for them.
     const lit = chain
       ? new Set(
           [...chain.highlighted].map((id) => canvas.presentation.get(id) ?? id),
+        )
+      : null
+
+    // An edge takes the selection's colour only when BOTH its ends are on the
+    // same side of it, so a line crossing from upstream to downstream through
+    // the selected story is never mislabelled.
+    const edgeDirection = direction
+      ? new Map(
+          canvas.edges.flatMap((edge) => {
+            const from = direction.get(edge.source) ?? null
+            const to = direction.get(edge.target) ?? null
+            const side =
+              from === "upstream" || to === "upstream"
+                ? from === "downstream" || to === "downstream"
+                  ? null
+                  : "upstream"
+                : from === "downstream" || to === "downstream"
+                  ? "downstream"
+                  : null
+            return side ? [[edge.id, side] as const] : []
+          }),
         )
       : null
 
@@ -257,6 +313,16 @@ export function RoadmapGraphView({
       const pathBlockedCount = epic.storyIds.filter((id) =>
         goals.blockers.has(id),
       ).length
+      const liveCount = epic.counts["in-progress"] ?? 0
+      // A folded lane takes a side only when every story of its that is on the
+      // chain agrees; a lane straddling both sides stays neutral rather than
+      // claiming a direction it does not have.
+      const sides = new Set(
+        epic.storyIds
+          .map((id) => direction?.get(id))
+          .filter((side): side is ChainDirection => side !== undefined),
+      )
+      const epicDirection = sides.size === 1 ? [...sides][0]! : null
 
       if (!epic.expanded) {
         cards.push({
@@ -271,6 +337,9 @@ export function RoadmapGraphView({
             status: epic.status,
             total,
             blockedCount: epic.blockedCount,
+            frontierCount: epic.frontierCount,
+            liveCount: liveCount,
+            direction: epicDirection,
             dimmed: lit ? !lit.has(epic.id) : false,
             onChain: lit ? lit.has(epic.id) : false,
             goalCount,
@@ -322,6 +391,9 @@ export function RoadmapGraphView({
           detail: story.title,
           hidden: story.hiddenBlockers + story.hiddenBlocked,
           blocked: story.isBlocked,
+          frontier: story.isFrontier,
+          live: story.status === "in-progress",
+          direction: direction?.get(story.id) ?? null,
           dimmed: lit ? !lit.has(story.id) : false,
           onChain: lit ? lit.has(story.id) : false,
           selected: story.id === selected,
@@ -341,9 +413,10 @@ export function RoadmapGraphView({
         layout,
         chain ? chain.edges : null,
         goals.edges.size > 0 ? goals.edges : null,
+        edgeDirection,
       ),
     }
-  }, [canvas, layout, chain, selected, goals])
+  }, [canvas, layout, chain, selected, goals, direction])
 
   const { nodes, onNodesChange } = useStableFlowNodes<GraphNode>(derived.nodes)
 
@@ -498,6 +571,7 @@ export function RoadmapGraphView({
             }}
             onPaneClick={() => select(null)}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
           >
             <Background
               variant={BackgroundVariant.Dots}
@@ -506,7 +580,10 @@ export function RoadmapGraphView({
               color="var(--color-border)"
             />
             <CanvasControls />
-            <Legend hasGoals={goals.goals.size > 0} />
+            <Legend
+              hasGoals={goals.goals.size > 0}
+              hasSelection={selected !== null}
+            />
             <FitOnLayout signature={layoutSignature} />
           </ReactFlow>
           </ReactFlowProvider>
@@ -523,10 +600,21 @@ export function RoadmapGraphView({
  * and one word each. The goal row appears only once goals exist, because a
  * legend entry for something not on screen defines nothing.
  */
-function Legend({ hasGoals }: { hasGoals: boolean }) {
-  const entries = [
-    { glyph: GLYPH.blocked, label: "blocked", tone: "text-destructive" },
-    { glyph: GLYPH.inProgress, label: "in flight", tone: "text-muted-foreground" },
+function Legend({
+  hasGoals,
+  hasSelection,
+}: {
+  hasGoals: boolean
+  hasSelection: boolean
+}) {
+  const marks = [
+    { glyph: GLYPH.blocked, label: "stuck", tone: "text-destructive" },
+    {
+      glyph: GLYPH.inaccessible,
+      label: "not yet reachable",
+      tone: "text-muted-foreground/50",
+    },
+    { glyph: GLYPH.inProgress, label: "in flight", tone: "text-foreground" },
     { glyph: GLYPH.shipped, label: "shipped", tone: "text-muted-foreground" },
     ...(hasGoals
       ? [{ glyph: GLYPH.goal, label: "goal", tone: "text-primary" }]
@@ -535,19 +623,39 @@ function Legend({ hasGoals }: { hasGoals: boolean }) {
 
   return (
     <Panel className="m-3!" position="bottom-right">
-      <ul className="flex items-center gap-2.5 rounded-md border border-border bg-background/90 px-2 py-1 backdrop-blur">
-        {entries.map((entry) => (
-          <li
-            key={entry.label}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground"
-          >
-            <span aria-hidden className={entry.tone}>
-              {entry.glyph}
-            </span>
-            {entry.label}
-          </li>
-        ))}
-      </ul>
+      <div className="flex flex-col gap-1 rounded-md border border-border bg-background/90 px-2 py-1 backdrop-blur">
+        <ul className="flex items-center gap-2.5">
+          {marks.map((mark) => (
+            <li
+              key={mark.label}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground"
+            >
+              <span aria-hidden className={mark.tone}>
+                {mark.glyph}
+              </span>
+              {mark.label}
+            </li>
+          ))}
+        </ul>
+        {/* Only while a selection exists: these two colours mean nothing on a
+            canvas with nothing selected. */}
+        {hasSelection ? (
+          <ul className="flex items-center gap-2.5 border-t border-border pt-1">
+            <li className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span aria-hidden className="text-chart-1">
+                &#9473;
+              </span>
+              blocks it
+            </li>
+            <li className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span aria-hidden className="text-chart-5">
+                &#9473;
+              </span>
+              waits on it
+            </li>
+          </ul>
+        ) : null}
+      </div>
     </Panel>
   )
 }
@@ -618,21 +726,32 @@ function EdgeHandles() {
 
 function StoryFlowNode({ id, data }: { id: string; data: StoryNodeData }) {
   const actions = useContext(GoalActionsContext)
-  const glyph = statusGlyph(data.status, data.blocked)
+  const glyph = statusGlyph(data)
   return (
     <div
       className={cn(
         "group flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
         // Border precedence, strongest first: stuck ON the way to a goal is the
         // thing to look at, then merely stuck, then merely on the way.
-        data.pathBlocker
+        // Red is reserved for a line that has actually stalled. Work that is
+        // merely far downstream of a stall is INACCESSIBLE, not blocked, and
+        // recedes instead of shouting.
+        data.pathBlocker && data.frontier
           ? "border-destructive ring-1 ring-destructive/40"
-          : data.blocked
-            ? "border-destructive/40"
+          : data.frontier
+            ? "border-destructive/50"
             : data.onPath
               ? "border-primary/60"
-              : "border-border",
-        data.onChain && !data.selected && !data.onPath && "border-primary/50",
+              : data.blocked
+                ? "border-border/50 saturate-50"
+                : "border-border",
+        data.direction === "upstream" && "border-chart-1",
+        data.direction === "downstream" && "border-chart-5",
+        data.onChain &&
+          !data.selected &&
+          !data.onPath &&
+          !data.direction &&
+          "border-primary/50",
         data.selected && "border-primary ring-1 ring-primary",
         // Two strengths of receding: a transient selection pushes everything
         // else right back, pinned goals only step the rest aside.
@@ -646,7 +765,13 @@ function StoryFlowNode({ id, data }: { id: string; data: StoryNodeData }) {
             aria-hidden
             className={cn(
               "shrink-0 text-[10px] leading-none",
-              data.blocked ? "text-destructive" : "text-muted-foreground",
+              data.frontier
+                ? "text-destructive"
+                : data.blocked
+                  ? "text-muted-foreground/50"
+                  : "text-muted-foreground",
+              // Motion tied to a real state: this work is happening right now.
+              data.live && "animate-pulse text-foreground",
             )}
           >
             {glyph}
@@ -698,14 +823,18 @@ function EpicRollupNode({ data }: { data: EpicNodeData }) {
     <div
       className={cn(
         "flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
-        data.pathBlockedCount > 0
+        data.pathBlockedCount > 0 && data.frontierCount > 0
           ? "border-destructive ring-1 ring-destructive/40"
-          : data.blockedCount > 0
-            ? "border-destructive/40"
+          : data.frontierCount > 0
+            ? "border-destructive/50"
             : data.onPath
               ? "border-primary/60"
-              : "border-border",
-        data.onChain && !data.onPath && "border-primary/50",
+              : data.blockedCount > 0
+                ? "border-border/50 saturate-50"
+                : "border-border",
+        data.direction === "upstream" && "border-chart-1",
+        data.direction === "downstream" && "border-chart-5",
+        data.onChain && !data.onPath && !data.direction && "border-primary/50",
         data.dimmed ? "opacity-20" : data.aside && "opacity-60",
       )}
     >
@@ -732,10 +861,16 @@ function EpicRollupNode({ data }: { data: EpicNodeData }) {
       <p className="truncate text-xs text-muted-foreground">{data.title}</p>
       <p className="text-[10px] text-muted-foreground">
         {data.total} {data.total === 1 ? "story" : "stories"}
-        {data.blockedCount > 0 ? (
+        {data.liveCount > 0 ? (
+          <span className="text-foreground">
+            {" · "}
+            {data.liveCount} in flight
+          </span>
+        ) : null}
+        {data.frontierCount > 0 ? (
           <span className="text-destructive/80">
             {" · "}
-            {data.blockedCount} blocked
+            {data.frontierCount} stuck
           </span>
         ) : null}
       </p>

@@ -27,20 +27,28 @@ function place(stories: RoadmapGraphStory[], expanded: string[]) {
 }
 
 describe("swimlane geometry", () => {
-  it("gives each lane one column, one card wide", () => {
+  it("lays a lane out as a tech tree: sequence down, siblings across", () => {
     const { placement } = place(
-      [story("A1"), story("A2"), story("A3")],
+      [
+        story("A1"),
+        story("A2", { deps: ["A1"] }),
+        story("A3", { deps: ["A1"] }),
+        story("A4", { deps: ["A2"] }),
+      ],
       ["a"],
     )
-    const positions = ["A1", "A2", "A3"].map((id) => placement.stories.get(id)!)
+    const at = (id: string) => placement.stories.get(id)!
 
-    // One column: every story in the lane shares an x, and they stack down.
-    expect(new Set(positions.map((at) => at.x)).size).toBe(1)
-    expect(positions[0]!.y).toBeLessThan(positions[1]!.y)
-    expect(positions[1]!.y).toBeLessThan(positions[2]!.y)
-    expect(placement.epics.get("a")?.width).toBeLessThanOrEqual(
-      STORY_WIDTH + 24,
-    )
+    // A2 and A3 both unlock from A1, so they sit side by side one row down;
+    // A4 unlocks from A2 and sits below that. This is what replaced the
+    // single-file stack that forced internal deps into looping detours.
+    expect(at("A2").y).toBeGreaterThan(at("A1").y)
+    expect(at("A3").y).toBe(at("A2").y)
+    expect(at("A3").x).not.toBe(at("A2").x)
+    expect(at("A4").y).toBeGreaterThan(at("A2").y)
+
+    // The container grows in both directions to hold it.
+    expect(placement.epics.get("a")!.width).toBeGreaterThan(STORY_WIDTH)
   })
 
   it("stacks lanes that tie at one depth instead of marching right", () => {
@@ -133,17 +141,38 @@ describe("edge routing", () => {
     expect(edge?.targetHandle).toBe(HANDLE.top)
   })
 
-  it("bows a within-lane edge outside the column rather than through cards", () => {
-    // A1 gates A3, and A2 sits between them: a straight vertical line would be
-    // drawn through A2's card.
+  it("leaves sideways when a within-lane run would clip the cards between", () => {
+    // A1 gates both A2 and A3, which sit side by side. A3 is not in A1's
+    // column, so a straight drop would cut across A2.
     const edges = routed(
       [story("A1"), story("A2", { deps: ["A1"] }), story("A3", { deps: ["A1"] })],
       ["a"],
     )
-    const edge = edges.get("A1->A3")
 
-    expect(edge?.sourceHandle).toBe(HANDLE.right)
-    expect(edge?.targetHandle).toBe(HANDLE.rightIn)
+    expect(edges.get("A1->A2")?.sourceHandle).toBe(HANDLE.bottom)
+    expect(edges.get("A1->A3")?.sourceHandle).toBe(HANDLE.right)
+    // Either way it enters an INPUT port. That is the convention.
+    expect(edges.get("A1->A3")?.targetHandle).toBe(HANDLE.top)
+  })
+
+  it("never violates the port convention, on any edge", () => {
+    const edges = routed(
+      [
+        story("A1", { epicId: "a" }),
+        story("A2", { epicId: "a", deps: ["A1"] }),
+        story("A3", { epicId: "a", deps: ["A1"] }),
+        story("B1", { epicId: "b", deps: ["A2"] }),
+        story("B2", { epicId: "b", deps: ["A3", "B1"] }),
+      ],
+      ["a", "b"],
+    )
+
+    // Inputs enter from the left or the top, outputs leave from the right or
+    // the bottom — everywhere, so sequence reads one way across the canvas.
+    for (const edge of edges.values()) {
+      expect([HANDLE.right, HANDLE.bottom]).toContain(edge.sourceHandle)
+      expect([HANDLE.left, HANDLE.top]).toContain(edge.targetHandle)
+    }
   })
 
   it("gives parallel edges crossing one seam their own lane in the gutter", () => {
@@ -168,7 +197,7 @@ describe("edge routing", () => {
     expect(new Set(offsets).size).toBe(3)
   })
 
-  it("keeps an aggregated edge's label and count when a lane is collapsed", () => {
+  it("hands a collapsed lane's aggregation count to the custom edge", () => {
     const edges = routed(
       [
         story("A1", { epicId: "a" }),
@@ -177,8 +206,18 @@ describe("edge routing", () => {
       ],
       ["b"],
     )
+    const edge = edges.get("a->B1")
 
+    // Cross-lane links render through their own component, which draws the
+    // count as a chip ON the line rather than in React Flow's label slot.
     expect(edges.size).toBe(1)
-    expect(edges.get("a->B1")?.label).toBe("×2")
+    expect(edge?.type).toBe("cross-lane")
+    expect((edge?.data as { count: number }).count).toBe(2)
+  })
+
+  it("keeps within-lane edges on the quiet built-in renderer", () => {
+    const edges = routed([story("A1"), story("A2", { deps: ["A1"] })], ["a"])
+
+    expect(edges.get("A1->A2")?.type).toBe("smoothstep")
   })
 })

@@ -464,3 +464,66 @@ describe("goal paths", () => {
     ])
   })
 })
+
+describe("frontier vs merely unreachable", () => {
+  it("marks the place the line stalls, not everything behind it", () => {
+    const graph = buildRoadmapGraph([
+      story("LIVE", { status: "in-progress" }),
+      story("NEXT", { deps: ["LIVE"] }),
+      story("AFTER", { deps: ["NEXT"] }),
+      story("LATER", { deps: ["AFTER"] }),
+    ])
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+
+    // All three are blocked in the old sense, which is why red stopped meaning
+    // anything. Only NEXT is where the line actually stalls: the thing it
+    // waits on is live work. AFTER and LATER are downstream of a stall — far
+    // future, not stuck.
+    for (const id of ["NEXT", "AFTER", "LATER"]) {
+      expect(byId.get(id)?.isBlocked).toBe(true)
+    }
+    expect(byId.get("NEXT")?.isFrontier).toBe(true)
+    expect(byId.get("AFTER")?.isFrontier).toBe(false)
+    expect(byId.get("LATER")?.isFrontier).toBe(false)
+  })
+
+  it("leaves work with everything shipped behind it neither blocked nor stalled", () => {
+    const graph = buildRoadmapGraph([
+      story("DONE", { status: "shipped" }),
+      story("READY", { deps: ["DONE"] }),
+    ])
+    const ready = graph.nodes.find((node) => node.id === "READY")
+
+    expect(ready?.isBlocked).toBe(false)
+    expect(ready?.isFrontier).toBe(false)
+  })
+
+  it("needs every unshipped blocker to be live before it counts as the stall", () => {
+    const graph = buildRoadmapGraph([
+      story("LIVE", { status: "in-progress" }),
+      story("STALLED", { deps: ["LIVE"] }),
+      // Waits on one thing that is live and one that is itself stalled, so the
+      // line stalls further back, not here.
+      story("BOTH", { deps: ["LIVE", "STALLED"] }),
+    ])
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+
+    expect(byId.get("STALLED")?.isFrontier).toBe(true)
+    expect(byId.get("BOTH")?.isFrontier).toBe(false)
+  })
+
+  it("counts a lane's stalls separately from everything it is waiting on", () => {
+    const canvas = buildRoadmapCanvas(
+      buildRoadmapGraph([
+        story("LIVE", { epicId: "a", status: "in-progress" }),
+        story("NEXT", { epicId: "a", deps: ["LIVE"] }),
+        story("AFTER", { epicId: "a", deps: ["NEXT"] }),
+      ]),
+      { expandedEpics: new Set() },
+    )
+    const lane = canvas.epics.find((epic) => epic.id === "a")
+
+    expect(lane?.blockedCount).toBe(2)
+    expect(lane?.frontierCount).toBe(1)
+  })
+})

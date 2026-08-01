@@ -51,6 +51,17 @@ export interface RoadmapGraphNode {
   /** True when something upstream is not shipped. */
   isBlocked: boolean
   /**
+   * True when this is where the line actually stalls: blocked, but everything
+   * it waits on is itself unblocked and therefore live work.
+   *
+   * A story blocked by something that is ITSELF blocked is not the stall, it is
+   * downstream of one — far future rather than next up. Separating the two is
+   * what keeps red meaning "this is stuck" instead of "this is distant"; with
+   * dozens of derived-blocked stories, marking them all alike made the colour
+   * say nothing.
+   */
+  isFrontier: boolean
+  /**
    * Blockers that exist in the roadmap but are not on the canvas, because a
    * collapse hid them. The canvas shows this as a count on the node: a
    * dependency the reader cannot see is worse than one they can, so the graph
@@ -187,8 +198,21 @@ export function buildRoadmapGraph(
       // not from the story's own authored status, so a story nobody remembered
       // to mark blocked still reads as blocked.
       isBlocked: upstream.some((id) => byId.get(id)?.status !== "shipped"),
+      // Filled in below: it needs every node's isBlocked to already exist.
+      isFrontier: false,
     }
   })
+
+  // Second pass, because the frontier is defined against the neighbours' state
+  // rather than the node's own.
+  const blockedById = new Map(nodes.map((node) => [node.id, node.isBlocked]))
+  const statusById = new Map(nodes.map((node) => [node.id, node.status]))
+  for (const node of nodes) {
+    if (!node.isBlocked) continue
+    node.isFrontier = node.blockedBy
+      .filter((id) => statusById.get(id) !== "shipped")
+      .every((id) => blockedById.get(id) === false)
+  }
 
   const edges: RoadmapGraphEdge[] = []
   for (const node of nodes) {
@@ -517,10 +541,14 @@ export interface RoadmapCanvasEpic {
   depth: number
   /** Position within that layer, top to bottom. */
   order: number
-  /** How many stories the open column holds. One card wide, always. */
+  /** Extent of the lane's internal tech tree, in story cells. */
   rows: number
+  columns: number
   /** Stories here whose blockers have not all shipped. */
   blockedCount: number
+  /** Stories here that are where a line stalls, rather than merely downstream
+   *  of a stall. This is what the lane's colour is allowed to react to. */
+  frontierCount: number
 }
 
 export interface RoadmapCanvasStory {
@@ -529,10 +557,14 @@ export interface RoadmapCanvasStory {
   status: StoryStatus
   epicId: string
   isBlocked: boolean
+  /** Blocked AND the place the line stalls — see RoadmapGraphNode.isFrontier. */
+  isFrontier: boolean
   hiddenBlockers: number
   hiddenBlocked: number
-  /** Row within the parent epic's column, top to bottom. */
+  /** Internal dependency depth: sequence inside a lane runs top to bottom. */
   row: number
+  /** Position among the stories sharing that depth, which sit side by side. */
+  column: number
 }
 
 export interface RoadmapCanvasEdge {
@@ -588,11 +620,14 @@ export function buildRoadmapCanvas(
     const own = members.get(epic.id) ?? []
     const expanded = options.expandedEpics.has(epic.id)
     let rows = 1
+    let columns = 1
 
     if (expanded) {
-      const order = internalOrder(own)
-      rows = Math.max(1, own.length)
+      const cells = internalTree(own)
+      rows = Math.max(1, ...[...cells.values()].map((cell) => cell.row + 1))
+      columns = Math.max(1, ...[...cells.values()].map((cell) => cell.column + 1))
       for (const node of own) {
+        const cell = cells.get(node.id) ?? { row: 0, column: 0 }
         presentation.set(node.id, node.id)
         stories.push({
           id: node.id,
@@ -600,9 +635,11 @@ export function buildRoadmapCanvas(
           status: node.status,
           epicId: node.epicId,
           isBlocked: node.isBlocked,
+          isFrontier: node.isFrontier,
           hiddenBlockers: node.hiddenBlockers,
           hiddenBlocked: node.hiddenBlocked,
-          row: order.get(node.id) ?? 0,
+          row: cell.row,
+          column: cell.column,
         })
       }
     } else {
@@ -619,7 +656,9 @@ export function buildRoadmapCanvas(
       depth: epicDepth.get(epic.id) ?? 0,
       order: epicOrder.get(epic.id) ?? 0,
       rows,
+      columns,
       blockedCount: own.filter((node) => node.isBlocked).length,
+      frontierCount: own.filter((node) => node.isFrontier).length,
     })
   }
 
@@ -671,19 +710,35 @@ function aggregateEdges(
 }
 
 /**
- * Where each story sits inside its own lane's column.
+ * The tech tree inside one lane.
  *
- * A lane is one card wide and stories stack down it, so this is a single
- * ordering rather than a grid: dependencies WITHIN the lane run top to bottom,
- * and stories at the same internal depth keep the global barycenter order the
- * base layout already worked out, so opening a lane doesn't scramble what was
- * on screen.
+ * Internal sequence runs DOWN: a story sits one row below the deepest thing it
+ * depends on inside its own lane, and stories that depend on nothing new sit
+ * side by side across that row. So a lane reads the way a tech tree reads —
+ * what unlocks what — and a dependency between two stories in the same lane
+ * becomes a short hop from one card's bottom to the next card's top instead of
+ * a long loop around the outside of a single-file stack.
  *
- * The lane is ordered on its OWN internal depth rather than inheriting a rank
- * from work in some other lane — cross-lane sequencing is carried by the
- * arrows between columns, which is the whole point of separating the two axes.
+ * Columns within a row are ordered by barycenter over the row above, so an
+ * unlock sits under the thing that unlocked it and the internal edges stop
+ * crossing each other.
+ *
+ * The lane is laid out on its OWN internal dependencies only; cross-lane
+ * sequencing is carried by the arrows between containers, which is the whole
+ * point of separating the two axes.
+ *
+ * A depth with many stories WRAPS rather than growing one enormous row: a lane
+ * holding fifteen independent stories would otherwise be a single row nearly
+ * four thousand pixels wide, which is the horizontality this layout exists to
+ * kill. Wrapped siblings stay inside their own depth band, so sequence still
+ * reads downward. Measured on the live roadmap, fully expanded: unwrapped is
+ * 12128px across, four columns 9104, three columns 8096 — hence three.
  */
-function internalOrder(own: readonly RoadmapGraphNode[]): Map<string, number> {
+const MAX_LANE_COLUMNS = 3
+
+function internalTree(
+  own: readonly RoadmapGraphNode[],
+): Map<string, { row: number; column: number }> {
   const ids = new Set(own.map((node) => node.id))
   const localBlockers = new Map(
     own.map((node) => [node.id, node.blockedBy.filter((id) => ids.has(id))]),
@@ -701,17 +756,46 @@ function internalOrder(own: readonly RoadmapGraphNode[]): Map<string, number> {
     ids,
   )
 
-  const order = new Map<string, number>()
-  own
-    .slice()
-    .sort(
-      (left, right) =>
-        (depth.get(left.id) ?? 0) - (depth.get(right.id) ?? 0) ||
-        left.lane - right.lane ||
-        left.id.localeCompare(right.id),
-    )
-    .forEach((node, row) => order.set(node.id, row))
-  return order
+  const byRow = new Map<number, RoadmapGraphNode[]>()
+  for (const node of own) {
+    const row = depth.get(node.id) ?? 0
+    const bucket = byRow.get(row)
+    if (bucket) bucket.push(node)
+    else byRow.set(row, [node])
+  }
+
+  const cells = new Map<string, { row: number; column: number }>()
+  let rowCursor = 0
+  for (const depthRow of [...byRow.keys()].sort((a, b) => a - b)) {
+    const bucket = byRow.get(depthRow) ?? []
+    const centre = (node: RoadmapGraphNode): number | null => {
+      const placed = (localBlockers.get(node.id) ?? [])
+        .map((id) => cells.get(id)?.column)
+        .filter((column): column is number => column !== undefined)
+      if (placed.length === 0) return null
+      return placed.reduce((total, column) => total + column, 0) / placed.length
+    }
+    const centres = new Map(bucket.map((node) => [node.id, centre(node)]))
+    bucket
+      .slice()
+      .sort((left, right) => {
+        const leftCentre = centres.get(left.id) ?? null
+        const rightCentre = centres.get(right.id) ?? null
+        if (leftCentre !== null && rightCentre !== null) {
+          if (leftCentre !== rightCentre) return leftCentre - rightCentre
+        } else if (leftCentre !== null) return -1
+        else if (rightCentre !== null) return 1
+        return left.lane - right.lane || left.id.localeCompare(right.id)
+      })
+      .forEach((node, index) =>
+        cells.set(node.id, {
+          row: rowCursor + Math.floor(index / MAX_LANE_COLUMNS),
+          column: index % MAX_LANE_COLUMNS,
+        }),
+      )
+    rowCursor += Math.ceil(bucket.length / MAX_LANE_COLUMNS)
+  }
+  return cells
 }
 
 /**
