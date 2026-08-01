@@ -5,6 +5,7 @@ import type { SigilAgentConfig } from "@workspace/runtime-env/config"
 import {
   findModelPreset,
   readBoundModelFromAttributes,
+  readRequestOptionsFromAttributes,
   readResolveContextAttributes,
   resolveSessionModel,
   resolveSessionModelFromAuth,
@@ -17,7 +18,20 @@ const AGENT: SigilAgentConfig = {
       id: "codex",
       label: "Codex subscription",
       kind: "codex",
-      models: [{ id: "luna", model: "gpt-5.6-luna", label: "GPT-5.6 Luna" }],
+      models: [
+        {
+          id: "luna",
+          model: "gpt-5.6-luna",
+          label: "GPT-5.6 Luna",
+          reasoning: {
+            levels: ["off", "low", "medium", "high", "xhigh", "max"],
+            default: "medium",
+          },
+          fastMode: true,
+        },
+        // Sol declares neither — the AC2/AC5 "no declaration, no control" case.
+        { id: "sol", model: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+      ],
     },
     {
       id: "deepseek",
@@ -238,5 +252,105 @@ describe("per-session model resolution", () => {
 
     expect(after?.presetId).toBe(before?.presetId)
     expect(after?.modelId).toBe("gpt-5.6-luna")
+  })
+})
+
+describe("MDL.4 reasoning level and fast mode", () => {
+  it("reads request options from the same verified attribute the model rides in", () => {
+    const attributes = readResolveContextAttributes(
+      authContext({
+        ...LUNA_BINDING,
+        requestOptions: { reasoningLevel: "high", fastMode: true },
+      }),
+    )
+    expect(readRequestOptionsFromAttributes(attributes)).toEqual({
+      reasoningLevel: "high",
+      fastMode: true,
+    })
+  })
+
+  it("treats an absent or malformed requestOptions block as ordinary silence", () => {
+    expect(readRequestOptionsFromAttributes(undefined)).toBeUndefined()
+    expect(
+      readRequestOptionsFromAttributes({
+        sigilExecutionBinding: JSON.stringify(LUNA_BINDING),
+      }),
+    ).toBeUndefined()
+    expect(
+      readRequestOptionsFromAttributes({
+        sigilExecutionBinding: JSON.stringify({
+          ...LUNA_BINDING,
+          requestOptions: { reasoningLevel: 5, fastMode: "yes" },
+        }),
+      }),
+    ).toBeUndefined()
+  })
+
+  // The red-proven case: the option must reach the actual step.started model
+  // resolution, not merely be readable off the attribute. This is what
+  // agent.ts forwards into Eve's `modelOptions.providerOptions`.
+  it("reaches modelOptions.providerOptions when the preset declares support", () => {
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(
+        authContext({
+          ...LUNA_BINDING,
+          requestOptions: { reasoningLevel: "high", fastMode: true },
+        }),
+      ),
+    )
+    expect(selection?.modelOptions).toEqual({
+      providerOptions: { openai: { reasoningEffort: "high", serviceTier: "flex" } },
+    })
+    expect(selection?.resolvedReasoningLevel).toBe("high")
+    expect(selection?.resolvedFastMode).toBe(true)
+  })
+
+  it("clamps an undeclared level to the preset's own default rather than dropping it", () => {
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(
+        authContext({
+          ...LUNA_BINDING,
+          requestOptions: { reasoningLevel: "ultra-nonexistent" },
+        }),
+      ),
+    )
+    expect(selection?.resolvedReasoningLevel).toBe("medium")
+    expect(selection?.modelOptions).toEqual({
+      providerOptions: { openai: { reasoningEffort: "medium" } },
+    })
+  })
+
+  it("drops fast mode when the preset does not declare support (AC3)", () => {
+    const solBinding = {
+      applicationThreadId: "thread-3",
+      personaId: "eve",
+      model: { presetId: "codex/sol", provider: "codex", modelId: "gpt-5.6-sol" },
+      requestOptions: { fastMode: true, reasoningLevel: "high" },
+    }
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(authContext(solBinding)),
+    )
+    // Sol declares neither reasoning nor fastMode — both must be absent from
+    // the applied result and from receipts, not silently forwarded anyway.
+    expect(selection?.resolvedReasoningLevel).toBeUndefined()
+    expect(selection?.resolvedFastMode).toBeUndefined()
+    expect(selection?.modelOptions).toBeUndefined()
+  })
+
+  it("still applies the preset's declared default reasoning level when the session made no request", () => {
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(authContext(LUNA_BINDING)),
+    )
+    // No requested level → the preset's declared default still applies
+    // (AC5: defaults come from the fixture, never a hardcoded app value).
+    expect(selection?.resolvedReasoningLevel).toBe("medium")
+    expect(selection?.resolvedFastMode).toBe(false)
+    expect(selection?.modelOptions).toEqual({
+      providerOptions: { openai: { reasoningEffort: "medium" } },
+    })
   })
 })

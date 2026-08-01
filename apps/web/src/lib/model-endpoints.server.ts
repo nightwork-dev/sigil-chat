@@ -20,6 +20,7 @@ import {
   type ModelEndpointInventory,
   type ModelEndpointProbeInput,
   type ModelEndpointProbeResult,
+  type ModelEndpointReasoningConfig,
   type ModelEndpointRecord,
   type ModelProviderRecord,
 } from "./model-endpoints"
@@ -142,8 +143,25 @@ function projectModel(candidate: unknown): ModelEndpointRecord[] {
           ? entry.contextWindowTokens
           : 0,
       isDeploymentDefault: entry.isDeploymentDefault === true,
+      ...(projectReasoning(entry.reasoning)
+        ? { reasoning: projectReasoning(entry.reasoning) }
+        : {}),
+      fastMode: entry.fastMode === true,
     },
   ]
+}
+
+function projectReasoning(
+  candidate: unknown,
+): ModelEndpointReasoningConfig | undefined {
+  if (typeof candidate !== "object" || candidate === null) return undefined
+  const entry = candidate as Record<string, unknown>
+  const levels = Array.isArray(entry.levels)
+    ? entry.levels.filter((level): level is string => typeof level === "string")
+    : []
+  const defaultLevel = text(entry.default)
+  if (levels.length === 0 || !defaultLevel) return undefined
+  return { levels, default: defaultLevel }
 }
 
 export function projectProbeResult(payload: unknown): ModelEndpointProbeResult {

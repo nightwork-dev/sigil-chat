@@ -196,6 +196,7 @@ describe("model endpoint inventory", () => {
             enabled: true,
             contextWindowTokens: 200_000,
             isDeploymentDefault: true,
+            fastMode: false,
           },
         ],
       },

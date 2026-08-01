@@ -26,9 +26,27 @@ import {
  * round-trip test in session-binding.test.ts. If a future @zigil/agent version
  * is adopted for verification, this field has to move upstream with it.
  */
+/**
+ * Mutable per-turn request parameters (MDL.4): reasoning level and fast mode.
+ *
+ * Deliberately NOT part of `model` above. `model` is session IDENTITY,
+ * chosen once and immutable for the thread's life; `requestOptions` is
+ * re-read from the live thread record every time this proof is minted (see
+ * apps/web/src/lib/agent-session-binding.ts — "minted for every turn"), so a
+ * change applies from the very next turn with no fork and no new signed
+ * identity. Both fields are optional and independently absent: a thread with
+ * no reasoning-capable model simply never carries this block.
+ */
+export interface SigilRequestOptions {
+  reasoningLevel?: string;
+  fastMode?: boolean;
+}
+
 export interface SigilSessionBindingExtras {
   /** Model the thread is bound to; absent means the deployment default. */
   model?: BoundAgentModel;
+  /** See {@link SigilRequestOptions}. */
+  requestOptions?: SigilRequestOptions;
 }
 
 export function issueAgentSessionBinding(
@@ -92,9 +110,21 @@ function isPayload(
     isIdentifierList(value.additionalContextScopeIds) &&
     ((value as SigilSessionBindingExtras).model === undefined ||
       isBoundAgentModel((value as SigilSessionBindingExtras).model)) &&
+    isRequestOptions((value as SigilSessionBindingExtras).requestOptions) &&
     typeof value.expiresAt === "number" &&
     Number.isSafeInteger(value.expiresAt) &&
     value.expiresAt > now
+  );
+}
+
+function isRequestOptions(value: unknown): value is SigilRequestOptions | undefined {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  const { reasoningLevel, fastMode } = value as Record<string, unknown>;
+  return (
+    (reasoningLevel === undefined ||
+      (typeof reasoningLevel === "string" && reasoningLevel.trim().length > 0)) &&
+    (fastMode === undefined || typeof fastMode === "boolean")
   );
 }
 

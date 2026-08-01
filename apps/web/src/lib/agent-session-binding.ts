@@ -69,6 +69,14 @@ const issueAgentSessionBindingFn = createServerFn({ method: "POST" })
           // The model travels inside the SIGNED proof, reconstructed from the
           // immutable thread binding — never read from browser input.
           ...(binding.model ? { model: binding.model } : {}),
+          // MDL.4: read fresh from the live thread record on every call —
+          // this is what makes a reasoning/fast-mode change apply from the
+          // very next turn, since this whole function already re-mints the
+          // proof "for every turn" (see the comment on
+          // getAgentSessionBindingProof below).
+          ...(binding.requestOptions
+            ? { requestOptions: binding.requestOptions }
+            : {}),
           ...(binding.eveSessionId
             ? { runtimeSessionId: binding.eveSessionId }
             : {}),
@@ -153,6 +161,9 @@ const issueAgentParticipantSessionBindingFn = createServerFn({ method: "POST" })
             initialPerspective: target.initialPerspective,
             additionalContextScopeIds: target.additionalContextScopeIds,
             ...(target.model ? { model: target.model } : {}),
+            ...(target.requestOptions
+              ? { requestOptions: target.requestOptions }
+              : {}),
             ...(target.eveSessionId ? { runtimeSessionId: target.eveSessionId } : {}),
             subject: session.user.id,
             expiresAt,

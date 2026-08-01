@@ -25,6 +25,12 @@ export interface ModelEndpointCredentialStatus {
   present: boolean
 }
 
+/** MDL.4: ordered reasoning-effort levels this model accepts, weakest first. */
+export interface ModelEndpointReasoningConfig {
+  levels: readonly string[]
+  default: string
+}
+
 export interface ModelEndpointRecord {
   /** `<providerId>/<modelId>`, or the reserved deployment-default id. */
   id: string
@@ -36,6 +42,10 @@ export interface ModelEndpointRecord {
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from the fixture's agent.model. */
   isDeploymentDefault: boolean
+  /** Absent means this model shows no reasoning control (MDL.4 AC2/AC5). */
+  reasoning?: ModelEndpointReasoningConfig
+  /** False means no fast-mode control for this model (MDL.4 AC3). */
+  fastMode: boolean
 }
 
 /**

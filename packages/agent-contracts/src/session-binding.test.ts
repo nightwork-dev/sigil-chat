@@ -135,6 +135,33 @@ describe("agent session binding attestation", () => {
     expect(readAgentSessionBinding(proof, 100, secret)).toBeUndefined();
   });
 
+  it("round-trips MDL.4 request options alongside the immutable model binding", () => {
+    const withRequestOptions = {
+      ...binding,
+      model: { presetId: "codex/luna", provider: "codex", modelId: "gpt-5.6-luna" },
+      requestOptions: { reasoningLevel: "high", fastMode: true },
+    };
+    const proof = issueAgentSessionBinding(withRequestOptions, secret);
+    expect(readAgentSessionBinding(proof, 100, secret)).toEqual({
+      ...withRequestOptions,
+      audience: "sigil-agent-session-binding",
+      version: 2,
+    });
+  });
+
+  it("round-trips an absent requestOptions block as ordinary, not malformed", () => {
+    const proof = issueAgentSessionBinding(binding, secret);
+    expect(readAgentSessionBinding(proof, 100, secret)?.requestOptions).toBeUndefined();
+  });
+
+  it("rejects a malformed requestOptions block", () => {
+    const proof = issueAgentSessionBinding(
+      { ...binding, requestOptions: { reasoningLevel: "", fastMode: "yes" } } as never,
+      secret,
+    );
+    expect(readAgentSessionBinding(proof, 100, secret)).toBeUndefined();
+  });
+
   it("rejects tampering, the wrong secret, and expiry", () => {
     const proof = issueAgentSessionBinding(binding, secret);
     expect(readAgentSessionBinding(`${proof}x`, 100, secret)).toBeUndefined();

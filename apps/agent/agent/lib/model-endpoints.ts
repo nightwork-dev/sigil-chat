@@ -38,6 +38,7 @@ import {
   type NormalizedSigilAgentModelPreset,
   type NormalizedSigilAgentProvider,
   type SigilAgentConfig,
+  type SigilAgentModelReasoningConfig,
 } from "@workspace/runtime-env/config"
 
 import {
@@ -89,6 +90,13 @@ export interface ModelEndpointRecord {
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from `agent.model`. */
   isDeploymentDefault: boolean
+  /**
+   * MDL.4: declared, never sniffed. Absent means this model shows no
+   * reasoning control at all in the chat composer.
+   */
+  reasoning?: SigilAgentModelReasoningConfig
+  /** MDL.4: absent/false means no fast-mode control for this model. */
+  fastMode: boolean
 }
 
 /**
@@ -345,6 +353,8 @@ async function describeProvider(
       contextWindowTokens:
         model.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
       isDeploymentDefault: model.isDeploymentDefault,
+      ...(model.reasoning ? { reasoning: model.reasoning } : {}),
+      fastMode: model.fastMode,
     })),
   }
 }

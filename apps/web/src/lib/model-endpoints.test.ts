@@ -109,11 +109,50 @@ describe("provider projection", () => {
             enabled: true,
             contextWindowTokens: 65_536,
             isDeploymentDefault: false,
+            fastMode: false,
           },
         ],
       },
     ])
     expect(JSON.stringify(providers)).not.toContain("sk-live-secret")
+  })
+
+  it("projects a reasoning declaration through, and drops a malformed one (MDL.4)", () => {
+    const withReasoning = projectProviders({
+      providers: [
+        {
+          ...payload.providers[0],
+          models: [
+            {
+              ...payload.providers[0].models[0],
+              reasoning: { levels: ["off", "low", "high"], default: "low" },
+              fastMode: true,
+            },
+          ],
+        },
+      ],
+    })
+    expect(withReasoning[0]?.models[0]?.reasoning).toEqual({
+      levels: ["off", "low", "high"],
+      default: "low",
+    })
+    expect(withReasoning[0]?.models[0]?.fastMode).toBe(true)
+
+    const malformed = projectProviders({
+      providers: [
+        {
+          ...payload.providers[0],
+          models: [
+            {
+              ...payload.providers[0].models[0],
+              // Missing `default` — not a valid declaration.
+              reasoning: { levels: ["off", "low"] },
+            },
+          ],
+        },
+      ],
+    })
+    expect(malformed[0]?.models[0]?.reasoning).toBeUndefined()
   })
 
   it("drops providers the runtime could not describe", () => {

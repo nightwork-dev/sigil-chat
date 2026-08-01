@@ -52,7 +52,13 @@ import { useWorkspaceResourceScope } from "@/components/agent/workspace-attentio
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
-import { useAgentThread } from "@/lib/agent-threads"
+import {
+  useAgentThread,
+  useSetAgentThreadRequestOptions,
+  type AgentThread,
+  type AgentThreadRequestOptions,
+} from "@/lib/agent-threads"
+import { useModelEndpoints } from "@/lib/model-endpoints"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import { appendDictationDraft } from "@/lib/voice-dictation"
 import { useSpeakReplies } from "@/lib/agent-speak-replies"
@@ -355,6 +361,9 @@ export function AgentChat({
             {hideHeader ? (
               <ModelLabel bound={activeThread.data?.executionBinding?.model} />
             ) : null}
+            {hideHeader && activeThread.data ? (
+              <ReasoningControls thread={activeThread.data} />
+            ) : null}
             {/* The mode switch sits immediately before the mic it changes:
                 with it on, the same press-to-talk gesture sends instead of
                 drafting, and Eve's finished replies are spoken back. */}
@@ -446,6 +455,92 @@ function ModelLabel({ bound }: { bound?: BoundAgentModel }) {
       {name}
       {model ? ` · ${model}` : ""}
     </span>
+  )
+}
+
+/**
+ * MDL.4 — reasoning level and fast mode, seated beside the model label they
+ * describe. Renders nothing when the bound model declares neither control
+ * (AC2/AC3): a model with no `reasoning`/`fastMode` fixture declaration is
+ * indistinguishable from one this component has never heard of.
+ *
+ * Reads `thread.requestOptions` — never local state — so what is shown is
+ * always the last value the server persisted, i.e. what the NEXT turn will
+ * actually run with. `useSetAgentThreadRequestOptions`'s `onSuccess` caches
+ * the server's returned thread, so a change round-trips through the same
+ * "resolved, not optimistic" path the model label already uses.
+ */
+// Mirrors the reserved id from @workspace/runtime-env/config's
+// DEPLOYMENT_DEFAULT_PRESET_ID — not imported directly, same reasoning as
+// models-section.tsx's own local copy: that package is server-oriented and
+// this is client component code.
+const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default"
+
+function ReasoningControls({ thread }: { thread: AgentThread }) {
+  const endpoints = useModelEndpoints()
+  const setRequestOptions = useSetAgentThreadRequestOptions()
+  const presetId =
+    thread.executionBinding?.model?.presetId ?? DEPLOYMENT_DEFAULT_PRESET_ID
+  const record = endpoints.data?.providers
+    .flatMap((provider) => provider.models)
+    .find((model) => model.id === presetId)
+  if (!record || (!record.reasoning && !record.fastMode)) return null
+
+  const current = thread.requestOptions
+  function apply(next: AgentThreadRequestOptions) {
+    setRequestOptions.mutate({
+      id: thread.id,
+      requestOptions: { ...current, ...next },
+      expectedRevision: thread.revision,
+    })
+  }
+
+  return (
+    <>
+      {record.reasoning ? (
+        <Select
+          disabled={setRequestOptions.isPending}
+          onValueChange={(value) => {
+            if (value) apply({ reasoningLevel: value })
+          }}
+          value={current?.reasoningLevel ?? record.reasoning.default}
+        >
+          <SelectTrigger
+            aria-label="Reasoning level"
+            className="h-6 gap-1 rounded-full border border-border bg-muted/50 px-2 text-[11px] text-muted-foreground max-sm:h-11"
+            size="sm"
+            title="Reasoning level"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            {record.reasoning.levels.map((level) => (
+              <SelectItem key={level} value={level}>
+                {level}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+      {record.fastMode ? (
+        <button
+          aria-label="Fast mode"
+          aria-pressed={current?.fastMode === true}
+          className={cn(
+            "h-6 shrink-0 rounded-full border px-2 text-[11px] max-sm:h-11",
+            current?.fastMode === true
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              : "border-border bg-muted/50 text-muted-foreground",
+          )}
+          disabled={setRequestOptions.isPending}
+          onClick={() => apply({ fastMode: !current?.fastMode })}
+          title="Fast mode"
+          type="button"
+        >
+          Fast
+        </button>
+      ) : null}
+    </>
   )
 }
 
