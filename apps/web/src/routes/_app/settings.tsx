@@ -3,8 +3,8 @@
 //   apps/web/src/routes/__root.tsx          — HTML shell, ThemeProvider, QueryClientProvider (no visible chrome)
 //   apps/web/src/routes/_app.tsx             — default collapsible sidebar, breadcrumb bar, and theme picker
 //   apps/web/src/routes/_app/settings.tsx    — THIS FILE
-// Content: SettingsPage — Account / Security / Appearance / Agent / Models
-// as a vertical section rail INSIDE the existing app chrome (deliberately not
+// Content: SettingsPage — Account / Security / Appearance / Agent / Models /
+// Flags as a vertical section rail INSIDE the existing app chrome (deliberately not
 // the standalone @workspace/ui SettingsShell, which owns its own header/
 // viewport — nesting it here would duplicate chrome). Notifications is
 // hidden until a real notification transport exists (spec, S10.4).
@@ -23,6 +23,7 @@ const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   "appearance",
   "agent",
   "models",
+  "flags",
 ]
 
 function isSettingsSection(value: unknown): value is SettingsSection {

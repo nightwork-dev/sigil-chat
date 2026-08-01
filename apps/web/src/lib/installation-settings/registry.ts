@@ -158,6 +158,41 @@ function isDiscoveredModelList(value: unknown): value is DiscoveredModelRecord[]
  */
 export const DISCOVERED_MODELS_KEY = "models.discovered"
 
+const MAX_FEATURE_FLAG_OVERRIDES = 256
+const MAX_FEATURE_FLAG_ID_LENGTH = 128
+
+/**
+ * `{ [declaredFlagId]: boolean }`. This is the SECOND consumer promised in
+ * the file header — one key for every flag, ever, rather than a new store key
+ * per flag. Adding a flag means adding a declaration to
+ * `../feature-flags/registry.ts`; this key, the store, and the owner-gated
+ * write path do not move.
+ *
+ * Validated generically (string keys, boolean values, bounded size) rather
+ * than against the live flag catalog: that keeps this file dependency-free of
+ * ../feature-flags/registry.ts, and a stale key here is already harmless —
+ * `isFeatureFlagEnabled` in ../feature-flags.ts treats an undeclared id as
+ * default-off regardless of what a stored override map says about it.
+ */
+function isFeatureFlagOverrideMap(value: unknown): value is Record<string, boolean> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const entries = Object.entries(value)
+  return (
+    entries.length <= MAX_FEATURE_FLAG_OVERRIDES &&
+    entries.every(
+      ([key, entryValue]) =>
+        key.length > 0 &&
+        key.length <= MAX_FEATURE_FLAG_ID_LENGTH &&
+        typeof entryValue === "boolean",
+    )
+  )
+}
+
+/** The one key every declared feature flag's override lives under. */
+export const FEATURE_FLAG_OVERRIDES_KEY = "flags.overrides"
+
 export const INSTALLATION_SETTINGS_REGISTRY = {
   // The explicitly-ENABLED set of model preset ids. Anything absent from it is
   // unselectable — including a provider the fixture authors and a model a
@@ -173,6 +208,14 @@ export const INSTALLATION_SETTINGS_REGISTRY = {
     key: DISCOVERED_MODELS_KEY,
     defaultValue: [],
     isValid: isDiscoveredModelList,
+  }),
+  // Per-flag overrides away from each flag's authored default (FLAG.1). An
+  // empty map is the correct bootstrap state: every declared flag reads its
+  // own registered default until an owner overrides it.
+  [FEATURE_FLAG_OVERRIDES_KEY]: defineInstallationSetting<Record<string, boolean>>({
+    key: FEATURE_FLAG_OVERRIDES_KEY,
+    defaultValue: {},
+    isValid: isFeatureFlagOverrideMap,
   }),
 } as const satisfies Record<string, InstallationSettingDefinition<unknown>>
 

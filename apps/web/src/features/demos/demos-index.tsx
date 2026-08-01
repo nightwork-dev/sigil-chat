@@ -9,30 +9,42 @@ import {
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-const demos = [
+import type { FeatureFlagState } from "@/lib/feature-flags"
+
+interface DemoEntry {
+  to: "/demos/studio" | "/demos/review" | "/demos/evidence" | "/demos/artifacts"
+  title: string
+  description: string
+  icon: typeof NetworkIcon
+  /** Gated by this declared feature flag (FLAG.1). Absent means ungated. */
+  flagId?: string
+}
+
+const demos: readonly DemoEntry[] = [
   {
-    to: "/demos/studio" as const,
+    to: "/demos/studio",
     title: "Studio",
     description:
       "Compose typed reducer graphs live, with ambient agent commentary and annotation overlays.",
     icon: NetworkIcon,
+    flagId: "surfaces.reducerStudio",
   },
   {
-    to: "/demos/review" as const,
+    to: "/demos/review",
     title: "Review",
     description:
       "Review documents through passage annotations, decisions, and an agent sidecar.",
     icon: FileCheck2Icon,
   },
   {
-    to: "/demos/evidence" as const,
+    to: "/demos/evidence",
     title: "Evidence",
     description:
       "Search a pinned resource corpus and ask questions with exact citations.",
     icon: LibraryBigIcon,
   },
   {
-    to: "/demos/artifacts" as const,
+    to: "/demos/artifacts",
     title: "Artifacts",
     description:
       "Browse images and files produced through authenticated agent tool calls.",
@@ -40,7 +52,21 @@ const demos = [
   },
 ]
 
-export function DemosIndex() {
+export function DemosIndex({
+  flags,
+}: {
+  flags: readonly FeatureFlagState[]
+}) {
+  // A card whose flag is declared and explicitly off is hidden. A card whose
+  // flag is undeclared, or whose id didn't come back in this response, stays
+  // visible — this list only ever HIDES on a positive "off", never on a
+  // lookup that failed for an unrelated reason.
+  const visibleDemos = demos.filter((demo) => {
+    if (!demo.flagId) return true
+    const flag = flags.find((candidate) => candidate.id === demo.flagId)
+    return flag ? flag.enabled : true
+  })
+
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-10 sm:px-8">
       <header className="mb-8 max-w-2xl">
@@ -52,7 +78,7 @@ export function DemosIndex() {
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {demos.map((demo) => {
+        {visibleDemos.map((demo) => {
           const Icon = demo.icon
 
           return (

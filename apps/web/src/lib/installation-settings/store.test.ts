@@ -8,7 +8,11 @@ import { mirkBackendFactory } from "@gonk/store/sqlite"
 import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
-import { DISCOVERED_MODELS_KEY, ENABLED_MODELS_KEY } from "./registry"
+import {
+  DISCOVERED_MODELS_KEY,
+  ENABLED_MODELS_KEY,
+  FEATURE_FLAG_OVERRIDES_KEY,
+} from "./registry"
 import {
   InstallationSettingRejectedError,
   InstallationSettingsStore,
@@ -87,6 +91,54 @@ describe("InstallationSettingsStore", () => {
     expect(new InstallationSettingsStore({ kv }).get(ENABLED_MODELS_KEY)).toEqual(
       [],
     )
+  })
+
+  // FLAG.1 acceptance criterion 4: model enablement and flags demonstrably
+  // share the installation tier's storage and authorization path. Same KV,
+  // same store class, two independent keys — not a second store standing in
+  // beside this one.
+  it("round-trips both consumers through the SAME store instance", () => {
+    const kv = realKv()
+    const store = new InstallationSettingsStore({ kv })
+    expect(store.get(ENABLED_MODELS_KEY)).toEqual([])
+    expect(store.get(FEATURE_FLAG_OVERRIDES_KEY)).toEqual({})
+
+    store.set(ENABLED_MODELS_KEY, ["codex/luna"])
+    store.set(FEATURE_FLAG_OVERRIDES_KEY, { "surfaces.reducerStudio": false })
+
+    const reread = new InstallationSettingsStore({ kv })
+    expect(reread.get(ENABLED_MODELS_KEY)).toEqual(["codex/luna"])
+    expect(reread.get(FEATURE_FLAG_OVERRIDES_KEY)).toEqual({
+      "surfaces.reducerStudio": false,
+    })
+  })
+
+  it("refuses a flag override map the registry does not accept", () => {
+    const store = new InstallationSettingsStore({ kv: realKv() })
+    for (const invalid of [
+      { valid: "not a boolean" },
+      ["not", "a", "map"],
+      "flags.overrides",
+      { [`${"x".repeat(200)}`]: true },
+    ]) {
+      expect(() =>
+        store.set(
+          FEATURE_FLAG_OVERRIDES_KEY,
+          invalid as unknown as Record<string, boolean>,
+        ),
+      ).toThrow(InstallationSettingRejectedError)
+    }
+  })
+
+  // Same reasoning as the model allow-list: an enforcement seam evaluating a
+  // flag cannot throw its way out, so an unreadable override record reads as
+  // "no overrides" rather than failing the check.
+  it("reads an invalid stored flag override record as the default", () => {
+    const kv = realKv()
+    kv.set(FEATURE_FLAG_OVERRIDES_KEY, "not an object")
+    expect(
+      new InstallationSettingsStore({ kv }).get(FEATURE_FLAG_OVERRIDES_KEY),
+    ).toEqual({})
   })
 })
 
