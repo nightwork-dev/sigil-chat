@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  groupEndpointsByProvider,
   InvalidProbeRequestError,
   parseProbeInput,
   presetFixtureSnippet,
   suggestPresetId,
+  type ModelEndpointRecord,
 } from "./model-endpoints"
 import { projectEndpoints, projectProbeResult } from "./model-endpoints.server"
 
@@ -204,5 +206,93 @@ describe("fixture snippet", () => {
       "127-0-0-1-qwen3-6-27b",
     )
     expect(suggestPresetId("not a url", "")).toBe("local")
+  })
+})
+
+describe("provider grouping", () => {
+  const record = (
+    over: Partial<ModelEndpointRecord> & Pick<ModelEndpointRecord, "id">,
+  ): ModelEndpointRecord => ({
+    label: over.id,
+    provider: "openai-compatible",
+    model: over.id,
+    contextWindowTokens: 200_000,
+    isDeploymentDefault: false,
+    credential: { required: false, present: true },
+    ...over,
+  })
+
+  it("puts every model of one subscription under a single provider", () => {
+    const groups = groupEndpointsByProvider([
+      record({
+        id: "deployment-default",
+        label: "gpt-5.6-terra (Codex subscription)",
+        provider: "codex",
+        model: "gpt-5.6-terra",
+        isDeploymentDefault: true,
+        credential: { required: true, present: true },
+      }),
+      record({
+        id: "luna",
+        label: "GPT-5.6 Luna (Codex subscription)",
+        provider: "codex",
+        model: "gpt-5.6-luna",
+        credential: { required: true, present: true },
+      }),
+    ])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.kind).toBe("codex")
+    // No row can name the provider once rows disagree, so it is derived —
+    // and the per-row "(Codex subscription)" suffix stops being repeated.
+    expect(groups[0]?.label).toBe("Codex subscription")
+    expect(groups[0]?.models.map((model) => model.model)).toEqual([
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+    ])
+    expect(groups[0]?.credential).toEqual({ required: true, present: true })
+  })
+
+  it("keeps a single authored row's label as the provider name", () => {
+    const groups = groupEndpointsByProvider([
+      record({
+        id: "lmstudio-local",
+        label: "LM Studio (local)",
+        model: "qwen3.6-27b",
+        baseUrl: "http://127.0.0.1:1234/v1",
+      }),
+    ])
+
+    expect(groups[0]?.label).toBe("LM Studio (local)")
+    expect(groups[0]?.baseUrl).toBe("http://127.0.0.1:1234/v1")
+  })
+
+  it("treats one origin as one provider across differing paths", () => {
+    const groups = groupEndpointsByProvider([
+      record({ id: "a", label: "A", baseUrl: "https://api.vendor.com/v1" }),
+      record({ id: "b", label: "B", baseUrl: "https://api.vendor.com/v1/" }),
+    ])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.label).toBe("api.vendor.com")
+    expect(groups[0]?.models).toHaveLength(2)
+  })
+
+  it("keeps distinct hosts and distinct kinds apart", () => {
+    const groups = groupEndpointsByProvider([
+      record({ id: "a", baseUrl: "https://one.example/v1" }),
+      record({ id: "b", baseUrl: "https://two.example/v1" }),
+      record({ id: "c", provider: "codex" }),
+    ])
+
+    expect(groups.map((group) => group.id)).toEqual([
+      "openai-compatible|https://one.example",
+      "openai-compatible|https://two.example",
+      "codex",
+    ])
+  })
+
+  it("preserves inventory order and returns an empty list for no input", () => {
+    expect(groupEndpointsByProvider([])).toEqual([])
   })
 })

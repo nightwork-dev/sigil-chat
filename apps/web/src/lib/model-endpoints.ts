@@ -204,3 +204,86 @@ function hostOf(baseUrl: string): string {
     return "local"
   }
 }
+
+/**
+ * A provider entry with its models inside.
+ *
+ * David's ruling (2026-07-31, MDL.2 `6939f1e`): providers — not models — are
+ * the unit. The fixture still authors one row per model, so this is a
+ * PROJECTION over that data, not a schema change: rows that share a provider
+ * kind and endpoint identity are one provider, and the facts that belong to
+ * the provider rather than the model (endpoint, credential, sign-in state) are
+ * stated once here instead of repeating on every row.
+ */
+export interface ModelProviderGroup {
+  /** Stable within a render: provider kind plus endpoint origin. */
+  id: string
+  label: string
+  /** Transport kind — `codex`, `openai-compatible`, … */
+  kind: string
+  baseUrl?: string
+  /** Provider-level, because a credential authenticates an endpoint. */
+  credential: ModelEndpointCredentialStatus
+  models: readonly ModelEndpointRecord[]
+}
+
+function providerIdentity(endpoint: ModelEndpointRecord): string {
+  if (!endpoint.baseUrl) return endpoint.provider
+  // Origin, so `/v1` and `/v1/` on one host do not split into two providers.
+  try {
+    return `${endpoint.provider}|${new URL(endpoint.baseUrl).origin}`
+  } catch {
+    return `${endpoint.provider}|${endpoint.baseUrl}`
+  }
+}
+
+function providerFallbackLabel(endpoint: ModelEndpointRecord): string {
+  if (endpoint.provider === "codex") return "Codex subscription"
+  if (endpoint.baseUrl) {
+    try {
+      return new URL(endpoint.baseUrl).host
+    } catch {
+      return endpoint.baseUrl
+    }
+  }
+  return endpoint.provider
+}
+
+/**
+ * Group model rows into provider entries, preserving inventory order.
+ *
+ * The label comes from the authored rows when they agree — today one preset
+ * per hosted vendor means its label IS the provider name. When rows disagree
+ * (the Codex entry now serves both terra and luna) no single row can name the
+ * provider, so the name is derived instead. That divergence is the fixture
+ * telling us providers want their own record; see the report.
+ */
+export function groupEndpointsByProvider(
+  endpoints: readonly ModelEndpointRecord[],
+): ModelProviderGroup[] {
+  const groups = new Map<string, ModelProviderGroup>()
+  for (const endpoint of endpoints) {
+    const id = providerIdentity(endpoint)
+    const existing = groups.get(id)
+    if (!existing) {
+      groups.set(id, {
+        id,
+        label: endpoint.label,
+        kind: endpoint.provider,
+        ...(endpoint.baseUrl ? { baseUrl: endpoint.baseUrl } : {}),
+        credential: endpoint.credential,
+        models: [endpoint],
+      })
+      continue
+    }
+    groups.set(id, {
+      ...existing,
+      label:
+        existing.label === endpoint.label
+          ? existing.label
+          : providerFallbackLabel(endpoint),
+      models: [...existing.models, endpoint],
+    })
+  }
+  return [...groups.values()]
+}

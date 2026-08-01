@@ -1,18 +1,19 @@
 // Settings → Models: the endpoint management surface (MDL.2 criterion 4).
 //
-// Two jobs, in the order an operator needs them:
-//   1. What can this deployment run, and is each entry actually usable —
-//      i.e. is its credential present. Presence only: Eve holds the values,
-//      and nothing on this page has ever seen one.
-//   2. Try a local OpenAI-compatible endpoint before committing it, then
-//      show the fixture rows that make it selectable. Providers are fixture
-//      DATA (David, 2026-07-31), so "adding an endpoint" is authoring those
-//      rows — this page probes and generates them, it does not secretly
-//      write config the runtime would not reload anyway.
+// Organised by PROVIDER, not by model (David, 2026-07-31): a provider entry
+// carries the facts that belong to the endpoint — kind, address, credential —
+// once, and its models are rows inside it. Authoring a row per model made the
+// provider invisible and repeated "(Codex subscription)" on every line.
 //
-// Credential state is a sentence, not a color-coded indicator: `destructive`
-// is reserved for the one state that is genuinely broken (required and
-// absent), so it keeps meaning exactly that everywhere else in the app.
+// Inventory and selection are separate controls because they mean different
+// things. The list answers "what can this deployment run, and is it usable";
+// the single select answers "what do MY new chats use". Merging them into one
+// radio list made a row's selected state ambiguous — it read as both "this is
+// configured" and "this is chosen".
+//
+// Shape is deliberately forward-compatible: fetched catalog models append to a
+// provider's `models` array, and a per-model enable toggle sits at the end of a
+// model row. Neither needs this layout rebuilt.
 
 import { useState } from "react"
 
@@ -20,15 +21,26 @@ import { Button } from "@workspace/ui/components/button"
 import { CodeBlock } from "@workspace/ui/components/code-block"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 
 import {
+  groupEndpointsByProvider,
   presetFixtureSnippet,
   suggestPresetId,
   useModelEndpoints,
   useProbeModelEndpoint,
+  type ModelEndpointCredentialStatus,
   type ModelEndpointRecord,
+  type ModelProviderGroup,
 } from "@/lib/model-endpoints"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 
@@ -38,19 +50,16 @@ export function ModelsSection({ userId }: { userId: string }) {
   const endpoints = useModelEndpoints()
   const preferred = useUserSetting(userId, "agent.modelPresetId")
   const setPreferred = useSetUserSetting(userId, "agent.modelPresetId")
+  const providers = groupEndpointsByProvider(endpoints.data?.endpoints ?? [])
 
-  // This selection is now live: it is applied by useCreateAgentThread to every
-  // new session, resolved server-side against the fixture presets, and written
-  // into the thread's immutable `AgentThreadExecutionBinding.model`.
-  //
-  // Switching model *mid-session* is the slice after that, and this is where
-  // its UI would live. Two constraints have to be visible at the moment of
-  // choosing rather than charged silently: a provider change invalidates that
-  // session's prompt cache and may force a compaction checkpoint (David,
+  // Switching model *mid-session* is the slice after this one, and this is
+  // where its UI would live. Two constraints have to be visible at the moment
+  // of choosing rather than charged silently: a provider change invalidates
+  // that session's prompt cache and may force a compaction checkpoint (David,
   // 2026-07-31), and the spec's v1 answer is that choosing a different model
-  // from an existing conversation FORKS it into a new immutable binding
-  // rather than rebinding the live thread. The control is therefore
-  // "continue in a new session on <model>", not a silent swap.
+  // from an existing conversation FORKS it into a new immutable binding rather
+  // than rebinding the live thread. The control is therefore "continue in a new
+  // session on <model>", not a silent swap.
   function handlePreferredChange(next: string) {
     setPreferred.mutate({
       scopeKind: "user",
@@ -63,41 +72,36 @@ export function ModelsSection({ userId }: { userId: string }) {
   return (
     <div className="flex max-w-2xl flex-col gap-6 p-4">
       <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
-        <div className="flex flex-col gap-1">
-          <SectionHeader>Configured models</SectionHeader>
-          <p className="text-xs text-muted-foreground">
-            Entries come from <code className="font-mono">agent.presets</code>{" "}
-            in the application fixture. Credentials stay in the agent
-            runtime&apos;s environment — this page can see whether a variable
-            is set, never what it contains.
-          </p>
-        </div>
+        <SectionHeader>Models</SectionHeader>
 
         {endpoints.isPending ? (
-          <p className="text-xs text-muted-foreground">Loading endpoints…</p>
+          <p className="text-xs text-muted-foreground">Loading providers…</p>
         ) : endpoints.isError ? (
           <p className="text-xs text-destructive">
-            The agent runtime did not answer. Endpoint status is unavailable
+            The agent runtime did not answer. Provider status is unavailable
             until it does.
           </p>
         ) : (
-          <RadioGroup
-            aria-label="Preferred model for new sessions"
-            value={preferred.data?.value ?? DEPLOYMENT_DEFAULT_PRESET_ID}
-            onValueChange={handlePreferredChange}
-            className="flex flex-col gap-0 divide-y divide-border"
-          >
-            {endpoints.data.endpoints.map((endpoint) => (
-              <EndpointRow key={endpoint.id} endpoint={endpoint} />
-            ))}
-          </RadioGroup>
+          <>
+            <NewChatModelPicker
+              providers={providers}
+              value={preferred.data?.value ?? DEPLOYMENT_DEFAULT_PRESET_ID}
+              disabled={setPreferred.isPending}
+              onChange={handlePreferredChange}
+            />
+            <div className="divide-y divide-border">
+              {providers.map((provider) => (
+                <ProviderBlock key={provider.id} provider={provider} />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Providers come from <code className="font-mono">agent.presets</code>{" "}
+              in the application fixture. Credentials stay in the agent
+              runtime&apos;s environment — this page can see whether a variable
+              is set, never what it contains.
+            </p>
+          </>
         )}
-
-        <p className="text-xs text-muted-foreground">
-          New sessions you start run this model. It is bound when the session is
-          created and stays fixed for that conversation, so sessions already
-          open keep the model they began with.
-        </p>
       </section>
 
       <AddEndpointSection />
@@ -105,42 +109,117 @@ export function ModelsSection({ userId }: { userId: string }) {
   )
 }
 
-function EndpointRow({ endpoint }: { endpoint: ModelEndpointRecord }) {
-  const inputId = `model-preset-${endpoint.id}`
+/**
+ * One control, one meaning: which model this account's new chats are bound to.
+ * Options are grouped by provider so the same structure reads the same way in
+ * both places on the page.
+ */
+function NewChatModelPicker({
+  providers,
+  value,
+  disabled,
+  onChange,
+}: {
+  providers: readonly ModelProviderGroup[]
+  value: string
+  disabled: boolean
+  onChange: (next: string) => void
+}) {
   return (
-    <div className="flex items-start gap-2.5 py-3 first:pt-0 last:pb-0">
-      <RadioGroupItem value={endpoint.id} id={inputId} className="mt-0.5" />
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <Label
-          htmlFor={inputId}
-          className="flex flex-wrap items-baseline gap-x-2 font-normal"
-        >
-          <span className="text-xs font-medium text-foreground">
-            {endpoint.label}
-          </span>
-          {endpoint.isDeploymentDefault ? (
-            <span className="text-xs text-muted-foreground">
-              Active — resolved at agent startup
-            </span>
-          ) : null}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor="new-chat-model" className="text-xs">
+          New chats use
         </Label>
-        <p className="truncate font-mono text-xs text-muted-foreground">
-          {endpoint.model} · {endpoint.provider} ·{" "}
-          {formatContextWindow(endpoint.contextWindowTokens)}
-        </p>
-        {endpoint.baseUrl ? (
+        <Select
+          value={value}
+          onValueChange={(next) => {
+            // base-ui's Select can clear to null; there is no "no model" state
+            // here, so a clear is simply not a change.
+            if (next !== null) onChange(next)
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger id="new-chat-model" size="sm" className="w-64">
+            <SelectValue placeholder="Select a model" />
+          </SelectTrigger>
+          <SelectContent>
+            {providers.map((provider) => (
+              <SelectGroup key={provider.id}>
+                <SelectLabel>{provider.label}</SelectLabel>
+                {provider.models.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.model}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Bound when a chat is created and fixed for that conversation, so chats
+        already open keep the model they began with.
+      </p>
+    </div>
+  )
+}
+
+function ProviderBlock({ provider }: { provider: ModelProviderGroup }) {
+  return (
+    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-xs font-medium text-foreground">
+            {provider.label}
+          </span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {provider.kind}
+          </span>
+        </div>
+        {provider.baseUrl ? (
           <p className="truncate font-mono text-xs text-muted-foreground">
-            {endpoint.baseUrl}
+            {provider.baseUrl}
           </p>
         ) : null}
-        <CredentialLine endpoint={endpoint} />
+        <CredentialLine credential={provider.credential} />
+      </div>
+
+      {/* Model rows. Fetched catalog models append here; a per-model enable
+          toggle belongs at the end of each row. */}
+      <div className="flex flex-col gap-1 border-l border-border pl-3">
+        {provider.models.map((model) => (
+          <ModelRow key={model.id} model={model} />
+        ))}
       </div>
     </div>
   )
 }
 
-function CredentialLine({ endpoint }: { endpoint: ModelEndpointRecord }) {
-  const { credential } = endpoint
+function ModelRow({ model }: { model: ModelEndpointRecord }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2">
+      <span className="font-mono text-xs text-foreground">{model.model}</span>
+      <span className="text-xs text-muted-foreground">
+        {formatContextWindow(model.contextWindowTokens)}
+      </span>
+      {model.isDeploymentDefault ? (
+        // Post-binding this marker means something narrower than it used to:
+        // sessions now carry their own model, so the fixture default is what
+        // a session falls back to when it has none.
+        <span className="text-xs text-muted-foreground">
+          Fallback for chats with no model of their own
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function CredentialLine({
+  credential,
+}: {
+  credential: ModelEndpointCredentialStatus
+}) {
   if (!credential.required && !credential.envName) {
     return (
       <p className="text-xs text-muted-foreground">No credential required.</p>
@@ -189,7 +268,7 @@ function AddEndpointSection() {
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
       <div className="flex flex-col gap-1">
-        <SectionHeader>Add a local endpoint</SectionHeader>
+        <SectionHeader>Add a provider</SectionHeader>
         <p className="text-xs text-muted-foreground">
           Ollama, LM Studio, vLLM, and llama.cpp all speak the same
           OpenAI-compatible HTTP API. Probe one to confirm the agent runtime
