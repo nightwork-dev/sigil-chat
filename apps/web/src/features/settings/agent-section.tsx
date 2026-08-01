@@ -7,10 +7,22 @@
 
 import { useEffect } from "react"
 
+import { CheckIcon, CircleDashedIcon, CircleHelpIcon } from "lucide-react"
+
 import { Label } from "@workspace/ui/components/label"
 import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Switch } from "@workspace/ui/components/switch"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@workspace/ui/components/toggle-group"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 
 import { setSpeakReplies, useSpeakReplies } from "@/lib/agent-speak-replies"
 import {
@@ -22,6 +34,32 @@ import {
 } from "@/lib/agent-tool-approval"
 import { useAgentCatalog } from "@/lib/agent-catalog"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
+
+const TOOL_MODES: {
+  value: "default" | ToolApprovalMode
+  label: string
+  hint: string
+  icon: typeof CircleDashedIcon
+}[] = [
+  {
+    value: "default",
+    label: "Default",
+    hint: "follow the default consent above",
+    icon: CircleDashedIcon,
+  },
+  {
+    value: "ask",
+    label: "Ask",
+    hint: "ask before running this tool",
+    icon: CircleHelpIcon,
+  },
+  {
+    value: "always",
+    label: "Allow",
+    hint: "run this tool without asking",
+    icon: CheckIcon,
+  },
+]
 
 const OPTIONS: { value: ToolApprovalMode; label: string; description: string }[] = [
   {
@@ -174,44 +212,61 @@ export function AgentSection({ userId }: { userId: string }) {
         ) : catalog.data.tools.length === 0 ? (
           <p className="text-xs text-muted-foreground">No tools are available.</p>
         ) : (
-          <div className="divide-y divide-border">
-            {catalog.data.tools.map((tool) => (
-              <div
-                key={tool.id}
-                className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="min-w-0 pr-3">
-                  <p className="truncate text-xs font-medium text-foreground">
-                    {tool.name}
-                  </p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {tool.description}
-                  </p>
-                </div>
-                <RadioGroup
-                  aria-label={`${tool.name} approval default`}
-                  value={localOverrides[tool.id] ?? "default"}
-                  onValueChange={(value) =>
-                    handleToolChange(
-                      tool.id,
-                      value as "default" | ToolApprovalMode,
-                    )
-                  }
-                  className="flex shrink-0 gap-3"
+          <TooltipProvider delay={200}>
+            <div className="divide-y divide-border">
+              {catalog.data.tools.map((tool) => (
+                <div
+                  key={tool.id}
+                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
                 >
-                  {(["default", "ask", "always"] as const).map((mode) => (
-                    <Label
-                      key={mode}
-                      className="flex items-center gap-1.5 text-xs font-normal"
-                    >
-                      <RadioGroupItem value={mode} />
-                      {mode === "default" ? "Default" : mode === "ask" ? "Ask" : "Allow"}
-                    </Label>
-                  ))}
-                </RadioGroup>
-              </div>
-            ))}
-          </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-foreground">
+                      {tool.name || tool.id}
+                    </p>
+                    {tool.description ? (
+                      <p className="line-clamp-2 text-xs text-muted-foreground">
+                        {tool.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <ToggleGroup
+                    value={[localOverrides[tool.id] ?? "default"]}
+                    onValueChange={(group) => {
+                      // Re-clicking the active segment reports an empty group;
+                      // one mode is always in force, so ignore the deselect.
+                      const next = group[group.length - 1]
+                      if (typeof next !== "string") return
+                      handleToolChange(
+                        tool.id,
+                        next as "default" | ToolApprovalMode,
+                      )
+                    }}
+                    variant="outline"
+                    size="sm"
+                    spacing={0}
+                    className="shrink-0"
+                    aria-label={`${tool.name || tool.id} approval default`}
+                  >
+                    {TOOL_MODES.map(({ value, label, hint, icon: Icon }) => (
+                      <Tooltip key={value}>
+                        <TooltipTrigger render={<span />}>
+                          <ToggleGroupItem
+                            value={value}
+                            aria-label={`${label} — ${hint}`}
+                          >
+                            <Icon />
+                          </ToggleGroupItem>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {label} — {hint}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </ToggleGroup>
+                </div>
+              ))}
+            </div>
+          </TooltipProvider>
         )}
       </section>
     </div>
