@@ -38,12 +38,13 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
+import { ToneChip } from "@workspace/ui/components/tone-chip"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AddMenu } from "@/components/agent/add-menu"
-import { ComposerChip } from "@/components/agent/composer-chip"
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
 import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
@@ -422,13 +423,14 @@ function ApprovalChip({
       }}
       value={mode}
     >
-      <ComposerChip.Trigger
+      <ToneChip
         aria-label="Tool approval mode"
+        render={<SelectTrigger size="sm" />}
         title="Tool approval mode"
-        tone={alwaysAllow ? "warning" : "neutral"}
+        tone={alwaysAllow ? "warning" : "muted"}
       >
         <SelectValue />
-      </ComposerChip.Trigger>
+      </ToneChip>
       <SelectContent align="start">
         <SelectItem value="ask">Ask</SelectItem>
         <SelectItem value="always">Always allow</SelectItem>
@@ -496,12 +498,13 @@ function ReasoningControls({ thread }: { thread: AgentThread }) {
           }}
           value={current?.reasoningLevel ?? record.reasoning.default}
         >
-          <ComposerChip.Trigger
+          <ToneChip
             aria-label="Reasoning level"
+            render={<SelectTrigger size="sm" />}
             title="Reasoning level"
           >
             <SelectValue />
-          </ComposerChip.Trigger>
+          </ToneChip>
           <SelectContent align="start">
             {record.reasoning.levels.map((level) => (
               <SelectItem key={level} value={level}>
@@ -512,16 +515,16 @@ function ReasoningControls({ thread }: { thread: AgentThread }) {
         </Select>
       ) : null}
       {record.fastMode ? (
-        <ComposerChip.Toggle
+        <ToneChip
           aria-label="Fast mode"
           aria-pressed={current?.fastMode === true}
           disabled={setRequestOptions.isPending}
           onClick={() => apply({ fastMode: !current?.fastMode })}
           title="Fast mode"
-          tone={current?.fastMode === true ? "info" : "neutral"}
+          tone={current?.fastMode === true ? "info" : "muted"}
         >
           Fast
-        </ComposerChip.Toggle>
+        </ToneChip>
       ) : null}
     </>
   )
