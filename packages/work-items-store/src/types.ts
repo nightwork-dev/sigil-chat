@@ -95,6 +95,21 @@ export interface WorkRequestDetails {
 export type ExtractionVerdict =
   "pending" | "consumed" | "extracted" | "app-domain" | `candidate:${string}`;
 
+/**
+ * Optional owner-verification block (VQ.1): where in the app to go to check
+ * this story, and the short checklist to run once there.
+ *
+ * Optional by construction — the overwhelming majority of roadmap stories
+ * carry no block, and a hand-authored one that is malformed degrades to
+ * "absent" on read rather than taking the story out of the board. `url` is an
+ * in-app path and may carry search params (`/settings?section=models`); it is
+ * re-validated same-origin at navigation time, never trusted from the store.
+ */
+export interface StoryVerification {
+  url?: string;
+  steps: string[];
+}
+
 export interface Story {
   id: string;
   kind: WorkKind;
@@ -126,6 +141,8 @@ export interface Story {
   /** Sigil-first extraction verdict — required for UI-touching
    *  stories before verify/shipped; defaults to "pending" for UI work. */
   extraction?: ExtractionVerdict;
+  /** Owner-verification target and checklist — see {@link StoryVerification}. */
+  verify?: StoryVerification;
   authoredBy: string;
   createdAt: string;
   updatedAt: string;

@@ -51,6 +51,19 @@ export const FEATURE_FLAG_REGISTRY = {
     defaultEnabled: true,
     ownerVisible: true,
   }),
+
+  // Gates the owner verification queue overlay (VQ.1) — the third consumer of
+  // this registry, and the one that demonstrates flag-gated surface MOUNTING
+  // rather than a route guard: flag off means the overlay is not in the tree
+  // at all, for anyone. Defaults OFF because the surface is net-new: the owner
+  // turns it on here, which is the demonstration.
+  "dev.verificationQueue": defineFeatureFlag({
+    id: "dev.verificationQueue",
+    description:
+      "Mount the owner verification queue overlay — verify-status stories with deep links, check-off, and feedback.",
+    defaultEnabled: false,
+    ownerVisible: true,
+  }),
 } as const satisfies Record<string, FeatureFlagDefinition>
 
 export type FeatureFlagId = keyof typeof FEATURE_FLAG_REGISTRY

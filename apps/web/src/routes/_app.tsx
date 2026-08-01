@@ -26,6 +26,7 @@ import {
 import { AgentRailStatus } from "@/components/agent/agent-rail-status"
 import { VoiceBoundThread } from "@/components/agent/voice-bound-thread"
 import { SessionListPane } from "@/components/agent/session-list-pane"
+import { VerificationQueueOverlay } from "@/components/roadmap/verification-queue-overlay"
 import { buildAppNav } from "@/lib/app-nav"
 import { AgentPrincipalProvider } from "@/lib/agent-principal"
 import { ActiveContainerProvider } from "@/lib/active-container"
@@ -122,6 +123,10 @@ function AppLayout() {
                 <Outlet />
                 <ShellAgentHud />
                 <ShellOmnibar />
+                {/* VQ.1 — owner-only and flag-gated, both decided server-side.
+                    It renders nothing at all for anyone else, and nothing when
+                    the pile is empty. */}
+                <VerificationQueueOverlay />
               </SidebarShell>
             </AgentSurfaceProvider>
           </AppAgentSessions>

@@ -18,6 +18,7 @@ import {
   filterRequests,
   isReviewItem,
   isWorkSponsorshipDecision,
+  parseStoryVerification,
   proposeFeatureRequest,
   recordSponsorshipDecision,
   isStory,
@@ -380,6 +381,7 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
             "reviewGate",
             "deps",
             "extraction",
+            "verify",
             "assignee",
             "assigneePrincipalId",
             "reviewDecision",
@@ -490,6 +492,10 @@ export class MirkWorkItemsRepository implements WorkItemsRepository {
       if (!Array.isArray(candidate.acceptanceCriteria)) {
         candidate.acceptanceCriteria = [];
       }
+      // VQ.1: `verify:` is hand-authored YAML in a file no schema guards.
+      // Normalize before validating so a malformed block costs the story its
+      // verification target, never its place on the board.
+      candidate.verify = parseStoryVerification(candidate.verify);
       if (!isStory(candidate)) {
         // Resilience: one malformed story file must NOT take down the whole
         // board. Skip it with a loud warning; the rest of the
@@ -724,6 +730,7 @@ function recordForStory(story: Story): Record<string, unknown> {
   if (story.reviewDecision !== undefined)
     record.reviewDecision = story.reviewDecision;
   if (story.extraction !== undefined) record.extraction = story.extraction;
+  if (story.verify !== undefined) record.verify = story.verify;
   if (story.request !== undefined) record.request = story.request;
   record.authoredBy = story.authoredBy;
   record.createdAt = story.createdAt;
