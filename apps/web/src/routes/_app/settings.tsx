@@ -23,6 +23,7 @@ const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   "appearance",
   "agent",
   "models",
+  "usage",
 ]
 
 function isSettingsSection(value: unknown): value is SettingsSection {

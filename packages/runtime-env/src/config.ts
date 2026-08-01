@@ -27,12 +27,24 @@ export type SigilAgentModelProvider =
  */
 export type SigilModelCapability = "chat" | "embedding" | "voice";
 
+/**
+ * USD rate data for one model, authored per 1M tokens (the unit every vendor
+ * quotes in). Optional everywhere: MDL.3 meters tokens regardless, and only
+ * converts to a cost when both this and the metered direction are present —
+ * an unpriced model is unpriced, never guessed at.
+ */
+export interface SigilAgentModelPricing {
+  inputPerMillionTokens?: number;
+  outputPerMillionTokens?: number;
+}
+
 export interface SigilAgentModelObjectConfig {
   provider: SigilAgentModelProvider;
   model: string;
   baseUrl?: string;
   apiKeyEnv?: string;
   contextWindowTokens?: number;
+  pricing?: SigilAgentModelPricing;
 }
 
 export type SigilAgentModelConfig = string | SigilAgentModelObjectConfig;
@@ -52,6 +64,8 @@ export interface SigilAgentProviderModelConfig {
    */
   enabled?: boolean;
   contextWindowTokens?: number;
+  /** Overrides the provider's `pricing`, if any. */
+  pricing?: SigilAgentModelPricing;
 }
 
 /**
@@ -71,6 +85,8 @@ export interface SigilAgentProviderConfig {
   apiKeyEnv?: string;
   /** Default context window for this provider's models. */
   contextWindowTokens?: number;
+  /** Default rate data for this provider's models; a model's own `pricing` wins. */
+  pricing?: SigilAgentModelPricing;
   /** UNIMPLEMENTED, as per the model-level `enabled`. */
   enabled?: boolean;
   models: SigilAgentProviderModelConfig[];
@@ -82,6 +98,7 @@ export interface NormalizedSigilAgentModelConfig {
   baseUrl?: string;
   apiKeyEnv?: string;
   contextWindowTokens?: number;
+  pricing?: SigilAgentModelPricing;
   source: "bare-slug" | "object";
 }
 
@@ -172,6 +189,7 @@ export function normalizeSigilAgentModelConfig(
     ...(model.contextWindowTokens !== undefined
       ? { contextWindowTokens: model.contextWindowTokens }
       : {}),
+    ...(model.pricing !== undefined ? { pricing: model.pricing } : {}),
     source: "object",
   };
 }
@@ -226,6 +244,7 @@ export function normalizeSigilAgentProviders(
         models: provider.models.map((entry) => {
           const contextWindowTokens =
             entry.contextWindowTokens ?? provider.contextWindowTokens;
+          const pricing = entry.pricing ?? provider.pricing;
           return {
             provider: provider.kind,
             model: entry.model,
@@ -238,6 +257,7 @@ export function normalizeSigilAgentProviders(
             ...(contextWindowTokens !== undefined
               ? { contextWindowTokens }
               : {}),
+            ...(pricing !== undefined ? { pricing } : {}),
             source: "object" as const,
             id: `${provider.id}/${entry.id}`,
             label: entry.label ?? entry.model,
@@ -441,9 +461,50 @@ function requireModelConfig(
         path: [...path, "baseUrl"],
       });
     }
+    requirePricing(candidate.pricing, issues, [...path, "pricing"]);
     return;
   }
   issues.push({ message: "must be a non-empty slug without whitespace", path });
+}
+
+/**
+ * Both rates are optional independently — a model priced only on input (or
+ * only on output) is a real fixture shape, not an error — but a present rate
+ * must be a non-negative number.
+ */
+function requirePricing(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (candidate === undefined) return;
+  if (!isRecord(candidate)) {
+    issues.push({ message: "must be an object", path });
+    return;
+  }
+  const { inputPerMillionTokens, outputPerMillionTokens } = candidate;
+  if (
+    inputPerMillionTokens !== undefined &&
+    !isNonNegativeNumber(inputPerMillionTokens)
+  ) {
+    issues.push({
+      message: "must be a non-negative number",
+      path: [...path, "inputPerMillionTokens"],
+    });
+  }
+  if (
+    outputPerMillionTokens !== undefined &&
+    !isNonNegativeNumber(outputPerMillionTokens)
+  ) {
+    issues.push({
+      message: "must be a non-negative number",
+      path: [...path, "outputPerMillionTokens"],
+    });
+  }
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 /**
@@ -536,6 +597,7 @@ function requireProviders(
         path: [...entryPath, "enabled"],
       });
     }
+    requirePricing(entry.pricing, issues, [...entryPath, "pricing"]);
     requireProviderModels(entry.models, issues, [...entryPath, "models"]);
   });
 }
@@ -609,6 +671,7 @@ function requireProviderModels(
         path: [...entryPath, "contextWindowTokens"],
       });
     }
+    requirePricing(entry.pricing, issues, [...entryPath, "pricing"]);
   });
 }
 

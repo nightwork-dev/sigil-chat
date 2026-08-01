@@ -16,6 +16,13 @@ agent:
   # accepted and normalized but NOT yet enforced — shaped now so the allow-list
   # and embedding work land without another reshape.
   #
+  # `pricing` (provider-level default, model-level override) is USD per 1M
+  # tokens and is entirely optional (MDL.3) — Settings -> Usage meters token
+  # counts regardless and only turns them into a cost when a rate is present.
+  # Rates go stale; this fixture only prices what needs no ongoing upkeep to
+  # stay true (a $0 local endpoint). Fill in a vendor's published per-1M-token
+  # rate here to see its cost in Settings -> Usage.
+  #
   # Base URLs below were verified to exist and require auth (HTTP 401 on
   # /models, 2026-07-31). Hosted `model` ids are the vendor's documented
   # default and can drift — Settings -> Models -> Probe lists what an endpoint
@@ -39,6 +46,9 @@ agent:
       kind: openai-compatible
       baseUrl: http://127.0.0.1:1234/v1
       contextWindowTokens: 262144
+      pricing:
+        inputPerMillionTokens: 0
+        outputPerMillionTokens: 0
       models:
         - id: qwen
           model: qwen3.6-27b

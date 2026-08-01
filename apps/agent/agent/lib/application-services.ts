@@ -1,3 +1,6 @@
+import { createScope } from "@gonk/scope"
+import { createStoreProvider } from "@gonk/store"
+import { mirkBackendFactory } from "@gonk/store/sqlite"
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
 import {
@@ -20,6 +23,23 @@ import { personalScopeId } from "./personal-scope"
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import { createScopeGrantPolicy } from "./scope-authorization"
 import { resolvePersonaVoice } from "./memory"
+import {
+  MirkUsageLedgerRepository,
+  type UsageAggregateBucket,
+  type UsageLedgerRecord,
+} from "./usage-ledger"
+
+const usageScope = createScope({ cwd: process.cwd() })
+const usageStore = createStoreProvider(usageScope, {
+  backendFactory: mirkBackendFactory(usageScope),
+})
+export const usageLedgerRepository = new MirkUsageLedgerRepository({
+  log: usageStore.log<UsageLedgerRecord>("project", "sigil-chat.usage-ledger.v1"),
+  rollups: usageStore.kv<UsageAggregateBucket>(
+    "project",
+    "sigil-chat.usage-rollups.v1",
+  ),
+})
 
 export const projectWorkspaceRegistries = getProjectWorkspaceRegistries()
 export const scopeGrantPolicy = createScopeGrantPolicy({

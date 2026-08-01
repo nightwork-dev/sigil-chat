@@ -6,6 +6,7 @@
 
 import {
   BoxesIcon,
+  ChartColumnIcon,
   KeyRoundIcon,
   PaletteIcon,
   SlidersHorizontalIcon,
@@ -26,6 +27,7 @@ import { AgentSection } from "./agent-section"
 import { AppearanceSection } from "./appearance-section"
 import { ModelsSection } from "./models-section"
 import { SecuritySection } from "./security-section"
+import { UsageSection } from "./usage-section"
 import { type AttentionContext } from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
@@ -36,6 +38,7 @@ export type SettingsSection =
   | "appearance"
   | "agent"
   | "models"
+  | "usage"
 
 const SETTINGS_TABS: {
   value: SettingsSection
@@ -47,6 +50,7 @@ const SETTINGS_TABS: {
   { value: "appearance", label: "Appearance", icon: PaletteIcon },
   { value: "agent", label: "Agent", icon: SlidersHorizontalIcon },
   { value: "models", label: "Models", icon: BoxesIcon },
+  { value: "usage", label: "Usage", icon: ChartColumnIcon },
 ]
 
 export function SettingsPage({
@@ -69,7 +73,9 @@ export function SettingsPage({
   // tab follows that restriction so a member is never shown a section whose
   // only possible content is a permission error.
   const isOwner = user.role === "owner"
-  const tabs = SETTINGS_TABS.filter((tab) => tab.value !== "models" || isOwner)
+  const tabs = SETTINGS_TABS.filter(
+    (tab) => (tab.value !== "models" && tab.value !== "usage") || isOwner,
+  )
   const activeSection = tabs.some((tab) => tab.value === section)
     ? section
     : "account"
@@ -142,6 +148,11 @@ export function SettingsPage({
           {isOwner ? (
             <TabsContent value="models">
               <ModelsSection userId={user.id} />
+            </TabsContent>
+          ) : null}
+          {isOwner ? (
+            <TabsContent value="usage">
+              <UsageSection />
             </TabsContent>
           ) : null}
         </div>
