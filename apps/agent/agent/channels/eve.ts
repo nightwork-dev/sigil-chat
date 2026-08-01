@@ -17,8 +17,10 @@ import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
 import {
   agentToolRegistry,
   eveSessionOwnerStore,
+  usageLedgerRepository,
 } from "../lib/application-services"
 import { createApplicationToolCatalogRoute } from "../lib/application-tool-catalog"
+import { createUsageEndpointRoutes } from "../lib/usage-endpoints"
 import {
   EveSessionBindingVerificationError,
   requireVerifiedEveSessionBinding,
@@ -248,6 +250,13 @@ export default {
     ...createRealtimeVoiceRoutes(authenticatePrincipal, realtimeVoiceHost, {
       bindingSecret,
     }),
+    // Usage aggregates for the Settings → Usage admin surface (MDL.3).
+    ...createUsageEndpointRoutes(
+      authenticatePrincipal,
+      sigilConfig.agent,
+      usageLedgerRepository,
+      { ...(bindingSecret ? { relaySecret: bindingSecret } : {}) },
+    ),
   ],
 }
 

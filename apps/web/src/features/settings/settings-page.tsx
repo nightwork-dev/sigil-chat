@@ -6,6 +6,7 @@
 
 import {
   BoxesIcon,
+  ChartColumnIcon,
   FlagIcon,
   KeyRoundIcon,
   PaletteIcon,
@@ -28,6 +29,7 @@ import { AppearanceSection } from "./appearance-section"
 import { FlagsSection } from "./flags-section"
 import { ModelsSection } from "./models-section"
 import { SecuritySection } from "./security-section"
+import { UsageSection } from "./usage-section"
 import { type AttentionContext } from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import {
@@ -42,6 +44,7 @@ export type SettingsSection =
   | "agent"
   | "models"
   | "flags"
+  | "usage"
 
 const SETTINGS_TABS: {
   value: SettingsSection
@@ -54,6 +57,7 @@ const SETTINGS_TABS: {
   { value: "agent", label: "Agent", icon: SlidersHorizontalIcon },
   { value: "models", label: "Models", icon: BoxesIcon },
   { value: "flags", label: "Flags", icon: FlagIcon },
+  { value: "usage", label: "Usage", icon: ChartColumnIcon },
 ]
 
 export function SettingsPage({
@@ -79,7 +83,11 @@ export function SettingsPage({
   // (FLAG.1): only the owner can flip a switch here, and a member would see
   // nothing but disabled controls.
   const isOwner = user.role === "owner"
-  const OWNER_ONLY_SECTIONS: readonly SettingsSection[] = ["models", "flags"]
+  const OWNER_ONLY_SECTIONS: readonly SettingsSection[] = [
+    "models",
+    "flags",
+    "usage",
+  ]
   const tabs = SETTINGS_TABS.filter(
     (tab) => !OWNER_ONLY_SECTIONS.includes(tab.value) || isOwner,
   )
@@ -161,6 +169,9 @@ export function SettingsPage({
           {isOwner ? (
             <TabsContent value="flags">
               <FlagsSection />
+            </TabsContent>
+            <TabsContent value="usage">
+              <UsageSection />
             </TabsContent>
           ) : null}
         </div>

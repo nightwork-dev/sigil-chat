@@ -1,3 +1,6 @@
+import { createScope } from "@gonk/scope"
+import { createStoreProvider } from "@gonk/store"
+import { mirkBackendFactory } from "@gonk/store/sqlite"
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
 import {
@@ -11,6 +14,7 @@ import {
 import { graphRepository } from "@workspace/graph-store/repository"
 import { reviewRepository } from "@workspace/review-store"
 import { readDataEnvironment } from "@workspace/runtime-env/server"
+import { resolveSigilProjectRoot } from "@workspace/runtime-env/project-root"
 import { workItemsRepository } from "@workspace/work-items-store"
 import { specsRepository } from "@workspace/work-items-store/specs"
 
@@ -20,6 +24,40 @@ import { personalScopeId } from "./personal-scope"
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import { createScopeGrantPolicy } from "./scope-authorization"
 import { resolvePersonaVoice } from "./memory"
+import {
+  MirkUsageLedgerRepository,
+  type UsageAggregateBucket,
+  type UsageLedgerRecord,
+} from "./usage-ledger"
+
+// `createScope({ cwd })` alone walks from `cwd` for a root marker
+// (`.gonk`/`.claude`/`.agents`/`agents`/`.git`) and, finding none, falls back
+// to the real user home for the project tier (@gonk/scope's
+// `scopeStateHome`/`resolveTierHomes` fallback). The agent app's own
+// cold-boot smoke test runs Eve from a scratch tmpdir that deliberately has
+// none of those markers (only `agent/`, `fixtures/`, and `package.json`), so
+// an unqualified `createScope` here durably wrote `sigil-chat.usage-*`
+// namespaces into the real `~/.agents/store` on every local/CI run. Passing
+// an explicit `projectRoot` — resolved the same way the fixture loader
+// resolves it, by walking for `fixtures/application/sigil-chat.yaml` or a
+// `package.json` named `sigil-chat` — pins the project tier to a directory
+// that is always real for this repo (the worktree root, or the smoke
+// script's copied fixture tree), so the store never silently escapes into
+// the operator's home.
+const usageScope = createScope({
+  cwd: process.cwd(),
+  projectRoot: resolveSigilProjectRoot(process.cwd()),
+})
+const usageStore = createStoreProvider(usageScope, {
+  backendFactory: mirkBackendFactory(usageScope),
+})
+export const usageLedgerRepository = new MirkUsageLedgerRepository({
+  log: usageStore.log<UsageLedgerRecord>("project", "sigil-chat.usage-ledger.v1"),
+  rollups: usageStore.kv<UsageAggregateBucket>(
+    "project",
+    "sigil-chat.usage-rollups.v1",
+  ),
+})
 
 export const projectWorkspaceRegistries = getProjectWorkspaceRegistries()
 export const scopeGrantPolicy = createScopeGrantPolicy({

@@ -336,6 +336,60 @@ ${REST}`),
     });
   });
 
+  it("fans provider-level pricing out to models, overridden per model", async () => {
+    const fixture = await loadSigilConfigFixture(
+      fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      pricing:
+        inputPerMillionTokens: 1
+        outputPerMillionTokens: 6
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+        - id: sol
+          model: gpt-5.6-sol
+          pricing:
+            inputPerMillionTokens: 5
+            outputPerMillionTokens: 30
+${REST}`),
+    );
+
+    const presets = normalizeSigilAgentModelPresets(fixture.value.agent);
+    expect(presets.find((preset) => preset.id === "codex/luna")?.pricing).toEqual(
+      { inputPerMillionTokens: 1, outputPerMillionTokens: 6 },
+    );
+    expect(presets.find((preset) => preset.id === "codex/sol")?.pricing).toEqual(
+      { inputPerMillionTokens: 5, outputPerMillionTokens: 30 },
+    );
+    // The bare-slug deployment default carries no pricing to inherit.
+    expect(
+      presets.find((preset) => preset.id === "deployment-default")?.pricing,
+    ).toBeUndefined();
+  });
+
+  it("fails before startup when a model's pricing rate is negative", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+          pricing:
+            inputPerMillionTokens: -1
+${REST}`),
+      ),
+    ).rejects.toThrow(/non-negative number/);
+  });
+
   it("fails before startup when two providers claim the same id", async () => {
     await expect(
       loadSigilConfigFixture(
