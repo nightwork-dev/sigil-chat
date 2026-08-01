@@ -275,6 +275,41 @@ export const SETTINGS_REGISTRY = {
     defaultValue: false,
     isValid: isBoolean,
   }),
+  // Preferred model entry for sessions this account starts, by preset id from
+  // the application fixture's `agent.providers` (`null` = follow the deployment
+  // default). A selection preference over an operator-authored list — it names
+  // a row, it does not carry a base URL or a credential, and it grants
+  // nothing: Eve still resolves every model from the fixture and its own
+  // environment.
+  //
+  // Applied by useCreateAgentThread to every new session and recorded in the
+  // thread's immutable `AgentThreadExecutionBinding.model`. The value is a
+  // `<providerId>/<modelId>` id, resolved server-side against the fixture.
+  "agent.modelPresetId": defineSetting<string | null>({
+    key: "agent.modelPresetId",
+    allowedScopes: ["user"],
+    allowedScopeKinds: [
+      "installation",
+      "organization",
+      "project",
+      "workspace",
+      "session",
+      "personal",
+    ],
+    allowedContributingLinkKinds: ["contributes-defaults"],
+    mergeMode: "replace",
+    allowsPersonalOverride: true,
+    affectsSecurity: false,
+    defaultValue: null,
+    isValid: (value): value is string | null =>
+      value === null ||
+      (typeof value === "string" &&
+        // `<providerId>/<modelId>`, or the reserved deployment-default id.
+        /^[a-z][a-z0-9]*(-[a-z0-9]+)*(\/[a-z][a-z0-9]*(-[a-z0-9]+)*)?$/.test(
+          value,
+        ) &&
+        value.length <= 129),
+  }),
   "agent.activeChannelId": defineSetting<string | null>({
     key: "agent.activeChannelId",
     allowedScopes: ["user"],

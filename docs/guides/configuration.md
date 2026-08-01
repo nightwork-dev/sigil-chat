@@ -116,6 +116,134 @@ profiles or thread bindings once those exist. Provider endpoints, credentials,
 and usage are installation state governed by
 [`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](../specs/MODEL-ADMINISTRATION-AND-USAGE-SPEC.md).
 
+### Model providers
+
+`agent.model` names the one model Eve resolves at startup. `agent.providers`
+names everything else the deployment can run. A provider states its transport
+kind, endpoint, and credential **once** and fans out the models it offers, so a
+hosted OpenAI-compatible vendor is data rather than a code branch:
+
+```yaml
+agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+          label: GPT-5.6 Luna
+
+    - id: deepseek
+      label: DeepSeek
+      kind: openai-compatible
+      baseUrl: https://api.deepseek.com/v1
+      apiKeyEnv: SIGIL_MODEL_DEEPSEEK_API_KEY
+      contextWindowTokens: 65536
+      models:
+        - id: chat
+          model: deepseek-chat
+        - id: reasoner
+          model: deepseek-reasoner
+          contextWindowTokens: 131072
+```
+
+Each provider needs a unique lowercase-slug `id`, a `label`, a supported
+`kind`, and at least one model; each model needs a slug `id` unique within its
+provider and a `model`. `baseUrl` is required for `openai-compatible`.
+Provider-level `contextWindowTokens` applies to every model beneath it and a
+model may override its own. The provider id `deployment` is reserved for the
+entry synthesized from `agent.model`, so the inventory is never empty and the
+running model is always identifiable. A malformed or duplicated entry fails
+fixture validation before startup.
+
+Never put a key in a provider. `apiKeyEnv` names the environment variable Eve
+reads it from.
+
+#### Model ids and session bindings
+
+A model's selectable id is **`<providerId>/<modelId>`** — for example
+`deepseek/chat`. That id is what a session's immutable execution binding
+records, so **renaming either slug retires the old id**. Sessions bound to a
+retired id fall back to the deployment default and log a warning naming the
+unresolved id; they never fail, and they never fall back silently. Treat these
+slugs as stable identifiers, not display strings — `label` is what you change
+when you want different wording.
+
+#### Shaped but not yet enforced
+
+Two fields are accepted, validated, and normalized, but nothing consumes them:
+
+- `enabled` on a provider and on a model. A model inside a disabled provider
+  normalizes to disabled regardless of its own flag — the provider holds the
+  credential. This is the allow-list slot; selection does not yet honour it.
+- `capability` on a model: `chat` (default), `embedding`, or `voice`.
+
+They are shaped now so the allow-list and embedding work land without another
+schema change.
+
+### Settings → Models
+
+The owner-only **Models** section of `/settings` lists providers with their
+kind, endpoint, and credential status, models nested beneath each, and probes a
+local OpenAI-compatible endpoint before you commit to it.
+
+- **Credential status is presence only.** Eve answers the settings surface
+  with booleans and variable NAMES; a credential value never leaves the agent
+  process.
+- **Probing** asks `{baseUrl}/models` (or `{baseUrl}/v1/models` when the base
+  URL has no version segment) and reports reachability plus the served model
+  list.
+- **A probe request carries a URL and nothing else.** Which credential — if
+  any — Eve attaches is decided from `agent.providers` by matching the probed
+  **origin**. A provider for `https://api.deepseek.com/v1` lends its credential
+  to that origin and to no other, and an origin with no matching provider is
+  probed unauthenticated (the ordinary local-server case). The caller cannot
+  name a variable, so it cannot aim a configured key at a host it chose.
+- **Both** model-endpoint routes require the verified `owner` role in the web
+  app *and* the shared `SIGIL_AGENT_BINDING_SECRET` on the internal call. The
+  owner role is a web-app concept Eve cannot verify on its own; the secret is
+  how the web server asserts it already checked. Without it configured, both
+  routes refuse.
+- **Adding a provider** means adding a fixture entry: after a successful probe
+  the section generates the YAML to paste under `agent.providers`. Eve reads
+  the fixture at startup, so restart the agent runtime afterwards.
+
+Selecting a model in this section binds it to the sessions you start next. It
+is fixed for the life of a conversation, so chats already open keep the model
+they began with.
+
+#### Probe target policy — deployment note
+
+The probe refuses base URLs carrying a query string, fragment, or embedded
+credentials, builds the catalog path on a parsed URL object, and does not
+follow redirects. It denies link-local and cloud-metadata targets —
+`169.254.0.0/16` in dotted, integer, and IPv4-mapped-IPv6 spellings,
+`fe80::/10`, `fd00::/8`, and the Google metadata hostnames.
+
+**Loopback and RFC1918 stay allowed**, deliberately: reaching a model server
+on `127.0.0.1` or `192.168.1.50` is the point of the feature. Two consequences
+worth knowing before you deploy:
+
+- An owner can make the Eve process issue a GET to any private address it can
+  route to, and learn whether that address answers. If Eve runs somewhere with
+  network reach you would not grant its owner, that reach is the boundary to
+  fix — not this feature.
+- `fd00::/8` is denied even though it is the IPv6 analogue of RFC1918, because
+  that block carries AWS's IPv6 metadata address. An IPv6-ULA model server
+  therefore cannot be probed; use its IPv4 address or a hostname.
+
+This is a structural fence, not a full SSRF boundary: a hostname that resolves
+to a denied address at DNS time is not caught, and cannot be without resolving
+first and pinning the socket. The owner gate plus the binding secret are the
+actual control.
+
+Selecting a preferred model in this section records the choice for your
+account. Sessions do not yet carry a model of their own — the execution
+binding has no model field — so every session runs the entry marked Active
+until per-session model binding lands.
+
 Two integration smokes cover the model paths:
 
 ```bash

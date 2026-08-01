@@ -13,11 +13,19 @@ import { parse as parseYaml } from "yaml";
 
 import { resolveSigilProjectRoot } from "@workspace/runtime-env/project-root";
 
+/** Transport kinds the resolver knows how to build. Not vendors. */
 export type SigilAgentModelProvider =
   | "codex"
   | "openai-compatible"
   | "openrouter"
   | "anthropic";
+
+/**
+ * What a model is FOR. Chat is the only kind anything consumes today; the
+ * others are declared so an embedding or voice model has an authoring home
+ * that does not require reshaping this schema again.
+ */
+export type SigilModelCapability = "chat" | "embedding" | "voice";
 
 export interface SigilAgentModelObjectConfig {
   provider: SigilAgentModelProvider;
@@ -29,6 +37,45 @@ export interface SigilAgentModelObjectConfig {
 
 export type SigilAgentModelConfig = string | SigilAgentModelObjectConfig;
 
+/** One model offered by a provider. */
+export interface SigilAgentProviderModelConfig {
+  /** Slug, unique within its provider. Full id is `<providerId>/<id>`. */
+  id: string;
+  model: string;
+  label?: string;
+  /** Defaults to `chat`. */
+  capability?: SigilModelCapability;
+  /**
+   * Whether this model may be selected. UNIMPLEMENTED — the field is accepted
+   * and normalized so the allow-list lands without a reshape, but nothing
+   * enforces it yet (see model-selection.server.ts).
+   */
+  enabled?: boolean;
+  contextWindowTokens?: number;
+}
+
+/**
+ * A provider entry: the unit of model configuration (David, 2026-07-31).
+ *
+ * Provider-level facts — transport kind, endpoint, credential — are stated
+ * once here, and the provider fans out the models it offers. Authoring one
+ * flat row per model made the provider invisible and forced every row to
+ * repeat the endpoint and credential it shared with its siblings.
+ */
+export interface SigilAgentProviderConfig {
+  /** Slug. Namespaces every model id beneath it. */
+  id: string;
+  label: string;
+  kind: SigilAgentModelProvider;
+  baseUrl?: string;
+  apiKeyEnv?: string;
+  /** Default context window for this provider's models. */
+  contextWindowTokens?: number;
+  /** UNIMPLEMENTED, as per the model-level `enabled`. */
+  enabled?: boolean;
+  models: SigilAgentProviderModelConfig[];
+}
+
 export interface NormalizedSigilAgentModelConfig {
   provider: SigilAgentModelProvider;
   model: string;
@@ -38,8 +85,48 @@ export interface NormalizedSigilAgentModelConfig {
   source: "bare-slug" | "object";
 }
 
+/**
+ * A flattened, selectable model.
+ *
+ * `id` is what a session binds to and is stable across a fixture edit as long
+ * as the provider and model slugs keep their names.
+ */
+export interface NormalizedSigilAgentModelPreset
+  extends NormalizedSigilAgentModelConfig {
+  /** `<providerId>/<modelId>`, or the reserved deployment-default id. */
+  id: string;
+  label: string;
+  providerId: string;
+  providerLabel: string;
+  capability: SigilModelCapability;
+  /** Both levels resolved: a model in a disabled provider is disabled. */
+  enabled: boolean;
+  isDeploymentDefault: boolean;
+}
+
+/** Provider-shaped inventory: the authored structure, normalized. */
+export interface NormalizedSigilAgentProvider {
+  id: string;
+  label: string;
+  kind: SigilAgentModelProvider;
+  baseUrl?: string;
+  apiKeyEnv?: string;
+  enabled: boolean;
+  models: NormalizedSigilAgentModelPreset[];
+}
+
+/** Reserved id for the entry synthesized from `agent.model`. */
+export const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default";
+/** Reserved provider id for that synthesized entry. */
+export const DEPLOYMENT_DEFAULT_PROVIDER_ID = "deployment";
+
+export interface SigilAgentConfig {
+  model: SigilAgentModelConfig;
+  providers?: SigilAgentProviderConfig[];
+}
+
 export interface SigilProductConfig {
-  agent: { model: SigilAgentModelConfig };
+  agent: SigilAgentConfig;
   auth: { registration: "closed" | "open" };
   branding: {
     accent: string;
@@ -87,6 +174,107 @@ export function normalizeSigilAgentModelConfig(
       : {}),
     source: "object",
   };
+}
+
+/**
+ * Provider-shaped inventory, deployment default first.
+ *
+ * The default is synthesized as its own single-model provider rather than
+ * required in `providers`, so a fixture that declares none still yields a
+ * one-entry inventory and the model Eve actually runs is always identifiable.
+ */
+export function normalizeSigilAgentProviders(
+  agent: SigilAgentConfig,
+): NormalizedSigilAgentProvider[] {
+  const fallback = normalizeSigilAgentModelConfig(agent.model);
+  const deploymentDefault: NormalizedSigilAgentModelPreset = {
+    ...fallback,
+    id: DEPLOYMENT_DEFAULT_PRESET_ID,
+    label: fallback.model,
+    providerId: DEPLOYMENT_DEFAULT_PROVIDER_ID,
+    providerLabel: deploymentProviderLabel(fallback),
+    capability: "chat",
+    enabled: true,
+    isDeploymentDefault: true,
+  };
+
+  return [
+    {
+      id: DEPLOYMENT_DEFAULT_PROVIDER_ID,
+      label: deploymentProviderLabel(fallback),
+      kind: fallback.provider,
+      ...(fallback.baseUrl !== undefined ? { baseUrl: fallback.baseUrl } : {}),
+      ...(fallback.apiKeyEnv !== undefined
+        ? { apiKeyEnv: fallback.apiKeyEnv }
+        : {}),
+      enabled: true,
+      models: [deploymentDefault],
+    },
+    ...(agent.providers ?? []).map((provider) => {
+      const providerEnabled = provider.enabled ?? true;
+      return {
+        id: provider.id,
+        label: provider.label,
+        kind: provider.kind,
+        ...(provider.baseUrl !== undefined
+          ? { baseUrl: provider.baseUrl }
+          : {}),
+        ...(provider.apiKeyEnv !== undefined
+          ? { apiKeyEnv: provider.apiKeyEnv }
+          : {}),
+        enabled: providerEnabled,
+        models: provider.models.map((entry) => {
+          const contextWindowTokens =
+            entry.contextWindowTokens ?? provider.contextWindowTokens;
+          return {
+            provider: provider.kind,
+            model: entry.model,
+            ...(provider.baseUrl !== undefined
+              ? { baseUrl: provider.baseUrl }
+              : {}),
+            ...(provider.apiKeyEnv !== undefined
+              ? { apiKeyEnv: provider.apiKeyEnv }
+              : {}),
+            ...(contextWindowTokens !== undefined
+              ? { contextWindowTokens }
+              : {}),
+            source: "object" as const,
+            id: `${provider.id}/${entry.id}`,
+            label: entry.label ?? entry.model,
+            providerId: provider.id,
+            providerLabel: provider.label,
+            capability: entry.capability ?? "chat",
+            // A model inside a disabled provider is disabled regardless of
+            // its own flag: the provider is the credential holder.
+            enabled: providerEnabled && (entry.enabled ?? true),
+            isDeploymentDefault: false,
+          };
+        }),
+      };
+    }),
+  ];
+}
+
+/**
+ * Every selectable model, flattened, deployment default first.
+ *
+ * Kept as the flattener over the provider shape so callers that only care
+ * about "which models exist" do not have to walk the tree.
+ */
+export function normalizeSigilAgentModelPresets(
+  agent: SigilAgentConfig,
+): NormalizedSigilAgentModelPreset[] {
+  return normalizeSigilAgentProviders(agent).flatMap(
+    (provider) => provider.models,
+  );
+}
+
+function deploymentProviderLabel(
+  model: NormalizedSigilAgentModelConfig,
+): string {
+  return model.provider === "codex"
+    ? "Codex subscription"
+    : `Deployment default (${model.provider})`;
 }
 
 function defaultConfigPath(): string {
@@ -146,6 +334,7 @@ function validateConfig(value: unknown): StandardSchemaV1Issue[] {
   const imageEdit = requireRecord(value, "imageEdit", issues);
 
   requireModelConfig(agent?.model, issues, ["agent", "model"]);
+  requireProviders(agent?.providers, issues, ["agent", "providers"]);
   const registration = auth?.registration;
   if (registration !== "closed" && registration !== "open") {
     issues.push({
@@ -239,9 +428,7 @@ function requireModelConfig(
     const contextWindowTokens = candidate.contextWindowTokens;
     if (
       contextWindowTokens !== undefined &&
-      (typeof contextWindowTokens !== "number" ||
-        !Number.isInteger(contextWindowTokens) ||
-        contextWindowTokens <= 0)
+      !isPositiveInteger(contextWindowTokens)
     ) {
       issues.push({
         message: "must be a positive integer",
@@ -259,6 +446,172 @@ function requireModelConfig(
   issues.push({ message: "must be a non-empty slug without whitespace", path });
 }
 
+/**
+ * Providers are optional; when present every entry must carry a unique slug,
+ * a label, a supported kind, and at least one model. The fixture is the only
+ * place a vendor is named, so a malformed entry fails here rather than
+ * surfacing as an unusable row in the endpoint list.
+ */
+function requireProviders(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (candidate === undefined) return;
+  if (!Array.isArray(candidate)) {
+    issues.push({ message: "must be a list of providers", path });
+    return;
+  }
+  const seen = new Set<string>();
+  candidate.forEach((entry, index) => {
+    const entryPath = [...path, String(index)];
+    if (!isRecord(entry)) {
+      issues.push({ message: "must be an object", path: entryPath });
+      return;
+    }
+    const id = entry.id;
+    const idPath = [...entryPath, "id"];
+    if (!isSlug(id)) {
+      issues.push({
+        message: "must be a lowercase slug (letters, digits, hyphens)",
+        path: idPath,
+      });
+    } else if (id === DEPLOYMENT_DEFAULT_PROVIDER_ID) {
+      issues.push({
+        message: `must not be "${DEPLOYMENT_DEFAULT_PROVIDER_ID}" — that id is reserved for agent.model`,
+        path: idPath,
+      });
+    } else if (seen.has(id)) {
+      issues.push({ message: "must be unique across providers", path: idPath });
+    } else {
+      seen.add(id);
+    }
+    if (!isNonEmptyText(entry.label)) {
+      issues.push({
+        message: "must be a non-empty string",
+        path: [...entryPath, "label"],
+      });
+    }
+    if (!isSupportedModelProvider(entry.kind)) {
+      issues.push({
+        message:
+          'must be one of "codex", "openai-compatible", "openrouter", or "anthropic"',
+        path: [...entryPath, "kind"],
+      });
+    }
+    const baseUrl = entry.baseUrl;
+    if (baseUrl !== undefined && !isHttpUrl(baseUrl)) {
+      issues.push({
+        message: "must be an http(s) URL",
+        path: [...entryPath, "baseUrl"],
+      });
+    }
+    if (entry.kind === "openai-compatible" && baseUrl === undefined) {
+      issues.push({
+        message: 'is required when kind is "openai-compatible"',
+        path: [...entryPath, "baseUrl"],
+      });
+    }
+    if (
+      entry.apiKeyEnv !== undefined &&
+      !isEnvironmentVariableName(entry.apiKeyEnv)
+    ) {
+      issues.push({
+        message: "must be an environment variable name",
+        path: [...entryPath, "apiKeyEnv"],
+      });
+    }
+    if (
+      entry.contextWindowTokens !== undefined &&
+      !isPositiveInteger(entry.contextWindowTokens)
+    ) {
+      issues.push({
+        message: "must be a positive integer",
+        path: [...entryPath, "contextWindowTokens"],
+      });
+    }
+    if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+      issues.push({
+        message: "must be true or false",
+        path: [...entryPath, "enabled"],
+      });
+    }
+    requireProviderModels(entry.models, issues, [...entryPath, "models"]);
+  });
+}
+
+function requireProviderModels(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (!Array.isArray(candidate) || candidate.length === 0) {
+    issues.push({ message: "must be a non-empty list of models", path });
+    return;
+  }
+  const seen = new Set<string>();
+  candidate.forEach((entry, index) => {
+    const entryPath = [...path, String(index)];
+    if (!isRecord(entry)) {
+      issues.push({ message: "must be an object", path: entryPath });
+      return;
+    }
+    const id = entry.id;
+    const idPath = [...entryPath, "id"];
+    if (!isSlug(id)) {
+      issues.push({
+        message: "must be a lowercase slug (letters, digits, hyphens)",
+        path: idPath,
+      });
+    } else if (seen.has(id)) {
+      issues.push({
+        message: "must be unique within its provider",
+        path: idPath,
+      });
+    } else {
+      seen.add(id);
+    }
+    if (!isModelSlug(entry.model)) {
+      issues.push({
+        message: "must be a non-empty model id without whitespace",
+        path: [...entryPath, "model"],
+      });
+    }
+    if (entry.label !== undefined && !isNonEmptyText(entry.label)) {
+      issues.push({
+        message: "must be a non-empty string",
+        path: [...entryPath, "label"],
+      });
+    }
+    if (
+      entry.capability !== undefined &&
+      entry.capability !== "chat" &&
+      entry.capability !== "embedding" &&
+      entry.capability !== "voice"
+    ) {
+      issues.push({
+        message: 'must be one of "chat", "embedding", or "voice"',
+        path: [...entryPath, "capability"],
+      });
+    }
+    if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+      issues.push({
+        message: "must be true or false",
+        path: [...entryPath, "enabled"],
+      });
+    }
+    if (
+      entry.contextWindowTokens !== undefined &&
+      !isPositiveInteger(entry.contextWindowTokens)
+    ) {
+      issues.push({
+        message: "must be a positive integer",
+        path: [...entryPath, "contextWindowTokens"],
+      });
+    }
+  });
+}
+
 function isSupportedModelProvider(
   value: unknown,
 ): value is SigilAgentModelProvider {
@@ -268,6 +621,16 @@ function isSupportedModelProvider(
     value === "openrouter" ||
     value === "anthropic"
   );
+}
+
+function isSlug(value: unknown): value is string {
+  return (
+    typeof value === "string" && /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(value)
+  );
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function isModelSlug(value: unknown): value is string {

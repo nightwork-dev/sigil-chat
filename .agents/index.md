@@ -198,11 +198,18 @@ Prerequisites and required env:
   sets it to the worktree's `.data`; deployments can retain per-store overrides
   where separate volume boundaries are intentional. Managed Gonk skills live
   under its `skills/` subtree so web and Eve share one registry.
-- `SIGIL_AGENT_BINDING_SECRET` — authenticates the private web-to-Eve binding
-  route used to attach a verified web principal to an Eve session. `pnpm dev`
-  generates a worktree-local value under `.data/dev`; deployments mount the
-  same secret into web and Eve. It authenticates that internal handoff, not an
-  end user or an application-tool invocation.
+- `SIGIL_AGENT_BINDING_SECRET` — authenticates private web-to-Eve calls: the
+  binding route that attaches a verified web principal to an Eve session, and
+  the two model-endpoint routes behind Settings → Models. `pnpm dev` generates
+  a worktree-local value under `.data/dev`; deployments mount the same secret
+  into web and Eve. It authenticates the internal handoff, not an end user or
+  an application-tool invocation — but note what that now covers: owner role
+  is a web-app concept Eve cannot verify, so presenting this secret is how the
+  web server asserts it already checked, and on the probe route it authorizes
+  Eve to issue an **outbound fetch** to an operator-supplied URL. Treat it as
+  the gate on that capability, and see `docs/guides/configuration.md` for the
+  target policy (link-local and metadata denied; loopback and RFC1918 allowed
+  on purpose).
 - `SIGIL_ROADMAP_DIR` — optional, configures the external Markdown roadmap
   store shared across worktrees, branches, and agents. Defaults to a
   `sigil-roadmap/` dir **co-located beside the sigil repos** (resolved portably

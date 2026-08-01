@@ -24,9 +24,12 @@ const envPath = resolve(repoRoot, ".env");
 if (existsSync(envPath)) process.loadEnvFile(envPath);
 
 const projectIdentity = readProjectIdentity(repoRoot);
+// Derive origins from portless so linked worktrees get their branch-derived
+// prefix; a hardcoded `<name>.localhost` origin diverges from the served URL
+// in every worktree and Better Auth then rejects the real browser origin.
 const localTopology = {
-  eveOrigin: portlessLocalhostUrl(projectIdentity.agentServiceName),
-  webOrigin: portlessLocalhostUrl(projectIdentity.webServiceName),
+  eveOrigin: portlessUrl(projectIdentity.agentServiceName),
+  webOrigin: portlessUrl(projectIdentity.webServiceName),
 };
 process.env.SIGIL_DEV_WEB_SERVICE_NAME = projectIdentity.webServiceName;
 process.env.SIGIL_DEV_AGENT_SERVICE_NAME = projectIdentity.agentServiceName;
@@ -144,10 +147,6 @@ function portlessUrl(name) {
     cwd: repoRoot,
     encoding: "utf8",
   }).trim();
-}
-
-function portlessLocalhostUrl(name) {
-  return `http://${name}.localhost:1355`;
 }
 
 function readProjectIdentity(root) {

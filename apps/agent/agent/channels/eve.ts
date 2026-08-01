@@ -37,6 +37,7 @@ import {
   requireAuthorizedResourceScope,
 } from "../lib/scope-authorization"
 import { createReadinessRoute } from "../lib/readiness"
+import { createModelEndpointRoutes } from "../lib/model-endpoints"
 import { hasConfiguredModelCredential } from "../lib/model-provider"
 import { hasCodexModelAuth } from "../lib/model-auth.mjs"
 import {
@@ -175,7 +176,16 @@ const channel = createOwnedEveChannel({
                 initialPerspective: sessionBinding.initialPerspective,
                 additionalContextScopeIds:
                   sessionBinding.additionalContextScopeIds,
+                // Per-session model, carried through the verified proof. The
+                // dynamic model resolver in agent.ts reads it from here, so it
+                // is trusted exactly as far as the HMAC above.
+                ...(sessionBinding.model
+                  ? { model: sessionBinding.model }
+                  : {}),
               }),
+              ...(sessionBinding.model
+                ? { sigilModelPresetId: sessionBinding.model.presetId }
+                : {}),
               ...(sessionBinding.runtimeSessionId
                 ? {
                     sigilAttestedEveSessionId:
@@ -208,6 +218,20 @@ export default {
         hasConfiguredModelCredential(sigilConfig.agent.model, {
           hasCodexModelAuth,
         }),
+    }),
+    // Endpoint inventory + reachability probing for the settings surface.
+    // Eve answers because Eve is where the credentials live: the operator UI
+    // receives presence booleans and variable names, never a value.
+    //
+    // BOTH routes require the binding secret, not just the probe. Owner role
+    // is a web-app concept that Eve cannot verify, so without this a member's
+    // own Eve bearer token would read deployment-wide model and credential
+    // configuration directly, and drive an outbound fetch to an address of
+    // its choosing. The secret is what makes "the web server vouches for this
+    // call, having checked owner role" a claim Eve can check.
+    ...createModelEndpointRoutes(authenticatePrincipal, sigilConfig.agent, {
+      hasCodexModelAuth,
+      ...(bindingSecret ? { relaySecret: bindingSecret } : {}),
     }),
     // Live voice relays only SDP: the browser's offer in, Codex's answer out.
     // One host, one live session — the host object holds that lifecycle, keyed

@@ -1,0 +1,410 @@
+// Settings → Models: the endpoint management surface (MDL.2 criterion 4).
+//
+// Organised by PROVIDER, not by model (David, 2026-07-31): a provider entry
+// carries the facts that belong to the endpoint — kind, address, credential —
+// once, and its models are rows inside it. Authoring a row per model made the
+// provider invisible and repeated "(Codex subscription)" on every line.
+//
+// Inventory and selection are separate controls because they mean different
+// things. The list answers "what can this deployment run, and is it usable";
+// the single select answers "what do MY new chats use". Merging them into one
+// radio list made a row's selected state ambiguous — it read as both "this is
+// configured" and "this is chosen".
+//
+// Shape is deliberately forward-compatible: fetched catalog models append to a
+// provider's `models` array, and a per-model enable toggle sits at the end of a
+// model row. Neither needs this layout rebuilt.
+
+import { useState } from "react"
+
+import { Button } from "@workspace/ui/components/button"
+import { CodeBlock } from "@workspace/ui/components/code-block"
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
+import { SectionHeader } from "@workspace/ui/components/section-header"
+
+import {
+  providerFixtureSnippet,
+  suggestProviderId,
+  useModelEndpoints,
+  useProbeModelEndpoint,
+  type ModelEndpointCredentialStatus,
+  type ModelEndpointRecord,
+  type ModelProviderRecord,
+} from "@/lib/model-endpoints"
+import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
+
+const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default"
+
+export function ModelsSection({ userId }: { userId: string }) {
+  const endpoints = useModelEndpoints()
+  const preferred = useUserSetting(userId, "agent.modelPresetId")
+  const setPreferred = useSetUserSetting(userId, "agent.modelPresetId")
+  const providers = endpoints.data?.providers ?? []
+
+  // Switching model *mid-session* is the slice after this one, and this is
+  // where its UI would live. Two constraints have to be visible at the moment
+  // of choosing rather than charged silently: a provider change invalidates
+  // that session's prompt cache and may force a compaction checkpoint (David,
+  // 2026-07-31), and the spec's v1 answer is that choosing a different model
+  // from an existing conversation FORKS it into a new immutable binding rather
+  // than rebinding the live thread. The control is therefore "continue in a new
+  // session on <model>", not a silent swap.
+  function handlePreferredChange(next: string) {
+    setPreferred.mutate({
+      scopeKind: "user",
+      scopeId: "",
+      value: next === DEPLOYMENT_DEFAULT_PRESET_ID ? null : next,
+      expectedRevision: preferred.data?.revision ?? undefined,
+    })
+  }
+
+  return (
+    <div className="flex max-w-2xl flex-col gap-6 p-4">
+      <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+        <SectionHeader>Models</SectionHeader>
+
+        {endpoints.isPending ? (
+          <p className="text-xs text-muted-foreground">Loading providers…</p>
+        ) : endpoints.isError ? (
+          <p className="text-xs text-destructive">
+            The agent runtime did not answer. Provider status is unavailable
+            until it does.
+          </p>
+        ) : (
+          <>
+            <NewChatModelPicker
+              providers={providers}
+              value={preferred.data?.value ?? DEPLOYMENT_DEFAULT_PRESET_ID}
+              disabled={setPreferred.isPending}
+              onChange={handlePreferredChange}
+            />
+            <div className="divide-y divide-border">
+              {providers.map((provider: ModelProviderRecord) => (
+                <ProviderBlock key={provider.id} provider={provider} />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Providers come from <code className="font-mono">agent.providers</code>{" "}
+              in the application fixture. Credentials stay in the agent
+              runtime&apos;s environment — this page can see whether a variable
+              is set, never what it contains.
+            </p>
+          </>
+        )}
+      </section>
+
+      <AddEndpointSection />
+    </div>
+  )
+}
+
+/**
+ * One control, one meaning: which model this account's new chats are bound to.
+ * Options are grouped by provider so the same structure reads the same way in
+ * both places on the page.
+ */
+function NewChatModelPicker({
+  providers,
+  value,
+  disabled,
+  onChange,
+}: {
+  providers: readonly ModelProviderRecord[]
+  value: string
+  disabled: boolean
+  onChange: (next: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor="new-chat-model" className="text-xs">
+          New chats use
+        </Label>
+        <Select
+          value={value}
+          onValueChange={(next) => {
+            // base-ui's Select can clear to null; there is no "no model" state
+            // here, so a clear is simply not a change.
+            if (next !== null) onChange(next)
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger id="new-chat-model" size="sm" className="w-64">
+            <SelectValue placeholder="Select a model" />
+          </SelectTrigger>
+          <SelectContent>
+            {providers.map((provider: ModelProviderRecord) => (
+              <SelectGroup key={provider.id}>
+                <SelectLabel>{provider.label}</SelectLabel>
+                {provider.models.map((model: ModelEndpointRecord) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.model}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Bound when a chat is created and fixed for that conversation, so chats
+        already open keep the model they began with.
+      </p>
+    </div>
+  )
+}
+
+function ProviderBlock({ provider }: { provider: ModelProviderRecord }) {
+  return (
+    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-xs font-medium text-foreground">
+            {provider.label}
+          </span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {provider.kind}
+          </span>
+        </div>
+        {provider.baseUrl ? (
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {provider.baseUrl}
+          </p>
+        ) : null}
+        <CredentialLine credential={provider.credential} />
+      </div>
+
+      {/* Model rows. Fetched catalog models append here; a per-model enable
+          toggle belongs at the end of each row. */}
+      <div className="flex flex-col gap-1 border-l border-border pl-3">
+        {provider.models.map((model: ModelEndpointRecord) => (
+          <ModelRow key={model.id} model={model} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ModelRow({ model }: { model: ModelEndpointRecord }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2">
+      <span className="font-mono text-xs text-foreground">{model.model}</span>
+      <span className="text-xs text-muted-foreground">
+        {formatContextWindow(model.contextWindowTokens)}
+      </span>
+      {model.isDeploymentDefault ? (
+        // Post-binding this marker means something narrower than it used to:
+        // sessions now carry their own model, so the fixture default is what
+        // a session falls back to when it has none.
+        <span className="text-xs text-muted-foreground">
+          Fallback for chats with no model of their own
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function CredentialLine({
+  credential,
+}: {
+  credential: ModelEndpointCredentialStatus
+}) {
+  if (!credential.required && !credential.envName) {
+    return (
+      <p className="text-xs text-muted-foreground">No credential required.</p>
+    )
+  }
+  if (!credential.envName) {
+    // Codex reads the local `codex login` session rather than a variable, so
+    // there is no name to print — only whether that login is usable.
+    return credential.present ? (
+      <p className="text-xs text-muted-foreground">Signed in locally.</p>
+    ) : (
+      <p className="text-xs text-destructive">
+        No local sign-in. Run <code className="font-mono">codex login</code>{" "}
+        where the agent runs.
+      </p>
+    )
+  }
+  return credential.present ? (
+    <p className="text-xs text-muted-foreground">
+      <span className="font-mono">{credential.envName}</span> is set.
+    </p>
+  ) : (
+    <p className="text-xs text-destructive">
+      <span className="font-mono">{credential.envName}</span> is not set.
+    </p>
+  )
+}
+
+function AddEndpointSection() {
+  const probe = useProbeModelEndpoint()
+  const [baseUrl, setBaseUrl] = useState("")
+  const [model, setModel] = useState("")
+  const [apiKeyEnv, setApiKeyEnv] = useState("")
+
+  const result = probe.data
+  const canProbe = baseUrl.trim().length > 0 && !probe.isPending
+
+  // A probe request carries the URL and nothing else. The credential field
+  // below feeds the generated fixture rows only — which key (if any) Eve
+  // attaches is decided from the fixture by origin, so this form cannot aim
+  // an existing credential at a new host.
+  function handleProbe() {
+    probe.mutate({ baseUrl: baseUrl.trim() })
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+      <div className="flex flex-col gap-1">
+        <SectionHeader>Add a provider</SectionHeader>
+        <p className="text-xs text-muted-foreground">
+          Ollama, LM Studio, vLLM, and llama.cpp all speak the same
+          OpenAI-compatible HTTP API. Probe one to confirm the agent runtime
+          can reach it and to see what it serves, then add the generated rows
+          to the application fixture.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Label htmlFor="endpoint-base-url" className="text-xs">
+            Base URL
+          </Label>
+          <Input
+            id="endpoint-base-url"
+            value={baseUrl}
+            onChange={(event) => setBaseUrl(event.target.value)}
+            placeholder="http://127.0.0.1:1234/v1"
+            className="font-mono text-xs"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Label htmlFor="endpoint-api-key-env" className="text-xs">
+            Credential variable for the generated rows (optional)
+          </Label>
+          <Input
+            id="endpoint-api-key-env"
+            value={apiKeyEnv}
+            onChange={(event) => setApiKeyEnv(event.target.value)}
+            placeholder="SIGIL_MODEL_LOCAL_API_KEY"
+            className="font-mono text-xs"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Name the environment variable the agent runtime reads the key from, not
+        the key. Local servers usually need none. The probe itself runs
+        unauthenticated against a new address — a credential is only ever sent
+        to an origin already listed in the fixture.
+      </p>
+
+      <div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!canProbe}
+          onClick={handleProbe}
+        >
+          {probe.isPending ? "Probing…" : "Probe endpoint"}
+        </Button>
+      </div>
+
+      {probe.isError ? (
+        <p className="text-xs text-destructive">
+          {probe.error instanceof Error
+            ? probe.error.message
+            : "The probe could not be run."}
+        </p>
+      ) : null}
+
+      {result ? (
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
+          {result.reachable ? (
+            <p className="text-xs text-muted-foreground">
+              Reachable — serving {result.models.length}{" "}
+              {result.models.length === 1 ? "model" : "models"}.
+            </p>
+          ) : (
+            <p className="text-xs text-destructive">
+              Unreachable.{result.error ? ` ${result.error}` : ""}
+            </p>
+          )}
+
+          {result.credential.envName ? (
+            <p className="text-xs text-muted-foreground">
+              This origin is already configured, so the probe used{" "}
+              <span className="font-mono">{result.credential.envName}</span>,
+              which {result.credential.present ? "is set" : "is not set"}.
+            </p>
+          ) : null}
+
+          {result.models.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {result.models.map((servedModel) => (
+                <Button
+                  key={servedModel}
+                  type="button"
+                  size="sm"
+                  variant={servedModel === model ? "secondary" : "ghost"}
+                  className="h-auto py-1 font-mono text-xs"
+                  onClick={() => setModel(servedModel)}
+                >
+                  {servedModel}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
+          {result.reachable && model ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs text-muted-foreground">
+                Add this provider under{" "}
+                <code className="font-mono">agent.providers</code> in{" "}
+                <code className="font-mono">
+                  fixtures/application/sigil-chat.yaml
+                </code>
+                , then restart the agent runtime.
+              </p>
+              <CodeBlock
+                language="yaml"
+                code={providerFixtureSnippet({
+                  id: suggestProviderId(baseUrl.trim(), model),
+                  label: model,
+                  model,
+                  modelId: "default",
+                  baseUrl: baseUrl.trim(),
+                  ...(apiKeyEnv.trim()
+                    ? { apiKeyEnv: apiKeyEnv.trim() }
+                    : {}),
+                })}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function formatContextWindow(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) return "context window unknown"
+  return tokens >= 1_000
+    ? `${Math.round(tokens / 1_000)}K context`
+    : `${tokens} context`
+}

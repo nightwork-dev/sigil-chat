@@ -18,6 +18,7 @@ import type {
 } from "@/lib/agent-threads-domain";
 import type { SigilAuthSession } from "@/lib/auth/server";
 import { useAgentPrincipalId } from "@/lib/agent-principal";
+import { useUserSetting } from "@/lib/user-settings";
 import { invalidateHomeSignals } from "@/lib/home-signals";
 
 export type {
@@ -64,17 +65,79 @@ const getAgentThreadFn = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * Real validation of the create body, not a pass-through cast.
+ *
+ * The exact-key check is load-bearing for the model contract: the browser may
+ * name a preset ID and nothing else. A body carrying `baseUrl`, `provider`,
+ * `apiKeyEnv`, or a resolved model is REFUSED rather than ignored, so an
+ * attempt to supply an endpoint or credential from the client fails loudly
+ * instead of quietly landing on the safe path.
+ */
+const CREATE_THREAD_KEYS = new Set([
+  "personaId",
+  "title",
+  "workspaceId",
+  "sessionKind",
+  "initialPerspective",
+  "additionalContextScopeIds",
+  "modelPresetId",
+]);
+
+export function parseCreateAgentThreadRequest(
+  input: unknown,
+): CreateAgentThreadRequest {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error("A thread creation request must be an object.");
+  }
+  const unexpected = Object.keys(input).filter(
+    (key) => !CREATE_THREAD_KEYS.has(key),
+  );
+  if (unexpected.length > 0) {
+    throw new Error(
+      `Unsupported thread creation fields: ${unexpected.join(", ")}.`,
+    );
+  }
+  const candidate = input as Record<string, unknown>;
+  if (
+    typeof candidate.personaId !== "string" ||
+    candidate.personaId.trim().length === 0
+  ) {
+    throw new Error("A persona id is required.");
+  }
+  const modelPresetId = candidate.modelPresetId;
+  if (
+    modelPresetId !== undefined &&
+    (typeof modelPresetId !== "string" ||
+      // `<providerId>/<modelId>`, or the reserved deployment-default id.
+      !/^[a-z][a-z0-9]*(-[a-z0-9]+)*(\/[a-z][a-z0-9]*(-[a-z0-9]+)*)?$/.test(
+        modelPresetId.trim(),
+      ) ||
+      modelPresetId.trim().length > 129)
+  ) {
+    throw new Error("The requested model preset id is malformed.");
+  }
+  return {
+    ...(candidate as unknown as CreateAgentThreadRequest),
+    ...(typeof modelPresetId === "string"
+      ? { modelPresetId: modelPresetId.trim() }
+      : {}),
+  };
+}
+
+export interface CreateAgentThreadRequest {
+  personaId: string;
+  title?: string;
+  workspaceId?: string;
+  sessionKind?: "workspace" | "personal";
+  initialPerspective?: ScopePerspective;
+  additionalContextScopeIds?: string[];
+  /** Fixture preset id only. Never an endpoint, provider, or credential. */
+  modelPresetId?: string;
+}
+
 const createAgentThreadFn = createServerFn({ method: "POST" })
-  .validator(
-    (input: {
-      personaId: string;
-      title?: string;
-      workspaceId?: string;
-      sessionKind?: "workspace" | "personal";
-      initialPerspective?: ScopePerspective;
-      additionalContextScopeIds?: string[];
-    }) => input,
-  )
+  .validator(parseCreateAgentThreadRequest)
   .handler(async ({ data }) => {
     const { agentThreadBindingService } =
       await import("@/lib/agent-threads.server");
@@ -346,15 +409,20 @@ export function useSetActiveContainer() {
 export function useCreateAgentThread() {
   const queryClient = useQueryClient();
   const principalId = useAgentPrincipalId();
+  // Settings -> Models records a preferred model for new sessions. Applying it
+  // here rather than at each call site means every way of starting a session
+  // honors it; an explicit per-session choice still wins.
+  const preferredPreset = useUserSetting(principalId, "agent.modelPresetId");
   return useMutation({
-    mutationFn: (input: {
-      personaId: string;
-      title?: string;
-      workspaceId?: string;
-      sessionKind?: "workspace" | "personal";
-      initialPerspective?: ScopePerspective;
-      additionalContextScopeIds?: string[];
-    }) => createAgentThreadFn({ data: input }),
+    mutationFn: (input: CreateAgentThreadRequest) =>
+      createAgentThreadFn({
+        data: {
+          ...(preferredPreset.data?.value
+            ? { modelPresetId: preferredPreset.data.value }
+            : {}),
+          ...input,
+        },
+      }),
     onSuccess: (thread) => {
       cacheThread(queryClient, principalId, thread);
       cacheActivePreference(queryClient, principalId, {

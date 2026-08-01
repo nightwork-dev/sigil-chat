@@ -5,6 +5,7 @@
 // hidden until a real notification transport exists (spec).
 
 import {
+  BoxesIcon,
   KeyRoundIcon,
   PaletteIcon,
   SlidersHorizontalIcon,
@@ -23,12 +24,18 @@ import type { LoginMethods } from "@/lib/auth/login-methods"
 import { AccountSection } from "./account-section"
 import { AgentSection } from "./agent-section"
 import { AppearanceSection } from "./appearance-section"
+import { ModelsSection } from "./models-section"
 import { SecuritySection } from "./security-section"
 import { type AttentionContext } from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
 
-export type SettingsSection = "account" | "security" | "appearance" | "agent"
+export type SettingsSection =
+  | "account"
+  | "security"
+  | "appearance"
+  | "agent"
+  | "models"
 
 const SETTINGS_TABS: {
   value: SettingsSection
@@ -39,6 +46,7 @@ const SETTINGS_TABS: {
   { value: "security", label: "Security", icon: KeyRoundIcon },
   { value: "appearance", label: "Appearance", icon: PaletteIcon },
   { value: "agent", label: "Agent", icon: SlidersHorizontalIcon },
+  { value: "models", label: "Models", icon: BoxesIcon },
 ]
 
 export function SettingsPage({
@@ -56,6 +64,16 @@ export function SettingsPage({
 }) {
   // Attention coverage: the selected settings section flows into
   // agent context, so "change my theme" / "explain this setting" have a target.
+  // Models reads deployment-wide model configuration and credential status,
+  // which the server functions behind it already restrict to the owner. The
+  // tab follows that restriction so a member is never shown a section whose
+  // only possible content is a permission error.
+  const isOwner = user.role === "owner"
+  const tabs = SETTINGS_TABS.filter((tab) => tab.value !== "models" || isOwner)
+  const activeSection = tabs.some((tab) => tab.value === section)
+    ? section
+    : "account"
+
   const telemetry = useAttentionTelemetry()
   const attention: AttentionContext = {
     application: "sigil-chat",
@@ -63,22 +81,22 @@ export function SettingsPage({
     workspace: { kind: "settings", id: "settings", label: "Settings" },
     selection: {
       kind: "settings-section",
-      id: section,
+      id: activeSection,
       label:
-        SETTINGS_TABS.find((tab) => tab.value === section)?.label ?? section,
+        tabs.find((tab) => tab.value === activeSection)?.label ?? activeSection,
     },
     history: telemetry.history,
   }
   usePublishWorkspaceAttention(attention)
 
   return (
+    // No page-level <h1>: the _app breadcrumb bar already names this place.
+    // Restating "Settings" directly beneath it reads as two places, and the
+    // section rail below names which part of Settings you are in.
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-border px-4 py-3">
-        <h1 className="text-sm font-medium">Settings</h1>
-      </div>
       <Tabs
         orientation="vertical"
-        value={section}
+        value={activeSection}
         onValueChange={(value) => onSectionChange(value as SettingsSection)}
         className="min-h-0 flex-1 flex-row! gap-0 p-3"
       >
@@ -86,7 +104,7 @@ export function SettingsPage({
           variant="line"
           className="h-fit w-auto shrink-0 flex-col items-stretch bg-transparent p-0 sm:w-40"
         >
-          {SETTINGS_TABS.map((tab) => (
+          {tabs.map((tab) => (
             <TabsTrigger
               key={tab.value}
               value={tab.value}
@@ -109,7 +127,7 @@ export function SettingsPage({
           </TabsContent>
           <TabsContent value="security">
             <SecuritySection
-              isOwner={user.role === "owner"}
+              isOwner={isOwner}
               loginMethods={loginMethods}
               providerLinkError={providerLinkError}
               userId={user.id}
@@ -121,6 +139,11 @@ export function SettingsPage({
           <TabsContent value="agent">
             <AgentSection userId={user.id} />
           </TabsContent>
+          {isOwner ? (
+            <TabsContent value="models">
+              <ModelsSection userId={user.id} />
+            </TabsContent>
+          ) : null}
         </div>
       </Tabs>
     </div>

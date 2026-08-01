@@ -58,6 +58,7 @@ import { appendDictationDraft } from "@/lib/voice-dictation"
 import { useSpeakReplies } from "@/lib/agent-speak-replies"
 import { useSpokenAgentReplies } from "@/lib/spoken-replies"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
+import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"
 import type { VoiceBoundThread } from "@/lib/voice-session-binding"
 import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
@@ -351,7 +352,9 @@ export function AgentChat({
         }
         trailingControls={
           <>
-            {hideHeader ? <ModelLabel /> : null}
+            {hideHeader ? (
+              <ModelLabel bound={activeThread.data?.executionBinding?.model} />
+            ) : null}
             {/* The mode switch sits immediately before the mic it changes:
                 with it on, the same press-to-talk gesture sends instead of
                 drafting, and Eve's finished replies are spoken back. */}
@@ -430,13 +433,14 @@ function ApprovalChip({
   )
 }
 
-/** §9.7 — a static model label, real data (agent runtime catalog), not a
- *  placeholder: a picker-ready slot for the MODEL-ADMINISTRATION draft, but
- *  today the model is fixed per-thread, so this just displays it. */
-function ModelLabel() {
+/** §9.7 — the model this thread actually runs. The thread's immutable bound
+ *  model wins; the runtime catalog's deployment default is only the fallback
+ *  for threads that made no selection. A deployment-global label here would
+ *  misreport every non-default session (it did, before per-session binding). */
+function ModelLabel({ bound }: { bound?: BoundAgentModel }) {
   const catalog = useAgentRuntimeCatalog()
   const name = catalog.data?.agent.name ?? "Eve"
-  const model = catalog.data?.agent.model
+  const model = bound ? `${bound.provider}/${bound.modelId}` : catalog.data?.agent.model
   return (
     <span className="hidden shrink-0 truncate px-1.5 font-mono text-[10px] text-muted-foreground sm:inline">
       {name}
