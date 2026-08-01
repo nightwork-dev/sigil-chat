@@ -69,7 +69,8 @@ const readScopedBlackboardFn = createServerFn({ method: "GET" })
       session,
       data,
       (userId, threadId) =>
-        agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
+        agentThreadRepository.get(userId, threadId)?.executionBinding
+          ?.homeScopeId,
       blackboardRepository,
     )
   })
@@ -98,7 +99,8 @@ const writeScopedBlackboardFn = createServerFn({ method: "POST" })
       session,
       data,
       (userId, threadId) =>
-        agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
+        agentThreadRepository.get(userId, threadId)?.executionBinding
+          ?.homeScopeId,
       blackboardRepository,
     )
   })

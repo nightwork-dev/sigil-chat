@@ -31,6 +31,7 @@ import {
 import { useEvidenceRoomScope } from "@/lib/evidence"
 import {
   artifactUrl,
+  formatBytes,
   useArtifactPreview,
   useArtifacts,
   type ArtifactRecord,
@@ -440,10 +441,10 @@ function ArtifactIcon({ artifact }: { artifact: ArtifactRecord }) {
         : artifact.mediaType.startsWith("audio/")
           ? AudioLinesIcon
           : artifact.mediaType.includes("json")
-          ? FileJsonIcon
-          : artifact.mediaType.startsWith("text/")
-            ? FileTextIcon
-            : FileIcon
+            ? FileJsonIcon
+            : artifact.mediaType.startsWith("text/")
+              ? FileTextIcon
+              : FileIcon
   return <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 }
 
@@ -495,12 +496,6 @@ function parseDistill(
   } catch {
     return null
   }
-}
-
-function formatBytes(value: number): string {
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatDate(value: string): string {

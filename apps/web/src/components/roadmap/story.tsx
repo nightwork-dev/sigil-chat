@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 // The roadmap Story as a compound component. One Story renders three ways —
 // a board card, the detail panel, and a review-queue row — by composing the
@@ -6,16 +6,16 @@
 // looks. Presentation maps (status/routing/gate) are exported alongside because
 // the board's column headers and the queue rows share the same vocabulary.
 
-import { createContext, useContext, type ReactNode } from "react";
-import { CheckIcon } from "lucide-react";
-import { Badge } from "@workspace/ui/components/badge";
-import { cn } from "@workspace/ui/lib/utils";
+import { createContext, useContext, type ReactNode } from "react"
+import { CheckIcon } from "lucide-react"
+import { Badge } from "@workspace/ui/components/badge"
+import { cn } from "@workspace/ui/lib/utils"
 import type {
   ReviewGate,
   Routing,
   Story as StoryData,
   StoryStatus,
-} from "@workspace/work-items-store/types";
+} from "@workspace/work-items-store/types"
 
 // ── Shared presentation vocabulary ──────────────────────────────────────────
 
@@ -29,14 +29,14 @@ export const STORY_STATUS_ORDER: StoryStatus[] = [
   "verify",
   "shipped",
   "blocked",
-];
+]
 
 interface StatusPresentation {
-  label: string;
+  label: string
   // Soft tint drawn from theme tone tokens (never raw palette) so status keeps
   // its meaning across every theme. The label always renders, so color is a
   // reinforcement, not the only cue.
-  badgeClass: string;
+  badgeClass: string
 }
 
 export const STORY_STATUS: Record<StoryStatus, StatusPresentation> = {
@@ -53,7 +53,7 @@ export const STORY_STATUS: Record<StoryStatus, StatusPresentation> = {
     label: "Blocked",
     badgeClass: "bg-destructive/15 text-destructive",
   },
-};
+}
 
 const ROUTING_LABEL: Record<Routing, string> = {
   self: "Self",
@@ -61,38 +61,36 @@ const ROUTING_LABEL: Record<Routing, string> = {
   design: "Design",
   implementation: "Implementation",
   research: "Research",
-};
+}
 
 // browser:owner / decision:owner are installation-owner gates;
 // peer is someone else's; none carries no review and renders nothing.
-const GATE_META: Record<
-  ReviewGate,
-  { label: string; owner: boolean } | null
-> = {
-  "browser:owner": { label: "Browser review", owner: true },
-  "decision:owner": { label: "Decision", owner: true },
-  peer: { label: "Peer review", owner: false },
-  none: null,
-};
+const GATE_META: Record<ReviewGate, { label: string; owner: boolean } | null> =
+  {
+    "browser:owner": { label: "Browser review", owner: true },
+    "decision:owner": { label: "Decision", owner: true },
+    peer: { label: "Peer review", owner: false },
+    none: null,
+  }
 
 export function isOwnerGate(gate: ReviewGate): boolean {
-  return GATE_META[gate]?.owner ?? false;
+  return GATE_META[gate]?.owner ?? false
 }
 
 // ── Context ─────────────────────────────────────────────────────────────────
 
-const StoryContext = createContext<StoryData | null>(null);
+const StoryContext = createContext<StoryData | null>(null)
 
 function useStoryContext(): StoryData {
-  const ctx = useContext(StoryContext);
-  if (!ctx) throw new Error("Story parts must be used inside <Story.Root>");
-  return ctx;
+  const ctx = useContext(StoryContext)
+  if (!ctx) throw new Error("Story parts must be used inside <Story.Root>")
+  return ctx
 }
 
 interface RootProps {
-  story: StoryData;
-  children: ReactNode;
-  className?: string;
+  story: StoryData
+  children: ReactNode
+  className?: string
 }
 
 function Root({ story, children, className }: RootProps) {
@@ -102,11 +100,11 @@ function Root({ story, children, className }: RootProps) {
         {children}
       </div>
     </StoryContext.Provider>
-  );
+  )
 }
 
 function Title({ className }: { className?: string }) {
-  const { title } = useStoryContext();
+  const { title } = useStoryContext()
   return (
     <span
       data-slot="story-title"
@@ -114,12 +112,12 @@ function Title({ className }: { className?: string }) {
     >
       {title}
     </span>
-  );
+  )
 }
 
 function Status({ className }: { className?: string }) {
-  const { status } = useStoryContext();
-  const meta = STORY_STATUS[status];
+  const { status } = useStoryContext()
+  const meta = STORY_STATUS[status]
   return (
     <Badge
       variant="outline"
@@ -127,11 +125,11 @@ function Status({ className }: { className?: string }) {
     >
       {meta.label}
     </Badge>
-  );
+  )
 }
 
 function RoutingBadge({ className }: { className?: string }) {
-  const { routing } = useStoryContext();
+  const { routing } = useStoryContext()
   // One encoding per fact (the persistence ladder): the label already
   // carries the routing role, so the bot/person icon is a
   // redundant second encoding — dropped.
@@ -139,15 +137,15 @@ function RoutingBadge({ className }: { className?: string }) {
     <Badge variant="outline" className={cn("font-mono", className)}>
       {ROUTING_LABEL[routing]}
     </Badge>
-  );
+  )
 }
 
 // Glanceable metadata row: story id, the review gate (when one applies), and
 // the dependency count. Everything here is a value that can change per story;
 // nothing is decorative.
 function Meta({ className }: { className?: string }) {
-  const { id, reviewGate, deps } = useStoryContext();
-  const gate = GATE_META[reviewGate];
+  const { id, reviewGate, deps } = useStoryContext()
+  const gate = GATE_META[reviewGate]
   return (
     <div
       className={cn(
@@ -172,12 +170,12 @@ function Meta({ className }: { className?: string }) {
         </span>
       ) : null}
     </div>
-  );
+  )
 }
 
 function AcceptanceList({ className }: { className?: string }) {
-  const { acceptanceCriteria } = useStoryContext();
-  if (acceptanceCriteria.length === 0) return null;
+  const { acceptanceCriteria } = useStoryContext()
+  if (acceptanceCriteria.length === 0) return null
   return (
     <ul className={cn("space-y-2", className)}>
       {acceptanceCriteria.map((criterion) => (
@@ -190,7 +188,7 @@ function AcceptanceList({ className }: { className?: string }) {
         </li>
       ))}
     </ul>
-  );
+  )
 }
 
 export const Story = {
@@ -200,4 +198,4 @@ export const Story = {
   RoutingBadge,
   Meta,
   AcceptanceList,
-};
+}

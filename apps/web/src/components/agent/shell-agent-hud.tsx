@@ -17,13 +17,14 @@ import { setAgentHudDock, useAgentHudDock } from "@/lib/agent-hud-dock"
 import { useAgentHudOpen } from "@/lib/agent-hud-open"
 import { useAgentSurfaceRegistry } from "@/lib/agent-surface-registry"
 import {
-  setToolApprovalMode,
+  useSetToolApprovalMode,
   useToolApprovalMode,
-} from "@/lib/agent-tool-approval"
+} from "@/lib/agent-preferences"
 
 export function ShellAgentHud() {
   const [open, setOpen] = useAgentHudOpen()
   const approvalMode = useToolApprovalMode()
+  const setApprovalMode = useSetToolApprovalMode()
   const dock = useAgentHudDock()
   const registry = useAgentSurfaceRegistry()
 
@@ -46,7 +47,7 @@ export function ShellAgentHud() {
         navigationTarget={<Link to="/chat" />}
         chatProps={{
           approvalMode,
-          onApprovalModeChange: setToolApprovalMode,
+          onApprovalModeChange: setApprovalMode.set,
           // Keep the compact panel clean — the context inspector belongs on
           // the full /chat view where there's room (and out of the narrow
           // toolbar, where it collided with the session switcher).

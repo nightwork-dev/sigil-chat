@@ -5,6 +5,7 @@ import type { SigilAgentConfig } from "@workspace/runtime-env/config"
 import {
   findModelPreset,
   readBoundModelFromAttributes,
+  readRequestOptionsFromAttributes,
   readResolveContextAttributes,
   resolveSessionModel,
   resolveSessionModelFromAuth,
@@ -17,7 +18,20 @@ const AGENT: SigilAgentConfig = {
       id: "codex",
       label: "Codex subscription",
       kind: "codex",
-      models: [{ id: "luna", model: "gpt-5.6-luna", label: "GPT-5.6 Luna" }],
+      models: [
+        {
+          id: "luna",
+          model: "gpt-5.6-luna",
+          label: "GPT-5.6 Luna",
+          reasoning: {
+            levels: ["off", "low", "medium", "high", "xhigh", "max"],
+            default: "medium",
+          },
+          fastMode: true,
+        },
+        // Sol declares neither — the AC2/AC5 "no declaration, no control" case.
+        { id: "sol", model: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+      ],
     },
     {
       id: "deepseek",
@@ -59,6 +73,83 @@ describe("preset lookup", () => {
     )
     expect(findModelPreset(AGENT, "codex/luna")?.model).toBe("gpt-5.6-luna")
     expect(findModelPreset(AGENT, "nope")).toBeUndefined()
+  })
+
+  // MDL.2: a model Eve's catalog discovery found but the fixture never
+  // authored resolves by borrowing its PROVIDER's transport facts from the
+  // fixture — the discovery cache itself carries no baseUrl or credential.
+  describe("a model from the discovery cache", () => {
+    const discovered = [
+      {
+        id: "deepseek/reasoner",
+        providerId: "deepseek",
+        model: "deepseek-reasoner",
+        label: "deepseek-reasoner",
+      },
+    ]
+
+    it("resolves against its authored provider's baseUrl and credential", () => {
+      const preset = findModelPreset(AGENT, "deepseek/reasoner", discovered)
+      expect(preset).toMatchObject({
+        id: "deepseek/reasoner",
+        provider: "openai-compatible",
+        model: "deepseek-reasoner",
+        baseUrl: "https://api.deepseek.com/v1",
+        apiKeyEnv: "SIGIL_MODEL_DEEPSEEK_API_KEY",
+        contextWindowTokens: 65_536,
+        isDeploymentDefault: false,
+      })
+    })
+
+    it("lets an authored preset with the same id win, unreachable in practice but not a crash", () => {
+      // "codex/luna" IS authored — a discovery-cache entry that somehow named
+      // it must never shadow the fixture's own row.
+      const preset = findModelPreset(AGENT, "codex/luna", [
+        { id: "codex/luna", providerId: "codex", model: "impostor", label: "x" },
+      ])
+      expect(preset?.model).toBe("gpt-5.6-luna")
+    })
+
+    it("refuses to resolve when the entry's provider is no longer in the fixture", () => {
+      expect(
+        findModelPreset(AGENT, "ghost/model", [
+          { id: "ghost/model", providerId: "ghost", model: "x", label: "x" },
+        ]),
+      ).toBeUndefined()
+    })
+
+    it("refuses to resolve when the provider has since been disabled", () => {
+      const agentWithDisabledProvider: SigilAgentConfig = {
+        ...AGENT,
+        providers: AGENT.providers?.map((provider) =>
+          provider.id === "deepseek" ? { ...provider, enabled: false } : provider,
+        ),
+      }
+      expect(
+        findModelPreset(agentWithDisabledProvider, "deepseek/reasoner", discovered),
+      ).toBeUndefined()
+    })
+
+    it("actually resolves and runs through resolveSessionModel, not just the lookup", () => {
+      const selection = resolveSessionModel(
+        AGENT,
+        {
+          presetId: "deepseek/reasoner",
+          provider: "openai-compatible",
+          modelId: "deepseek-reasoner",
+        },
+        {
+          env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-test" },
+          discovered,
+        },
+      )
+      expect(selection).toMatchObject({
+        presetId: "deepseek/reasoner",
+        provider: "openai-compatible",
+        modelId: "deepseek-reasoner",
+        modelContextWindowTokens: 65_536,
+      })
+    })
   })
 })
 
@@ -238,5 +329,105 @@ describe("per-session model resolution", () => {
 
     expect(after?.presetId).toBe(before?.presetId)
     expect(after?.modelId).toBe("gpt-5.6-luna")
+  })
+})
+
+describe("MDL.4 reasoning level and fast mode", () => {
+  it("reads request options from the same verified attribute the model rides in", () => {
+    const attributes = readResolveContextAttributes(
+      authContext({
+        ...LUNA_BINDING,
+        requestOptions: { reasoningLevel: "high", fastMode: true },
+      }),
+    )
+    expect(readRequestOptionsFromAttributes(attributes)).toEqual({
+      reasoningLevel: "high",
+      fastMode: true,
+    })
+  })
+
+  it("treats an absent or malformed requestOptions block as ordinary silence", () => {
+    expect(readRequestOptionsFromAttributes(undefined)).toBeUndefined()
+    expect(
+      readRequestOptionsFromAttributes({
+        sigilExecutionBinding: JSON.stringify(LUNA_BINDING),
+      }),
+    ).toBeUndefined()
+    expect(
+      readRequestOptionsFromAttributes({
+        sigilExecutionBinding: JSON.stringify({
+          ...LUNA_BINDING,
+          requestOptions: { reasoningLevel: 5, fastMode: "yes" },
+        }),
+      }),
+    ).toBeUndefined()
+  })
+
+  // The red-proven case: the option must reach the actual step.started model
+  // resolution, not merely be readable off the attribute. This is what
+  // agent.ts forwards into Eve's `modelOptions.providerOptions`.
+  it("reaches modelOptions.providerOptions when the preset declares support", () => {
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(
+        authContext({
+          ...LUNA_BINDING,
+          requestOptions: { reasoningLevel: "high", fastMode: true },
+        }),
+      ),
+    )
+    expect(selection?.modelOptions).toEqual({
+      providerOptions: { openai: { reasoningEffort: "high", serviceTier: "flex" } },
+    })
+    expect(selection?.resolvedReasoningLevel).toBe("high")
+    expect(selection?.resolvedFastMode).toBe(true)
+  })
+
+  it("clamps an undeclared level to the preset's own default rather than dropping it", () => {
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(
+        authContext({
+          ...LUNA_BINDING,
+          requestOptions: { reasoningLevel: "ultra-nonexistent" },
+        }),
+      ),
+    )
+    expect(selection?.resolvedReasoningLevel).toBe("medium")
+    expect(selection?.modelOptions).toEqual({
+      providerOptions: { openai: { reasoningEffort: "medium" } },
+    })
+  })
+
+  it("drops fast mode when the preset does not declare support (AC3)", () => {
+    const solBinding = {
+      applicationThreadId: "thread-3",
+      personaId: "eve",
+      model: { presetId: "codex/sol", provider: "codex", modelId: "gpt-5.6-sol" },
+      requestOptions: { fastMode: true, reasoningLevel: "high" },
+    }
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(authContext(solBinding)),
+    )
+    // Sol declares neither reasoning nor fastMode — both must be absent from
+    // the applied result and from receipts, not silently forwarded anyway.
+    expect(selection?.resolvedReasoningLevel).toBeUndefined()
+    expect(selection?.resolvedFastMode).toBeUndefined()
+    expect(selection?.modelOptions).toBeUndefined()
+  })
+
+  it("still applies the preset's declared default reasoning level when the session made no request", () => {
+    const selection = resolveSessionModelFromAuth(
+      AGENT,
+      readResolveContextAttributes(authContext(LUNA_BINDING)),
+    )
+    // No requested level → the preset's declared default still applies
+    // (AC5: defaults come from the fixture, never a hardcoded app value).
+    expect(selection?.resolvedReasoningLevel).toBe("medium")
+    expect(selection?.resolvedFastMode).toBe(false)
+    expect(selection?.modelOptions).toEqual({
+      providerOptions: { openai: { reasoningEffort: "medium" } },
+    })
   })
 })

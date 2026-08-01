@@ -1,5 +1,9 @@
 export const overlayPaths = Object.freeze([
   ".env.example",
+  ".agents/skills",
+  ".claude/skills",
+  ".pi/skills",
+  "docs/guides",
   "package.json",
   "pnpm-workspace.yaml",
   "sigil.doctor.json",

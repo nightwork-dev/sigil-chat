@@ -11,6 +11,10 @@ import {
 import { createMemoryFixtureSource } from "@mirk/fixtures/memory";
 import { parse as parseYaml } from "yaml";
 
+import {
+  DEPLOYMENT_DEFAULT_PRESET_ID,
+  DEPLOYMENT_DEFAULT_PROVIDER_ID,
+} from "@workspace/runtime-env/constants";
 import { resolveSigilProjectRoot } from "@workspace/runtime-env/project-root";
 
 /** Transport kinds the resolver knows how to build. Not vendors. */
@@ -27,15 +31,43 @@ export type SigilAgentModelProvider =
  */
 export type SigilModelCapability = "chat" | "embedding" | "voice";
 
+/**
+ * USD rate data for one model, authored per 1M tokens (the unit every vendor
+ * quotes in). Optional everywhere: MDL.3 meters tokens regardless, and only
+ * converts to a cost when both this and the metered direction are present —
+ * an unpriced model is unpriced, never guessed at.
+ */
+export interface SigilAgentModelPricing {
+  inputPerMillionTokens?: number;
+  outputPerMillionTokens?: number;
+}
+
 export interface SigilAgentModelObjectConfig {
   provider: SigilAgentModelProvider;
   model: string;
   baseUrl?: string;
   apiKeyEnv?: string;
   contextWindowTokens?: number;
+  pricing?: SigilAgentModelPricing;
 }
 
 export type SigilAgentModelConfig = string | SigilAgentModelObjectConfig;
+
+/**
+ * Ordered reasoning-effort levels a model accepts, weakest first, plus which
+ * one a session starts on.
+ *
+ * Declared, never sniffed (MDL.4): a model with no `reasoning` block shows no
+ * reasoning control at all, rather than the app guessing what a provider
+ * supports. The level strings are provider vocabulary passed through
+ * verbatim by the resolver (e.g. codex/openai: "minimal" | "low" | "medium" |
+ * "high" | "xhigh" | "max") — this schema does not constrain the set, because
+ * that vocabulary is a provider fact, not an app one.
+ */
+export interface SigilAgentModelReasoningConfig {
+  levels: string[];
+  default: string;
+}
 
 /** One model offered by a provider. */
 export interface SigilAgentProviderModelConfig {
@@ -46,12 +78,26 @@ export interface SigilAgentProviderModelConfig {
   /** Defaults to `chat`. */
   capability?: SigilModelCapability;
   /**
-   * Whether this model may be selected. UNIMPLEMENTED — the field is accepted
-   * and normalized so the allow-list lands without a reshape, but nothing
-   * enforces it yet (see model-selection.server.ts).
+   * The author's veto. `false` makes this model unselectable everywhere, and
+   * an installation owner cannot override it — enforced by
+   * `isSelectableModelPreset` in the web app's model-selection.server.ts.
+   * Note what `true` does NOT mean: a model still has to be enabled by an
+   * owner before a new session may run it.
    */
   enabled?: boolean;
   contextWindowTokens?: number;
+  /**
+   * Reasoning-effort levels this model accepts. Absent means the model shows
+   * no reasoning control (MDL.4 AC2/AC5) — never a hardcoded app default.
+   */
+  reasoning?: SigilAgentModelReasoningConfig;
+  /**
+   * Whether this model accepts a faster/cheaper request mode. Absent or
+   * false means no fast-mode control is shown for it (MDL.4 AC3).
+   */
+  fastMode?: boolean;
+  /** Overrides the provider's `pricing`, if any. */
+  pricing?: SigilAgentModelPricing;
 }
 
 /**
@@ -71,7 +117,13 @@ export interface SigilAgentProviderConfig {
   apiKeyEnv?: string;
   /** Default context window for this provider's models. */
   contextWindowTokens?: number;
-  /** UNIMPLEMENTED, as per the model-level `enabled`. */
+  /** Default rate data for this provider's models; a model's own `pricing` wins. */
+  pricing?: SigilAgentModelPricing;
+  /**
+   * The author's veto over this provider and every model beneath it. An owner
+   * cannot re-enable it from the installation allow-list — that set narrows
+   * what the author permitted, it never widens it.
+   */
   enabled?: boolean;
   models: SigilAgentProviderModelConfig[];
 }
@@ -82,6 +134,7 @@ export interface NormalizedSigilAgentModelConfig {
   baseUrl?: string;
   apiKeyEnv?: string;
   contextWindowTokens?: number;
+  pricing?: SigilAgentModelPricing;
   source: "bare-slug" | "object";
 }
 
@@ -102,6 +155,10 @@ export interface NormalizedSigilAgentModelPreset
   /** Both levels resolved: a model in a disabled provider is disabled. */
   enabled: boolean;
   isDeploymentDefault: boolean;
+  /** Absent means this preset declares no reasoning control (MDL.4). */
+  reasoning?: SigilAgentModelReasoningConfig;
+  /** Defaults to false — the deployment default and any undeclared preset. */
+  fastMode: boolean;
 }
 
 /** Provider-shaped inventory: the authored structure, normalized. */
@@ -115,10 +172,9 @@ export interface NormalizedSigilAgentProvider {
   models: NormalizedSigilAgentModelPreset[];
 }
 
-/** Reserved id for the entry synthesized from `agent.model`. */
-export const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default";
-/** Reserved provider id for that synthesized entry. */
-export const DEPLOYMENT_DEFAULT_PROVIDER_ID = "deployment";
+// Defined in ./constants (client-safe, no Node imports) and re-exported here so
+// existing importers of this module keep resolving them from one definition.
+export { DEPLOYMENT_DEFAULT_PRESET_ID, DEPLOYMENT_DEFAULT_PROVIDER_ID };
 
 export interface SigilAgentConfig {
   model: SigilAgentModelConfig;
@@ -172,6 +228,7 @@ export function normalizeSigilAgentModelConfig(
     ...(model.contextWindowTokens !== undefined
       ? { contextWindowTokens: model.contextWindowTokens }
       : {}),
+    ...(model.pricing !== undefined ? { pricing: model.pricing } : {}),
     source: "object",
   };
 }
@@ -196,6 +253,13 @@ export function normalizeSigilAgentProviders(
     capability: "chat",
     enabled: true,
     isDeploymentDefault: true,
+    // The deployment default is authored as `agent.model`, a bare slug or a
+    // credential-only object — that shape has no room for a reasoning/fastMode
+    // declaration today, so it never shows either control. Declaring one for
+    // the default would need widening SigilAgentModelObjectConfig, which is
+    // out of MDL.4's scope; every AUTHORED provider preset below can declare
+    // both.
+    fastMode: false,
   };
 
   return [
@@ -226,6 +290,7 @@ export function normalizeSigilAgentProviders(
         models: provider.models.map((entry) => {
           const contextWindowTokens =
             entry.contextWindowTokens ?? provider.contextWindowTokens;
+          const pricing = entry.pricing ?? provider.pricing;
           return {
             provider: provider.kind,
             model: entry.model,
@@ -238,6 +303,7 @@ export function normalizeSigilAgentProviders(
             ...(contextWindowTokens !== undefined
               ? { contextWindowTokens }
               : {}),
+            ...(pricing !== undefined ? { pricing } : {}),
             source: "object" as const,
             id: `${provider.id}/${entry.id}`,
             label: entry.label ?? entry.model,
@@ -248,6 +314,8 @@ export function normalizeSigilAgentProviders(
             // its own flag: the provider is the credential holder.
             enabled: providerEnabled && (entry.enabled ?? true),
             isDeploymentDefault: false,
+            ...(entry.reasoning ? { reasoning: entry.reasoning } : {}),
+            fastMode: entry.fastMode ?? false,
           };
         }),
       };
@@ -441,9 +509,50 @@ function requireModelConfig(
         path: [...path, "baseUrl"],
       });
     }
+    requirePricing(candidate.pricing, issues, [...path, "pricing"]);
     return;
   }
   issues.push({ message: "must be a non-empty slug without whitespace", path });
+}
+
+/**
+ * Both rates are optional independently — a model priced only on input (or
+ * only on output) is a real fixture shape, not an error — but a present rate
+ * must be a non-negative number.
+ */
+function requirePricing(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (candidate === undefined) return;
+  if (!isRecord(candidate)) {
+    issues.push({ message: "must be an object", path });
+    return;
+  }
+  const { inputPerMillionTokens, outputPerMillionTokens } = candidate;
+  if (
+    inputPerMillionTokens !== undefined &&
+    !isNonNegativeNumber(inputPerMillionTokens)
+  ) {
+    issues.push({
+      message: "must be a non-negative number",
+      path: [...path, "inputPerMillionTokens"],
+    });
+  }
+  if (
+    outputPerMillionTokens !== undefined &&
+    !isNonNegativeNumber(outputPerMillionTokens)
+  ) {
+    issues.push({
+      message: "must be a non-negative number",
+      path: [...path, "outputPerMillionTokens"],
+    });
+  }
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 /**
@@ -536,6 +645,7 @@ function requireProviders(
         path: [...entryPath, "enabled"],
       });
     }
+    requirePricing(entry.pricing, issues, [...entryPath, "pricing"]);
     requireProviderModels(entry.models, issues, [...entryPath, "models"]);
   });
 }
@@ -609,7 +719,57 @@ function requireProviderModels(
         path: [...entryPath, "contextWindowTokens"],
       });
     }
+    if (entry.fastMode !== undefined && typeof entry.fastMode !== "boolean") {
+      issues.push({
+        message: "must be true or false",
+        path: [...entryPath, "fastMode"],
+      });
+    }
+    requireReasoningConfig(entry.reasoning, issues, [...entryPath, "reasoning"]);
+    requirePricing(entry.pricing, issues, [...entryPath, "pricing"]);
   });
+}
+
+/**
+ * Optional per-model reasoning declaration (MDL.4): an ordered, non-empty
+ * list of provider-vocabulary levels plus a default that is one of them. Not
+ * validating the level strings against a fixed set is deliberate — that
+ * vocabulary belongs to the provider, not this schema.
+ */
+function requireReasoningConfig(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (candidate === undefined) return;
+  if (!isRecord(candidate)) {
+    issues.push({ message: "must be an object", path });
+    return;
+  }
+  const levels = candidate.levels;
+  const levelsPath = [...path, "levels"];
+  const validLevels =
+    Array.isArray(levels) &&
+    levels.length > 0 &&
+    levels.every((level) => isNonEmptyText(level));
+  if (!validLevels) {
+    issues.push({
+      message: "must be a non-empty list of non-empty strings",
+      path: levelsPath,
+    });
+  }
+  const defaultLevel = candidate.default;
+  if (!isNonEmptyText(defaultLevel)) {
+    issues.push({
+      message: "must be a non-empty string",
+      path: [...path, "default"],
+    });
+  } else if (validLevels && !(levels as unknown[]).includes(defaultLevel)) {
+    issues.push({
+      message: "must be one of reasoning.levels",
+      path: [...path, "default"],
+    });
+  }
 }
 
 function isSupportedModelProvider(

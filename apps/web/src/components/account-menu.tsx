@@ -37,7 +37,9 @@ export function AccountMenu({ user }: { user: CurrentSessionUser }) {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={<SidebarMenuButton className="max-sm:min-h-11" tooltip={label} />}
+            render={
+              <SidebarMenuButton className="max-sm:min-h-11" tooltip={label} />
+            }
           >
             <Avatar size="sm">
               <AvatarFallback>{initial}</AvatarFallback>

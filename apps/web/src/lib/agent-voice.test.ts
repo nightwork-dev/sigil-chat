@@ -32,9 +32,9 @@ describe("synthesizeSpeech", () => {
 
     await synthesizeSpeech("hello", fetchImpl, "persona-a")
 
-    expect((init?.headers as Record<string, string>)["x-sigil-persona-id"]).toBe(
-      "persona-a",
-    )
+    expect(
+      (init?.headers as Record<string, string>)["x-sigil-persona-id"],
+    ).toBe("persona-a")
     expect(init?.body).toBe(JSON.stringify({ text: "hello" }))
   })
 
@@ -81,8 +81,8 @@ describe("speakMessageParts", () => {
   it("degrades a synth failure to a status the caller can ignore", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("synth down"))
 
-    await expect(
-      speakMessageParts([textPart], {}, fetchImpl),
-    ).resolves.toEqual({ status: "failed" })
+    await expect(speakMessageParts([textPart], {}, fetchImpl)).resolves.toEqual(
+      { status: "failed" },
+    )
   })
 })

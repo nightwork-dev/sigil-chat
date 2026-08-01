@@ -100,11 +100,7 @@ export function WorkspaceHome({ state, compact }: WorkspaceHomeProps) {
         }
         compact={compact}
       >
-        <HomeResources
-          resources={view.resources}
-          compact={compact}
-          showKind
-        />
+        <HomeResources resources={view.resources} compact={compact} showKind />
       </HomeSection>
 
       <HomeSection

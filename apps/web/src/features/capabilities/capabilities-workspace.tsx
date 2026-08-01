@@ -4,7 +4,11 @@ import { useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { SearchIcon, SlidersHorizontalIcon } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert"
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Spinner } from "@workspace/ui/components/spinner"
@@ -19,7 +23,8 @@ import {
 import {
   useToolApprovalMode,
   useToolApprovalOverrides,
-} from "@/lib/agent-tool-approval"
+} from "@/lib/agent-preferences"
+import { effectiveToolApprovalOverrides } from "@/lib/agent-tool-approval"
 
 /**
  * An explanatory surface over the authenticated catalogs. Settings remains the
@@ -36,10 +41,17 @@ export function CapabilitiesWorkspace() {
   if (catalog.isError) return <UnavailableState />
 
   const groups = filterCapabilityGroups(
-    projectCapabilityGroups(catalog.data, defaultMode, overrides),
+    projectCapabilityGroups(
+      catalog.data,
+      defaultMode,
+      effectiveToolApprovalOverrides(overrides),
+    ),
     query,
   )
-  const itemCount = groups.reduce((total, group) => total + group.items.length, 0)
+  const itemCount = groups.reduce(
+    (total, group) => total + group.items.length,
+    0,
+  )
   const gonkCount = catalog.data.tools.length
   const runtimeCount =
     catalog.data.runtimeTools.length +
@@ -58,7 +70,11 @@ export function CapabilitiesWorkspace() {
               with rather than the registry that happens to provide it.
             </p>
           </div>
-          <Button size="sm" variant="outline" render={<Link to="/settings" search={{ section: "agent" }} />}>
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link to="/settings" search={{ section: "agent" }} />}
+          >
             <SlidersHorizontalIcon />
             Consent settings
           </Button>
@@ -66,7 +82,8 @@ export function CapabilitiesWorkspace() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            {itemCount} {summaryLabel} capabilities · {gonkCount} application · {runtimeCount} runtime
+            {itemCount} {summaryLabel} capabilities · {gonkCount} application ·{" "}
+            {runtimeCount} runtime
           </p>
           <label className="relative block w-full sm:max-w-xs">
             <span className="sr-only">Search capabilities</span>
@@ -110,13 +127,18 @@ export function CapabilitiesWorkspace() {
 
 function CapabilityGroupSection({ group }: { group: CapabilityGroup }) {
   return (
-    <section aria-labelledby={`${group.id}-heading`} className="border-b border-border py-5">
+    <section
+      aria-labelledby={`${group.id}-heading`}
+      className="border-b border-border py-5"
+    >
       <div className="mb-3 flex items-baseline justify-between gap-4">
         <div>
           <h2 className="text-sm font-medium" id={`${group.id}-heading`}>
             {group.title}
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{group.description}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {group.description}
+          </p>
         </div>
         <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
           {group.items.length} {group.items.length === 1 ? "item" : "items"}
@@ -136,7 +158,9 @@ function CapabilityRow({ item }: { item: CapabilityItem }) {
     <article className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
       <div className="min-w-0">
         <h3 className="text-sm font-medium text-foreground">{item.name}</h3>
-        <p className="mt-0.5 text-sm text-muted-foreground">{item.description}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {item.description}
+        </p>
       </div>
       <dl className="grid shrink-0 grid-cols-2 gap-x-5 gap-y-1 text-[11px] sm:w-64">
         <Metadata label="Source">{item.source}</Metadata>

@@ -72,3 +72,11 @@ export function useArtifactPreview(scope: string | null, id: string | null) {
     enabled: Boolean(scope && id),
   })
 }
+
+/** An artifact's byte size at row precision — never more digits than a reader
+ *  can use to decide whether to open it. */
+export function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+}

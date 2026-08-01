@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { toast } from "sonner";
-import { CircleAlertIcon } from "lucide-react";
-import type { ManagedSkillDetail } from "@/lib/skills";
-import { useDeleteSkill, useSkill, useUpsertSkill } from "@/lib/skills";
-import { useResourceManager } from "@workspace/data/components/resource-manager";
-import { DetailPanel } from "@workspace/data/components/detail-panel";
-import { SkillSummary } from "@/features/skills-manager/skill-summary";
+import { useState } from "react"
+import { toast } from "sonner"
+import { CircleAlertIcon } from "lucide-react"
+import type { ManagedSkillDetail } from "@/lib/skills"
+import { useDeleteSkill, useSkill, useUpsertSkill } from "@/lib/skills"
+import { useResourceManager } from "@workspace/data/components/resource-manager"
+import { DetailPanel } from "@workspace/data/components/detail-panel"
+import { SkillSummary } from "@/features/skills-manager/skill-summary"
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from "@workspace/ui/components/alert";
+} from "@workspace/ui/components/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,19 +21,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@workspace/ui/components/alert-dialog";
-import { Button } from "@workspace/ui/components/button";
-import { Skeleton } from "@workspace/ui/components/skeleton";
-import { Textarea } from "@workspace/ui/components/textarea";
+} from "@workspace/ui/components/alert-dialog"
+import { Button } from "@workspace/ui/components/button"
+import { Skeleton } from "@workspace/ui/components/skeleton"
+import { Textarea } from "@workspace/ui/components/textarea"
 
 /** Skill-summary-shaped item this feature hands to `ResourceManager.Root`. */
 interface SkillListItem {
-  id: string;
+  id: string
 }
 
 export function SkillDetailView() {
-  const { selectedId, select } = useResourceManager<SkillListItem>();
-  const skillQuery = useSkill(selectedId ?? undefined);
+  const { selectedId, select } = useResourceManager<SkillListItem>()
+  const skillQuery = useSkill(selectedId ?? undefined)
 
   if (skillQuery.isPending) {
     return (
@@ -43,7 +43,7 @@ export function SkillDetailView() {
         </DetailPanel.Header>
         <Skeleton className="h-48 w-full" />
       </>
-    );
+    )
   }
 
   if (skillQuery.isError) {
@@ -57,10 +57,10 @@ export function SkillDetailView() {
             : "Unknown error"}
         </AlertDescription>
       </Alert>
-    );
+    )
   }
 
-  const result = skillQuery.data;
+  const result = skillQuery.data
   if (!result || result.status === "not-found") {
     return (
       <Alert variant="destructive">
@@ -70,7 +70,7 @@ export function SkillDetailView() {
           It may have been deleted since this list loaded.
         </AlertDescription>
       </Alert>
-    );
+    )
   }
 
   return (
@@ -79,24 +79,24 @@ export function SkillDetailView() {
       skill={result.skill}
       onDeleted={() => select(null)}
     />
-  );
+  )
 }
 
 function SkillDetailForm({
   skill,
   onDeleted,
 }: {
-  skill: ManagedSkillDetail;
-  onDeleted: () => void;
+  skill: ManagedSkillDetail
+  onDeleted: () => void
 }) {
-  const [body, setBody] = useState(skill.body);
-  const upsert = useUpsertSkill();
-  const del = useDeleteSkill();
+  const [body, setBody] = useState(skill.body)
+  const upsert = useUpsertSkill()
+  const del = useDeleteSkill()
 
-  const isDirty = body !== skill.body;
+  const isDirty = body !== skill.body
 
   function handleSave() {
-    if (!isDirty) return;
+    if (!isDirty) return
     upsert.mutate(
       {
         id: skill.id,
@@ -107,18 +107,18 @@ function SkillDetailForm({
       {
         onSuccess: (result) => {
           if (result.status === "ok") {
-            toast.success(`Saved "${skill.name ?? skill.id}".`);
+            toast.success(`Saved "${skill.name ?? skill.id}".`)
           } else {
-            toast.error(result.message);
+            toast.error(result.message)
           }
         },
         onError: (error) => {
           toast.error(
             error instanceof Error ? error.message : "Failed to save skill.",
-          );
+          )
         },
       },
-    );
+    )
   }
 
   function handleDelete() {
@@ -127,19 +127,19 @@ function SkillDetailForm({
       {
         onSuccess: (result) => {
           if (result.status === "ok") {
-            toast.success(`Deleted "${skill.name ?? skill.id}".`);
-            onDeleted();
+            toast.success(`Deleted "${skill.name ?? skill.id}".`)
+            onDeleted()
           } else {
-            toast.error(result.message);
+            toast.error(result.message)
           }
         },
         onError: (error) => {
           toast.error(
             error instanceof Error ? error.message : "Failed to delete skill.",
-          );
+          )
         },
       },
-    );
+    )
   }
 
   return (
@@ -208,8 +208,8 @@ function SkillDetailForm({
               </AlertDialogTitle>
               <AlertDialogDescription>
                 This archives the skill rather than erasing it — it can be
-                restored from the archive later. The agent will no longer see
-                it as an active skill.
+                restored from the archive later. The agent will no longer see it
+                as an active skill.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -228,5 +228,5 @@ function SkillDetailForm({
         </Button>
       </div>
     </>
-  );
+  )
 }

@@ -23,10 +23,13 @@ import {
 import { passageDraftReducer, projectPassageDraft } from "@/lib/passage-draft"
 import { useAttentionTelemetry } from "@zigil/agent/react"
 import {
-  AttentionProvider,
   type AttentionContext,
   type AttentionSelection,
 } from "@zigil/agent/react"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 import { getAgentTargetProps } from "@/lib/agent-dom-effects"
 import {
   useMediaQuery,
@@ -497,274 +500,275 @@ export function ReviewWorkspace() {
     hover: telemetry.hover,
     history: telemetry.history,
   }
+  usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   return (
-    <AttentionProvider context={attention}>
-      <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
-        <header className="flex min-h-12 items-center justify-between gap-3 border-b border-border px-3 py-2 md:px-4">
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-2">
-              <h1 className="truncate text-sm font-medium">
-                Draft Article Review
-              </h1>
-              <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
-                revision {document.revision}
-              </span>
-            </div>
-            <p className="truncate text-xs text-muted-foreground">
-              Select a passage to focus the reviewer and agent.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden font-mono text-[10px] text-muted-foreground lg:inline">
-              {openCount} open · {debtCount} debt
+    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+      <header className="flex min-h-12 items-center justify-between gap-3 border-b border-border px-3 py-2 md:px-4">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h1 className="truncate text-sm font-medium">
+              Draft Article Review
+            </h1>
+            <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
+              revision {document.revision}
             </span>
-            <Button
-              aria-label="Toggle passage multi-select"
-              aria-pressed={multiSelect}
-              onClick={() => setMultiSelect((current) => !current)}
-              size="sm"
-              variant={multiSelect ? "secondary" : "ghost"}
-            >
-              Multi-select · {telemetry.selections.length}
-            </Button>
-            <ReviewWorkbench.Root
-              description="Annotate the selected passage, settle decisions, clear review debt, then sign off."
-              size="lg"
-              title="Review — Draft Article"
-              trigger={
-                <Button size="sm" variant="outline">
-                  <FileCheck2Icon />
-                  Review
-                  {openCount + debtCount > 0 ? (
-                    <Badge
-                      className="ml-1 h-4 min-w-4 px-1 font-mono text-[9px]"
-                      variant="secondary"
-                    >
-                      {openCount + debtCount}
-                    </Badge>
-                  ) : null}
-                </Button>
-              }
-            >
-              <ReviewWorkbench.Tabs tabs={reviewTabs} />
-            </ReviewWorkbench.Root>
           </div>
-        </header>
-
-        <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section
-            aria-label="Document under review"
-            className="min-h-0 overflow-y-auto"
+          <p className="truncate text-xs text-muted-foreground">
+            Select a passage to focus the reviewer and agent.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="hidden font-mono text-[10px] text-muted-foreground lg:inline">
+            {openCount} open · {debtCount} debt
+          </span>
+          <Button
+            aria-label="Toggle passage multi-select"
+            aria-pressed={multiSelect}
+            onClick={() => setMultiSelect((current) => !current)}
+            size="sm"
+            variant={multiSelect ? "secondary" : "ghost"}
           >
-            <ReaderSurface
-              className="space-y-3 px-4 pb-28 pt-6 md:px-8 lg:px-12 lg:pb-10"
-              measure="wide"
-            >
-              {passages.map((passage, index) => {
-                const selected = selectedPassageIds.has(passage.id)
-                const primary = passage.id === selectedPassage.id
-                const passageAnnotations = annotations.filter(
-                  (annotation) =>
-                    annotation.status === "active" &&
-                    annotation.anchor === passage.id,
-                ).length
-                const previousSection = passages[index - 1]?.section
-                const editing = editingPassageId === passage.id
+            Multi-select · {telemetry.selections.length}
+          </Button>
+          <ReviewWorkbench.Root
+            description="Annotate the selected passage, settle decisions, clear review debt, then sign off."
+            size="lg"
+            title="Review — Draft Article"
+            trigger={
+              <Button size="sm" variant="outline">
+                <FileCheck2Icon />
+                Review
+                {openCount + debtCount > 0 ? (
+                  <Badge
+                    className="ml-1 h-4 min-w-4 px-1 font-mono text-[9px]"
+                    variant="secondary"
+                  >
+                    {openCount + debtCount}
+                  </Badge>
+                ) : null}
+              </Button>
+            }
+          >
+            <ReviewWorkbench.Tabs tabs={reviewTabs} />
+          </ReviewWorkbench.Root>
+        </div>
+      </header>
 
-                return (
-                  <div key={passage.id}>
-                    {passage.section !== previousSection ? (
-                      <h2 className="mb-3 mt-8 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground first:mt-0">
-                        {passage.section}
-                      </h2>
-                    ) : null}
-                    <article
-                      className={cn(
-                        "group overflow-hidden rounded-r-md border-l-2 text-foreground transition-colors",
-                        primary
-                          ? "border-primary bg-primary/6"
-                          : selected
-                            ? "border-primary/50 bg-primary/3"
-                            : "border-transparent hover:border-border hover:bg-muted/35",
-                      )}
-                      onMouseEnter={() =>
-                        telemetry.beginHover(passageAttention(passage))
-                      }
-                      onMouseLeave={() =>
-                        telemetry.endHover(passageAttention(passage))
-                      }
-                      {...getAgentTargetProps(`passage:${passage.id}`)}
+      <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section
+          aria-label="Document under review"
+          className="min-h-0 overflow-y-auto"
+        >
+          <ReaderSurface
+            className="space-y-3 px-4 pb-28 pt-6 md:px-8 lg:px-12 lg:pb-10"
+            measure="wide"
+          >
+            {passages.map((passage, index) => {
+              const selected = selectedPassageIds.has(passage.id)
+              const primary = passage.id === selectedPassage.id
+              const passageAnnotations = annotations.filter(
+                (annotation) =>
+                  annotation.status === "active" &&
+                  annotation.anchor === passage.id,
+              ).length
+              const previousSection = passages[index - 1]?.section
+              const editing = editingPassageId === passage.id
+
+              return (
+                <div key={passage.id}>
+                  {passage.section !== previousSection ? (
+                    <h2 className="mb-3 mt-8 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground first:mt-0">
+                      {passage.section}
+                    </h2>
+                  ) : null}
+                  <article
+                    className={cn(
+                      "group overflow-hidden rounded-r-md border-l-2 text-foreground transition-colors",
+                      primary
+                        ? "border-primary bg-primary/6"
+                        : selected
+                          ? "border-primary/50 bg-primary/3"
+                          : "border-transparent hover:border-border hover:bg-muted/35",
+                    )}
+                    onMouseEnter={() =>
+                      telemetry.beginHover(passageAttention(passage))
+                    }
+                    onMouseLeave={() =>
+                      telemetry.endHover(passageAttention(passage))
+                    }
+                    {...getAgentTargetProps(`passage:${passage.id}`)}
+                  >
+                    <button
+                      aria-pressed={selected}
+                      className="relative block w-full px-4 py-3 text-left"
+                      onClick={(event) => {
+                        const target = passageAttention(passage)
+                        if (multiSelect || event.metaKey || event.ctrlKey) {
+                          const isOnlySelection =
+                            selected && telemetry.selections.length === 1
+                          if (!isOnlySelection)
+                            telemetry.toggleSelection(target)
+                        } else {
+                          telemetry.select(target)
+                        }
+                        recordActivity("focus", target, {
+                          summary: `Focused ${passage.section}`,
+                        })
+                      }}
+                      type="button"
                     >
-                      <button
-                        aria-pressed={selected}
-                        className="relative block w-full px-4 py-3 text-left"
-                        onClick={(event) => {
-                          const target = passageAttention(passage)
-                          if (multiSelect || event.metaKey || event.ctrlKey) {
-                            const isOnlySelection =
-                              selected && telemetry.selections.length === 1
-                            if (!isOnlySelection)
-                              telemetry.toggleSelection(target)
-                          } else {
-                            telemetry.select(target)
-                          }
-                          recordActivity("focus", target, {
-                            summary: `Focused ${passage.section}`,
+                      <span className="block pr-8">{passage.body}</span>
+                      {passageAnnotations > 0 ? (
+                        <span className="absolute right-2 top-2 font-mono text-[9px] text-muted-foreground">
+                          {passageAnnotations}
+                        </span>
+                      ) : null}
+                    </button>
+
+                    <div
+                      className={cn(
+                        "flex items-center gap-1 border-t border-border/60 px-2 py-1.5 transition-opacity",
+                        primary
+                          ? "opacity-100"
+                          : "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
+                      )}
+                    >
+                      <Button
+                        aria-expanded={editing}
+                        onClick={() => {
+                          telemetry.select(passageAttention(passage))
+                          setEditingPassageId((current) =>
+                            current === passage.id ? null : passage.id,
+                          )
+                        }}
+                        size="xs"
+                        variant={editing ? "secondary" : "ghost"}
+                      >
+                        <PencilLineIcon />
+                        {editing ? "Close editor" : "Edit inline"}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          telemetry.select(passageAttention(passage))
+                          recordActivity("focus", passageAttention(passage), {
+                            summary: `Asked the agent about ${passage.section}`,
                           })
                         }}
-                        type="button"
+                        size="xs"
+                        variant="ghost"
                       >
-                        <span className="block pr-8">{passage.body}</span>
-                        {passageAnnotations > 0 ? (
-                          <span className="absolute right-2 top-2 font-mono text-[9px] text-muted-foreground">
-                            {passageAnnotations}
-                          </span>
-                        ) : null}
-                      </button>
+                        <BotIcon />
+                        Ask agent
+                      </Button>
+                      <span className="ml-auto font-mono text-[9px] text-muted-foreground">
+                        {passageAnnotations} note
+                        {passageAnnotations === 1 ? "" : "s"}
+                      </span>
+                    </div>
 
-                      <div
-                        className={cn(
-                          "flex items-center gap-1 border-t border-border/60 px-2 py-1.5 transition-opacity",
-                          primary
-                            ? "opacity-100"
-                            : "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
-                        )}
-                      >
-                        <Button
-                          aria-expanded={editing}
-                          onClick={() => {
-                            telemetry.select(passageAttention(passage))
-                            setEditingPassageId((current) =>
-                              current === passage.id ? null : passage.id,
-                            )
-                          }}
-                          size="xs"
-                          variant={editing ? "secondary" : "ghost"}
-                        >
-                          <PencilLineIcon />
-                          {editing ? "Close editor" : "Edit inline"}
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            telemetry.select(passageAttention(passage))
-                            recordActivity("focus", passageAttention(passage), {
-                              summary: `Asked the agent about ${passage.section}`,
-                            })
-                          }}
-                          size="xs"
-                          variant="ghost"
-                        >
-                          <BotIcon />
-                          Ask agent
-                        </Button>
-                        <span className="ml-auto font-mono text-[9px] text-muted-foreground">
-                          {passageAnnotations} note
-                          {passageAnnotations === 1 ? "" : "s"}
-                        </span>
+                    {(agentAnnotationsByAnchor.get(passage.id) ?? []).map(
+                      (a) => (
+                        <AnnotationOverlay
+                          key={a.toolCallId}
+                          kind={a.kind === "highlight" ? "highlight" : "note"}
+                          label={a.label}
+                          title={`Passage: “${passage.section}”`}
+                          body={<p>{a.body}</p>}
+                          meta={<span>sigil-{a.kind} · agent</span>}
+                        />
+                      ),
+                    )}
+
+                    {editing ? (
+                      <div className="border-t border-border bg-background/60 p-4">
+                        <PassageEditor
+                          compact
+                          onSave={(edit) => savePassage({ ...edit, passage })}
+                          passage={passage}
+                          revision={document.revision}
+                          saving={updateReviewPassages.isPending}
+                        />
                       </div>
+                    ) : null}
+                  </article>
+                </div>
+              )
+            })}
+          </ReaderSurface>
+        </section>
 
-                      {(agentAnnotationsByAnchor.get(passage.id) ?? []).map(
-                        (a) => (
-                          <AnnotationOverlay
-                            key={a.toolCallId}
-                            kind={a.kind === "highlight" ? "highlight" : "note"}
-                            label={a.label}
-                            title={`Passage: “${passage.section}”`}
-                            body={<p>{a.body}</p>}
-                            meta={<span>sigil-{a.kind} · agent</span>}
-                          />
-                        ),
-                      )}
-
-                      {editing ? (
-                        <div className="border-t border-border bg-background/60 p-4">
-                          <PassageEditor
-                            compact
-                            onSave={(edit) => savePassage({ ...edit, passage })}
-                            passage={passage}
-                            revision={document.revision}
-                            saving={updateReviewPassages.isPending}
-                          />
-                        </div>
-                      ) : null}
-                    </article>
-                  </div>
-                )
-              })}
-            </ReaderSurface>
-          </section>
-
-          <aside
-            className={cn(
-              "hidden min-h-0 border-l border-border bg-card/20 lg:block",
-            )}
+        <aside
+          className={cn(
+            "hidden min-h-0 border-l border-border bg-card/20 lg:block",
+          )}
+        >
+          <Tabs
+            className="flex h-full min-h-0 flex-col"
+            onValueChange={(value) =>
+              setRailTab(value === "passage" ? "passage" : "agent")
+            }
+            value={railTab}
           >
-            <Tabs
-              className="flex h-full min-h-0 flex-col"
-              onValueChange={(value) =>
-                setRailTab(value === "passage" ? "passage" : "agent")
-              }
-              value={railTab}
-            >
-              <TabsList className="mx-2 mt-2 shrink-0">
-                {/* The agent tab defaults: the sidecar IS this route's agent
+            <TabsList className="mx-2 mt-2 shrink-0">
+              {/* The agent tab defaults: the sidecar IS this route's agent
                     presentation (§4.1); the passage tab is the reviewer's own
                     annotation flow. */}
-                <TabsTrigger value="agent">Agent</TabsTrigger>
-                <TabsTrigger value="passage">Passage</TabsTrigger>
-              </TabsList>
-              <TabsContent
-                className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-                value="agent"
-              >
-                {/* Bound to the selected passage through the AttentionProvider
-                    above — the passage-aware placeholder flows from attention,
-                    not a second mount (§4.1). */}
-                <AgentSidecar
-                  className="min-h-0 flex-1 border-l-0 bg-transparent"
-                  subject={selectedPassage.section}
-                  subjectDetail={
-                    <span className="line-clamp-1">{selectedPassage.body}</span>
-                  }
-                />
-              </TabsContent>
-              <TabsContent
-                className="min-h-0 flex-1 data-[state=inactive]:hidden"
-                value="passage"
-              >
-                <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-                  <div className="border-b border-border px-4 py-3">
-                    <SectionHeader
-                      action={
-                        <span className="font-mono text-[10px] text-muted-foreground">
-                          {activeAnnotations.length} notes
-                        </span>
-                      }
-                    >
-                      Selected passage
-                    </SectionHeader>
-                    <p className="mt-2 text-sm font-medium">
-                      {selectedPassage.section}
-                    </p>
-                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                      {selectedPassage.body}
-                    </p>
-                  </div>
-                  <div className="min-h-0 overflow-y-auto p-4">
-                    <PassageFeedback
-                      annotations={activeAnnotations}
-                      onSubmit={addAnnotation}
-                      passage={selectedPassage}
-                    />
-                  </div>
+              <TabsTrigger value="agent">Agent</TabsTrigger>
+              <TabsTrigger value="passage">Passage</TabsTrigger>
+            </TabsList>
+            <TabsContent
+              className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+              value="agent"
+            >
+              {/* Bound to the selected passage through the shell-owned
+                    workspace attention publisher — the passage-aware
+                    placeholder flows from attention, not a second mount
+                    (§4.1). */}
+              <AgentSidecar
+                className="min-h-0 flex-1 border-l-0 bg-transparent"
+                subject={selectedPassage.section}
+                subjectDetail={
+                  <span className="line-clamp-1">{selectedPassage.body}</span>
+                }
+              />
+            </TabsContent>
+            <TabsContent
+              className="min-h-0 flex-1 data-[state=inactive]:hidden"
+              value="passage"
+            >
+              <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+                <div className="border-b border-border px-4 py-3">
+                  <SectionHeader
+                    action={
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {activeAnnotations.length} notes
+                      </span>
+                    }
+                  >
+                    Selected passage
+                  </SectionHeader>
+                  <p className="mt-2 text-sm font-medium">
+                    {selectedPassage.section}
+                  </p>
+                  <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                    {selectedPassage.body}
+                  </p>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </aside>
-        </div>
+                <div className="min-h-0 overflow-y-auto p-4">
+                  <PassageFeedback
+                    annotations={activeAnnotations}
+                    onSubmit={addAnnotation}
+                    passage={selectedPassage}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </aside>
       </div>
-    </AttentionProvider>
+    </div>
   )
 }
 

@@ -40,9 +40,9 @@ import {
   useSetActiveAgentThread,
 } from "@/lib/agent-threads"
 import {
-  setToolApprovalMode,
+  useSetToolApprovalMode,
   useToolApprovalMode,
-} from "@/lib/agent-tool-approval"
+} from "@/lib/agent-preferences"
 import { SessionHome } from "@/features/homes/session-home"
 import type { HomeState, SessionHomeView } from "@/features/homes/types"
 
@@ -63,6 +63,7 @@ export function SessionChatSurface({
   compact?: boolean
 }) {
   const approvalMode = useToolApprovalMode()
+  const setApprovalMode = useSetToolApprovalMode()
   const preference = useActiveAgentThreadPreference()
   const setActiveThread = useSetActiveAgentThread()
   const attention = useAttention()
@@ -119,7 +120,7 @@ export function SessionChatSurface({
           <AgentChat
             approvalMode={approvalMode}
             hideHeader
-            onApprovalModeChange={setToolApprovalMode}
+            onApprovalModeChange={setApprovalMode.set}
             placeholder="Ask the agent, or tell it to use an application tool…"
             showNewSession={false}
           />
@@ -153,7 +154,9 @@ export function SessionChatSurface({
             <div className="relative my-2 shrink-0 self-start">
               <Button
                 aria-label={
-                  railOpen ? "Collapse session details" : "Expand session details"
+                  railOpen
+                    ? "Collapse session details"
+                    : "Expand session details"
                 }
                 onClick={() => setRailOpen((open) => !open)}
                 size="icon-sm"
@@ -183,7 +186,8 @@ function ContextRailHeader({
 }: {
   attention: Parameters<typeof ContextTray.Root>[0]["attention"]
 }) {
-  const subject = attention?.selection?.label ?? attention?.workspace?.label ?? null
+  const subject =
+    attention?.selection?.label ?? attention?.workspace?.label ?? null
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
       {subject ? (

@@ -10,12 +10,20 @@ import { useRouter } from "@tanstack/react-router"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import { Field, FieldLabel, FieldDescription } from "@workspace/ui/components/field"
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+} from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Alert, AlertDescription } from "@workspace/ui/components/alert"
 
+import {
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 import { authClient } from "@/lib/auth/client"
 import type { CurrentSessionUser } from "@/lib/auth/route-guard"
 import { isAllowedUsername, normalizeUsername } from "@/lib/auth/username-rules"
@@ -42,7 +50,8 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
   const normalizedPreview = normalizeUsername(usernameInput)
   const usernameValid = isAllowedUsername(usernameInput)
   const usernameChanged = usernameInput.trim() !== currentUsername
-  const nameChanged = nameInput.trim() !== user.name && nameInput.trim().length > 0
+  const nameChanged =
+    nameInput.trim() !== user.name && nameInput.trim().length > 0
 
   async function handleSaveUsername() {
     setUsernameError(null)
@@ -90,7 +99,7 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
   }
 
   return (
-    <div className="flex max-w-xl flex-col gap-6 p-4">
+    <SettingsPanel width="xl">
       <section className="flex flex-col gap-3">
         <SectionHeader>Profile</SectionHeader>
 
@@ -105,12 +114,13 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
           {usernameChanged ? (
             usernameValid ? (
               <FieldDescription>
-                Will save as <span className="font-mono">@{normalizedPreview}</span>
+                Will save as{" "}
+                <span className="font-mono">@{normalizedPreview}</span>
               </FieldDescription>
             ) : (
               <FieldDescription className="text-destructive">
-                Not a valid username — lowercase letters, numbers, dots, dashes, or
-                underscores only.
+                Not a valid username — lowercase letters, numbers, dots, dashes,
+                or underscores only.
               </FieldDescription>
             )
           ) : null}
@@ -156,7 +166,9 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
         <Field>
           <Label>Email</Label>
           <p className="text-xs text-muted-foreground">{email}</p>
-          <FieldDescription>Private — never shown to other users.</FieldDescription>
+          <FieldDescription>
+            Private — never shown to other users.
+          </FieldDescription>
         </Field>
 
         <Field>
@@ -169,7 +181,7 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
         </Field>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <SettingsSection className="gap-2">
         <SectionHeader>Session</SectionHeader>
         <Button
           variant="destructive"
@@ -180,7 +192,7 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
         >
           {signingOut ? "Signing out…" : "Sign out"}
         </Button>
-      </section>
-    </div>
+      </SettingsSection>
+    </SettingsPanel>
   )
 }

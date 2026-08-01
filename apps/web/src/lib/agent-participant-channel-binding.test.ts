@@ -98,23 +98,23 @@ describe("agent participant channel binding", () => {
 
     const payload = readAgentSessionBinding(proof, 1_750_000_000, "secret")
     expect(payload).toMatchObject({
-        applicationThreadId: "thread-b",
-        channel: {
-          channelId: "agent-channel:thread-a+thread-b",
-          participants: expect.arrayContaining([
-            expect.objectContaining({
-              applicationThreadId: "thread-b",
-              runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
-              state: "active",
-            }),
-            expect.objectContaining({
-              applicationThreadId: "thread-a",
-              state: "dormant",
-            }),
-          ]),
-        },
-        personaId: "agent-b",
-      })
+      applicationThreadId: "thread-b",
+      channel: {
+        channelId: "agent-channel:thread-a+thread-b",
+        participants: expect.arrayContaining([
+          expect.objectContaining({
+            applicationThreadId: "thread-b",
+            runtimeSessionId: AGENT_PARTICIPANT_PENDING_RUNTIME_SESSION_ID,
+            state: "active",
+          }),
+          expect.objectContaining({
+            applicationThreadId: "thread-a",
+            state: "dormant",
+          }),
+        ]),
+      },
+      personaId: "agent-b",
+    })
     expect(payload).not.toHaveProperty("runtimeSessionId")
   })
 
@@ -156,13 +156,13 @@ describe("agent participant channel binding", () => {
       "secret",
     )
 
-    expect(readAgentSessionBinding(proof, 1_750_000_000, "secret")).toMatchObject(
-      {
-        applicationThreadId: "thread-b",
-        runtimeSessionId: "eve-b",
-        personaId: "agent-b",
-      },
-    )
+    expect(
+      readAgentSessionBinding(proof, 1_750_000_000, "secret"),
+    ).toMatchObject({
+      applicationThreadId: "thread-b",
+      runtimeSessionId: "eve-b",
+      personaId: "agent-b",
+    })
   })
 
   it("keeps each target's signed channel projection stable as peer sessions wake", () => {

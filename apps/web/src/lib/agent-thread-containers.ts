@@ -1,4 +1,4 @@
-import type { AgentThreadSummary } from "@/lib/agent-threads-domain";
+import type { AgentThreadSummary } from "@/lib/agent-threads-domain"
 
 /**
  * The minimal shape a container-resolution lookup needs from the workspace
@@ -6,7 +6,7 @@ import type { AgentThreadSummary } from "@/lib/agent-threads-domain";
  * Mirk-backed registry types directly (that lives behind .server.ts).
  */
 export interface WorkspaceContainmentLookup {
-  getWorkspaceProjectId(workspaceId: string): string | undefined;
+  getWorkspaceProjectId(workspaceId: string): string | undefined
 }
 
 /**
@@ -21,8 +21,8 @@ export function deriveThreadProjectId(
   lookup: WorkspaceContainmentLookup,
   personalProjectId: string,
 ): string {
-  if (!thread.workspaceId) return personalProjectId;
-  return lookup.getWorkspaceProjectId(thread.workspaceId) ?? personalProjectId;
+  if (!thread.workspaceId) return personalProjectId
+  return lookup.getWorkspaceProjectId(thread.workspaceId) ?? personalProjectId
 }
 
 /** Groups threads by their bound workspace id. Threads with no workspaceId
@@ -31,14 +31,14 @@ export function deriveThreadProjectId(
 export function groupThreadsByWorkspace<T extends { workspaceId?: string }>(
   threads: readonly T[],
 ): Map<string | undefined, T[]> {
-  const groups = new Map<string | undefined, T[]>();
+  const groups = new Map<string | undefined, T[]>()
   for (const thread of threads) {
-    const key = thread.workspaceId;
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(thread);
-    else groups.set(key, [thread]);
+    const key = thread.workspaceId
+    const bucket = groups.get(key)
+    if (bucket) bucket.push(thread)
+    else groups.set(key, [thread])
   }
-  return groups;
+  return groups
 }
 
 /** Threads whose derived project matches `projectId`, given a containment
@@ -52,5 +52,5 @@ export function threadsForProject<T extends { workspaceId?: string }>(
   return threads.filter(
     (thread) =>
       deriveThreadProjectId(thread, lookup, personalProjectId) === projectId,
-  );
+  )
 }

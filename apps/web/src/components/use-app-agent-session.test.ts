@@ -17,8 +17,11 @@ import {
 import { resetContextDraftForTests } from "@zigil/agent/testing/react"
 import type { AgentRuntimeSession } from "@zigil/agent/contracts"
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { resetAttentionDeliveryForTests } from "@/lib/agent-attention-delivery"
+import { AgentPrincipalProvider } from "@/lib/agent-principal"
 
 // Vitest externalizes the published package before the React plugin can apply
 // the automatic JSX transform. The application build does not.
@@ -27,6 +30,7 @@ Object.assign(globalThis, { React: ReactRuntime })
 let container: HTMLDivElement
 let root: Root
 let capturedSession: AgentRuntimeSession | null
+let queryClient: QueryClient
 
 beforeEach(() => {
   ;(
@@ -36,6 +40,9 @@ beforeEach(() => {
   resetAttentionDeliveryForTests()
   setContextDraftScope("thread-a")
   capturedSession = null
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   container = document.createElement("div")
   document.body.append(container)
   root = createRoot(container)
@@ -169,15 +176,23 @@ async function renderSession(
 ): Promise<void> {
   await act(() => {
     const capture = createElement(SessionCapture)
+    // The session reads the tool-approval preference out of the query cache
+    // for this principal, so both providers are part of its real environment.
     root.render(
-      createElement(AgentRuntimeSessionProvider, {
-        session,
-        children: attentionContext
-          ? createElement(AttentionProvider, {
-              context: attentionContext,
-              children: capture,
-            })
-          : capture,
+      createElement(QueryClientProvider, {
+        client: queryClient,
+        children: createElement(AgentPrincipalProvider, {
+          principalId: "user-under-test",
+          children: createElement(AgentRuntimeSessionProvider, {
+            session,
+            children: attentionContext
+              ? createElement(AttentionProvider, {
+                  context: attentionContext,
+                  children: capture,
+                })
+              : capture,
+          }),
+        }),
       }),
     )
   })

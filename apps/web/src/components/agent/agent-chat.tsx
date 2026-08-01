@@ -21,6 +21,7 @@ import {
   type UploadedFile,
 } from "@workspace/ui/hooks/use-attachments"
 import { imageMediaTypeFromUrl } from "@workspace/ui/lib/image-url"
+import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 import {
   Alert,
   AlertDescription,
@@ -40,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
+import { ToneChip } from "@workspace/ui/components/tone-chip"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { AddMenu } from "@/components/agent/add-menu"
@@ -52,10 +54,16 @@ import { useWorkspaceResourceScope } from "@/components/agent/workspace-attentio
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
-import { useAgentThread } from "@/lib/agent-threads"
+import {
+  useAgentThread,
+  useSetAgentThreadRequestOptions,
+  type AgentThread,
+  type AgentThreadRequestOptions,
+} from "@/lib/agent-threads"
+import { useModelEndpoints } from "@/lib/model-endpoints"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import { appendDictationDraft } from "@/lib/voice-dictation"
-import { useSpeakReplies } from "@/lib/agent-speak-replies"
+import { useSpeakReplies } from "@/lib/agent-preferences"
 import { useSpokenAgentReplies } from "@/lib/spoken-replies"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"
@@ -355,6 +363,9 @@ export function AgentChat({
             {hideHeader ? (
               <ModelLabel bound={activeThread.data?.executionBinding?.model} />
             ) : null}
+            {hideHeader && activeThread.data ? (
+              <ReasoningControls thread={activeThread.data} />
+            ) : null}
             {/* The mode switch sits immediately before the mic it changes:
                 with it on, the same press-to-talk gesture sends instead of
                 drafting, and Eve's finished replies are spoken back. */}
@@ -412,19 +423,14 @@ function ApprovalChip({
       }}
       value={mode}
     >
-      <SelectTrigger
+      <ToneChip
         aria-label="Tool approval mode"
-        className={cn(
-          "h-6 gap-1 rounded-full border px-2 text-[11px] max-sm:h-11",
-          alwaysAllow
-            ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            : "border-border bg-muted/50 text-muted-foreground",
-        )}
-        size="sm"
+        render={<SelectTrigger size="sm" />}
         title="Tool approval mode"
+        tone={alwaysAllow ? "warning" : "muted"}
       >
         <SelectValue />
-      </SelectTrigger>
+      </ToneChip>
       <SelectContent align="start">
         <SelectItem value="ask">Ask</SelectItem>
         <SelectItem value="always">Always allow</SelectItem>
@@ -440,12 +446,87 @@ function ApprovalChip({
 function ModelLabel({ bound }: { bound?: BoundAgentModel }) {
   const catalog = useAgentRuntimeCatalog()
   const name = catalog.data?.agent.name ?? "Eve"
-  const model = bound ? `${bound.provider}/${bound.modelId}` : catalog.data?.agent.model
+  const model = bound
+    ? `${bound.provider}/${bound.modelId}`
+    : catalog.data?.agent.model
   return (
     <span className="hidden shrink-0 truncate px-1.5 font-mono text-[10px] text-muted-foreground sm:inline">
       {name}
       {model ? ` · ${model}` : ""}
     </span>
+  )
+}
+
+/**
+ * MDL.4 — reasoning level and fast mode, seated beside the model label they
+ * describe. Renders nothing when the bound model declares neither control
+ * (AC2/AC3): a model with no `reasoning`/`fastMode` fixture declaration is
+ * indistinguishable from one this component has never heard of.
+ *
+ * Reads `thread.requestOptions` — never local state — so what is shown is
+ * always the last value the server persisted, i.e. what the NEXT turn will
+ * actually run with. `useSetAgentThreadRequestOptions`'s `onSuccess` caches
+ * the server's returned thread, so a change round-trips through the same
+ * "resolved, not optimistic" path the model label already uses.
+ */
+function ReasoningControls({ thread }: { thread: AgentThread }) {
+  const endpoints = useModelEndpoints()
+  const setRequestOptions = useSetAgentThreadRequestOptions()
+  const presetId =
+    thread.executionBinding?.model?.presetId ?? DEPLOYMENT_DEFAULT_PRESET_ID
+  const record = endpoints.data?.providers
+    .flatMap((provider) => provider.models)
+    .find((model) => model.id === presetId)
+  if (!record || (!record.reasoning && !record.fastMode)) return null
+
+  const current = thread.requestOptions
+  function apply(next: AgentThreadRequestOptions) {
+    setRequestOptions.mutate({
+      id: thread.id,
+      requestOptions: { ...current, ...next },
+      expectedRevision: thread.revision,
+    })
+  }
+
+  return (
+    <>
+      {record.reasoning ? (
+        <Select
+          disabled={setRequestOptions.isPending}
+          onValueChange={(value) => {
+            if (value) apply({ reasoningLevel: value })
+          }}
+          value={current?.reasoningLevel ?? record.reasoning.default}
+        >
+          <ToneChip
+            aria-label="Reasoning level"
+            render={<SelectTrigger size="sm" />}
+            title="Reasoning level"
+          >
+            <SelectValue />
+          </ToneChip>
+          <SelectContent align="start">
+            {record.reasoning.levels.map((level) => (
+              <SelectItem key={level} value={level}>
+                {level}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+      {record.fastMode ? (
+        <ToneChip
+          aria-label="Fast mode"
+          aria-pressed={current?.fastMode === true}
+          disabled={setRequestOptions.isPending}
+          onClick={() => apply({ fastMode: !current?.fastMode })}
+          title="Fast mode"
+          tone={current?.fastMode === true ? "info" : "muted"}
+        >
+          Fast
+        </ToneChip>
+      ) : null}
+    </>
   )
 }
 

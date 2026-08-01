@@ -118,6 +118,56 @@ const MEMORY_RUNTIME_TOOLS = new Set([
   "forget-memory",
 ])
 
+/**
+ * The human grouping for one application tool, for surfaces that list tools
+ * outside the capability catalog (Settings → Tool permissions). Same
+ * categorization the /skills page uses, so a tool never files under two
+ * different headings in different parts of the app.
+ */
+export function applicationToolGroup(name: string): {
+  id: string
+  title: string
+} {
+  const group = GROUPS[groupForApplicationTool(name)] ?? GROUPS.other
+  return { id: group.id, title: group.title }
+}
+
+/** GROUPS declaration order — the display order for grouped tool lists. */
+export const APPLICATION_TOOL_GROUP_ORDER: readonly string[] =
+  Object.keys(GROUPS)
+
+/**
+ * Filter tools by a free-text query and bucket them under their capability
+ * groups, in display order. Pure derivation — callers use it directly in
+ * render, no memo required at this collection size.
+ */
+export function groupApplicationTools<
+  T extends { id: string; name: string; description: string },
+>(
+  tools: readonly T[],
+  query: string,
+): { id: string; title: string; tools: T[] }[] {
+  const needle = query.trim().toLowerCase()
+  const matching = needle
+    ? tools.filter((tool) =>
+        `${tool.name} ${tool.id} ${tool.description}`
+          .toLowerCase()
+          .includes(needle),
+      )
+    : tools
+  const byGroup = new Map<string, { id: string; title: string; tools: T[] }>()
+  for (const tool of matching) {
+    const group = applicationToolGroup(tool.name || tool.id)
+    const existing = byGroup.get(group.id)
+    if (existing) existing.tools.push(tool)
+    else byGroup.set(group.id, { ...group, tools: [tool] })
+  }
+  return APPLICATION_TOOL_GROUP_ORDER.flatMap((groupId) => {
+    const group = byGroup.get(groupId)
+    return group ? [group] : []
+  })
+}
+
 function groupForApplicationTool(name: string): string {
   if (name.startsWith("sigil-graph-") || name === "sigil-reducer-catalog")
     return "graph"

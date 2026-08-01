@@ -24,7 +24,10 @@ export function RoadmapHub({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <nav aria-label="Roadmap views" className="flex shrink-0 items-center gap-1 border-b border-border p-2">
+      <nav
+        aria-label="Roadmap views"
+        className="flex shrink-0 items-center gap-1 border-b border-border p-2"
+      >
         <Button
           size="sm"
           variant={view === "board" ? "secondary" : "ghost"}
@@ -59,7 +62,10 @@ export function RoadmapHub({
       {view === "specs" ? (
         <SpecsWorkspace initialSelectedId={initialSpecId} />
       ) : view === "graph" ? (
-        <RoadmapGraphWorkspace viewerId={viewer.id} initialStoryId={initialStoryId} />
+        <RoadmapGraphWorkspace
+          viewerId={viewer.id}
+          initialStoryId={initialStoryId}
+        />
       ) : (
         <RoadmapWorkspace viewer={viewer} initialSelectedId={initialStoryId} />
       )}

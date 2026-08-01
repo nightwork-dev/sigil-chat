@@ -51,7 +51,9 @@ export function ProjectWorkspaceNav({
   const [selectedProjectId, setSelectedProjectId] = useState<string>()
 
   const lookup: WorkspaceContainmentLookup = useMemo(() => {
-    const byId = new Map((nav.data?.workspaces ?? []).map((w) => [w.id, w.projectId]))
+    const byId = new Map(
+      (nav.data?.workspaces ?? []).map((w) => [w.id, w.projectId]),
+    )
     return { getWorkspaceProjectId: (id) => byId.get(id) }
   }, [nav.data?.workspaces])
 
@@ -98,7 +100,11 @@ export function ProjectWorkspaceNav({
           onValueChange={(value) => value && setSelectedProjectId(value)}
           value={activeProjectId}
         >
-          <SelectTrigger aria-label="Active project" className="w-full" size="sm">
+          <SelectTrigger
+            aria-label="Active project"
+            className="w-full"
+            size="sm"
+          >
             <FolderIcon className="size-3.5 text-muted-foreground" />
             <SelectValue />
           </SelectTrigger>

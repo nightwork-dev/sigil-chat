@@ -11,7 +11,12 @@ const nav: ProjectWorkspaceNavSummary = {
   projects: [
     { id: "personal:u1", slug: "personal", name: "Personal", description: "" },
     { id: "project:brand", slug: "brand", name: "Brand", description: "" },
-    { id: "project:commerce", slug: "commerce", name: "Commerce", description: "" },
+    {
+      id: "project:commerce",
+      slug: "commerce",
+      name: "Commerce",
+      description: "",
+    },
   ],
   workspaces: [
     {

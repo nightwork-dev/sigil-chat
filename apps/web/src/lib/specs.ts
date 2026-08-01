@@ -3,8 +3,8 @@ import {
   useQuery,
   useQueryClient,
   type QueryClient,
-} from "@tanstack/react-query";
-import { createServerFn } from "@tanstack/react-start";
+} from "@tanstack/react-query"
+import { createServerFn } from "@tanstack/react-start"
 import type {
   CreateSpecInput,
   ProductSpec,
@@ -12,52 +12,52 @@ import type {
   SpecFilter,
   SpecMutationResult,
   SpecStatus,
-} from "@workspace/work-items-store/specs";
+} from "@workspace/work-items-store/specs"
 
 const listSpecsFn = createServerFn({ method: "GET" })
   .validator((input?: { filter?: SpecFilter }) => input ?? {})
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer } =
-      await import("@/lib/work-items-viewer.server");
-    authenticatedWorkItemsViewer(await getSession());
+      await import("@/lib/work-items-viewer.server")
+    authenticatedWorkItemsViewer(await getSession())
     const { specsRepository } =
-      await import("@workspace/work-items-store/specs");
+      await import("@workspace/work-items-store/specs")
     return {
       revision: await specsRepository.revision(),
       specs: await specsRepository.list(data.filter),
-    };
-  });
+    }
+  })
 
 const getSpecFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer } =
-      await import("@/lib/work-items-viewer.server");
-    authenticatedWorkItemsViewer(await getSession());
+      await import("@/lib/work-items-viewer.server")
+    authenticatedWorkItemsViewer(await getSession())
     const { specsRepository } =
-      await import("@workspace/work-items-store/specs");
-    const spec = await specsRepository.get(data.id);
-    if (!spec) throw new Error(`Unknown spec id: ${data.id}.`);
-    return { revision: await specsRepository.revision(), spec };
-  });
+      await import("@workspace/work-items-store/specs")
+    const spec = await specsRepository.get(data.id)
+    if (!spec) throw new Error(`Unknown spec id: ${data.id}.`)
+    return { revision: await specsRepository.revision(), spec }
+  })
 
 const createSpecFn = createServerFn({ method: "POST" })
   .validator(
     (
       input: Omit<CreateSpecInput, "authoredBy"> & {
-        expectedRevision?: number;
+        expectedRevision?: number
       },
     ) => input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { requireWorkItemsMutationAccess } =
-      await import("@/lib/work-items-access.server");
-    const viewer = requireWorkItemsMutationAccess(await getSession());
+      await import("@/lib/work-items-access.server")
+    const viewer = requireWorkItemsMutationAccess(await getSession())
     const { specsRepository } =
-      await import("@workspace/work-items-store/specs");
+      await import("@workspace/work-items-store/specs")
     return specsRepository.create(
       {
         id: data.id,
@@ -69,8 +69,8 @@ const createSpecFn = createServerFn({ method: "POST" })
         authoredBy: viewer.user.username ?? viewer.user.name,
       },
       data.expectedRevision,
-    );
-  });
+    )
+  })
 
 const reviseSpecFn = createServerFn({ method: "POST" })
   .validator(
@@ -78,15 +78,15 @@ const reviseSpecFn = createServerFn({ method: "POST" })
       input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { requireWorkItemsMutationAccess } =
-      await import("@/lib/work-items-access.server");
-    requireWorkItemsMutationAccess(await getSession());
+      await import("@/lib/work-items-access.server")
+    requireWorkItemsMutationAccess(await getSession())
     const { specsRepository } =
-      await import("@workspace/work-items-store/specs");
-    const { id, expectedRevision, ...revision } = data;
-    return specsRepository.revise(id, revision, expectedRevision);
-  });
+      await import("@workspace/work-items-store/specs")
+    const { id, expectedRevision, ...revision } = data
+    return specsRepository.revise(id, revision, expectedRevision)
+  })
 
 const transitionSpecFn = createServerFn({ method: "POST" })
   .validator(
@@ -94,25 +94,25 @@ const transitionSpecFn = createServerFn({ method: "POST" })
       input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { requireWorkItemsMutationAccess } =
-      await import("@/lib/work-items-access.server");
-    requireWorkItemsMutationAccess(await getSession());
+      await import("@/lib/work-items-access.server")
+    requireWorkItemsMutationAccess(await getSession())
     const { specsRepository } =
-      await import("@workspace/work-items-store/specs");
+      await import("@workspace/work-items-store/specs")
     return specsRepository.transition(
       data.id,
       data.status,
       data.expectedRevision,
-    );
-  });
+    )
+  })
 
 export const specKeys = {
   all: () => ["roadmap-specs"] as const,
   list: (filter?: SpecFilter) =>
     [...specKeys.all(), "list", filter ?? {}] as const,
   detail: (id: string) => [...specKeys.all(), id] as const,
-};
+}
 
 export function useSpecs(filter?: SpecFilter) {
   return useQuery({
@@ -122,7 +122,7 @@ export function useSpecs(filter?: SpecFilter) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useSpec(id: string | undefined) {
@@ -134,41 +134,41 @@ export function useSpec(id: string | undefined) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useCreateSpec() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (
       input: Omit<CreateSpecInput, "authoredBy"> & {
-        expectedRevision?: number;
+        expectedRevision?: number
       },
     ) => createSpecFn({ data: input }),
     onSuccess: (result) => reconcileSpec(queryClient, result),
-  });
+  })
 }
 
 export function useReviseSpec() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (
       input: ReviseSpecInput & { id: string; expectedRevision?: number },
     ) => reviseSpecFn({ data: input }),
     onSuccess: (result) => reconcileSpec(queryClient, result),
-  });
+  })
 }
 
 export function useTransitionSpec() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: {
-      id: string;
-      status: SpecStatus;
-      expectedRevision?: number;
+      id: string
+      status: SpecStatus
+      expectedRevision?: number
     }) => transitionSpecFn({ data: input }),
     onSuccess: (result) => reconcileSpec(queryClient, result),
-  });
+  })
 }
 
 function reconcileSpec(
@@ -178,8 +178,8 @@ function reconcileSpec(
   queryClient.setQueryData(specKeys.detail(result.spec.id), {
     revision: result.revision,
     spec: result.spec,
-  });
-  return queryClient.invalidateQueries({ queryKey: specKeys.all() });
+  })
+  return queryClient.invalidateQueries({ queryKey: specKeys.all() })
 }
 
-export type { ProductSpec };
+export type { ProductSpec }

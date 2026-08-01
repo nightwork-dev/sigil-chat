@@ -112,6 +112,54 @@ describe("voice conversion and persona identity", () => {
   });
 });
 
+describe("voice conversion and persona identity", () => {
+  it("resolves an enabled external conversion contract without exposing it by default", () => {
+    expect(readVoiceEnvironment({}).tts.conversion).toBeUndefined();
+    const conversion = readVoiceEnvironment({
+      SIGIL_VOICE_CONVERSION_ENABLED: "true",
+      SIGIL_VOICE_CONVERSION_BASE_URL: "https://converter.example/v1/",
+      SIGIL_VOICE_CONVERSION_MODEL: "rvc-model",
+      SIGIL_VOICE_CONVERSION_VOICE: "persona-a",
+      SIGIL_VOICE_CONVERSION_FORMAT: "wav",
+      SIGIL_VOICE_CONVERSION_API_KEY: "secret",
+    }).tts.conversion;
+    expect(conversion).toEqual({
+      enabled: true,
+      baseURL: "https://converter.example/v1",
+      model: "rvc-model",
+      voice: "persona-a",
+      format: "wav",
+      apiKey: "secret",
+    });
+  });
+
+  it("leaves bytes identical and never calls a converter when conversion is absent", async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const converter = vi.fn();
+    const result = await applyVoiceConversion(
+      {
+        bytes,
+        inputFormat: "mp3",
+        inputMediaType: "audio/mpeg",
+      },
+      converter,
+    );
+    expect(result.bytes).toBe(bytes);
+    expect(converter).not.toHaveBeenCalled();
+  });
+
+  it("reads separate persona sidecars and overlays deployment defaults", () => {
+    const scope = (voice: string) => ({
+      get: () => ({ voice, speed: voice === "voice-a" ? 0.9 : 1.1 }),
+    });
+    const deployment = readVoiceEnvironment({}).tts;
+    const a = resolveTtsConfig(deployment, readPersonaVoice(scope("voice-a")));
+    const b = resolveTtsConfig(deployment, readPersonaVoice(scope("voice-b")));
+    expect([a.voice, a.speed]).toEqual(["voice-a", 0.9]);
+    expect([b.voice, b.speed]).toEqual(["voice-b", 1.1]);
+  });
+});
+
 describe("explicit overrides", () => {
   // Switching between a local Kokoro server and a remote OpenAI-compatible
   // endpoint must be configuration, never a code change.

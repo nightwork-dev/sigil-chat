@@ -6,6 +6,8 @@
 
 import {
   BoxesIcon,
+  ChartColumnIcon,
+  FlagIcon,
   KeyRoundIcon,
   PaletteIcon,
   SlidersHorizontalIcon,
@@ -24,18 +26,19 @@ import type { LoginMethods } from "@/lib/auth/login-methods"
 import { AccountSection } from "./account-section"
 import { AgentSection } from "./agent-section"
 import { AppearanceSection } from "./appearance-section"
+import { FlagsSection } from "./flags-section"
 import { ModelsSection } from "./models-section"
 import { SecuritySection } from "./security-section"
+import { UsageSection } from "./usage-section"
 import { type AttentionContext } from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 
 export type SettingsSection =
-  | "account"
-  | "security"
-  | "appearance"
-  | "agent"
-  | "models"
+  "account" | "security" | "appearance" | "agent" | "models" | "flags" | "usage"
 
 const SETTINGS_TABS: {
   value: SettingsSection
@@ -47,6 +50,8 @@ const SETTINGS_TABS: {
   { value: "appearance", label: "Appearance", icon: PaletteIcon },
   { value: "agent", label: "Agent", icon: SlidersHorizontalIcon },
   { value: "models", label: "Models", icon: BoxesIcon },
+  { value: "flags", label: "Flags", icon: FlagIcon },
+  { value: "usage", label: "Usage", icon: ChartColumnIcon },
 ]
 
 export function SettingsPage({
@@ -67,9 +72,19 @@ export function SettingsPage({
   // Models reads deployment-wide model configuration and credential status,
   // which the server functions behind it already restrict to the owner. The
   // tab follows that restriction so a member is never shown a section whose
-  // only possible content is a permission error.
+  // only possible content is a permission error. Flags is owner-only for the
+  // same reason even though the read itself is open to any principal
+  // (FLAG.1): only the owner can flip a switch here, and a member would see
+  // nothing but disabled controls.
   const isOwner = user.role === "owner"
-  const tabs = SETTINGS_TABS.filter((tab) => tab.value !== "models" || isOwner)
+  const OWNER_ONLY_SECTIONS: readonly SettingsSection[] = [
+    "models",
+    "flags",
+    "usage",
+  ]
+  const tabs = SETTINGS_TABS.filter(
+    (tab) => !OWNER_ONLY_SECTIONS.includes(tab.value) || isOwner,
+  )
   const activeSection = tabs.some((tab) => tab.value === section)
     ? section
     : "account"
@@ -88,6 +103,7 @@ export function SettingsPage({
     history: telemetry.history,
   }
   usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   return (
     // No page-level <h1>: the _app breadcrumb bar already names this place.
@@ -137,12 +153,22 @@ export function SettingsPage({
             <AppearanceSection userId={user.id} />
           </TabsContent>
           <TabsContent value="agent">
-            <AgentSection userId={user.id} />
+            <AgentSection />
           </TabsContent>
           {isOwner ? (
             <TabsContent value="models">
               <ModelsSection userId={user.id} />
             </TabsContent>
+          ) : null}
+          {isOwner ? (
+            <>
+              <TabsContent value="flags">
+                <FlagsSection />
+              </TabsContent>
+              <TabsContent value="usage">
+                <UsageSection />
+              </TabsContent>
+            </>
           ) : null}
         </div>
       </Tabs>

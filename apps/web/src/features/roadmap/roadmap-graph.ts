@@ -12,13 +12,7 @@
 // points the way work flows, which is the reading David asked for.
 
 export type StoryStatus =
-  | "idea"
-  | "spec"
-  | "ready"
-  | "in-progress"
-  | "verify"
-  | "shipped"
-  | "blocked"
+  "idea" | "spec" | "ready" | "in-progress" | "verify" | "shipped" | "blocked"
 
 /** The subset of the store's `Story` this view needs. */
 export interface RoadmapGraphStory {
@@ -326,7 +320,9 @@ function assignLanes(
       const anchored = bucket
         .filter((story) => story.epicId === epicId)
         .map((story) => centers.get(story.id))
-        .filter((center): center is number => center !== null && center !== undefined)
+        .filter(
+          (center): center is number => center !== null && center !== undefined,
+        )
       if (anchored.length > 0) {
         epicCenter.set(
           epicId,
@@ -346,11 +342,18 @@ function assignLanes(
             if (leftEpic !== rightEpic) return leftEpic - rightEpic
           } else if (leftEpic !== undefined) return -1
           else if (rightEpic !== undefined) return 1
-          return epicOrder.indexOf(left.epicId) - epicOrder.indexOf(right.epicId)
+          return (
+            epicOrder.indexOf(left.epicId) - epicOrder.indexOf(right.epicId)
+          )
         }
         const leftCenter = centers.get(left.id)
         const rightCenter = centers.get(right.id)
-        if (leftCenter !== null && leftCenter !== undefined && rightCenter !== null && rightCenter !== undefined) {
+        if (
+          leftCenter !== null &&
+          leftCenter !== undefined &&
+          rightCenter !== null &&
+          rightCenter !== undefined
+        ) {
           if (leftCenter !== rightCenter) return leftCenter - rightCenter
         } else if (leftCenter !== null && leftCenter !== undefined) return -1
         else if (rightCenter !== null && rightCenter !== undefined) return 1
@@ -364,7 +367,10 @@ function assignLanes(
 function buildEpicClusters(
   stories: readonly RoadmapGraphStory[],
 ): RoadmapEpicCluster[] {
-  const clusters = new Map<string, RoadmapEpicCluster & { counts: Record<StoryStatus, number> }>()
+  const clusters = new Map<
+    string,
+    RoadmapEpicCluster & { counts: Record<StoryStatus, number> }
+  >()
   for (const story of stories) {
     const existing = clusters.get(story.epicId)
     if (existing) {
@@ -394,7 +400,9 @@ function buildEpicClusters(
  * live status wins, because the executive question is "what needs attention",
  * not "what is the average".
  */
-export function rollupStatus(counts: Readonly<Record<StoryStatus, number>>): StoryStatus {
+export function rollupStatus(
+  counts: Readonly<Record<StoryStatus, number>>,
+): StoryStatus {
   for (const status of STATUS_ORDER) {
     if (status === "shipped") continue
     if ((counts[status] ?? 0) > 0) return status
@@ -609,7 +617,9 @@ export function buildRoadmapCanvas(
   // Epic depth comes from the FULL cross-epic DAG, not from what is currently
   // open. Collapsing a lane should fold it up in place, not shuffle every
   // other lane sideways.
-  const epicDepth = new Map(epicGraph.nodes.map((epic) => [epic.id, epic.depth]))
+  const epicDepth = new Map(
+    epicGraph.nodes.map((epic) => [epic.id, epic.depth]),
+  )
   const epicOrder = orderEpics(epicGraph, epicDepth)
 
   const stories: RoadmapCanvasStory[] = []
@@ -625,7 +635,10 @@ export function buildRoadmapCanvas(
     if (expanded) {
       const cells = internalTree(own)
       rows = Math.max(1, ...[...cells.values()].map((cell) => cell.row + 1))
-      columns = Math.max(1, ...[...cells.values()].map((cell) => cell.column + 1))
+      columns = Math.max(
+        1,
+        ...[...cells.values()].map((cell) => cell.column + 1),
+      )
       for (const node of own) {
         const cell = cells.get(node.id) ?? { row: 0, column: 0 }
         presentation.set(node.id, node.id)
@@ -810,7 +823,8 @@ function orderEpics(
 ): Map<string, number> {
   const upstream = new Map<string, string[]>()
   for (const epic of epicGraph.nodes) upstream.set(epic.id, [])
-  for (const edge of epicGraph.edges) upstream.get(edge.target)?.push(edge.source)
+  for (const edge of epicGraph.edges)
+    upstream.get(edge.target)?.push(edge.source)
 
   const byDepth = new Map<number, string[]>()
   for (const epic of epicGraph.nodes) {

@@ -14,7 +14,7 @@
 // synth failure leaves the message exactly as it was — the transcript on
 // screen is the authoritative copy and this is a delivery surface over it.
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { Volume2Icon, SquareIcon } from "lucide-react"
 
 import type { AgentMessagePart } from "@zigil/agent/contracts"
@@ -50,23 +50,22 @@ export function MessageReadAloud({
   const personaId = useAgentPersonaSession()
   const [speaking, setSpeaking] = useState(false)
   const [failed, setFailed] = useState(false)
-  const mounted = useRef(true)
   const playerRef = useRef(player)
   playerRef.current = player
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  // The run this component is currently listening to. Stopping clears it, and
+  // starting replaces it, so a synth or playback that resolves after the user
+  // has moved on cannot write its outcome over the newer one.
+  const currentRun = useRef<object | null>(null)
 
   const handleClick = useCallback(() => {
     if (speaking) {
+      currentRun.current = null
       playerRef.current.stop()
       setSpeaking(false)
       return
     }
+    const run = {}
+    currentRun.current = run
     setFailed(false)
     setSpeaking(true)
     void (async () => {
@@ -79,13 +78,13 @@ export function MessageReadAloud({
       if (outcome.status !== "spoken") {
         // Silence, not a broken message: `speakMessageParts` never throws, and
         // the rendered text is untouched either way.
-        if (!mounted.current) return
+        if (currentRun.current !== run) return
         setFailed(outcome.status === "failed")
         setSpeaking(false)
         return
       }
       await playerRef.current.play(outcome.audio)
-      if (!mounted.current) return
+      if (currentRun.current !== run) return
       setSpeaking(false)
     })()
   }, [parts, personaId, speak, speaking])

@@ -1,4 +1,9 @@
-import { useTheme, type ThemeDef, type ThemeMode, type ResolvedMode } from "@/lib/theme"
+import {
+  useTheme,
+  type ThemeDef,
+  type ThemeMode,
+  type ResolvedMode,
+} from "@/lib/theme"
 import { cn } from "@workspace/ui/lib/utils"
 import { ColorSwatch } from "@workspace/ui/components/color-swatch"
 import {
@@ -47,11 +52,12 @@ function ThemeSwatch({
 // reachable directly (not hidden behind a double-tap) so "follow OS" is a
 // first-class choice. Theme-tokened, no raw palette.
 
-const MODE_OPTIONS: { mode: ThemeMode; label: string; Icon: typeof SunIcon }[] = [
-  { mode: "light", label: "Light", Icon: SunIcon },
-  { mode: "system", label: "Follow system", Icon: MonitorIcon },
-  { mode: "dark", label: "Dark", Icon: MoonIcon },
-]
+const MODE_OPTIONS: { mode: ThemeMode; label: string; Icon: typeof SunIcon }[] =
+  [
+    { mode: "light", label: "Light", Icon: SunIcon },
+    { mode: "system", label: "Follow system", Icon: MonitorIcon },
+    { mode: "dark", label: "Dark", Icon: MoonIcon },
+  ]
 
 function ModeToggle({ className }: { className?: string }) {
   const { mode, setMode } = useTheme()

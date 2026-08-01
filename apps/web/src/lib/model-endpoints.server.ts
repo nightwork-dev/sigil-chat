@@ -15,11 +15,14 @@ import {
 } from "@workspace/runtime-env/topology"
 
 import { getEveBearerToken, getSession, requireOwner } from "./auth/session"
+import { persistDiscoveredModels } from "./discovered-models.server"
 import {
   parseProbeInput,
+  type ModelCatalogStatus,
   type ModelEndpointInventory,
   type ModelEndpointProbeInput,
   type ModelEndpointProbeResult,
+  type ModelEndpointReasoningConfig,
   type ModelEndpointRecord,
   type ModelProviderRecord,
 } from "./model-endpoints"
@@ -35,7 +38,15 @@ export async function readModelEndpointInventory(): Promise<ModelEndpointInvento
       `The agent runtime could not list model endpoints (HTTP ${response.status}).`,
     )
   }
-  return { providers: projectProviders(await response.json()) }
+  const providers = projectProviders(await response.json())
+  // Eve is the only process that can reach a provider's catalog endpoint —
+  // it holds the credential. The create-time allow-list check runs
+  // synchronously in THIS process, though, so a discovered model has to be
+  // cached here as a side effect of the owner viewing the inventory, rather
+  // than resolved live on every session-creation request. This is the only
+  // writer of that cache; it is owner-gated by `requireOwner` above.
+  persistDiscoveredModels(providers)
+  return { providers }
 }
 
 export async function probeModelEndpointThroughEve(
@@ -105,6 +116,7 @@ export function projectProviders(payload: unknown): ModelProviderRecord[] {
     // A provider with no readable models has nothing to offer; dropping it
     // keeps an empty block off the screen.
     if (models.length === 0) return []
+    const catalog = projectCatalogStatus(entry.catalog)
     return [
       {
         id,
@@ -118,6 +130,7 @@ export function projectProviders(payload: unknown): ModelProviderRecord[] {
           present: credential.present === true,
         },
         models,
+        ...(catalog ? { catalog } : {}),
       },
     ]
   })
@@ -142,8 +155,35 @@ function projectModel(candidate: unknown): ModelEndpointRecord[] {
           ? entry.contextWindowTokens
           : 0,
       isDeploymentDefault: entry.isDeploymentDefault === true,
+      ...(entry.discovered === true ? { discovered: true } : {}),
+      ...(projectReasoning(entry.reasoning)
+        ? { reasoning: projectReasoning(entry.reasoning) }
+        : {}),
+      fastMode: entry.fastMode === true,
     },
   ]
+}
+
+function projectCatalogStatus(value: unknown): ModelCatalogStatus | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const entry = value as Record<string, unknown>
+  const checkedAt = text(entry.checkedAt)
+  if (!checkedAt) return undefined
+  const error = text(entry.error)
+  return { checkedAt, ...(error ? { error } : {}) }
+}
+
+function projectReasoning(
+  candidate: unknown,
+): ModelEndpointReasoningConfig | undefined {
+  if (typeof candidate !== "object" || candidate === null) return undefined
+  const entry = candidate as Record<string, unknown>
+  const levels = Array.isArray(entry.levels)
+    ? entry.levels.filter((level): level is string => typeof level === "string")
+    : []
+  const defaultLevel = text(entry.default)
+  if (levels.length === 0 || !defaultLevel) return undefined
+  return { levels, default: defaultLevel }
 }
 
 export function projectProbeResult(payload: unknown): ModelEndpointProbeResult {

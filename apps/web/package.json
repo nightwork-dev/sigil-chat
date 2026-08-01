@@ -14,8 +14,6 @@
     "dev": "portless run --name sigil-chat vite dev --host",
     "prebuild": "pnpm gaze:setup",
     "build": "pnpm --filter @workspace/ui registry:build && vite build",
-    "prebuild:static": "pnpm gaze:setup",
-    "build:static": "vite build --config vite.config.static.ts && node scripts/finalize-spa.mjs",
     "preview": "vite preview",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",

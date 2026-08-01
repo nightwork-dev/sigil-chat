@@ -24,9 +24,14 @@ export interface ThemeNameCheck {
 export function validateThemeName(name: string): ThemeNameCheck {
   if (!name) return { ok: false, reason: "Name is required" }
   if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(name)) {
-    return { ok: false, reason: "Name must be kebab-case (a-z, 0-9, hyphens; must start with a letter)" }
+    return {
+      ok: false,
+      reason:
+        "Name must be kebab-case (a-z, 0-9, hyphens; must start with a letter)",
+    }
   }
-  if (RESERVED.has(name)) return { ok: false, reason: `"${name}" is a reserved name` }
+  if (RESERVED.has(name))
+    return { ok: false, reason: `"${name}" is a reserved name` }
   return { ok: true }
 }
 
@@ -113,7 +118,10 @@ function themesEntry(r: ThemeRegistration): string {
   },`
 }
 
-export function upsertThemeRegistration(source: string, r: ThemeRegistration): string {
+export function upsertThemeRegistration(
+  source: string,
+  r: ThemeRegistration,
+): string {
   // Replace an existing entry object that carries this className.
   const existing = new RegExp(
     `\\n  \\{\\n    className: "${escapeRe(r.className)}",[\\s\\S]*?\\n  \\},`,
@@ -124,7 +132,9 @@ export function upsertThemeRegistration(source: string, r: ThemeRegistration): s
   // Insert before the array close `] as const`.
   const closeRe = /\n\] as const/
   if (!closeRe.test(source)) {
-    throw new Error("Could not find THEMES array close (`] as const`) in theme.tsx")
+    throw new Error(
+      "Could not find THEMES array close (`] as const`) in theme.tsx",
+    )
   }
   return source.replace(closeRe, "\n" + themesEntry(r) + "\n] as const")
 }

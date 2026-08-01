@@ -12,7 +12,9 @@ import {
   pickActiveThread,
 } from "./session-route-target"
 
-function thread(partial: Partial<AgentThreadSummary> & { id: string }): AgentThreadSummary {
+function thread(
+  partial: Partial<AgentThreadSummary> & { id: string },
+): AgentThreadSummary {
   return {
     slug: `${partial.id}-slug`,
     personaId: "eve",
@@ -40,7 +42,12 @@ function threadWithUnrelatedSlug(
 const NAV: ProjectWorkspaceNavSummary = {
   personalProjectId: "project:personal",
   projects: [
-    { id: "project:personal", slug: "personal", name: "Personal", description: "" },
+    {
+      id: "project:personal",
+      slug: "personal",
+      name: "Personal",
+      description: "",
+    },
     { id: "project:brand", slug: "brand", name: "Brand", description: "" },
   ],
   workspaces: [
@@ -128,7 +135,9 @@ describe("chatResolverRedirectTarget", () => {
     const uuid2 = "22222222-2222-4222-8222-222222222222"
     const uuid3 = "33333333-3333-4333-8333-333333333333"
     const uuid4 = "44444444-4444-4444-8444-444444444444"
-    const cases: Array<[AgentThreadSummary, ProjectWorkspaceNavSummary | undefined]> = [
+    const cases: Array<
+      [AgentThreadSummary, ProjectWorkspaceNavSummary | undefined]
+    > = [
       [threadWithUnrelatedSlug(uuid1, "aaaaaaaa"), undefined],
       [threadWithUnrelatedSlug(uuid2, "bbbbbbbb"), NAV],
       [

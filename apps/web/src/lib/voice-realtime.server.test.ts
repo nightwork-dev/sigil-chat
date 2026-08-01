@@ -117,10 +117,14 @@ describe("relaying the offer to Eve", () => {
       }),
     )
 
-    await expect(exchangeRealtimeOffer(offer(), unconfirmed)).resolves.toMatchObject({
+    await expect(
+      exchangeRealtimeOffer(offer(), unconfirmed),
+    ).resolves.toMatchObject({
       error: expect.stringMatching(/binding/i),
     })
-    await expect(exchangeRealtimeOffer(offer(), mismatched)).resolves.toMatchObject({
+    await expect(
+      exchangeRealtimeOffer(offer(), mismatched),
+    ).resolves.toMatchObject({
       error: expect.stringMatching(/binding/i),
     })
   })
@@ -145,7 +149,9 @@ describe("relaying the offer to Eve", () => {
 
     const result = await exchangeRealtimeOffer(offer(), deps)
 
-    expect(result).toMatchObject({ error: expect.stringMatching(/unavailable/i) })
+    expect(result).toMatchObject({
+      error: expect.stringMatching(/unavailable/i),
+    })
   })
 
   it("treats a malformed answer as an error rather than a live session", async () => {
@@ -162,7 +168,10 @@ describe("relaying the offer to Eve", () => {
     const deps = dependencies(() => Response.json({}))
 
     await expect(
-      exchangeRealtimeOffer({ offerSdp: "   ", applicationThreadId: THREAD }, deps),
+      exchangeRealtimeOffer(
+        { offerSdp: "   ", applicationThreadId: THREAD },
+        deps,
+      ),
     ).resolves.toMatchObject({ error: expect.any(String) })
     expect(deps.calls).toHaveLength(0)
   })

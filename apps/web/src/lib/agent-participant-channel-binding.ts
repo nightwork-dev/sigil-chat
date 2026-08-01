@@ -35,9 +35,7 @@ export function agentParticipantOwnerParticipantId(
   return `owner:${principalId.trim()}`
 }
 
-export function agentParticipantPersonaParticipantId(
-  threadId: string,
-): string {
+export function agentParticipantPersonaParticipantId(threadId: string): string {
   return `persona:${threadId.trim()}`
 }
 

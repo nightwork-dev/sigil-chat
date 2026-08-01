@@ -97,19 +97,22 @@ describe("mergeWorkspaceResourceCandidates", () => {
       "project:proj-1",
     )
     expect(result[0]?.url).toBe(artifactUrl("artifact-1", "project:proj-1"))
-    expect(result[0]?.url).not.toBe(artifactUrl("artifact-1", "session:thread-1"))
+    expect(result[0]?.url).not.toBe(
+      artifactUrl("artifact-1", "session:thread-1"),
+    )
   })
 
   it("returns an empty list when both sources are empty", () => {
-    expect(mergeWorkspaceResourceCandidates([], [], "session:thread-1")).toEqual(
-      [],
-    )
+    expect(
+      mergeWorkspaceResourceCandidates([], [], "session:thread-1"),
+    ).toEqual([])
   })
 })
 
 // Type-level check that the union really is closed to the three §9.8(a)
 // nouns — this will fail to compile (not just fail at runtime) if a verb
 // kind is ever added without deliberately widening the contract.
-const _exhaustive: (kind: AddSourceKind) => "files" | "workspace-resource" | "session-note" =
-  (kind) => kind
+const _exhaustive: (
+  kind: AddSourceKind,
+) => "files" | "workspace-resource" | "session-note" = (kind) => kind
 void _exhaustive

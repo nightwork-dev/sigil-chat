@@ -14,10 +14,8 @@ import {
 } from "@zigil/agent/react"
 import type { AgentRuntimeSession } from "@zigil/agent/contracts"
 
-import {
-  getToolApprovalHeaderValue,
-  TOOL_APPROVAL_HEADER,
-} from "@/lib/agent-tool-approval"
+import { useToolApprovalHeaderValue } from "@/lib/agent-preferences"
+import { TOOL_APPROVAL_HEADER } from "@/lib/agent-tool-approval"
 import {
   commitAttentionDelivery,
   pendingAttentionContext,
@@ -29,6 +27,7 @@ export function useAppAgentSession(
   const provided = useAgentRuntimeSession()
   const session = source ?? provided
   const attention = useAttention()
+  const toolApprovalHeader = useToolApprovalHeaderValue()
 
   const send = useCallback<AgentRuntimeSession["send"]>(
     async (input) => {
@@ -49,7 +48,7 @@ export function useAppAgentSession(
           : {}),
         headers: {
           ...input.headers,
-          [TOOL_APPROVAL_HEADER]: getToolApprovalHeaderValue(),
+          [TOOL_APPROVAL_HEADER]: toolApprovalHeader(),
         },
       })
       if (result.status === "succeeded") {
@@ -59,7 +58,7 @@ export function useAppAgentSession(
       }
       return result
     },
-    [attention, session],
+    [attention, session, toolApprovalHeader],
   )
 
   const reset = useCallback(() => {

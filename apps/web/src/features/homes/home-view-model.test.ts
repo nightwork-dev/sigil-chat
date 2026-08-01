@@ -70,7 +70,9 @@ const nav: ProjectWorkspaceNavSummary = {
   ],
 }
 
-function thread(partial: Partial<AgentThreadSummary> & { id: string }): AgentThreadSummary {
+function thread(
+  partial: Partial<AgentThreadSummary> & { id: string },
+): AgentThreadSummary {
   return {
     slug: partial.id,
     personaId: "neve",
@@ -111,9 +113,9 @@ describe("projectWorkspaceRows", () => {
     ])
     const mounted = rows[1]
     expect("relation" in mounted && mounted.relation).toBe("mounted")
-    expect(
-      "canonicalOwnerName" in mounted && mounted.canonicalOwnerName,
-    ).toBe("Brand")
+    expect("canonicalOwnerName" in mounted && mounted.canonicalOwnerName).toBe(
+      "Brand",
+    )
   })
 
   it("omits the owner name when the canonical project is not visible", () => {
@@ -129,9 +131,11 @@ describe("projectWorkspaceRows", () => {
     const mounted = rows.find(
       (row) => "id" in row && row.id === NORTHSTAR.holidayLaunch,
     )
-    expect(mounted && "canonicalOwnerName" in mounted
-      ? mounted.canonicalOwnerName
-      : "unset").toBeUndefined()
+    expect(
+      mounted && "canonicalOwnerName" in mounted
+        ? mounted.canonicalOwnerName
+        : "unset",
+    ).toBeUndefined()
   })
 
   it("links owned rows canonically and mounted rows with the entered-via perspective", () => {
@@ -154,14 +158,19 @@ describe("projectWorkspaceRows", () => {
     }
     const rows = projectWorkspaceRows(selfNav, NORTHSTAR.commerce)
     const ids = rows.map((row) => ("id" in row ? row.id : "restricted"))
-    expect(ids.filter((id) => id === NORTHSTAR.checkoutReliability)).toHaveLength(1)
+    expect(
+      ids.filter((id) => id === NORTHSTAR.checkoutReliability),
+    ).toHaveLength(1)
   })
 })
 
 describe("buildProjectHome", () => {
   it("returns undefined for a project absent from the visible nav", () => {
     expect(
-      buildProjectHome({ nav, threads, work: fixtureWorkSource }, "project:hidden"),
+      buildProjectHome(
+        { nav, threads, work: fixtureWorkSource },
+        "project:hidden",
+      ),
     ).toBeUndefined()
   })
 
@@ -242,7 +251,11 @@ describe("resolveViaLabel — entered-via is presentation only", () => {
       ),
     }
     expect(
-      resolveViaLabel(hiddenOwnerNav, NORTHSTAR.holidayLaunch, NORTHSTAR.commerce),
+      resolveViaLabel(
+        hiddenOwnerNav,
+        NORTHSTAR.holidayLaunch,
+        NORTHSTAR.commerce,
+      ),
     ).toEqual({
       enteredViaName: "Commerce Platform",
       enteredViaScopeId: NORTHSTAR.commerce,

@@ -34,9 +34,9 @@ describe("no partial narration", () => {
   // flight, never because of how finished its text happens to look.
   it("excludes a streaming reply that already reads as a complete sentence", () => {
     const messages = [message("m1", "assistant", "Done — 3 files changed.")]
-    expect(
-      completedAgentReplies({ messages, isStreaming: true }),
-    ).toHaveLength(0)
+    expect(completedAgentReplies({ messages, isStreaming: true })).toHaveLength(
+      0,
+    )
   })
 })
 
@@ -48,9 +48,9 @@ describe("what is a reply", () => {
 
   it("ignores system messages", () => {
     const messages = [message("s1", "system", "context refreshed")]
-    expect(completedAgentReplies({ messages, isStreaming: false })).toHaveLength(
-      0,
-    )
+    expect(
+      completedAgentReplies({ messages, isStreaming: false }),
+    ).toHaveLength(0)
   })
 })
 

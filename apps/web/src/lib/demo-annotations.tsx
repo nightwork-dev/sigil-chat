@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 // Demo annotation injection — a deterministic, local-only way to SEE overlay
 // projection without waiting for the LLM to call sigil-annotate.
@@ -17,27 +17,30 @@ import {
   useMemo,
   useState,
   type ReactNode,
-} from "react";
+} from "react"
 
-import type { AgentAnnotation } from "@/lib/agent-annotations";
+import type { AgentAnnotation } from "@/lib/agent-annotations"
 
 interface DemoAnnotationsValue {
-  readonly byAnchor: ReadonlyMap<string, readonly AgentAnnotation[]>;
-  readonly add: (anchorId: string, annotation: Omit<AgentAnnotation, "toolCallId" | "anchorId">) => void;
-  readonly clear: () => void;
+  readonly byAnchor: ReadonlyMap<string, readonly AgentAnnotation[]>
+  readonly add: (
+    anchorId: string,
+    annotation: Omit<AgentAnnotation, "toolCallId" | "anchorId">,
+  ) => void
+  readonly clear: () => void
 }
 
-const DemoAnnotationsContext = createContext<DemoAnnotationsValue | null>(null);
+const DemoAnnotationsContext = createContext<DemoAnnotationsValue | null>(null)
 
 export function DemoAnnotationsProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<AgentAnnotation[]>([]);
+  const [items, setItems] = useState<AgentAnnotation[]>([])
 
   const value = useMemo<DemoAnnotationsValue>(() => {
-    const byAnchor = new Map<string, AgentAnnotation[]>();
+    const byAnchor = new Map<string, AgentAnnotation[]>()
     for (const a of items) {
-      const list = byAnchor.get(a.anchorId) ?? [];
-      list.push(a);
-      byAnchor.set(a.anchorId, list);
+      const list = byAnchor.get(a.anchorId) ?? []
+      list.push(a)
+      byAnchor.set(a.anchorId, list)
     }
     return {
       byAnchor,
@@ -51,18 +54,18 @@ export function DemoAnnotationsProvider({ children }: { children: ReactNode }) {
           },
         ]),
       clear: () => setItems([]),
-    };
-  }, [items]);
+    }
+  }, [items])
 
   return (
     <DemoAnnotationsContext.Provider value={value}>
       {children}
     </DemoAnnotationsContext.Provider>
-  );
+  )
 }
 
 export function useDemoAnnotations(): DemoAnnotationsValue | null {
-  return useContext(DemoAnnotationsContext);
+  return useContext(DemoAnnotationsContext)
 }
 
 /**
@@ -73,8 +76,8 @@ export function mergeDemoAnnotations(
   real: readonly AgentAnnotation[] | undefined,
   demo: readonly AgentAnnotation[] | undefined,
 ): readonly AgentAnnotation[] {
-  if (!real && !demo) return [];
-  if (!real) return demo!;
-  if (!demo) return real;
-  return [...real, ...demo];
+  if (!real && !demo) return []
+  if (!real) return demo!
+  if (!demo) return real
+  return [...real, ...demo]
 }

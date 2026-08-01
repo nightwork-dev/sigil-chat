@@ -40,7 +40,7 @@ import { useAgentPersonaSession } from "@/components/agent/agent-persona-session
 import { ContextTray } from "@/components/agent/context-tray"
 import { ProjectWorkspaceNav } from "@/components/agent/project-workspace-nav"
 import { SessionBlackboard } from "@/components/agent/session-blackboard"
-import { AgentPortrait } from "@/components/agents/agent-portrait"
+import { AgentPersona } from "@/components/agents/agent-persona"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentRoster, type AgentPersonaSummary } from "@/lib/agent-profile"
 import { deriveThreadProjectId } from "@/lib/agent-thread-containers"
@@ -99,8 +99,7 @@ export function AgentChatHeader({
     (thread) => thread.id === threadControls?.activeThreadId,
   )
   let activeContainers:
-    | { workspaceId: string | undefined; projectId: string }
-    | undefined
+    { workspaceId: string | undefined; projectId: string } | undefined
   if (activeThreadSummary && projectNav.data) {
     const nav = projectNav.data
     const projectId = deriveThreadProjectId(
@@ -281,18 +280,16 @@ function PersonaPickerItem({
       onClick={onSelect}
       type="button"
     >
-      <AgentPortrait
-        personaId={persona.id}
-        name={persona.name}
-        hasPortrait={persona.hasPortrait}
-        className="size-9"
-      />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="font-medium">{persona.name}</span>
-        <span className="line-clamp-1 text-muted-foreground">
-          {persona.description || persona.id}
-        </span>
-      </span>
+      <AgentPersona.Root className="contents" persona={persona}>
+        <AgentPersona.Portrait className="size-9" />
+        <AgentPersona.Body>
+          <AgentPersona.Name />
+          <AgentPersona.Description
+            className="line-clamp-1 text-sm"
+            fallback="id"
+          />
+        </AgentPersona.Body>
+      </AgentPersona.Root>
     </button>
   )
 }

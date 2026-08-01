@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest"
 
 import {
   resolveScopePerspective,
   type ProjectWorkspaceNav,
-} from "./agent-thread-containers.server";
+} from "./agent-thread-containers.server"
 
 const nav: ProjectWorkspaceNav = {
   personalProjectId: "project-a",
@@ -40,7 +40,7 @@ const nav: ProjectWorkspaceNav = {
       createdBy: "owner",
     },
   ],
-};
+}
 
 describe("resolveScopePerspective", () => {
   it("preserves a valid mounted-in entry project", () => {
@@ -51,8 +51,8 @@ describe("resolveScopePerspective", () => {
       ),
     ).toEqual({
       perspective: { focusScopeId: "workspace-b", viaScopeIds: ["project-a"] },
-    });
-  });
+    })
+  })
 
   it("falls back to the canonical home without retaining a stale path", () => {
     expect(
@@ -63,8 +63,8 @@ describe("resolveScopePerspective", () => {
     ).toEqual({
       perspective: { focusScopeId: "workspace-b", viaScopeIds: ["project-b"] },
       diagnostic: "scope-perspective-fallback",
-    });
-  });
+    })
+  })
 
   it("returns no perspective for a focus the visible nav does not contain", () => {
     expect(
@@ -72,8 +72,8 @@ describe("resolveScopePerspective", () => {
         { focusScopeId: "workspace-hidden", viaScopeIds: ["project-a"] },
         nav,
       ),
-    ).toBeUndefined();
-  });
+    ).toBeUndefined()
+  })
 
   it("does not retain a hidden canonical project in the perspective", () => {
     const directlyGrantedNav: ProjectWorkspaceNav = {
@@ -85,15 +85,15 @@ describe("resolveScopePerspective", () => {
           mountedProjectIds: [],
         },
       ],
-    };
+    }
     const resolved = resolveScopePerspective(
       { focusScopeId: "workspace-b", viaScopeIds: ["project-b"] },
       directlyGrantedNav,
-    );
+    )
 
     expect(resolved).toEqual({
       perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
       diagnostic: "scope-perspective-fallback",
-    });
-  });
-});
+    })
+  })
+})

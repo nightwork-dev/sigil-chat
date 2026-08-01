@@ -33,13 +33,7 @@
 //     than red text on every card — with dozens blocked, red everywhere stops
 //     being a signal. Status is quiet text at every status.
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import {
   Background,
   BackgroundVariant,
@@ -208,7 +202,9 @@ export function RoadmapGraphView({
   onSelectStory?: (storyId: string | null) => void
 }) {
   const [showShipped, setShowShipped] = useState(false)
-  const [selected, setSelected] = useState<string | null>(initialStoryId ?? null)
+  const [selected, setSelected] = useState<string | null>(
+    initialStoryId ?? null,
+  )
 
   // Open the lanes with work in flight, plus the lane of a deep-linked story so
   // the link lands on the story itself rather than on the lane hiding it.
@@ -236,7 +232,10 @@ export function RoadmapGraphView({
 
   const goalSetting = useUserSetting(viewerId, "roadmap.goalStoryIds")
   const setGoals = useSetUserSetting(viewerId, "roadmap.goalStoryIds")
-  const pinned = useMemo(() => goalSetting.data?.value ?? [], [goalSetting.data])
+  const pinned = useMemo(
+    () => goalSetting.data?.value ?? [],
+    [goalSetting.data],
+  )
   const goals = useMemo(() => goalPaths(graph, pinned), [graph, pinned])
   // `mutate` rather than the mutation object: React Query hands back a new
   // object every render, and this value is the context every card reads.
@@ -542,50 +541,50 @@ export function RoadmapGraphView({
       <div className="min-h-0 flex-1">
         <GoalActionsContext.Provider value={goalActions}>
           <ReactFlowProvider>
-          <ReactFlow<GraphNode>
-            nodes={nodes}
-            edges={derived.edges}
-            onNodesChange={onNodesChange}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            edgesFocusable={false}
-            // Selection is ours, not React Flow's: `selected` here means "this
-            // is the story whose chain is lit", which the projection decides.
-            // Letting React Flow keep a second, internal notion of selected
-            // would elevate node z-order and fight it for no gain — and node
-            // clicks are still delivered when elements aren't selectable.
-            elementsSelectable={false}
-            fitView
-            fitViewOptions={{ padding: 0.12 }}
-            minZoom={0.08}
-            proOptions={{ hideAttribution: true }}
-            onNodeClick={(_event, node) => {
-              if (node.type === "story") {
-                select(node.id === selected ? null : node.id)
-                return
-              }
-              if (node.type === "epic") toggleEpic(node.id)
-              if (node.type === "epic-container") {
-                toggleEpic(node.id.slice("container:".length))
-              }
-            }}
-            onPaneClick={() => select(null)}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={28}
-              size={1}
-              color="var(--color-border)"
-            />
-            <CanvasControls />
-            <Legend
-              hasGoals={goals.goals.size > 0}
-              hasSelection={selected !== null}
-            />
-            <FitOnLayout signature={layoutSignature} />
-          </ReactFlow>
+            <ReactFlow<GraphNode>
+              nodes={nodes}
+              edges={derived.edges}
+              onNodesChange={onNodesChange}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              edgesFocusable={false}
+              // Selection is ours, not React Flow's: `selected` here means "this
+              // is the story whose chain is lit", which the projection decides.
+              // Letting React Flow keep a second, internal notion of selected
+              // would elevate node z-order and fight it for no gain — and node
+              // clicks are still delivered when elements aren't selectable.
+              elementsSelectable={false}
+              fitView
+              fitViewOptions={{ padding: 0.12 }}
+              minZoom={0.08}
+              proOptions={{ hideAttribution: true }}
+              onNodeClick={(_event, node) => {
+                if (node.type === "story") {
+                  select(node.id === selected ? null : node.id)
+                  return
+                }
+                if (node.type === "epic") toggleEpic(node.id)
+                if (node.type === "epic-container") {
+                  toggleEpic(node.id.slice("container:".length))
+                }
+              }}
+              onPaneClick={() => select(null)}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+            >
+              <Background
+                variant={BackgroundVariant.Dots}
+                gap={28}
+                size={1}
+                color="var(--color-border)"
+              />
+              <CanvasControls />
+              <Legend
+                hasGoals={goals.goals.size > 0}
+                hasSelection={selected !== null}
+              />
+              <FitOnLayout signature={layoutSignature} />
+            </ReactFlow>
           </ReactFlowProvider>
         </GoalActionsContext.Provider>
       </div>

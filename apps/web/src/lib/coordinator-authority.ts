@@ -380,7 +380,9 @@ export function announceApprovalDecision(input: {
   })
 }
 
-function narrowActionRequest(value: unknown): DelegatedActionRequest | undefined {
+function narrowActionRequest(
+  value: unknown,
+): DelegatedActionRequest | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return undefined
   }

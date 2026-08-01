@@ -8,6 +8,18 @@
     "template": "sigil-design"
   },
   "replacements": [
+    ".agents/skills/component-development/SKILL.md",
+    ".agents/skills/extending-this-template/SKILL.md",
+    ".agents/skills/sigil-cli/SKILL.md",
+    ".agents/skills/ux-design-language/SKILL.md",
+    ".claude/skills/component-development/SKILL.md",
+    ".claude/skills/extending-this-template/SKILL.md",
+    ".claude/skills/sigil-cli/SKILL.md",
+    ".claude/skills/ux-design-language/SKILL.md",
+    ".pi/skills/component-development/SKILL.md",
+    ".pi/skills/extending-this-template/SKILL.md",
+    ".pi/skills/sigil-cli/SKILL.md",
+    ".pi/skills/ux-design-language/SKILL.md",
     "package.json",
     "pnpm-workspace.yaml",
     "turbo.json",

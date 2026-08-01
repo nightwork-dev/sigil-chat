@@ -3,68 +3,83 @@ import {
   type AgentEventCompactionReceipt,
   type AgentSessionTimelineEvent,
   type PersistedAgentEvent,
-} from "./agent-event-retention";
-import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts";
+} from "./agent-event-retention"
+import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts"
 import {
   cloneBoundAgentModel,
   isBoundAgentModel,
   type BoundAgentModel,
-} from "@workspace/agent-contracts/model-binding";
+} from "@workspace/agent-contracts/model-binding"
 
-export type AgentThreadStatus = "active" | "archived";
+export type AgentThreadStatus = "active" | "archived"
 
 export interface AgentRuntimeSessionState {
-  continuationToken?: string;
-  sessionId?: string;
-  streamIndex: number;
+  continuationToken?: string
+  sessionId?: string
+  streamIndex: number
 }
 
 export interface AgentThreadForkMessage {
-  role: "user" | "assistant";
-  text: string;
+  role: "user" | "assistant"
+  text: string
 }
 
 export interface AgentThreadForkSeed {
-  sourceThreadId: string;
-  sourceRevision: number;
-  createdAt: string;
-  messages: AgentThreadForkMessage[];
+  sourceThreadId: string
+  sourceRevision: number
+  createdAt: string
+  messages: AgentThreadForkMessage[]
 }
 
 /** A validated display route to a focused scope; never an authority grant. */
 export interface ScopePerspective {
-  focusScopeId: string;
+  focusScopeId: string
   /** Ordered display path ending immediately before focusScopeId. */
-  viaScopeIds: string[];
+  viaScopeIds: string[]
 }
 
 export interface AgentThreadExecutionBinding {
   /** Server-derived authenticated principal; never accepted from browser input. */
-  principalId: string;
+  principalId: string
   /** Server-validated persona id for this execution thread. */
-  personaId: string;
+  personaId: string
   /**
    * Immutable scope record id. Ordinary sessions are workspace-homed; private
    * cross-project personal-agent sessions are homed in the principal's personal
    * scope.
    */
-  homeScopeId: string;
+  homeScopeId: string
   /** The validated display perspective at session creation/fork time. */
-  initialPerspective: ScopePerspective;
+  initialPerspective: ScopePerspective
   /** Ordered, deduped, server-authorized context scope ids. */
-  additionalContextScopeIds: string[];
+  additionalContextScopeIds: string[]
   /**
    * Model this session runs, chosen once at creation. Absent means the
    * deployment default, which is what every thread created before per-session
    * selection existed carries — so an absent model is a normal state, not a
    * migration gap.
    */
-  model?: BoundAgentModel;
+  model?: BoundAgentModel
+}
+
+/**
+ * Mutable per-turn request parameters (MDL.4): reasoning level and fast
+ * mode.
+ *
+ * Lives as a sibling of `executionBinding`, never inside it — the binding is
+ * immutable session identity once set (`bindExecution` refuses a second
+ * write), while this is meant to change freely mid-conversation. See
+ * `setRequestOptions` below and `agent-session-binding.ts`, which re-mints
+ * the signed proof from this live field on every turn.
+ */
+export interface AgentThreadRequestOptions {
+  reasoningLevel?: string
+  fastMode?: boolean
 }
 
 export interface AgentThread {
-  members: string[];
-  id: string;
+  members: string[]
+  id: string
   /**
    * Short, immutable, URL-friendly alias for `id` — 8-char lowercase base36,
    * minted once at creation (or lazily backfilled the first time a
@@ -73,23 +88,25 @@ export interface AgentThread {
    * only — every domain lookup, scope, and persistence key in this file
    * still keys on `id`.
    */
-  slug: string;
-  personaId: string;
-  executionBinding?: AgentThreadExecutionBinding;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  status: AgentThreadStatus;
-  revision: number;
+  slug: string
+  personaId: string
+  executionBinding?: AgentThreadExecutionBinding
+  /** See {@link AgentThreadRequestOptions}. Absent is the ordinary state. */
+  requestOptions?: AgentThreadRequestOptions
+  title: string
+  createdAt: string
+  updatedAt: string
+  status: AgentThreadStatus
+  revision: number
   runtime: {
-    schemaVersion: 1;
-    session: AgentRuntimeSessionState;
-    events: PersistedAgentEvent[];
-    compaction: AgentEventCompactionReceipt;
-  };
-  contextReceipts?: AgentContextReceiptProjectionRecord[];
-  forkedFrom?: string;
-  forkSeed?: AgentThreadForkSeed;
+    schemaVersion: 1
+    session: AgentRuntimeSessionState
+    events: PersistedAgentEvent[]
+    compaction: AgentEventCompactionReceipt
+  }
+  contextReceipts?: AgentContextReceiptProjectionRecord[]
+  forkedFrom?: string
+  forkSeed?: AgentThreadForkSeed
   /**
    * The workspace this thread is bound to. Optional and additive — an
    * unbound thread (no workspaceId) is not an error state, it resolves to
@@ -97,88 +114,89 @@ export interface AgentThread {
    * containing project is never duplicated here: it is always derived
    * through workspace containment, one registry lookup away.
    */
-  workspaceId?: string;
+  workspaceId?: string
 }
 
 export interface AgentThreadPreference {
-  members: string[];
-  activeThreadId?: string;
+  members: string[]
+  activeThreadId?: string
   /** The principal's canonical active container path. */
-  activePerspective?: ScopePerspective;
-  updatedAt: string;
+  activePerspective?: ScopePerspective
+  updatedAt: string
 }
 
 export interface AgentThreadSummary {
-  id: string;
-  slug: string;
-  personaId: string;
-  executionBinding?: AgentThreadExecutionBinding;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  status: AgentThreadStatus;
-  revision: number;
-  forkedFrom?: string;
-  workspaceId?: string;
+  id: string
+  slug: string
+  personaId: string
+  executionBinding?: AgentThreadExecutionBinding
+  requestOptions?: AgentThreadRequestOptions
+  title: string
+  createdAt: string
+  updatedAt: string
+  status: AgentThreadStatus
+  revision: number
+  forkedFrom?: string
+  workspaceId?: string
 }
 
 export interface AgentThreadKvStore<T> {
-  delete(key: string): void;
-  get(key: string): T | undefined;
-  set(key: string, value: T): void;
-  entries(prefix?: string): Array<{ key: string; value: T }>;
+  delete(key: string): void
+  get(key: string): T | undefined
+  set(key: string, value: T): void
+  entries(prefix?: string): Array<{ key: string; value: T }>
 }
 
 export interface AgentThreadRepositoryOptions {
-  threads: AgentThreadKvStore<AgentThread>;
-  preferences: AgentThreadKvStore<AgentThreadPreference>;
-  defaultPersonaId: string;
-  now?: () => Date;
-  createId?: () => string;
+  threads: AgentThreadKvStore<AgentThread>
+  preferences: AgentThreadKvStore<AgentThreadPreference>
+  defaultPersonaId: string
+  now?: () => Date
+  createId?: () => string
   /** Injectable for tests (mint-on-create, collision regeneration). Defaults
    *  to a random 8-char lowercase base36 string. */
-  createSlug?: () => string;
+  createSlug?: () => string
 }
 
 export interface AgentThreadSnapshot {
-  session: AgentRuntimeSessionState;
-  events: AgentSessionTimelineEvent[];
+  session: AgentRuntimeSessionState
+  events: AgentSessionTimelineEvent[]
 }
 
 export interface ForkAgentThreadInput {
-  sourceThreadId: string;
-  title?: string;
-  expectedRevision?: number;
+  sourceThreadId: string
+  title?: string
+  expectedRevision?: number
 }
 
 export interface CreateAgentThreadInput {
-  personaId?: string;
-  title?: string;
-  workspaceId?: string;
-  executionBinding?: AgentThreadExecutionBinding;
+  personaId?: string
+  title?: string
+  workspaceId?: string
+  executionBinding?: AgentThreadExecutionBinding
 }
 
-const THREAD_KEY_PREFIX = "thread:";
-const ACTIVE_THREAD_KEY_PREFIX = "active-thread:";
-const DEFAULT_THREAD_TITLE = "New conversation";
-const MAX_FORK_MESSAGES = 12;
-const MAX_FORK_MESSAGE_CHARS = 2_000;
-const MAX_FORK_TOTAL_CHARS = 12_000;
-const FORK_PACKET_HEADING = "# Forked conversation context";
-const NEW_BRANCH_MARKER = "\n\n## New branch request\n\n";
+const THREAD_KEY_PREFIX = "thread:"
+const ACTIVE_THREAD_KEY_PREFIX = "active-thread:"
+const DEFAULT_THREAD_TITLE = "New conversation"
+const MAX_FORK_MESSAGES = 12
+const MAX_FORK_MESSAGE_CHARS = 2_000
+const MAX_FORK_TOTAL_CHARS = 12_000
+const FORK_PACKET_HEADING = "# Forked conversation context"
+const NEW_BRANCH_MARKER = "\n\n## New branch request\n\n"
 
-const SLUG_LENGTH = 8;
-const SLUG_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
-const MAX_SLUG_MINT_ATTEMPTS = 10;
+const SLUG_LENGTH = 8
+const SLUG_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
+const MAX_SLUG_MINT_ATTEMPTS = 10
 const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function randomSlug(): string {
-  let slug = "";
+  let slug = ""
   for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    slug += SLUG_ALPHABET[Math.floor(Math.random() * SLUG_ALPHABET.length)];
+    slug += SLUG_ALPHABET[Math.floor(Math.random() * SLUG_ALPHABET.length)]
   }
-  return slug;
+  return slug
 }
 
 // Authz finding 2 (2026-07-23, Annika): the lazy slug backfill in
@@ -199,29 +217,29 @@ function randomSlug(): string {
 // which one's write survives. FNV-1a is a plain synchronous string hash —
 // no node:crypto, so this stays safe in a client-reachable import chain.
 function fnv1aHash(input: string): number {
-  let hash = 0x811c9dc5;
+  let hash = 0x811c9dc5
   for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
   }
-  return hash >>> 0;
+  return hash >>> 0
 }
 
 function deterministicSlugCandidate(threadId: string, attempt: number): string {
-  let seed = fnv1aHash(`${threadId}:${attempt}`);
-  let slug = "";
+  let seed = fnv1aHash(`${threadId}:${attempt}`)
+  let slug = ""
   for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    slug += SLUG_ALPHABET[seed % SLUG_ALPHABET.length];
-    seed = Math.imul(seed ^ (seed >>> 15), 0x2545f491) >>> 0;
+    slug += SLUG_ALPHABET[seed % SLUG_ALPHABET.length]
+    seed = Math.imul(seed ^ (seed >>> 15), 0x2545f491) >>> 0
   }
-  return slug;
+  return slug
 }
 
 /** 36-char UUID (crypto.randomUUID() form) vs an 8-char base36 slug — no
  *  ambiguity between the two shapes, so a route param resolves unambiguously
  *  without a heuristic guess. */
 export function isUuidShaped(candidate: string): boolean {
-  return UUID_PATTERN.test(candidate);
+  return UUID_PATTERN.test(candidate)
 }
 
 export class AgentThreadConflictError extends Error {
@@ -232,33 +250,33 @@ export class AgentThreadConflictError extends Error {
   ) {
     super(
       `Agent thread ${threadId} changed from revision ${expectedRevision} to ${actualRevision}.`,
-    );
-    this.name = "AgentThreadConflictError";
+    )
+    this.name = "AgentThreadConflictError"
   }
 }
 
 export class AgentThreadNotFoundError extends Error {
   constructor(readonly threadId: string) {
-    super(`Agent thread ${threadId} was not found.`);
-    this.name = "AgentThreadNotFoundError";
+    super(`Agent thread ${threadId} was not found.`)
+    this.name = "AgentThreadNotFoundError"
   }
 }
 
 export class AgentThreadRepository {
-  private readonly threads: AgentThreadKvStore<AgentThread>;
-  private readonly preferences: AgentThreadKvStore<AgentThreadPreference>;
-  private readonly defaultPersonaId: string;
-  private readonly now: () => Date;
-  private readonly createId: () => string;
-  private readonly createSlug: () => string;
+  private readonly threads: AgentThreadKvStore<AgentThread>
+  private readonly preferences: AgentThreadKvStore<AgentThreadPreference>
+  private readonly defaultPersonaId: string
+  private readonly now: () => Date
+  private readonly createId: () => string
+  private readonly createSlug: () => string
 
   constructor(options: AgentThreadRepositoryOptions) {
-    this.threads = options.threads;
-    this.preferences = options.preferences;
-    this.defaultPersonaId = normalizePersonaId(options.defaultPersonaId);
-    this.now = options.now ?? (() => new Date());
-    this.createId = options.createId ?? (() => crypto.randomUUID());
-    this.createSlug = options.createSlug ?? randomSlug;
+    this.threads = options.threads
+    this.preferences = options.preferences
+    this.defaultPersonaId = normalizePersonaId(options.defaultPersonaId)
+    this.now = options.now ?? (() => new Date())
+    this.createId = options.createId ?? (() => crypto.randomUUID())
+    this.createSlug = options.createSlug ?? randomSlug
   }
 
   list(userId: string, includeArchived = false): AgentThread[] {
@@ -271,38 +289,38 @@ export class AgentThreadRepository {
         (left, right) =>
           right.updatedAt.localeCompare(left.updatedAt) ||
           left.id.localeCompare(right.id),
-      );
+      )
   }
 
   ensureActive(userId: string): AgentThread[] {
-    const active = this.list(userId, false);
-    return active.length > 0 ? active : [this.create(userId)];
+    const active = this.list(userId, false)
+    return active.length > 0 ? active : [this.create(userId)]
   }
 
   getDefaultPersonaId(): string {
-    return this.defaultPersonaId;
+    return this.defaultPersonaId
   }
 
   get(userId: string, id: string): AgentThread | undefined {
-    const stored = this.threads.get(threadKey(id));
-    const thread = stored ? this.normalizeThread(stored, userId) : undefined;
+    const stored = this.threads.get(threadKey(id))
+    const thread = stored ? this.normalizeThread(stored, userId) : undefined
     return thread && isMember(thread.members, userId)
       ? cloneThread(thread)
-      : undefined;
+      : undefined
   }
 
   /** Resolves a thread by its immutable slug, scoped to this principal's own
    *  threads (mirrors the mint-time collision scope — see mintUniqueSlug).
    *  Lazily backfills any pre-slug record it scans past, same as list/get. */
   getBySlug(userId: string, slug: string): AgentThread | undefined {
-    const normalizedSlug = slug.trim().toLowerCase();
-    if (!normalizedSlug) return undefined;
+    const normalizedSlug = slug.trim().toLowerCase()
+    if (!normalizedSlug) return undefined
     for (const { value } of this.threads.entries(THREAD_KEY_PREFIX)) {
-      if (!isMember(value.members, userId)) continue;
-      const thread = this.normalizeThread(value, userId);
-      if (thread.slug === normalizedSlug) return cloneThread(thread);
+      if (!isMember(value.members, userId)) continue
+      const thread = this.normalizeThread(value, userId)
+      if (thread.slug === normalizedSlug) return cloneThread(thread)
     }
-    return undefined;
+    return undefined
   }
 
   /** The route-boundary resolver (SC.10 session slugs): a URL segment is
@@ -315,9 +333,12 @@ export class AgentThreadRepository {
    *  exported, purely as a documented/tested shape fact — id and slug
    *  formats truly never overlap; it isn't load-bearing for dispatch here,
    *  precisely so synthetic non-UUID ids in tests keep resolving by id). */
-  resolveByRouteParam(userId: string, candidate: string): AgentThread | undefined {
-    const trimmed = candidate.trim();
-    return this.get(userId, trimmed) ?? this.getBySlug(userId, trimmed);
+  resolveByRouteParam(
+    userId: string,
+    candidate: string,
+  ): AgentThread | undefined {
+    const trimmed = candidate.trim()
+    return this.get(userId, trimmed) ?? this.getBySlug(userId, trimmed)
   }
 
   private mintUniqueSlug(userId: string): string {
@@ -327,21 +348,24 @@ export class AgentThreadRepository {
         .filter(({ value }) => isMember(value.members, userId))
         .map(({ value }) => value.slug)
         .filter((slug): slug is string => Boolean(slug)),
-    );
+    )
     for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
-      const candidate = this.createSlug();
-      if (!existing.has(candidate)) return candidate;
+      const candidate = this.createSlug()
+      if (!existing.has(candidate)) return candidate
     }
     throw new Error(
       `Could not mint a unique session slug for principal ${userId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
-    );
+    )
   }
 
   /** The lazy-backfill mint (finding 2 above) — deterministic from the
    *  thread's own id, unlike mintUniqueSlug's random mint used by
    *  create()/fork(), which never races (each writes a freshly-generated
    *  id nothing else could be reading yet). */
-  private mintDeterministicBackfillSlug(userId: string, threadId: string): string {
+  private mintDeterministicBackfillSlug(
+    userId: string,
+    threadId: string,
+  ): string {
     const existing = new Set(
       this.threads
         .entries(THREAD_KEY_PREFIX)
@@ -351,7 +375,7 @@ export class AgentThreadRepository {
         )
         .map(({ value }) => value.slug)
         .filter((slug): slug is string => Boolean(slug)),
-    );
+    )
     // Residual (documented, not fixed, per Annika's re-review): `existing`
     // is read without a lock, so two processes racing to backfill DIFFERENT
     // threads whose deterministic candidates happen to collide could still
@@ -361,20 +385,20 @@ export class AgentThreadRepository {
     // strictly no worse than create()/fork()'s pre-existing random-mint
     // collision window, which this repository has always accepted.
     for (let attempt = 0; attempt < MAX_SLUG_MINT_ATTEMPTS; attempt += 1) {
-      const candidate = deterministicSlugCandidate(threadId, attempt);
-      if (!existing.has(candidate)) return candidate;
+      const candidate = deterministicSlugCandidate(threadId, attempt)
+      if (!existing.has(candidate)) return candidate
     }
     throw new Error(
       `Could not mint a deterministic backfill slug for thread ${threadId} after ${MAX_SLUG_MINT_ATTEMPTS} attempts.`,
-    );
+    )
   }
 
   create(userId: string, input: CreateAgentThreadInput = {}): AgentThread {
-    const timestamp = this.now().toISOString();
-    const workspaceId = normalizeWorkspaceId(input.workspaceId);
+    const timestamp = this.now().toISOString()
+    const workspaceId = normalizeWorkspaceId(input.workspaceId)
     const personaId = normalizePersonaId(
       input.personaId ?? this.defaultPersonaId,
-    );
+    )
     const executionBinding = input.executionBinding
       ? normalizeExecutionBinding(input.executionBinding, {
           principalId: userId,
@@ -382,7 +406,7 @@ export class AgentThreadRepository {
         })
       : workspaceId
         ? legacyExecutionBinding(userId, personaId, workspaceId)
-        : undefined;
+        : undefined
     const thread: AgentThread = {
       members: [userId],
       id: this.createId(),
@@ -401,10 +425,10 @@ export class AgentThreadRepository {
         compaction: emptyCompaction(timestamp),
       },
       ...(workspaceId ? { workspaceId } : {}),
-    };
-    this.write(thread);
-    this.setActive(userId, thread.id, timestamp);
-    return cloneThread(thread);
+    }
+    this.write(thread)
+    this.setActive(userId, thread.id, timestamp)
+    return cloneThread(thread)
   }
 
   /** Rebinds an existing thread to a different workspace, or unbinds it
@@ -421,18 +445,18 @@ export class AgentThreadRepository {
       if (thread.executionBinding) {
         throw new Error(
           "Bound agent thread home scope cannot be changed by workspace rebinding.",
-        );
+        )
       }
-      const normalized = normalizeWorkspaceId(workspaceId);
-      const rebound = cloneThread(thread);
-      if (normalized) rebound.workspaceId = normalized;
-      else delete rebound.workspaceId;
+      const normalized = normalizeWorkspaceId(workspaceId)
+      const rebound = cloneThread(thread)
+      if (normalized) rebound.workspaceId = normalized
+      else delete rebound.workspaceId
       return {
         ...rebound,
         updatedAt: timestamp,
         revision: thread.revision + 1,
-      };
-    });
+      }
+    })
   }
 
   bindExecution(
@@ -445,18 +469,18 @@ export class AgentThreadRepository {
       const normalized = normalizeExecutionBinding(executionBinding, {
         principalId: userId,
         personaId: thread.personaId,
-      });
+      })
       if (thread.executionBinding) {
-        if (bindingsEqual(thread.executionBinding, normalized)) return thread;
-        throw new Error("Agent thread execution binding is immutable.");
+        if (bindingsEqual(thread.executionBinding, normalized)) return thread
+        throw new Error("Agent thread execution binding is immutable.")
       }
       return {
         ...thread,
         executionBinding: normalized,
         updatedAt: timestamp,
         revision: thread.revision + 1,
-      };
-    });
+      }
+    })
   }
 
   rename(
@@ -470,7 +494,33 @@ export class AgentThreadRepository {
       title: normalizeTitle(title),
       updatedAt: timestamp,
       revision: thread.revision + 1,
-    }));
+    }))
+  }
+
+  /**
+   * Replaces the thread's mutable reasoning level / fast mode (MDL.4).
+   *
+   * Unlike `bindExecution`, this never refuses a second write — that is the
+   * entire point of keeping it out of `executionBinding`. An empty object
+   * clears both fields rather than requiring a separate "unset" call.
+   */
+  setRequestOptions(
+    userId: string,
+    id: string,
+    requestOptions: AgentThreadRequestOptions,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => {
+      const normalized = normalizeRequestOptions(requestOptions)
+      const next = { ...thread }
+      if (normalized) next.requestOptions = normalized
+      else delete next.requestOptions
+      return {
+        ...next,
+        updatedAt: timestamp,
+        revision: thread.revision + 1,
+      }
+    })
   }
 
   archive(userId: string, id: string, expectedRevision?: number): AgentThread {
@@ -484,22 +534,22 @@ export class AgentThreadRepository {
         updatedAt: timestamp,
         revision: thread.revision + 1,
       }),
-    );
+    )
     if (this.getActivePreference(userId).activeThreadId === id) {
-      const next = this.list(userId, false).find((thread) => thread.id !== id);
-      this.setActive(userId, next?.id);
+      const next = this.list(userId, false).find((thread) => thread.id !== id)
+      this.setActive(userId, next?.id)
     }
-    return archived;
+    return archived
   }
 
   delete(userId: string, id: string, expectedRevision?: number): AgentThread {
-    const deleted = this.require(userId, id);
-    assertRevision(deleted, expectedRevision);
-    this.threads.delete(threadKey(id));
+    const deleted = this.require(userId, id)
+    assertRevision(deleted, expectedRevision)
+    this.threads.delete(threadKey(id))
     if (this.getActivePreference(userId).activeThreadId === id) {
-      this.setActive(userId, this.list(userId, false)[0]?.id);
+      this.setActive(userId, this.list(userId, false)[0]?.id)
     }
-    return deleted;
+    return deleted
   }
 
   saveSnapshot(
@@ -519,13 +569,13 @@ export class AgentThreadRepository {
           now: () => new Date(timestamp),
         }),
       },
-    }));
+    }))
   }
 
   fork(userId: string, input: ForkAgentThreadInput): AgentThread {
-    const source = this.require(userId, input.sourceThreadId);
-    assertRevision(source, input.expectedRevision);
-    const timestamp = this.now().toISOString();
+    const source = this.require(userId, input.sourceThreadId)
+    assertRevision(source, input.expectedRevision)
+    const timestamp = this.now().toISOString()
     const executionBinding = source.executionBinding
       ? normalizeExecutionBinding(source.executionBinding, {
           principalId: userId,
@@ -533,7 +583,7 @@ export class AgentThreadRepository {
         })
       : source.workspaceId
         ? legacyExecutionBinding(userId, source.personaId, source.workspaceId)
-        : undefined;
+        : undefined
     const fork: AgentThread = {
       members: [...source.members],
       id: this.createId(),
@@ -553,10 +603,10 @@ export class AgentThreadRepository {
       },
       forkedFrom: source.id,
       forkSeed: buildForkSeed(source, timestamp),
-    };
-    this.write(fork);
-    this.setActive(userId, fork.id, timestamp);
-    return cloneThread(fork);
+    }
+    this.write(fork)
+    this.setActive(userId, fork.id, timestamp)
+    return cloneThread(fork)
   }
 
   consumeForkSeed(
@@ -565,27 +615,27 @@ export class AgentThreadRepository {
     expectedRevision?: number,
   ): AgentThread {
     return this.update(userId, id, expectedRevision, (thread, timestamp) => {
-      if (!thread.forkSeed) return thread;
-      const withoutSeed = cloneThread(thread);
-      delete withoutSeed.forkSeed;
+      if (!thread.forkSeed) return thread
+      const withoutSeed = cloneThread(thread)
+      delete withoutSeed.forkSeed
       return {
         ...withoutSeed,
         updatedAt: timestamp,
         revision: thread.revision + 1,
-      };
-    });
+      }
+    })
   }
 
   getActivePreference(userId: string): AgentThreadPreference {
-    const preference = this.preferences.get(activeThreadKey(userId));
+    const preference = this.preferences.get(activeThreadKey(userId))
     if (!preference) {
-      return { members: [userId], updatedAt: this.now().toISOString() };
+      return { members: [userId], updatedAt: this.now().toISOString() }
     }
-    const normalized = normalizePreferencePerspective(preference);
+    const normalized = normalizePreferencePerspective(preference)
     if (normalized !== preference) {
-      this.preferences.set(activeThreadKey(userId), normalized);
+      this.preferences.set(activeThreadKey(userId), normalized)
     }
-    return structuredClone(normalized);
+    return structuredClone(normalized)
   }
 
   setActive(
@@ -594,23 +644,23 @@ export class AgentThreadRepository {
     updatedAt = this.now().toISOString(),
   ): AgentThreadPreference {
     if (id) {
-      const thread = this.require(userId, id);
+      const thread = this.require(userId, id)
       if (thread.status === "archived") {
-        throw new Error(`Archived agent thread ${id} cannot be active.`);
+        throw new Error(`Archived agent thread ${id} cannot be active.`)
       }
     }
     // Read the raw stored preference — NOT getActivePreference, whose
     // not-found fallback stamps updatedAt with this.now(): a clock-consuming
     // read that would shift timestamps for every subsequent write.
-    const existing = this.preferences.get(activeThreadKey(userId));
+    const existing = this.preferences.get(activeThreadKey(userId))
     const preference: AgentThreadPreference = {
       ...existing,
       members: [userId],
       activeThreadId: id,
       updatedAt,
-    };
-    this.preferences.set(activeThreadKey(userId), preference);
-    return structuredClone(preference);
+    }
+    this.preferences.set(activeThreadKey(userId), preference)
+    return structuredClone(preference)
   }
 
   /**
@@ -625,7 +675,7 @@ export class AgentThreadRepository {
     updatedAt = this.now().toISOString(),
   ): AgentThreadPreference {
     // Same raw-read rule as setActive (see the comment there).
-    const existing = this.preferences.get(activeThreadKey(userId));
+    const existing = this.preferences.get(activeThreadKey(userId))
     const {
       activePerspective: _activePerspective,
       activeProjectId: _activeProjectId,
@@ -633,16 +683,16 @@ export class AgentThreadRepository {
       ...retained
     } = (existing as StoredAgentThreadPreference | undefined) ?? {
       members: [userId],
-    };
-    const perspective = normalizeScopePerspective(container.perspective);
+    }
+    const perspective = normalizeScopePerspective(container.perspective)
     const preference: AgentThreadPreference = {
       ...retained,
       members: [userId],
       ...(perspective ? { activePerspective: perspective } : {}),
       updatedAt,
-    };
-    this.preferences.set(activeThreadKey(userId), preference);
-    return structuredClone(preference);
+    }
+    this.preferences.set(activeThreadKey(userId), preference)
+    return structuredClone(preference)
   }
 
   private update(
@@ -651,23 +701,23 @@ export class AgentThreadRepository {
     expectedRevision: number | undefined,
     updater: (thread: AgentThread, timestamp: string) => AgentThread,
   ): AgentThread {
-    const current = this.require(userId, id);
-    assertRevision(current, expectedRevision);
-    const updated = updater(current, this.now().toISOString());
-    if (updated !== current) this.write(updated);
-    return cloneThread(updated);
+    const current = this.require(userId, id)
+    assertRevision(current, expectedRevision)
+    const updated = updater(current, this.now().toISOString())
+    if (updated !== current) this.write(updated)
+    return cloneThread(updated)
   }
 
   private require(userId: string, id: string): AgentThread {
-    const stored = this.threads.get(threadKey(id));
-    const thread = stored ? this.normalizeThread(stored, userId) : undefined;
+    const stored = this.threads.get(threadKey(id))
+    const thread = stored ? this.normalizeThread(stored, userId) : undefined
     if (!thread || !isMember(thread.members, userId))
-      throw new AgentThreadNotFoundError(id);
-    return cloneThread(thread);
+      throw new AgentThreadNotFoundError(id)
+    return cloneThread(thread)
   }
 
   private write(thread: AgentThread) {
-    this.threads.set(threadKey(thread.id), cloneThread(thread));
+    this.threads.set(threadKey(thread.id), cloneThread(thread))
   }
 
   /** Lazy backfill (SC.10 session slugs): any thread read without a slug
@@ -677,67 +727,67 @@ export class AgentThreadRepository {
    *  the mint's collision check to this principal's OTHER threads, matching
    *  mintUniqueSlug's own scope. */
   private normalizeThread(thread: AgentThread, userId: string): AgentThread {
-    const stored = thread as StoredAgentThread;
+    const stored = thread as StoredAgentThread
     const hasPersonaId =
-      typeof thread.personaId === "string" && thread.personaId.trim();
+      typeof thread.personaId === "string" && thread.personaId.trim()
     const runtime =
       stored.runtime?.schemaVersion === 1
         ? stored.runtime
-        : freshRuntimeRecord(thread.updatedAt);
-    const hasSlug = typeof thread.slug === "string" && thread.slug.trim();
+        : freshRuntimeRecord(thread.updatedAt)
+    const hasSlug = typeof thread.slug === "string" && thread.slug.trim()
     const slug = hasSlug
       ? thread.slug.trim().toLowerCase()
-      : this.mintDeterministicBackfillSlug(userId, thread.id);
+      : this.mintDeterministicBackfillSlug(userId, thread.id)
     const normalized = cloneThread({
       ...stored,
       personaId: hasPersonaId ? thread.personaId.trim() : this.defaultPersonaId,
       runtime,
       slug,
-    });
+    })
     if (!hasPersonaId || stored.runtime?.schemaVersion !== 1 || !hasSlug) {
-      this.threads.set(threadKey(thread.id), normalized);
+      this.threads.set(threadKey(thread.id), normalized)
     }
-    return normalized;
+    return normalized
   }
 
   claimLegacyRecords(userIds: readonly string[]): LegacyClaimResult {
     if (userIds.length !== 1) {
-      throw new LegacyAgentThreadClaimRefusedError(userIds.length);
+      throw new LegacyAgentThreadClaimRefusedError(userIds.length)
     }
 
-    const [userId] = userIds;
-    let claimedThreads = 0;
-    let claimedPreferences = 0;
+    const [userId] = userIds
+    let claimedThreads = 0
+    let claimedPreferences = 0
     for (const { key, value } of this.threads.entries(THREAD_KEY_PREFIX)) {
-      if (hasMembers(value)) continue;
-      this.threads.set(key, { ...value, members: [userId] });
-      claimedThreads += 1;
+      if (hasMembers(value)) continue
+      this.threads.set(key, { ...value, members: [userId] })
+      claimedThreads += 1
     }
     for (const { key, value } of this.preferences.entries()) {
-      if (hasMembers(value)) continue;
-      const ownerKey = activeThreadKey(userId);
+      if (hasMembers(value)) continue
+      const ownerKey = activeThreadKey(userId)
       if (!this.preferences.get(ownerKey)) {
-        this.preferences.set(ownerKey, { ...value, members: [userId] });
+        this.preferences.set(ownerKey, { ...value, members: [userId] })
       }
-      this.preferences.delete(key);
-      claimedPreferences += 1;
+      this.preferences.delete(key)
+      claimedPreferences += 1
     }
-    return { claimedPreferences, claimedThreads, userId };
+    return { claimedPreferences, claimedThreads, userId }
   }
 }
 
 export interface LegacyClaimResult {
-  claimedPreferences: number;
-  claimedThreads: number;
-  userId: string;
+  claimedPreferences: number
+  claimedThreads: number
+  userId: string
 }
 
 export class LegacyAgentThreadClaimRefusedError extends Error {
   constructor(readonly userCount: number) {
     super(
       `Legacy agent-thread records can only be claimed when exactly one user exists; found ${userCount}.`,
-    );
-    this.name = "LegacyAgentThreadClaimRefusedError";
+    )
+    this.name = "LegacyAgentThreadClaimRefusedError"
   }
 }
 
@@ -751,6 +801,9 @@ export function projectAgentThreadSummary(
     ...(thread.executionBinding
       ? { executionBinding: cloneExecutionBinding(thread.executionBinding) }
       : {}),
+    ...(thread.requestOptions
+      ? { requestOptions: { ...thread.requestOptions } }
+      : {}),
     title: thread.title,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
@@ -758,27 +811,27 @@ export function projectAgentThreadSummary(
     revision: thread.revision,
     ...(thread.forkedFrom ? { forkedFrom: thread.forkedFrom } : {}),
     ...(thread.workspaceId ? { workspaceId: thread.workspaceId } : {}),
-  };
+  }
 }
 
 export function buildForkSeed(
   source: AgentThread,
   createdAt: string,
 ): AgentThreadForkSeed {
-  const messages: AgentThreadForkMessage[] = [];
+  const messages: AgentThreadForkMessage[] = []
   for (const event of source.runtime.events) {
-    const message = forkMessageFromEvent(event);
-    if (!message) continue;
-    messages.push(message);
+    const message = forkMessageFromEvent(event)
+    if (!message) continue
+    messages.push(message)
   }
 
-  const bounded: AgentThreadForkMessage[] = [];
-  let totalChars = 0;
+  const bounded: AgentThreadForkMessage[] = []
+  let totalChars = 0
   for (const message of messages.slice(-MAX_FORK_MESSAGES).reverse()) {
-    const text = message.text.slice(0, MAX_FORK_MESSAGE_CHARS);
-    if (totalChars + text.length > MAX_FORK_TOTAL_CHARS) continue;
-    bounded.unshift({ ...message, text });
-    totalChars += text.length;
+    const text = message.text.slice(0, MAX_FORK_MESSAGE_CHARS)
+    if (totalChars + text.length > MAX_FORK_TOTAL_CHARS) continue
+    bounded.unshift({ ...message, text })
+    totalChars += text.length
   }
 
   return {
@@ -786,7 +839,7 @@ export function buildForkSeed(
     sourceRevision: source.revision,
     createdAt,
     messages: bounded,
-  };
+  }
 }
 
 function forkMessageFromEvent(
@@ -796,62 +849,75 @@ function forkMessageFromEvent(
     return trimmedForkMessage(
       "user",
       userMessageWithoutForkPacket(event.data.message),
-    );
+    )
   }
   if (event.type === "message.completed" && event.data.message) {
-    return trimmedForkMessage("assistant", event.data.message);
+    return trimmedForkMessage("assistant", event.data.message)
   }
-  return undefined;
+  return undefined
 }
 
 function userMessageWithoutForkPacket(message: string): string {
-  if (!message.startsWith(FORK_PACKET_HEADING)) return message;
-  const markerIndex = message.lastIndexOf(NEW_BRANCH_MARKER);
+  if (!message.startsWith(FORK_PACKET_HEADING)) return message
+  const markerIndex = message.lastIndexOf(NEW_BRANCH_MARKER)
   return markerIndex < 0
     ? ""
-    : message.slice(markerIndex + NEW_BRANCH_MARKER.length);
+    : message.slice(markerIndex + NEW_BRANCH_MARKER.length)
 }
 
 function trimmedForkMessage(
   role: AgentThreadForkMessage["role"],
   text: string,
 ): AgentThreadForkMessage | undefined {
-  const normalized = text.trim();
-  return normalized ? { role, text: normalized } : undefined;
+  const normalized = text.trim()
+  return normalized ? { role, text: normalized } : undefined
 }
 
 function normalizeTitle(title?: string): string {
-  const normalized = title?.trim();
-  return normalized || DEFAULT_THREAD_TITLE;
+  const normalized = title?.trim()
+  return normalized || DEFAULT_THREAD_TITLE
+}
+
+/** Returns undefined when both fields are absent, so the caller can delete
+ *  the thread's `requestOptions` key rather than store an empty object. */
+function normalizeRequestOptions(
+  input: AgentThreadRequestOptions,
+): AgentThreadRequestOptions | undefined {
+  const reasoningLevel = input.reasoningLevel?.trim() || undefined
+  const fastMode = input.fastMode === true ? true : undefined
+  if (reasoningLevel === undefined && fastMode === undefined) return undefined
+  return {
+    ...(reasoningLevel !== undefined ? { reasoningLevel } : {}),
+    ...(fastMode !== undefined ? { fastMode } : {}),
+  }
 }
 
 function normalizePersonaId(personaId: string): string {
-  const normalized = personaId.trim();
-  if (!normalized)
-    throw new Error("Agent thread persona id must be non-empty.");
-  return normalized;
+  const normalized = personaId.trim()
+  if (!normalized) throw new Error("Agent thread persona id must be non-empty.")
+  return normalized
 }
 
 function normalizeWorkspaceId(
   workspaceId: string | undefined,
 ): string | undefined {
-  const normalized = workspaceId?.trim();
-  return normalized ? normalized : undefined;
+  const normalized = workspaceId?.trim()
+  return normalized ? normalized : undefined
 }
 
 function normalizeExecutionBinding(
   binding: AgentThreadExecutionBinding,
   expected: { principalId: string; personaId: string },
 ): AgentThreadExecutionBinding {
-  const principalId = normalizePrincipalId(binding.principalId);
-  const personaId = normalizePersonaId(binding.personaId);
+  const principalId = normalizePrincipalId(binding.principalId)
+  const personaId = normalizePersonaId(binding.personaId)
   if (principalId !== expected.principalId) {
-    throw new Error("Agent thread principal binding does not match owner.");
+    throw new Error("Agent thread principal binding does not match owner.")
   }
   if (personaId !== expected.personaId) {
-    throw new Error("Agent thread persona binding does not match persona.");
+    throw new Error("Agent thread persona binding does not match persona.")
   }
-  const homeScopeId = normalizeScopeId(binding.homeScopeId, "home scope id");
+  const homeScopeId = normalizeScopeId(binding.homeScopeId, "home scope id")
   return {
     principalId,
     personaId,
@@ -868,7 +934,7 @@ function normalizeExecutionBinding(
     ...(isBoundAgentModel(binding.model)
       ? { model: cloneBoundAgentModel(binding.model) }
       : {}),
-  };
+  }
 }
 
 function legacyExecutionBinding(
@@ -877,7 +943,7 @@ function legacyExecutionBinding(
   workspaceId: string | undefined,
 ): AgentThreadExecutionBinding {
   if (!workspaceId) {
-    throw new Error("Agent thread home workspace could not be derived.");
+    throw new Error("Agent thread home workspace could not be derived.")
   }
   return {
     principalId,
@@ -885,44 +951,44 @@ function legacyExecutionBinding(
     homeScopeId: workspaceId,
     initialPerspective: { focusScopeId: workspaceId, viaScopeIds: [] },
     additionalContextScopeIds: [],
-  };
+  }
 }
 
 function bindingsEqual(
   left: AgentThreadExecutionBinding,
   right: AgentThreadExecutionBinding,
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function normalizePrincipalId(principalId: string): string {
-  const normalized = principalId.trim();
+  const normalized = principalId.trim()
   if (!normalized) {
-    throw new Error("Agent thread principal id must be non-empty.");
+    throw new Error("Agent thread principal id must be non-empty.")
   }
-  return normalized;
+  return normalized
 }
 
 function normalizeScopeId(scopeId: string, label: string): string {
-  const normalized = scopeId.trim();
-  if (!normalized) throw new Error(`Agent thread ${label} must be non-empty.`);
-  return normalized;
+  const normalized = scopeId.trim()
+  if (!normalized) throw new Error(`Agent thread ${label} must be non-empty.`)
+  return normalized
 }
 
 function dedupeScopeIds(scopeIds: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const deduped: string[] = [];
+  const seen = new Set<string>()
+  const deduped: string[] = []
   for (const scopeId of scopeIds) {
-    const normalized = normalizeScopeId(scopeId, "context scope id");
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-    deduped.push(normalized);
+    const normalized = normalizeScopeId(scopeId, "context scope id")
+    if (seen.has(normalized)) continue
+    seen.add(normalized)
+    deduped.push(normalized)
   }
-  return deduped;
+  return deduped
 }
 
 function failInvalidPerspective(): never {
-  throw new Error("Agent thread initial perspective is invalid.");
+  throw new Error("Agent thread initial perspective is invalid.")
 }
 
 export function isScopePerspective(value: unknown): value is ScopePerspective {
@@ -937,31 +1003,31 @@ export function isScopePerspective(value: unknown): value is ScopePerspective {
     ) &&
     new Set((value as ScopePerspective).viaScopeIds).size ===
       (value as ScopePerspective).viaScopeIds.length
-  );
+  )
 }
 
 function normalizeScopePerspective(
   perspective: ScopePerspective | undefined,
 ): ScopePerspective | undefined {
-  if (!isScopePerspective(perspective)) return undefined;
+  if (!isScopePerspective(perspective)) return undefined
   return {
     focusScopeId: perspective.focusScopeId.trim(),
     viaScopeIds: perspective.viaScopeIds.map((scopeId) => scopeId.trim()),
-  };
+  }
 }
 
 function normalizePreferencePerspective(
   preference: AgentThreadPreference,
 ): AgentThreadPreference {
-  const stored = preference as StoredAgentThreadPreference;
+  const stored = preference as StoredAgentThreadPreference
   const {
     activeProjectId: _activeProjectId,
     activeWorkspaceId: _activeWorkspaceId,
     ...withoutLegacy
-  } = stored;
+  } = stored
   const perspective =
     normalizeScopePerspective(preference.activePerspective) ??
-    legacyContainerPerspective(stored);
+    legacyContainerPerspective(stored)
   if (perspective) {
     const unchanged =
       !("activeProjectId" in stored) &&
@@ -969,25 +1035,25 @@ function normalizePreferencePerspective(
       preference.activePerspective?.focusScopeId === perspective.focusScopeId &&
       preference.activePerspective.viaScopeIds.every(
         (scopeId, index) => scopeId === perspective.viaScopeIds[index],
-      );
+      )
     return unchanged
       ? preference
-      : { ...withoutLegacy, activePerspective: perspective };
+      : { ...withoutLegacy, activePerspective: perspective }
   }
   if (
     preference.activePerspective === undefined &&
     !("activeProjectId" in stored) &&
     !("activeWorkspaceId" in stored)
   ) {
-    return preference;
+    return preference
   }
-  return withoutActivePerspective(withoutLegacy);
+  return withoutActivePerspective(withoutLegacy)
 }
 
 type StoredAgentThreadPreference = AgentThreadPreference & {
-  activeProjectId?: string;
-  activeWorkspaceId?: string;
-};
+  activeProjectId?: string
+  activeWorkspaceId?: string
+}
 
 function legacyContainerPerspective(
   container: StoredAgentThreadPreference,
@@ -996,44 +1062,44 @@ function legacyContainerPerspective(
     return {
       focusScopeId: container.activeWorkspaceId,
       viaScopeIds: container.activeProjectId ? [container.activeProjectId] : [],
-    };
+    }
   }
   return container.activeProjectId
     ? { focusScopeId: container.activeProjectId, viaScopeIds: [] }
-    : undefined;
+    : undefined
 }
 
 function withoutActivePerspective(
   preference: AgentThreadPreference,
 ): AgentThreadPreference {
-  const { activePerspective: _activePerspective, ...rest } = preference;
-  return rest;
+  const { activePerspective: _activePerspective, ...rest } = preference
+  return rest
 }
 
 function threadKey(id: string): string {
-  return `${THREAD_KEY_PREFIX}${id}`;
+  return `${THREAD_KEY_PREFIX}${id}`
 }
 
 function activeThreadKey(userId: string): string {
-  return `${ACTIVE_THREAD_KEY_PREFIX}${userId}`;
+  return `${ACTIVE_THREAD_KEY_PREFIX}${userId}`
 }
 
 function hasMembers(
   record: Pick<AgentThread, "members"> | Pick<AgentThreadPreference, "members">,
 ): boolean {
-  return Array.isArray(record.members);
+  return Array.isArray(record.members)
 }
 
 function isMember(members: unknown, userId: string): boolean {
-  return Array.isArray(members) && members.includes(userId);
+  return Array.isArray(members) && members.includes(userId)
 }
 
 type StoredAgentThread = Omit<AgentThread, "runtime"> & {
-  runtime?: AgentThread["runtime"];
-};
+  runtime?: AgentThread["runtime"]
+}
 
 function freshRuntimeSession(): AgentRuntimeSessionState {
-  return { streamIndex: 0 };
+  return { streamIndex: 0 }
 }
 
 function freshRuntimeRecord(timestamp: string): AgentThread["runtime"] {
@@ -1042,13 +1108,13 @@ function freshRuntimeRecord(timestamp: string): AgentThread["runtime"] {
     session: freshRuntimeSession(),
     events: [],
     compaction: emptyCompaction(timestamp),
-  };
+  }
 }
 
 function emptyCompaction(timestamp: string): AgentEventCompactionReceipt {
   return sanitizeAndBoundAgentEvents([], {
     now: () => new Date(timestamp),
-  }).compaction;
+  }).compaction
 }
 
 function cloneSession(
@@ -1060,17 +1126,17 @@ function cloneSession(
       : {}),
     ...(session.sessionId ? { sessionId: session.sessionId } : {}),
     streamIndex: session.streamIndex,
-  };
+  }
 }
 
 function cloneThread(thread: AgentThread): AgentThread {
-  return structuredClone(thread);
+  return structuredClone(thread)
 }
 
 function cloneExecutionBinding(
   binding: AgentThreadExecutionBinding,
 ): AgentThreadExecutionBinding {
-  return structuredClone(binding);
+  return structuredClone(binding)
 }
 
 function assertRevision(thread: AgentThread, expectedRevision?: number): void {
@@ -1079,6 +1145,6 @@ function assertRevision(thread: AgentThread, expectedRevision?: number): void {
       thread.id,
       expectedRevision,
       thread.revision,
-    );
+    )
   }
 }

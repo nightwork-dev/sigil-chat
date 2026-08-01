@@ -42,7 +42,8 @@ const getUserSettingFn = createServerFn({ method: "GET" })
     (input: { key: string; workspaceId?: string; channelId?: string }) => input,
   )
   .handler(async ({ data }): Promise<GetUserSettingResult> => {
-    const { getSession, AuthenticationRequiredError } = await import("./auth/session")
+    const { getSession, AuthenticationRequiredError } =
+      await import("./auth/session")
     const { getAuthDbClient } = await import("./auth/server")
     const { resolveUserSetting } = await import("./user-settings/store")
 
@@ -83,7 +84,8 @@ interface SetUserSettingResult {
 const setUserSettingFn = createServerFn({ method: "POST" })
   .validator((input: SetUserSettingRequest) => input)
   .handler(async ({ data }): Promise<SetUserSettingResult> => {
-    const { getSession, AuthenticationRequiredError } = await import("./auth/session")
+    const { getSession, AuthenticationRequiredError } =
+      await import("./auth/session")
     const { getAuthDbClient } = await import("./auth/server")
     const { setUserSetting } = await import("./user-settings/store")
 
@@ -94,7 +96,9 @@ const setUserSettingFn = createServerFn({ method: "POST" })
       throw new Error(`Unknown setting key: ${data.key}`)
     }
     if (!isScopeAllowed(data.key, data.scopeKind)) {
-      throw new Error(`Setting "${data.key}" cannot be written at scope "${data.scopeKind}"`)
+      throw new Error(
+        `Setting "${data.key}" cannot be written at scope "${data.scopeKind}"`,
+      )
     }
 
     let value: unknown
@@ -152,7 +156,11 @@ export function useUserSetting<K extends SettingKey>(
     queryKey: userSettingKeys.detail(userId, key, scope),
     queryFn: async (): Promise<UserSettingResult<SettingValue<K>>> => {
       const result = await getUserSettingFn({
-        data: { key, workspaceId: scope?.workspaceId, channelId: scope?.channelId },
+        data: {
+          key,
+          workspaceId: scope?.workspaceId,
+          channelId: scope?.channelId,
+        },
       })
       return {
         value: JSON.parse(result.valueJson) as SettingValue<K>,
@@ -163,7 +171,10 @@ export function useUserSetting<K extends SettingKey>(
   })
 }
 
-export function useSetUserSetting<K extends SettingKey>(userId: string, key: K) {
+export function useSetUserSetting<K extends SettingKey>(
+  userId: string,
+  key: K,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({

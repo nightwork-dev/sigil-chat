@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest"
 
 import {
   AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
   type AgentContextCompileReceiptProjection,
-} from "@workspace/agent-contracts/context-receipt";
-import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts";
-import { mergeThreadForCache } from "./agent-threads";
-import type { AgentThread } from "./agent-threads-domain";
+} from "@workspace/agent-contracts/context-receipt"
+import type { AgentContextReceiptProjectionRecord } from "@workspace/agent-tools/context-receipts"
+import { mergeThreadForCache } from "./agent-threads"
+import type { AgentThread } from "./agent-threads-domain"
 
 describe("agent thread query cache", () => {
   it("preserves context receipt projections when a snapshot save returns a bare thread", () => {
@@ -21,13 +21,13 @@ describe("agent thread query cache", () => {
           retainedAt: "2026-07-29T14:00:01.000Z",
         },
       ],
-    });
-    const incoming = thread({ revision: 2 });
+    })
+    const incoming = thread({ revision: 2 })
 
     expect(mergeThreadForCache(current, incoming).contextReceipts).toEqual(
       current.contextReceipts,
-    );
-  });
+    )
+  })
 
   it("uses fresh server-projected receipts when the incoming thread includes them", () => {
     const current = thread({
@@ -41,7 +41,7 @@ describe("agent thread query cache", () => {
           retainedAt: "2026-07-29T14:00:01.000Z",
         },
       ],
-    });
+    })
     const freshReceipts: AgentContextReceiptProjectionRecord[] = [
       {
         applicationThreadId: "thread-1",
@@ -51,14 +51,14 @@ describe("agent thread query cache", () => {
         recordId: "fresh-record",
         retainedAt: "2026-07-29T14:01:01.000Z",
       },
-    ];
-    const incoming = thread({ contextReceipts: freshReceipts, revision: 2 });
+    ]
+    const incoming = thread({ contextReceipts: freshReceipts, revision: 2 })
 
     expect(mergeThreadForCache(current, incoming).contextReceipts).toEqual(
       freshReceipts,
-    );
-  });
-});
+    )
+  })
+})
 
 function thread(overrides: Partial<AgentThread> = {}): AgentThread {
   return {
@@ -83,7 +83,7 @@ function thread(overrides: Partial<AgentThread> = {}): AgentThread {
       },
     },
     ...overrides,
-  };
+  }
 }
 
 function receipt(id: string): AgentContextCompileReceiptProjection {
@@ -99,5 +99,5 @@ function receipt(id: string): AgentContextCompileReceiptProjection {
     status: "ready",
     totalTokens: 0,
     version: AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
-  };
+  }
 }

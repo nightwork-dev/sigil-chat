@@ -54,7 +54,9 @@ describe("resolveProjectRouteParam", () => {
 
   it("returns undefined for an unknown candidate or missing nav", () => {
     expect(resolveProjectRouteParam(NAV, "no-such-project")).toBeUndefined()
-    expect(resolveProjectRouteParam(undefined, "commerce-platform")).toBeUndefined()
+    expect(
+      resolveProjectRouteParam(undefined, "commerce-platform"),
+    ).toBeUndefined()
   })
 
   // Authz regression (finding 1, 2026-07-23): a crafted project whose `id`
@@ -75,7 +77,9 @@ describe("resolveProjectRouteParam", () => {
     }
     // Without the ambiguity guard, `.find` would first-match the attacker's
     // record here (id === candidate) and never reach the victim.
-    expect(resolveProjectRouteParam(spoofed, "commerce-platform")).toBeUndefined()
+    expect(
+      resolveProjectRouteParam(spoofed, "commerce-platform"),
+    ).toBeUndefined()
     // The attacker's own slug still resolves to the attacker — only the
     // colliding candidate is ambiguous, not every lookup involving them.
     expect(resolveProjectRouteParam(spoofed, "attacker-project")?.id).toBe(
@@ -88,7 +92,12 @@ describe("resolveProjectRouteParam", () => {
       ...NAV,
       projects: [
         ...NAV.projects,
-        { id: "project:third", slug: "third-project", name: "Third", description: "" },
+        {
+          id: "project:third",
+          slug: "third-project",
+          name: "Third",
+          description: "",
+        },
       ],
     }
     expect(resolveProjectRouteParam(withThird, "commerce-platform")?.id).toBe(

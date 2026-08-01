@@ -34,7 +34,9 @@ function fakeMicrophone() {
   return { stream, track, stopped: () => stops }
 }
 
-function fakePeer(behavior: { offerSdp?: string | undefined; failOffer?: Error } = {}) {
+function fakePeer(
+  behavior: { offerSdp?: string | undefined; failOffer?: Error } = {},
+) {
   const added: unknown[] = []
   const channels: string[] = []
   const local: unknown[] = []
@@ -120,13 +122,16 @@ function harness(
       createAudioSink: () => sink.sink,
       exchange:
         options.exchange ??
-        (() => Promise.resolve({ threadId: "thread-1", answerSdp: ANSWER_SDP })),
+        (() =>
+          Promise.resolve({ threadId: "thread-1", answerSdp: ANSWER_SDP })),
       endSession: () => {
         ends += 1
         return Promise.resolve(true)
       },
       ...(options.signal ? { signal: options.signal } : {}),
-      ...(options.onRemoteAudio ? { onRemoteAudio: options.onRemoteAudio } : {}),
+      ...(options.onRemoteAudio
+        ? { onRemoteAudio: options.onRemoteAudio }
+        : {}),
     },
   }
 }
@@ -208,9 +213,9 @@ describe("cleanup on every exit path", () => {
       peerBehavior: { failOffer: new Error("createOffer exploded") },
     })
 
-    await expect(startRealtimeVoiceSession(test.primitives)).rejects.toBeInstanceOf(
-      RealtimeVoiceError,
-    )
+    await expect(
+      startRealtimeVoiceSession(test.primitives),
+    ).rejects.toBeInstanceOf(RealtimeVoiceError)
     expect(test.microphone.stopped()).toBe(1)
     expect(test.peer.closed()).toBe(1)
     expect(test.sink.stopped()).toBe(1)
@@ -228,8 +233,7 @@ describe("cleanup on every exit path", () => {
 
   it("a host refusal surfaces its message and releases everything", async () => {
     const test = harness({
-      exchange: () =>
-        Promise.resolve({ error: "Voice session access denied" }),
+      exchange: () => Promise.resolve({ error: "Voice session access denied" }),
     })
 
     await expect(startRealtimeVoiceSession(test.primitives)).rejects.toThrow(

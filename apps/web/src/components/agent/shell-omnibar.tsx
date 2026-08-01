@@ -143,7 +143,9 @@ export function ShellOmnibar() {
                 <span className="min-w-0 truncate">
                   Send: <span className="font-medium">{query.trim()}</span>
                 </span>
-                <span className="ml-auto text-[10px] text-muted-foreground">↵</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  ↵
+                </span>
               </CommandItem>
             </CommandGroup>
           ) : null}

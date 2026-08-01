@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import type { AgentRuntimeStreamEvent } from "./agent-event-retention";
+import { describe, expect, it } from "vitest"
+import type { AgentRuntimeStreamEvent } from "./agent-event-retention"
 
 import {
   AgentThreadConflictError,
@@ -11,32 +11,32 @@ import {
   type AgentThread,
   type AgentThreadPreference,
   type AgentThreadKvStore,
-} from "./agent-threads-domain";
+} from "./agent-threads-domain"
 
-const USER_A = "user-a";
-const USER_B = "user-b";
+const USER_A = "user-a"
+const USER_B = "user-b"
 
 class MemoryKv<T> implements AgentThreadKvStore<T> {
-  private readonly values = new Map<string, T>();
+  private readonly values = new Map<string, T>()
 
   delete(key: string): void {
-    this.values.delete(key);
+    this.values.delete(key)
   }
 
   get(key: string): T | undefined {
-    const value = this.values.get(key);
-    return value === undefined ? undefined : structuredClone(value);
+    const value = this.values.get(key)
+    return value === undefined ? undefined : structuredClone(value)
   }
 
   set(key: string, value: T): void {
-    this.values.set(key, structuredClone(value));
+    this.values.set(key, structuredClone(value))
   }
 
   entries(prefix = ""): Array<{ key: string; value: T }> {
     return [...this.values.entries()]
       .filter(([key]) => key.startsWith(prefix))
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, value]) => ({ key, value: structuredClone(value) }));
+      .map(([key, value]) => ({ key, value: structuredClone(value) }))
   }
 }
 
@@ -50,26 +50,26 @@ function repository() {
     "2026-07-16T10:05:00.000Z",
     "2026-07-16T10:06:00.000Z",
     "2026-07-16T10:07:00.000Z",
-  ];
-  let timeIndex = 0;
-  let id = 0;
+  ]
+  let timeIndex = 0
+  let id = 0
   return new AgentThreadRepository({
     defaultPersonaId: "agent-a",
     threads: new MemoryKv(),
     preferences: new MemoryKv(),
     now: () => new Date(timestamps[timeIndex++] ?? timestamps.at(-1)),
     createId: () => `thread-${++id}`,
-  });
+  })
 }
 
 describe("AgentThreadRepository", () => {
   it("creates independently resumable threads and lists newest first", () => {
-    const repo = repository();
-    const first = repo.create(USER_A, { title: "Launch review" });
+    const repo = repository()
+    const first = repo.create(USER_A, { title: "Launch review" })
     const second = repo.create(USER_A, {
       personaId: "agent-b",
       title: "Incident analysis",
-    });
+    })
 
     expect(first.runtime).toEqual({
       schemaVersion: 1,
@@ -81,172 +81,164 @@ describe("AgentThreadRepository", () => {
         omittedEventCount: 0,
         compactedAt: "2026-07-16T10:00:00.000Z",
       },
-    });
+    })
     expect(repo.list(USER_A).map((thread) => thread.id)).toEqual([
       second.id,
       first.id,
-    ]);
-    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(second.id);
-    expect(first.personaId).toBe("agent-a");
-    expect(second.personaId).toBe("agent-b");
-  });
+    ])
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(second.id)
+    expect(first.personaId).toBe("agent-a")
+    expect(second.personaId).toBe("agent-b")
+  })
 
   it("persists the active container selection per principal (§3.1)", () => {
-    const repo = repository();
+    const repo = repository()
 
     // Default: no selection (resolves to the personal project upstream).
-    expect(repo.getActivePreference(USER_A).activePerspective).toBeUndefined();
+    expect(repo.getActivePreference(USER_A).activePerspective).toBeUndefined()
 
     repo.setActiveContainer(USER_A, {
       perspective: { focusScopeId: "project-1", viaScopeIds: [] },
-    });
+    })
     expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
       focusScopeId: "project-1",
       viaScopeIds: [],
-    });
+    })
 
     repo.setActiveContainer(USER_A, {
       perspective: {
         focusScopeId: "workspace-1",
         viaScopeIds: ["project-1"],
       },
-    });
+    })
     expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
       focusScopeId: "workspace-1",
       viaScopeIds: ["project-1"],
-    });
+    })
 
     // Per-principal isolation: another principal's selection is untouched.
-    expect(repo.getActivePreference(USER_B).activePerspective).toBeUndefined();
+    expect(repo.getActivePreference(USER_B).activePerspective).toBeUndefined()
 
     // Clearing returns to the default.
-    repo.setActiveContainer(USER_A, {});
-    expect(repo.getActivePreference(USER_A).activePerspective).toBeUndefined();
-  });
+    repo.setActiveContainer(USER_A, {})
+    expect(repo.getActivePreference(USER_A).activePerspective).toBeUndefined()
+  })
 
   it("writes back a ScopePerspective for a legacy scalar container preference", () => {
-    const preferences = new MemoryKv<AgentThreadPreference>();
-    preferences.set(
-      `active-thread:${USER_A}`,
-      {
-        members: [USER_A],
-        activeProjectId: "project-1",
-        activeWorkspaceId: "workspace-1",
-        updatedAt: "2026-07-16T10:00:00.000Z",
-      } as AgentThreadPreference,
-    );
+    const preferences = new MemoryKv<AgentThreadPreference>()
+    preferences.set(`active-thread:${USER_A}`, {
+      members: [USER_A],
+      activeProjectId: "project-1",
+      activeWorkspaceId: "workspace-1",
+      updatedAt: "2026-07-16T10:00:00.000Z",
+    } as AgentThreadPreference)
     const repo = new AgentThreadRepository({
       defaultPersonaId: "agent-a",
       threads: new MemoryKv(),
       preferences,
       now: () => new Date("2026-07-16T10:00:00.000Z"),
-    });
+    })
 
     expect(repo.getActivePreference(USER_A).activePerspective).toEqual({
       focusScopeId: "workspace-1",
       viaScopeIds: ["project-1"],
-    });
+    })
     expect(
       preferences.get(`active-thread:${USER_A}`)?.activePerspective,
     ).toEqual({
       focusScopeId: "workspace-1",
       viaScopeIds: ["project-1"],
-    });
+    })
     expect(preferences.get(`active-thread:${USER_A}`)).not.toHaveProperty(
       "activeProjectId",
-    );
+    )
     expect(preferences.get(`active-thread:${USER_A}`)).not.toHaveProperty(
       "activeWorkspaceId",
-    );
-  });
+    )
+  })
 
   it("persists a direct workspace perspective without a hidden project projection", () => {
-    const preferences = new MemoryKv<AgentThreadPreference>();
-    preferences.set(
-      `active-thread:${USER_A}`,
-      {
-        members: [USER_A],
-        activeProjectId: "project-hidden",
-        activeWorkspaceId: "workspace-b",
-        activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
-        updatedAt: "2026-07-21T00:00:00.000Z",
-      } as AgentThreadPreference,
-    );
+    const preferences = new MemoryKv<AgentThreadPreference>()
+    preferences.set(`active-thread:${USER_A}`, {
+      members: [USER_A],
+      activeProjectId: "project-hidden",
+      activeWorkspaceId: "workspace-b",
+      activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
+      updatedAt: "2026-07-21T00:00:00.000Z",
+    } as AgentThreadPreference)
     const repo = new AgentThreadRepository({
       defaultPersonaId: "agent-a",
       threads: new MemoryKv(),
       preferences,
       now: () => new Date("2026-07-21T00:00:00.000Z"),
-    });
+    })
 
     const preference = repo.setActiveContainer(USER_A, {
       perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
-    });
+    })
 
     expect(preference).toMatchObject({
       activePerspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
-    });
-    expect(preference).not.toHaveProperty("activeProjectId");
-    expect(preference).not.toHaveProperty("activeWorkspaceId");
+    })
+    expect(preference).not.toHaveProperty("activeProjectId")
+    expect(preference).not.toHaveProperty("activeWorkspaceId")
     expect(preferences.get(`active-thread:${USER_A}`)).not.toHaveProperty(
       "activeProjectId",
-    );
-  });
+    )
+  })
 
   it("keeps the container selection when the active thread changes", () => {
-    const repo = repository();
+    const repo = repository()
     repo.setActiveContainer(USER_A, {
       perspective: {
         focusScopeId: "workspace-1",
         viaScopeIds: ["project-1"],
       },
-    });
-    const thread = repo.create(USER_A, { title: "T" });
+    })
+    const thread = repo.create(USER_A, { title: "T" })
 
-    repo.setActive(USER_A, thread.id);
+    repo.setActive(USER_A, thread.id)
 
-    const preference = repo.getActivePreference(USER_A);
-    expect(preference.activeThreadId).toBe(thread.id);
-    expect(preference.activePerspective?.focusScopeId).toBe("workspace-1");
-  });
+    const preference = repo.getActivePreference(USER_A)
+    expect(preference.activeThreadId).toBe(thread.id)
+    expect(preference.activePerspective?.focusScopeId).toBe("workspace-1")
+  })
 
   it("ensures one default active thread for first-load query paths", () => {
-    const repo = repository();
+    const repo = repository()
 
-    const threads = repo.ensureActive(USER_A);
+    const threads = repo.ensureActive(USER_A)
 
-    expect(threads).toHaveLength(1);
+    expect(threads).toHaveLength(1)
     expect(threads[0]).toMatchObject({
       id: "thread-1",
       title: "New conversation",
       status: "active",
-    });
-    expect(repo.ensureActive(USER_A)).toHaveLength(1);
-  });
+    })
+    expect(repo.ensureActive(USER_A)).toHaveLength(1)
+  })
 
   it("projects legacy threads through the configured default persona", () => {
-    const threads = new MemoryKv<AgentThread>();
-    const preferences = new MemoryKv<AgentThreadPreference>();
+    const threads = new MemoryKv<AgentThread>()
+    const preferences = new MemoryKv<AgentThreadPreference>()
     const repo = new AgentThreadRepository({
       defaultPersonaId: "agent-default",
       threads,
       preferences,
       createId: () => "thread-legacy",
       now: () => new Date("2026-07-16T10:00:00.000Z"),
-    });
-    const created = repo.create(USER_A, { personaId: "agent-old" });
-    const legacy = structuredClone(created) as Partial<AgentThread>;
-    delete legacy.personaId;
-    threads.set(`thread:${created.id}`, legacy as AgentThread);
+    })
+    const created = repo.create(USER_A, { personaId: "agent-old" })
+    const legacy = structuredClone(created) as Partial<AgentThread>
+    delete legacy.personaId
+    threads.set(`thread:${created.id}`, legacy as AgentThread)
 
-    expect(repo.get(USER_A, created.id)?.personaId).toBe("agent-default");
-    expect(threads.get(`thread:${created.id}`)?.personaId).toBe(
-      "agent-default",
-    );
-  });
+    expect(repo.get(USER_A, created.id)?.personaId).toBe("agent-default")
+    expect(threads.get(`thread:${created.id}`)?.personaId).toBe("agent-default")
+  })
 
   it("creates immutable execution bindings with deduped additional context", () => {
-    const repo = repository();
+    const repo = repository()
     const thread = repo.create(USER_A, {
       personaId: "agent-a",
       title: "Personal reach",
@@ -260,7 +252,7 @@ describe("AgentThreadRepository", () => {
         },
         additionalContextScopeIds: ["workspace-1", "workspace-1", "project-1"],
       },
-    });
+    })
 
     expect(thread.executionBinding).toEqual({
       principalId: USER_A,
@@ -271,19 +263,19 @@ describe("AgentThreadRepository", () => {
         viaScopeIds: [],
       },
       additionalContextScopeIds: ["workspace-1", "project-1"],
-    });
+    })
     expect(projectAgentThreadSummary(thread).executionBinding).toEqual(
       thread.executionBinding,
-    );
-  });
+    )
+  })
 
   it("persists a bounded retained event read model with its receipt", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A);
+    const repo = repository()
+    const thread = repo.create(USER_A)
     const events = [
       userEvent("What changed?", "turn-1"),
       assistantEvent("Two launch rules changed.", "turn-1"),
-    ];
+    ]
 
     const saved = repo.saveSnapshot(
       USER_A,
@@ -308,30 +300,30 @@ describe("AgentThreadRepository", () => {
         ],
       },
       thread.revision,
-    );
+    )
 
-    expect(saved.revision).toBe(2);
+    expect(saved.revision).toBe(2)
     expect(saved.runtime.session).toEqual({
       continuationToken: "continue-secret",
       sessionId: "eve-session-1",
       streamIndex: 17,
-    });
+    })
     expect(saved.runtime.events.map((event) => event.type)).toEqual([
       "message.received",
       "message.completed",
-    ]);
+    ])
     expect(saved.runtime.compaction).toEqual({
       policyVersion: "sigil-chat-event-retention-v2",
       firstRetainedStreamIndex: 0,
       omittedEventCount: 1,
       compactedAt: "2026-07-16T10:01:00.000Z",
-    });
-    expect(JSON.stringify(saved)).not.toContain("private reasoning sentinel");
-  });
+    })
+    expect(JSON.stringify(saved)).not.toContain("private reasoning sentinel")
+  })
 
   it("projects token-free thread catalog summaries", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A, { title: "Private session" });
+    const repo = repository()
+    const thread = repo.create(USER_A, { title: "Private session" })
     const saved = repo.saveSnapshot(
       USER_A,
       thread.id,
@@ -344,28 +336,28 @@ describe("AgentThreadRepository", () => {
         events: [userEvent("Private transcript", "turn-1")],
       },
       thread.revision,
-    );
+    )
 
-    const summary = projectAgentThreadSummary(saved);
+    const summary = projectAgentThreadSummary(saved)
 
     expect(summary).toMatchObject({
       id: saved.id,
       title: "Private session",
       revision: saved.revision,
-    });
+    })
     expect(JSON.stringify(summary)).not.toContain(
       "catalog-must-not-contain-this",
-    );
-    expect(JSON.stringify(summary)).not.toContain("Private transcript");
-  });
+    )
+    expect(JSON.stringify(summary)).not.toContain("Private transcript")
+  })
 
   it("carries a bound thread's workspaceId into its summary, and omits it when unbound", () => {
-    const repo = repository();
+    const repo = repository()
     const bound = repo.create(USER_A, {
       title: "Bound thread",
       workspaceId: "workspace-1",
-    });
-    const unbound = repo.create(USER_A, { title: "Unbound thread" });
+    })
+    const unbound = repo.create(USER_A, { title: "Unbound thread" })
 
     // This is the exact projector the client's optimistic cache write
     // (agent-threads.ts: cacheThread) reuses — one source of truth, so a
@@ -373,38 +365,36 @@ describe("AgentThreadRepository", () => {
     // server's the way two separate projectors once did.
     expect(projectAgentThreadSummary(bound)).toMatchObject({
       workspaceId: "workspace-1",
-    });
-    expect(projectAgentThreadSummary(unbound)).not.toHaveProperty(
-      "workspaceId",
-    );
-  });
+    })
+    expect(projectAgentThreadSummary(unbound)).not.toHaveProperty("workspaceId")
+  })
 
   it("rejects workspace rebinding for immutable execution-bound threads", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A, { workspaceId: "workspace-1" });
+    const repo = repository()
+    const thread = repo.create(USER_A, { workspaceId: "workspace-1" })
 
     expect(() =>
       repo.rebindWorkspace(USER_A, thread.id, "workspace-2", thread.revision),
-    ).toThrow("Bound agent thread home scope cannot be changed");
-  });
+    ).toThrow("Bound agent thread home scope cannot be changed")
+  })
 
   it("keeps legacy unbound workspace rebinding available before binding migration", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A);
+    const repo = repository()
+    const thread = repo.create(USER_A)
 
     const rebound = repo.rebindWorkspace(
       USER_A,
       thread.id,
       "workspace-2",
       thread.revision,
-    );
-    expect(rebound.workspaceId).toBe("workspace-2");
-    expect(rebound.executionBinding).toBeUndefined();
-  });
+    )
+    expect(rebound.workspaceId).toBe("workspace-2")
+    expect(rebound.executionBinding).toBeUndefined()
+  })
 
   it("owner-only migrates a legacy thread to one immutable execution binding", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A);
+    const repo = repository()
+    const thread = repo.create(USER_A)
     const binding = {
       principalId: USER_A,
       personaId: thread.personaId,
@@ -414,82 +404,145 @@ describe("AgentThreadRepository", () => {
         viaScopeIds: [],
       },
       additionalContextScopeIds: [],
-    };
+    }
 
     expect(() =>
       repo.bindExecution(USER_B, thread.id, {
         ...binding,
         principalId: USER_B,
       }),
-    ).toThrow(AgentThreadNotFoundError);
+    ).toThrow(AgentThreadNotFoundError)
 
     const migrated = repo.bindExecution(
       USER_A,
       thread.id,
       binding,
       thread.revision,
-    );
-    expect(migrated.executionBinding).toEqual(binding);
-    expect(migrated.revision).toBe(thread.revision + 1);
+    )
+    expect(migrated.executionBinding).toEqual(binding)
+    expect(migrated.revision).toBe(thread.revision + 1)
     expect(() =>
       repo.bindExecution(USER_A, thread.id, {
         ...binding,
         homeScopeId: "workspace-2",
       }),
-    ).toThrow("execution binding is immutable");
-  });
+    ).toThrow("execution binding is immutable")
+  })
 
   it("rejects stale optimistic writes", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A);
-    repo.rename(USER_A, thread.id, "Current title", thread.revision);
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    repo.rename(USER_A, thread.id, "Current title", thread.revision)
 
     expect(() =>
       repo.rename(USER_A, thread.id, "Stale title", thread.revision),
-    ).toThrow(AgentThreadConflictError);
-  });
+    ).toThrow(AgentThreadConflictError)
+  })
+
+  it("sets and replaces mutable request options without a fork (MDL.4)", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    expect(thread.requestOptions).toBeUndefined()
+
+    const withLevel = repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "high" },
+      thread.revision,
+    )
+    expect(withLevel.requestOptions).toEqual({ reasoningLevel: "high" })
+    // A second write is not "immutable execution binding" — unlike
+    // bindExecution, this never throws on a change.
+    const withBoth = repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "low", fastMode: true },
+      withLevel.revision,
+    )
+    expect(withBoth.requestOptions).toEqual({
+      reasoningLevel: "low",
+      fastMode: true,
+    })
+    expect(repo.get(USER_A, thread.id)?.requestOptions).toEqual(
+      withBoth.requestOptions,
+    )
+  })
+
+  it("clears request options when both fields are empty", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    const set = repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "high" },
+      thread.revision,
+    )
+    const cleared = repo.setRequestOptions(USER_A, thread.id, {}, set.revision)
+    expect(cleared.requestOptions).toBeUndefined()
+    expect("requestOptions" in cleared).toBe(false)
+  })
+
+  it("rejects a stale request-options write", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "high" },
+      thread.revision,
+    )
+
+    expect(() =>
+      repo.setRequestOptions(
+        USER_A,
+        thread.id,
+        { reasoningLevel: "low" },
+        thread.revision,
+      ),
+    ).toThrow(AgentThreadConflictError)
+  })
 
   it("archives a thread and moves the active preference to another thread", () => {
-    const repo = repository();
-    const first = repo.create(USER_A, { title: "First" });
-    const second = repo.create(USER_A, { title: "Second" });
+    const repo = repository()
+    const first = repo.create(USER_A, { title: "First" })
+    const second = repo.create(USER_A, { title: "Second" })
 
-    repo.archive(USER_A, second.id, second.revision);
+    repo.archive(USER_A, second.id, second.revision)
 
-    expect(repo.list(USER_A).map((thread) => thread.id)).toEqual([first.id]);
-    expect(repo.list(USER_A, true)).toHaveLength(2);
-    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(first.id);
-  });
+    expect(repo.list(USER_A).map((thread) => thread.id)).toEqual([first.id])
+    expect(repo.list(USER_A, true)).toHaveLength(2)
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(first.id)
+  })
 
   it("hard-deletes the read model and moves the active preference", () => {
-    const repo = repository();
-    const first = repo.create(USER_A, { title: "First" });
-    const second = repo.create(USER_A, { title: "Second" });
+    const repo = repository()
+    const first = repo.create(USER_A, { title: "First" })
+    const second = repo.create(USER_A, { title: "Second" })
 
-    const deleted = repo.delete(USER_A, second.id, second.revision);
+    const deleted = repo.delete(USER_A, second.id, second.revision)
 
-    expect(deleted.id).toBe(second.id);
-    expect(repo.get(USER_A, second.id)).toBeUndefined();
+    expect(deleted.id).toBe(second.id)
+    expect(repo.get(USER_A, second.id)).toBeUndefined()
     expect(repo.list(USER_A, true).map((thread) => thread.id)).toEqual([
       first.id,
-    ]);
-    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(first.id);
-  });
+    ])
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe(first.id)
+  })
 
   it("rejects a stale hard-delete revision", () => {
-    const repo = repository();
-    const thread = repo.create(USER_A);
-    const renamed = repo.rename(USER_A, thread.id, "Current", thread.revision);
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    const renamed = repo.rename(USER_A, thread.id, "Current", thread.revision)
 
     expect(() => repo.delete(USER_A, thread.id, thread.revision)).toThrow(
       AgentThreadConflictError,
-    );
-    expect(repo.get(USER_A, thread.id)?.revision).toBe(renamed.revision);
-  });
+    )
+    expect(repo.get(USER_A, thread.id)?.revision).toBe(renamed.revision)
+  })
 
   it("forks with provenance and a bounded semantic packet, never Eve handles", () => {
-    const repo = repository();
-    const source = repo.create(USER_A, { title: "Draft review" });
+    const repo = repository()
+    const source = repo.create(USER_A, { title: "Draft review" })
     const saved = repo.saveSnapshot(
       USER_A,
       source.id,
@@ -505,16 +558,16 @@ describe("AgentThreadRepository", () => {
         ],
       },
       source.revision,
-    );
+    )
 
     const fork = repo.fork(USER_A, {
       sourceThreadId: source.id,
       expectedRevision: saved.revision,
-    });
+    })
 
-    expect(fork.forkedFrom).toBe(source.id);
-    expect(fork.personaId).toBe(source.personaId);
-    expect(fork.executionBinding).toEqual(source.executionBinding);
+    expect(fork.forkedFrom).toBe(source.id)
+    expect(fork.personaId).toBe(source.personaId)
+    expect(fork.executionBinding).toEqual(source.executionBinding)
     expect(fork.runtime).toEqual({
       schemaVersion: 1,
       session: { streamIndex: 0 },
@@ -525,8 +578,8 @@ describe("AgentThreadRepository", () => {
         omittedEventCount: 0,
         compactedAt: "2026-07-16T10:02:00.000Z",
       },
-    });
-    expect(JSON.stringify(fork)).not.toContain("must-not-copy");
+    })
+    expect(JSON.stringify(fork)).not.toContain("must-not-copy")
     expect(fork.forkSeed).toMatchObject({
       sourceThreadId: source.id,
       sourceRevision: saved.revision,
@@ -537,11 +590,11 @@ describe("AgentThreadRepository", () => {
           text: "The safer path preserves reward state.",
         },
       ],
-    });
-  });
+    })
+  })
 
   it("forks from the source thread's immutable execution binding", () => {
-    const repo = repository();
+    const repo = repository()
     const source = repo.create(USER_A, {
       personaId: "agent-a",
       executionBinding: {
@@ -554,18 +607,18 @@ describe("AgentThreadRepository", () => {
         },
         additionalContextScopeIds: ["project-1"],
       },
-    });
+    })
 
-    const fork = repo.fork(USER_A, { sourceThreadId: source.id });
+    const fork = repo.fork(USER_A, { sourceThreadId: source.id })
 
-    expect(fork.executionBinding).toEqual(source.executionBinding);
-    expect(fork.executionBinding?.principalId).toBe(USER_A);
-    expect(fork.executionBinding?.personaId).toBe(source.personaId);
-  });
+    expect(fork.executionBinding).toEqual(source.executionBinding)
+    expect(fork.executionBinding?.principalId).toBe(USER_A)
+    expect(fork.executionBinding?.personaId).toBe(source.personaId)
+  })
 
   it("does not re-ingest a persisted fork packet when forking a fork", () => {
-    const repo = repository();
-    const source = repo.create(USER_A, { title: "Second generation" });
+    const repo = repository()
+    const source = repo.create(USER_A, { title: "Second generation" })
     const persistedForkTurn = [
       "# Forked conversation context",
       "",
@@ -577,7 +630,7 @@ describe("AgentThreadRepository", () => {
       "## New branch request",
       "",
       "Compare the revised rollback owner.",
-    ].join("\n");
+    ].join("\n")
     const saved = repo.saveSnapshot(
       USER_A,
       source.id,
@@ -589,70 +642,68 @@ describe("AgentThreadRepository", () => {
         ],
       },
       source.revision,
-    );
+    )
 
     const secondGeneration = repo.fork(USER_A, {
       sourceThreadId: source.id,
       expectedRevision: saved.revision,
-    });
+    })
 
     expect(secondGeneration.forkSeed?.messages).toEqual([
       { role: "user", text: "Compare the revised rollback owner." },
       { role: "assistant", text: "The revision names operations." },
-    ]);
+    ])
     expect(JSON.stringify(secondGeneration.forkSeed)).not.toContain(
       "Original request that must not be duplicated",
-    );
-  });
+    )
+  })
 
   it("consumes a fork seed after the app has used it for the first send", () => {
-    const repo = repository();
-    const source = repo.create(USER_A);
-    const fork = repo.fork(USER_A, { sourceThreadId: source.id });
+    const repo = repository()
+    const source = repo.create(USER_A)
+    const fork = repo.fork(USER_A, { sourceThreadId: source.id })
 
-    const consumed = repo.consumeForkSeed(USER_A, fork.id, fork.revision);
+    const consumed = repo.consumeForkSeed(USER_A, fork.id, fork.revision)
 
-    expect(consumed.forkSeed).toBeUndefined();
-    expect(consumed.forkedFrom).toBe(source.id);
-    expect(consumed.revision).toBe(2);
-  });
+    expect(consumed.forkSeed).toBeUndefined()
+    expect(consumed.forkedFrom).toBe(source.id)
+    expect(consumed.revision).toBe(2)
+  })
 
   it("denies every thread operation to a non-member", () => {
-    const repo = repository();
-    const owner = repo.create(USER_A, { title: "Owner-only" });
-    const userB = "user-b";
+    const repo = repository()
+    const owner = repo.create(USER_A, { title: "Owner-only" })
+    const userB = "user-b"
 
-    expect(repo.list(userB)).toEqual([]);
-    expect(repo.get(userB, owner.id)).toBeUndefined();
+    expect(repo.list(userB)).toEqual([])
+    expect(repo.get(userB, owner.id)).toBeUndefined()
     expect(() => repo.rename(userB, owner.id, "stolen")).toThrow(
       AgentThreadNotFoundError,
-    );
+    )
     expect(() => repo.archive(userB, owner.id)).toThrow(
       AgentThreadNotFoundError,
-    );
-    expect(() => repo.delete(userB, owner.id)).toThrow(
-      AgentThreadNotFoundError,
-    );
+    )
+    expect(() => repo.delete(userB, owner.id)).toThrow(AgentThreadNotFoundError)
     expect(() =>
       repo.saveSnapshot(userB, owner.id, {
         session: { streamIndex: 1 },
         events: [],
       }),
-    ).toThrow(AgentThreadNotFoundError);
+    ).toThrow(AgentThreadNotFoundError)
     expect(() => repo.fork(userB, { sourceThreadId: owner.id })).toThrow(
       AgentThreadNotFoundError,
-    );
+    )
     expect(() => repo.consumeForkSeed(userB, owner.id)).toThrow(
       AgentThreadNotFoundError,
-    );
+    )
     expect(() => repo.setActive(userB, owner.id)).toThrow(
       AgentThreadNotFoundError,
-    );
-  });
+    )
+  })
 
   it("claims legacy records only for exactly one user and is idempotent", () => {
-    const threads = new MemoryKv<AgentThread>();
-    const preferences = new MemoryKv<AgentThreadPreference>();
+    const threads = new MemoryKv<AgentThread>()
+    const preferences = new MemoryKv<AgentThreadPreference>()
     threads.set("thread:legacy", {
       id: "legacy",
       personaId: "agent-a",
@@ -672,79 +723,79 @@ describe("AgentThreadRepository", () => {
           omittedMessageChars: 0,
         },
       },
-    } as unknown as AgentThread);
+    } as unknown as AgentThread)
     preferences.set("active-thread", {
       activeThreadId: "legacy",
       updatedAt: "2026-07-16T10:00:00.000Z",
-    } as unknown as AgentThreadPreference);
+    } as unknown as AgentThreadPreference)
     const repo = new AgentThreadRepository({
       defaultPersonaId: "agent-a",
       threads,
       preferences,
-    });
+    })
 
     expect(() => repo.claimLegacyRecords([USER_A, "user-b"])).toThrow(
       LegacyAgentThreadClaimRefusedError,
-    );
-    expect(repo.get(USER_A, "legacy")).toBeUndefined();
+    )
+    expect(repo.get(USER_A, "legacy")).toBeUndefined()
 
     expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
       claimedPreferences: 1,
       claimedThreads: 1,
       userId: USER_A,
-    });
-    expect(repo.get(USER_A, "legacy")?.members).toEqual([USER_A]);
-    expect(repo.get(USER_A, "legacy")?.runtime.schemaVersion).toBe(1);
-    expect(repo.getActivePreference(USER_A).activeThreadId).toBe("legacy");
+    })
+    expect(repo.get(USER_A, "legacy")?.members).toEqual([USER_A])
+    expect(repo.get(USER_A, "legacy")?.runtime.schemaVersion).toBe(1)
+    expect(repo.getActivePreference(USER_A).activeThreadId).toBe("legacy")
     expect(repo.claimLegacyRecords([USER_A])).toMatchObject({
       claimedPreferences: 0,
       claimedThreads: 0,
-    });
-  });
+    })
+  })
 
   describe("session slugs (SC.10)", () => {
     it("mints a short slug at creation, distinct from the id", () => {
-      const repo = repository();
-      const thread = repo.create(USER_A, { title: "Launch review" });
+      const repo = repository()
+      const thread = repo.create(USER_A, { title: "Launch review" })
 
-      expect(thread.slug).toMatch(/^[0-9a-z]{8}$/);
-      expect(thread.slug).not.toBe(thread.id);
-      expect(projectAgentThreadSummary(thread).slug).toBe(thread.slug);
-    });
+      expect(thread.slug).toMatch(/^[0-9a-z]{8}$/)
+      expect(thread.slug).not.toBe(thread.id)
+      expect(projectAgentThreadSummary(thread).slug).toBe(thread.slug)
+    })
 
     it("mints a slug on fork too", () => {
-      const repo = repository();
-      const source = repo.create(USER_A, { title: "Source" });
-      const fork = repo.fork(USER_A, { sourceThreadId: source.id });
+      const repo = repository()
+      const source = repo.create(USER_A, { title: "Source" })
+      const fork = repo.fork(USER_A, { sourceThreadId: source.id })
 
-      expect(fork.slug).toMatch(/^[0-9a-z]{8}$/);
-      expect(fork.slug).not.toBe(source.slug);
-    });
+      expect(fork.slug).toMatch(/^[0-9a-z]{8}$/)
+      expect(fork.slug).not.toBe(source.slug)
+    })
 
     it("lazily backfills a slug for a pre-migration record on read, and persists it", () => {
-      const threads = new MemoryKv<AgentThread>();
-      const preferences = new MemoryKv<AgentThreadPreference>();
+      const threads = new MemoryKv<AgentThread>()
+      const preferences = new MemoryKv<AgentThreadPreference>()
       const repo = new AgentThreadRepository({
         defaultPersonaId: "agent-a",
         threads,
         preferences,
         createId: () => "thread-pre-slug",
         now: () => new Date("2026-07-23T00:00:00.000Z"),
-      });
+      })
       // Simulate a record written before the slug migration landed.
-      const preSlug = repo.create(USER_A, { title: "Before slugs" });
-      const { slug: _slug, ...withoutSlug } = preSlug;
-      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread);
-      expect(threads.get(`thread:${preSlug.id}`)).not.toHaveProperty("slug");
+      const preSlug = repo.create(USER_A, { title: "Before slugs" })
+      const { slug: _slug, ...withoutSlug } = preSlug
+      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread)
+      expect(threads.get(`thread:${preSlug.id}`)).not.toHaveProperty("slug")
 
-      const read = repo.get(USER_A, preSlug.id);
+      const read = repo.get(USER_A, preSlug.id)
 
-      expect(read?.slug).toMatch(/^[0-9a-z]{8}$/);
+      expect(read?.slug).toMatch(/^[0-9a-z]{8}$/)
       // Backfill persisted — no migration script needed, the next read
       // (or repo.list) sees the same slug without minting again.
-      expect(threads.get(`thread:${preSlug.id}`)?.slug).toBe(read?.slug);
-      expect(repo.list(USER_A)[0]?.slug).toBe(read?.slug);
-    });
+      expect(threads.get(`thread:${preSlug.id}`)?.slug).toBe(read?.slug)
+      expect(repo.list(USER_A)[0]?.slug).toBe(read?.slug)
+    })
 
     // Authz finding 2 (2026-07-23, Annika): web and Eve share the same
     // store and can race to backfill the SAME slug-less thread on their
@@ -753,18 +804,18 @@ describe("AgentThreadRepository", () => {
     // never regenerated." Two separate repository instances sharing one
     // underlying store stand in for the two racing processes here.
     it("two racing processes backfilling the same thread converge on the identical slug", () => {
-      const threads = new MemoryKv<AgentThread>();
-      const preferences = new MemoryKv<AgentThreadPreference>();
+      const threads = new MemoryKv<AgentThread>()
+      const preferences = new MemoryKv<AgentThreadPreference>()
       const seedRepo = new AgentThreadRepository({
         defaultPersonaId: "agent-a",
         threads,
         preferences,
         createId: () => "thread-race",
         now: () => new Date("2026-07-23T00:00:00.000Z"),
-      });
-      const preSlug = seedRepo.create(USER_A, { title: "Racing backfill" });
-      const { slug: _slug, ...withoutSlug } = preSlug;
-      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread);
+      })
+      const preSlug = seedRepo.create(USER_A, { title: "Racing backfill" })
+      const { slug: _slug, ...withoutSlug } = preSlug
+      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread)
 
       // Two independent repository instances over the SAME underlying
       // store — standing in for web and Eve as separate processes.
@@ -772,27 +823,27 @@ describe("AgentThreadRepository", () => {
         defaultPersonaId: "agent-a",
         threads,
         preferences,
-      });
+      })
       const processB = new AgentThreadRepository({
         defaultPersonaId: "agent-a",
         threads,
         preferences,
-      });
+      })
 
-      const backfilledByA = processA.get(USER_A, preSlug.id);
+      const backfilledByA = processA.get(USER_A, preSlug.id)
       // Reset the stored record to slug-less again, simulating process B's
       // read racing BEFORE it observed process A's write.
-      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread);
-      const backfilledByB = processB.get(USER_A, preSlug.id);
+      threads.set(`thread:${preSlug.id}`, withoutSlug as AgentThread)
+      const backfilledByB = processB.get(USER_A, preSlug.id)
 
-      expect(backfilledByA?.slug).toBeTruthy();
-      expect(backfilledByB?.slug).toBe(backfilledByA?.slug);
-    });
+      expect(backfilledByA?.slug).toBeTruthy()
+      expect(backfilledByB?.slug).toBe(backfilledByA?.slug)
+    })
 
     it("regenerates on collision (per-principal collision scope)", () => {
-      const threads = new MemoryKv<AgentThread>();
-      const preferences = new MemoryKv<AgentThreadPreference>();
-      let call = 0;
+      const threads = new MemoryKv<AgentThread>()
+      const preferences = new MemoryKv<AgentThreadPreference>()
+      let call = 0
       // First two candidates collide with an existing thread's slug; the
       // third is free.
       const repo = new AgentThreadRepository({
@@ -800,27 +851,28 @@ describe("AgentThreadRepository", () => {
         threads,
         preferences,
         createId: () => `thread-${call}`,
-        createSlug: () => ["taken001", "taken001", "free0001"][call++] ?? "overflow",
+        createSlug: () =>
+          ["taken001", "taken001", "free0001"][call++] ?? "overflow",
         now: () => new Date("2026-07-23T00:00:00.000Z"),
-      });
-      call = 0;
-      const first = repo.create(USER_A); // mints "taken001" (call 0)
-      expect(first.slug).toBe("taken001");
+      })
+      call = 0
+      const first = repo.create(USER_A) // mints "taken001" (call 0)
+      expect(first.slug).toBe("taken001")
 
-      const second = repo.create(USER_A); // "taken001" collides, retries to "free0001"
-      expect(second.slug).toBe("free0001");
-      expect(second.slug).not.toBe(first.slug);
-    });
+      const second = repo.create(USER_A) // "taken001" collides, retries to "free0001"
+      expect(second.slug).toBe("free0001")
+      expect(second.slug).not.toBe(first.slug)
+    })
 
     it("resolves a thread by slug, scoped to the requesting principal", () => {
-      const repo = repository();
-      const ownThread = repo.create(USER_A, { title: "Mine" });
-      const otherThread = repo.create(USER_B, { title: "Not mine" });
+      const repo = repository()
+      const ownThread = repo.create(USER_A, { title: "Mine" })
+      const otherThread = repo.create(USER_B, { title: "Not mine" })
 
-      expect(repo.getBySlug(USER_A, ownThread.slug)?.id).toBe(ownThread.id);
-      expect(repo.getBySlug(USER_A, otherThread.slug)).toBeUndefined();
-      expect(repo.getBySlug(USER_A, "no-such-slug")).toBeUndefined();
-    });
+      expect(repo.getBySlug(USER_A, ownThread.slug)?.id).toBe(ownThread.id)
+      expect(repo.getBySlug(USER_A, otherThread.slug)).toBeUndefined()
+      expect(repo.getBySlug(USER_A, "no-such-slug")).toBeUndefined()
+    })
 
     it("resolveByRouteParam resolves both a UUID-shaped id and a slug, unambiguously", () => {
       const repo = new AgentThreadRepository({
@@ -829,28 +881,29 @@ describe("AgentThreadRepository", () => {
         preferences: new MemoryKv(),
         now: () => new Date("2026-07-23T00:00:00.000Z"),
         // A real UUID id, so isUuidShaped actually distinguishes it from the slug.
-      });
-      const thread = repo.create(USER_A, { title: "Route param" });
-      expect(isUuidShaped(thread.id)).toBe(true);
-      expect(isUuidShaped(thread.slug)).toBe(false);
+      })
+      const thread = repo.create(USER_A, { title: "Route param" })
+      expect(isUuidShaped(thread.id)).toBe(true)
+      expect(isUuidShaped(thread.slug)).toBe(false)
 
-      expect(repo.resolveByRouteParam(USER_A, thread.id)?.id).toBe(thread.id);
-      expect(repo.resolveByRouteParam(USER_A, thread.slug)?.id).toBe(
-        thread.id,
-      );
+      expect(repo.resolveByRouteParam(USER_A, thread.id)?.id).toBe(thread.id)
+      expect(repo.resolveByRouteParam(USER_A, thread.slug)?.id).toBe(thread.id)
       expect(
-        repo.resolveByRouteParam(USER_A, "00000000-0000-0000-0000-000000000000"),
-      ).toBeUndefined();
-      expect(repo.resolveByRouteParam(USER_A, "nosuchslug")).toBeUndefined();
-    });
-  });
-});
+        repo.resolveByRouteParam(
+          USER_A,
+          "00000000-0000-0000-0000-000000000000",
+        ),
+      ).toBeUndefined()
+      expect(repo.resolveByRouteParam(USER_A, "nosuchslug")).toBeUndefined()
+    })
+  })
+})
 
 function userEvent(message: string, turnId: string): AgentRuntimeStreamEvent {
   return {
     type: "message.received",
     data: { message, sequence: 0, turnId },
-  };
+  }
 }
 
 function assistantEvent(
@@ -866,5 +919,5 @@ function assistantEvent(
       stepIndex: 0,
       turnId,
     },
-  };
+  }
 }

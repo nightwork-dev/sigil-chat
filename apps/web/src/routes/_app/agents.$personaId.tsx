@@ -38,5 +38,7 @@ export const Route = createFileRoute("/_app/agents/$personaId")({
 function AgentProfileRoute() {
   const { personaId } = Route.useParams()
   const { user } = Route.useRouteContext()
-  return <AgentProfileView owner={user.role === "owner"} personaId={personaId} />
+  return (
+    <AgentProfileView owner={user.role === "owner"} personaId={personaId} />
+  )
 }

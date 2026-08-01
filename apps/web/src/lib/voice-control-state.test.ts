@@ -31,7 +31,9 @@ describe("voice control state machine", () => {
       expect(nextVoiceControlState(state, "start")).toBe(state)
     }
     expect(nextVoiceControlState("idle", "start")).toBe("requesting-microphone")
-    expect(nextVoiceControlState("error", "start")).toBe("requesting-microphone")
+    expect(nextVoiceControlState("error", "start")).toBe(
+      "requesting-microphone",
+    )
   })
 
   it("ignores transitions that do not belong to the current state", () => {

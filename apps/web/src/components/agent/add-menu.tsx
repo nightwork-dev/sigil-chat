@@ -173,8 +173,8 @@ function WorkspaceResourcePicker({
         <DialogHeader>
           <DialogTitle>Add from workspace</DialogTitle>
           <DialogDescription>
-            Attach a document or artifact already in this scope — the agent
-            sees it the same way as a freshly uploaded file.
+            Attach a document or artifact already in this scope — the agent sees
+            it the same way as a freshly uploaded file.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-80 space-y-1 overflow-y-auto">

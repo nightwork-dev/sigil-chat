@@ -25,17 +25,49 @@ export interface ModelEndpointCredentialStatus {
   present: boolean
 }
 
+/** MDL.4: ordered reasoning-effort levels this model accepts, weakest first. */
+export interface ModelEndpointReasoningConfig {
+  levels: readonly string[]
+  default: string
+}
+
 export interface ModelEndpointRecord {
   /** `<providerId>/<modelId>`, or the reserved deployment-default id. */
   id: string
   label: string
   model: string
   capability: string
-  /** Shaped for the allow-list; nothing enforces it yet. */
+  /**
+   * The fixture author's verdict, not the installation's. Availability to new
+   * chats is this AND the owner's allow-list — see ./model-enablement.ts.
+   */
   enabled: boolean
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from the fixture's agent.model. */
   isDeploymentDefault: boolean
+  /**
+   * True when Eve's live catalog fetch reported this model and the fixture
+   * did not author it (MDL.2). Absent for every authored row.
+   */
+  discovered?: boolean
+  /** Absent means this model shows no reasoning control (MDL.4 AC2/AC5). */
+  reasoning?: ModelEndpointReasoningConfig
+  /** False means no fast-mode control for this model (MDL.4 AC3). */
+  fastMode: boolean
+}
+
+/**
+ * Whether Eve attempted a live catalog fetch for a provider, and what
+ * happened. Present only when discovery was attempted — a provider with no
+ * catalog endpoint (no `baseUrl`, or a kind discovery does not support) never
+ * carries this field, so its absence means "not applicable", never "silently
+ * failed".
+ */
+export interface ModelCatalogStatus {
+  /** ISO timestamp of the attempt, success or failure. */
+  checkedAt: string
+  /** Operator-facing reason discovery could not add anything this time. */
+  error?: string
 }
 
 /**
@@ -53,6 +85,8 @@ export interface ModelProviderRecord {
   enabled: boolean
   credential: ModelEndpointCredentialStatus
   models: readonly ModelEndpointRecord[]
+  /** Present only when Eve attempted a live catalog fetch for this provider. */
+  catalog?: ModelCatalogStatus
 }
 
 export interface ModelEndpointInventory {
@@ -125,11 +159,10 @@ export const fetchModelEndpoints = createServerFn({ method: "GET" }).handler(
 
 export const probeModelEndpoint = createServerFn({ method: "POST" })
   .validator(parseProbeInput)
-  .handler(
-    async ({ data }): Promise<ModelEndpointProbeResult> =>
-      (await import("./model-endpoints.server")).probeModelEndpointThroughEve(
-        data,
-      ),
+  .handler(async ({ data }): Promise<ModelEndpointProbeResult> =>
+    (await import("./model-endpoints.server")).probeModelEndpointThroughEve(
+      data,
+    ),
   )
 
 export const modelEndpointKeys = {
@@ -224,4 +257,31 @@ function hostOf(baseUrl: string): string {
   } catch {
     return "local"
   }
+}
+
+/**
+ * When Eve last checked a provider's catalog, in words.
+ *
+ * Coarse on purpose: the reader's question is "is this recent" and a precise
+ * timestamp invites treating a cached answer as live. An unparseable time
+ * says "recently" rather than printing a broken date.
+ */
+export function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return "recently"
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000))
+  if (seconds < 5) return "just now"
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  return `${hours}h ago`
+}
+
+/** A model's context window as a row-width label. Zero means undeclared. */
+export function formatContextWindow(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) return "context window unknown"
+  return tokens >= 1_000
+    ? `${Math.round(tokens / 1_000)}K context`
+    : `${tokens} context`
 }

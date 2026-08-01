@@ -10,9 +10,9 @@ import { projectProviders, projectProbeResult } from "./model-endpoints.server"
 
 describe("probe request validation", () => {
   it("accepts and trims a well-formed request", () => {
-    expect(parseProbeInput({ baseUrl: "  http://127.0.0.1:1234/v1  " })).toEqual(
-      { baseUrl: "http://127.0.0.1:1234/v1" },
-    )
+    expect(
+      parseProbeInput({ baseUrl: "  http://127.0.0.1:1234/v1  " }),
+    ).toEqual({ baseUrl: "http://127.0.0.1:1234/v1" })
   })
 
   // REGRESSION (blocking, Annika 2026-07-31): the probe used to accept
@@ -109,11 +109,50 @@ describe("provider projection", () => {
             enabled: true,
             contextWindowTokens: 65_536,
             isDeploymentDefault: false,
+            fastMode: false,
           },
         ],
       },
     ])
     expect(JSON.stringify(providers)).not.toContain("sk-live-secret")
+  })
+
+  it("projects a reasoning declaration through, and drops a malformed one (MDL.4)", () => {
+    const withReasoning = projectProviders({
+      providers: [
+        {
+          ...payload.providers[0],
+          models: [
+            {
+              ...payload.providers[0].models[0],
+              reasoning: { levels: ["off", "low", "high"], default: "low" },
+              fastMode: true,
+            },
+          ],
+        },
+      ],
+    })
+    expect(withReasoning[0]?.models[0]?.reasoning).toEqual({
+      levels: ["off", "low", "high"],
+      default: "low",
+    })
+    expect(withReasoning[0]?.models[0]?.fastMode).toBe(true)
+
+    const malformed = projectProviders({
+      providers: [
+        {
+          ...payload.providers[0],
+          models: [
+            {
+              ...payload.providers[0].models[0],
+              // Missing `default` — not a valid declaration.
+              reasoning: { levels: ["off", "low"] },
+            },
+          ],
+        },
+      ],
+    })
+    expect(malformed[0]?.models[0]?.reasoning).toBeUndefined()
   })
 
   it("drops providers the runtime could not describe", () => {
@@ -122,6 +161,109 @@ describe("provider projection", () => {
     ).toEqual([])
     expect(projectProviders({})).toEqual([])
     expect(projectProviders(null)).toEqual([])
+  })
+
+  it("relays a discovered model and its provider's catalog status", () => {
+    const [provider] = projectProviders({
+      providers: [
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          kind: "openai-compatible",
+          baseUrl: "https://api.deepseek.com/v1",
+          enabled: true,
+          credential: { required: true, present: true },
+          catalog: { checkedAt: "2026-08-01T00:00:00.000Z" },
+          models: [
+            {
+              id: "deepseek/chat",
+              label: "deepseek-chat",
+              model: "deepseek-chat",
+              capability: "chat",
+              enabled: true,
+              contextWindowTokens: 65_536,
+              isDeploymentDefault: false,
+            },
+            {
+              id: "deepseek/reasoner",
+              label: "deepseek-reasoner",
+              model: "deepseek-reasoner",
+              capability: "chat",
+              enabled: true,
+              contextWindowTokens: 65_536,
+              isDeploymentDefault: false,
+              discovered: true,
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(provider?.catalog).toEqual({ checkedAt: "2026-08-01T00:00:00.000Z" })
+    expect(provider?.models[0]?.discovered).toBeUndefined()
+    expect(provider?.models[1]?.discovered).toBe(true)
+  })
+
+  it("relays a catalog failure rather than dropping it silently", () => {
+    const [provider] = projectProviders({
+      providers: [
+        {
+          id: "lmstudio-local",
+          label: "LM Studio (local)",
+          kind: "openai-compatible",
+          baseUrl: "http://127.0.0.1:1234/v1",
+          enabled: true,
+          credential: { required: false, present: false },
+          catalog: {
+            checkedAt: "2026-08-01T00:00:00.000Z",
+            error: "No response from the provider's catalog endpoint.",
+          },
+          models: [
+            {
+              id: "lmstudio-local/qwen",
+              label: "qwen",
+              model: "qwen3.6-27b",
+              capability: "chat",
+              enabled: true,
+              contextWindowTokens: 200_000,
+              isDeploymentDefault: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(provider?.catalog).toEqual({
+      checkedAt: "2026-08-01T00:00:00.000Z",
+      error: "No response from the provider's catalog endpoint.",
+    })
+  })
+
+  it("omits catalog entirely when Eve did not attempt discovery, rather than a false empty status", () => {
+    const [provider] = projectProviders({
+      providers: [
+        {
+          id: "codex",
+          label: "Codex subscription",
+          kind: "codex",
+          enabled: true,
+          credential: { required: true, present: true },
+          models: [
+            {
+              id: "deployment-default",
+              label: "gpt-5.6-terra",
+              model: "gpt-5.6-terra",
+              capability: "chat",
+              enabled: true,
+              contextWindowTokens: 200_000,
+              isDeploymentDefault: true,
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(provider).not.toHaveProperty("catalog")
   })
 
   it("drops a provider whose models are all unreadable", () => {

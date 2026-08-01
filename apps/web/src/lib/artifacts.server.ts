@@ -7,8 +7,7 @@ import {
 
 const MAX_PREVIEW_BYTES = 80_000
 
-export interface ArtifactAccessDependencies
-  extends WebArtifactStoreDependencies {
+export interface ArtifactAccessDependencies extends WebArtifactStoreDependencies {
   readonly getSession: () => Promise<SigilAuthSession | null>
   readonly ownedThreadHomeScope: (
     userId: string,
@@ -20,10 +19,7 @@ export async function listArtifacts(
   scope: string,
   dependencies: ArtifactAccessDependencies,
 ): Promise<ArtifactRecord[]> {
-  const { store, principal } = await authorizeArtifactScope(
-    scope,
-    dependencies,
-  )
+  const { store, principal } = await authorizeArtifactScope(scope, dependencies)
   const artifacts = await store.listByScope(scope, principal)
   return artifacts.map((artifact) => ({
     id: artifact.id,
@@ -83,7 +79,8 @@ async function artifactAccessDependencies(): Promise<ArtifactAccessDependencies>
   return {
     getSession,
     ownedThreadHomeScope: (userId, threadId) =>
-      agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
+      agentThreadRepository.get(userId, threadId)?.executionBinding
+        ?.homeScopeId,
   }
 }
 

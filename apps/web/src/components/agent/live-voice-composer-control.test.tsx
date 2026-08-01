@@ -198,8 +198,7 @@ describe("activating a live call", () => {
 describe("failure is visible and text keeps working", () => {
   it("shows the host's own refusal message", async () => {
     const fake = fakePrimitives({
-      exchange: () =>
-        Promise.resolve({ error: "Voice session access denied" }),
+      exchange: () => Promise.resolve({ error: "Voice session access denied" }),
     })
     const el = mount({ primitives: fake.primitives })
 

@@ -4,10 +4,7 @@ import type {
   AttentionActivityEvent,
   AttentionContext,
 } from "@zigil/agent/react"
-import {
-  attentionHistoryKey,
-  getContextDraftScope,
-} from "@zigil/agent/react"
+import { attentionHistoryKey, getContextDraftScope } from "@zigil/agent/react"
 
 const deliveredHistory = new Map<string, Set<string>>()
 const revisions = new Map<string, number>()

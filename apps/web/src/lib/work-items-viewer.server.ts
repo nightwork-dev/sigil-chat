@@ -1,29 +1,29 @@
-import type { SigilAuthSession } from "@/lib/auth/server";
-import { requireSession } from "@/lib/auth/session";
+import type { SigilAuthSession } from "@/lib/auth/server"
+import { requireSession } from "@/lib/auth/session"
 import {
   canDiscoverBoardView,
   canReadBoardView,
   currentWorkItemsScopeAccess,
   type WorkItemsScopeAccess,
-} from "@/lib/work-items-access.server";
-import type { BoardView } from "@workspace/work-items-store/types";
+} from "@/lib/work-items-access.server"
+import type { BoardView } from "@workspace/work-items-store/types"
 
 export interface AuthenticatedWorkItemsViewer {
-  id: string;
-  role: "owner" | "member";
-  username: string | null;
+  id: string
+  role: "owner" | "member"
+  username: string | null
 }
 
 /** The only viewer identity accepted by roadmap filtering and comment writes. */
 export function authenticatedWorkItemsViewer(
   session: SigilAuthSession | null,
 ): AuthenticatedWorkItemsViewer {
-  requireSession(session);
+  requireSession(session)
   return {
     id: session.user.id,
     role: session.user.role,
     username: session.user.username ?? null,
-  };
+  }
 }
 
 /** Filters saved boards before their roots can become browser-visible. */
@@ -32,9 +32,7 @@ export function boardViewsVisibleToViewer(
   viewer: AuthenticatedWorkItemsViewer,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): BoardView[] {
-  return views.filter((view) =>
-    canDiscoverBoardView(view, viewer.id, access),
-  );
+  return views.filter((view) => canDiscoverBoardView(view, viewer.id, access))
 }
 
 /**
@@ -47,7 +45,7 @@ export function boardViewVisibleToViewer(
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): BoardView {
   if (!view || !canReadBoardView(view, viewer.id, access)) {
-    throw new Error("Board view was not found.");
+    throw new Error("Board view was not found.")
   }
-  return view;
+  return view
 }

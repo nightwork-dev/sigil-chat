@@ -1,5 +1,5 @@
-import type { ManagedSkillSummary } from "@/lib/skills";
-import { SkillSummary } from "@/features/skills-manager/skill-summary";
+import type { ManagedSkillSummary } from "@/lib/skills"
+import { SkillSummary } from "@/features/skills-manager/skill-summary"
 
 export function SkillListRow({ skill }: { skill: ManagedSkillSummary }) {
   return (
@@ -11,5 +11,5 @@ export function SkillListRow({ skill }: { skill: ManagedSkillSummary }) {
       </div>
       <SkillSummary.Description className="line-clamp-2" />
     </SkillSummary.Root>
-  );
+  )
 }

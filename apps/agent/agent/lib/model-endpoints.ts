@@ -38,6 +38,7 @@ import {
   type NormalizedSigilAgentModelPreset,
   type NormalizedSigilAgentProvider,
   type SigilAgentConfig,
+  type SigilAgentModelReasoningConfig,
 } from "@workspace/runtime-env/config"
 
 import {
@@ -55,6 +56,7 @@ import {
  */
 const PROBE_ENV_PREFIX = "SIGIL_MODEL_"
 const PROBE_TIMEOUT_MS = 5_000
+const CATALOG_TIMEOUT_MS = 5_000
 const MAX_REPORTED_MODELS = 200
 
 /**
@@ -89,6 +91,34 @@ export interface ModelEndpointRecord {
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from `agent.model`. */
   isDeploymentDefault: boolean
+  /**
+   * True when this row was NOT authored in the fixture and instead came back
+   * from a live catalog fetch (MDL.2). Absent (not merely `false`) for every
+   * authored row, so a projection that forgets the field entirely still
+   * matches an authored row exactly.
+   */
+  discovered?: boolean
+  /**
+   * MDL.4: declared, never sniffed. Absent means this model shows no
+   * reasoning control at all in the chat composer.
+   */
+  reasoning?: SigilAgentModelReasoningConfig
+  /** MDL.4: absent/false means no fast-mode control for this model. */
+  fastMode: boolean
+}
+
+/**
+ * Whether a live catalog fetch was attempted for a provider, and what
+ * happened. Present only when discovery was attempted at all — a provider
+ * with no `baseUrl`, an unsupported `kind`, or a fixture-level veto never
+ * gets an entry, so its absence from the payload means "not applicable"
+ * rather than "silently failed".
+ */
+export interface ModelCatalogStatus {
+  /** ISO timestamp of the attempt, success or failure. */
+  checkedAt: string
+  /** Operator-facing reason discovery could not add anything this time. */
+  error?: string
 }
 
 /**
@@ -106,6 +136,8 @@ export interface ModelProviderRecord {
   enabled: boolean
   credential: ModelEndpointCredentialStatus
   models: ModelEndpointRecord[]
+  /** Present only when a live catalog fetch was attempted for this provider. */
+  catalog?: ModelCatalogStatus
 }
 
 export interface ModelEndpointInventory {
@@ -141,6 +173,14 @@ export interface ModelEndpointOptions {
   readonly env?: NodeJS.ProcessEnv
   readonly fetch?: typeof fetch
   readonly hasCodexModelAuth?: () => Promise<boolean>
+  /**
+   * Fetch each openai-compatible provider's own `/v1/models` catalog and
+   * merge models it serves that the fixture did not author (MDL.2). Off by
+   * default so existing callers — most tests among them — do not start
+   * making outbound calls; `createModelEndpointRoutes` turns it on for the
+   * real inventory route, which is the only production caller.
+   */
+  readonly discoverCatalogs?: boolean
 }
 
 export interface ModelEndpointProbeOptions extends ModelEndpointOptions {
@@ -323,6 +363,57 @@ async function describeProvider(
       : {}),
   })
 
+  const authoredModels: ModelEndpointRecord[] = provider.models.map(
+    (model) => ({
+      id: model.id,
+      label: model.label,
+      model: model.model,
+      capability: model.capability,
+      enabled: model.enabled,
+      contextWindowTokens:
+        model.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
+      isDeploymentDefault: model.isDeploymentDefault,
+      ...(model.reasoning ? { reasoning: model.reasoning } : {}),
+      fastMode: model.fastMode,
+    }),
+  )
+
+  const discovery = options.discoverCatalogs
+    ? await discoverProviderCatalog(provider, options)
+    : undefined
+
+  const defaultContextWindowTokens =
+    representative?.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS
+  const authoredModelStrings = new Set(provider.models.map((m) => m.model))
+  const takenSlugs = new Set(
+    provider.models.map((m) => m.id.slice(provider.id.length + 1)),
+  )
+  const discoveredModels: ModelEndpointRecord[] = []
+  for (const rawModel of discovery?.models ?? []) {
+    // Already authored — the fixture's own row wins, including its `enabled`
+    // veto, so discovery never resurrects a model the author turned off.
+    if (authoredModelStrings.has(rawModel)) continue
+    const slug = uniqueModelSlug(rawModel, takenSlugs)
+    takenSlugs.add(slug)
+    discoveredModels.push({
+      id: `${provider.id}/${slug}`,
+      label: rawModel,
+      model: rawModel,
+      capability: "chat",
+      // Not authored, so there is no fixture veto to apply — the ONLY thing
+      // that keeps a discovered model out of new sessions is the
+      // installation allow-list, which starts empty (David, 2026-07-31: new
+      // models default to disabled).
+      enabled: true,
+      contextWindowTokens: defaultContextWindowTokens,
+      isDeploymentDefault: false,
+      discovered: true,
+      // A discovered model has no fixture declaration, so it can't declare
+      // reasoning levels or fast mode (MDL.4: declared, never sniffed).
+      fastMode: false,
+    })
+  }
+
   return {
     id: provider.id,
     label: provider.label,
@@ -336,17 +427,143 @@ async function describeProvider(
       required: requirement.required,
       present,
     },
-    models: provider.models.map((model) => ({
-      id: model.id,
-      label: model.label,
-      model: model.model,
-      capability: model.capability,
-      enabled: model.enabled,
-      contextWindowTokens:
-        model.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
-      isDeploymentDefault: model.isDeploymentDefault,
-    })),
+    models: [...authoredModels, ...discoveredModels],
+    ...(discovery !== undefined ? { catalog: discovery.status } : {}),
   }
+}
+
+/**
+ * A slug that does not collide with an authored model's own slug or a
+ * discovered sibling's. Catalog ids are remote data and routinely fail the
+ * `provider/model` id grammar the allow-list validates against (dots,
+ * colons, uppercase) — `qwen3.6-27b` and `Qwen3.6-27B` would otherwise mint
+ * the same slug and silently merge into one entry.
+ */
+function uniqueModelSlug(rawModel: string, taken: ReadonlySet<string>): string {
+  const base = slugifyModelId(rawModel)
+  if (!taken.has(base)) return base
+  for (let suffix = 2; suffix < 1_000; suffix += 1) {
+    const candidate = `${base}-${suffix}`
+    if (!taken.has(candidate)) return candidate
+  }
+  // Effectively unreachable — MAX_REPORTED_MODELS caps the catalog well
+  // below this — but total rather than throwing mid-inventory.
+  return `${base}-${Date.now()}`
+}
+
+/** Fixture-legal slug from a catalog's own model id. */
+export function slugifyModelId(raw: string): string {
+  const slug = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  return slug.length > 0 ? slug : "model"
+}
+
+interface ProviderCatalogDiscovery {
+  readonly models: readonly string[]
+  readonly status: ModelCatalogStatus
+}
+
+/**
+ * Ask a provider's own endpoint what it serves, reusing the same URL and
+ * network hardening the operator-facing probe uses (`checkProbeUrl`,
+ * `modelCatalogUrl`, manual redirects, a bounded timeout) — this is the same
+ * class of outbound call, just aimed at an address the fixture already
+ * authored rather than one an operator just typed in.
+ *
+ * Only `openai-compatible` providers with a `baseUrl` have a catalog
+ * endpoint this resolver understands; every other provider (Codex reads a
+ * local login session; `anthropic`/`openrouter` have no `/v1/models`
+ * equivalent wired here) is left exactly as the fixture authored it —
+ * discovery is additive, never a requirement to configure a provider at all.
+ */
+async function discoverProviderCatalog(
+  provider: NormalizedSigilAgentProvider,
+  options: ModelEndpointOptions,
+): Promise<ProviderCatalogDiscovery | undefined> {
+  if (provider.kind !== "openai-compatible" || provider.baseUrl === undefined) {
+    return undefined
+  }
+  // The fixture author's veto covers discovery too: an operator who turned a
+  // provider off does not want Eve still reaching out to it every time the
+  // settings page loads.
+  if (!provider.enabled) return undefined
+
+  const checkedAt = () => new Date().toISOString()
+  const check = checkProbeUrl(provider.baseUrl)
+  if (!check.ok) {
+    return { models: [], status: { checkedAt: checkedAt(), error: check.reason } }
+  }
+
+  const env = options.env ?? process.env
+  const fetcher = options.fetch ?? fetch
+  const apiKey =
+    provider.apiKeyEnv === undefined ? undefined : env[provider.apiKeyEnv]?.trim()
+
+  let response: Response
+  try {
+    response = await fetcher(modelCatalogUrl(check.url), {
+      cache: "no-store",
+      redirect: "manual",
+      headers: {
+        accept: "application/json",
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+      },
+      signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
+    })
+  } catch {
+    return {
+      models: [],
+      status: {
+        checkedAt: checkedAt(),
+        error:
+          "No response from the provider's catalog endpoint. The authored model list stands.",
+      },
+    }
+  }
+
+  if (
+    response.type === "opaqueredirect" ||
+    (response.status >= 300 && response.status < 400)
+  ) {
+    return {
+      models: [],
+      status: {
+        checkedAt: checkedAt(),
+        error: "The provider's catalog endpoint redirected.",
+      },
+    }
+  }
+
+  if (!response.ok) {
+    return {
+      models: [],
+      status: {
+        checkedAt: checkedAt(),
+        error:
+          response.status === 401 || response.status === 403
+            ? "The provider rejected the configured credential."
+            : `The provider's catalog endpoint answered HTTP ${response.status}.`,
+      },
+    }
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    return {
+      models: [],
+      status: {
+        checkedAt: checkedAt(),
+        error: "The provider's catalog endpoint did not answer with JSON.",
+      },
+    }
+  }
+
+  return { models: readModelIds(payload), status: { checkedAt: checkedAt() } }
 }
 
 function toModelConfig(preset: NormalizedSigilAgentModelPreset) {
@@ -507,7 +724,12 @@ export function createModelEndpointRoutes(
     GET("/sigil/v1/model-endpoints", async (request) => {
       const denied = await guard(request)
       if (denied) return denied
-      return json(await buildModelEndpointInventory(agent, options))
+      return json(
+        await buildModelEndpointInventory(agent, {
+          ...options,
+          discoverCatalogs: options.discoverCatalogs ?? true,
+        }),
+      )
     }),
     POST("/sigil/v1/model-endpoints/probe", async (request) => {
       const denied = await guard(request)

@@ -101,11 +101,14 @@ export const Route = createFileRoute("/_app/review")({
    + a `lucide-react` icon. Icons here are FUNCTIONAL wayfinding (see the
    real entries: `LayoutDashboardIcon`/Dashboard, `NetworkIcon`/Studio,
    `FileCheck2Icon`/Review). Do NOT add an icon "for visual interest."
-4. If the workspace must report user selections to the agent (a passage, a
-   node, a row), wrap content in `AttentionProvider` from
-   `@zigil/agent-surface/attention`. See `docs/guides/building-workspaces.md` and
-   `features/review/review-workspace.tsx` for the real pattern. Do NOT
-   invent a separate ad hoc mechanism for this.
+4. If the workspace must report user selections to the agent, publish through
+   `usePublishWorkspaceAttention` from
+   `@/components/agent/workspace-attention`. DO NOT mount a workspace-local
+   `AttentionProvider`; the shell HUD cannot read it. Call
+   `usePublishWorkspaceResourceScope` with an authorized workspace scope or
+   `null` for an explicit session fallback. Read
+   `docs/guides/building-workspaces.md` and the
+   `agentic-workspace-development` skill.
 5. If a Gonk tool result should update this workspace's data, wire a
    domain-outcome handler — see `docs/guides/building-workspaces.md`
    ("domain-outcome loop") and the `adding-gonk-tools` skill. Do NOT poll.

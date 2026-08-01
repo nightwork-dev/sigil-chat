@@ -117,7 +117,11 @@ export function SessionBlackboardSheet({
         ? workspaceBlackboard
         : projectBlackboard
 
-  function save(content: string, expectedRevision: string, onSuccess: (doc: BlackboardDoc) => void) {
+  function save(
+    content: string,
+    expectedRevision: string,
+    onSuccess: (doc: BlackboardDoc) => void,
+  ) {
     if (activeTier === "session") {
       writeBlackboard.mutate(
         { sessionId, content, expectedRevision },
@@ -133,7 +137,8 @@ export function SessionBlackboardSheet({
     )
   }
 
-  const writeState = activeTier === "session" ? writeBlackboard : writeContainerBlackboard
+  const writeState =
+    activeTier === "session" ? writeBlackboard : writeContainerBlackboard
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
@@ -142,13 +147,16 @@ export function SessionBlackboardSheet({
           <SheetTitle>Blackboard</SheetTitle>
           <SheetDescription>
             Shared working notes for you and the agent — the session tab is
-            private to this conversation; workspace and project tabs are
-            shared with every session in that container.
+            private to this conversation; workspace and project tabs are shared
+            with every session in that container.
           </SheetDescription>
         </SheetHeader>
         {availableTiers.length > 1 ? (
           <div className="border-b border-border px-4 py-2">
-            <Tabs onValueChange={(value) => setTier(value as BlackboardTier)} value={activeTier}>
+            <Tabs
+              onValueChange={(value) => setTier(value as BlackboardTier)}
+              value={activeTier}
+            >
               <TabsList>
                 {availableTiers.map((candidate) => (
                   <TabsTrigger key={candidate} value={candidate}>
@@ -290,57 +298,63 @@ function BlackboardEditor({
           className="flex min-h-0 flex-1 flex-col gap-3"
           onSubmit={handleSubmit}
         >
-      <Textarea
-        aria-label="Blackboard notes"
-        className="min-h-64 flex-1 resize-none font-mono text-sm leading-6"
-        maxLength={MAX_BLACKBOARD_CONTENT_CHARS}
-        name="content"
-        onChange={(event) => setDraft(event.target.value)}
-        placeholder="Keep decisions, constraints, and working notes here…"
-        value={draft}
-      />
-      {remoteChanged ? (
-        <div className="border-l-2 border-warning pl-3 text-sm">
-          <p>The agent changed these notes while you were editing.</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <Textarea
+            aria-label="Blackboard notes"
+            className="min-h-64 flex-1 resize-none font-mono text-sm leading-6"
+            maxLength={MAX_BLACKBOARD_CONTENT_CHARS}
+            name="content"
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Keep decisions, constraints, and working notes here…"
+            value={draft}
+          />
+          {remoteChanged ? (
+            <div className="border-l-2 border-warning pl-3 text-sm">
+              <p>The agent changed these notes while you were editing.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void loadLatest()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Load latest
+                </Button>
+                <Button
+                  disabled={writePending}
+                  onClick={() => save(document.revision)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Overwrite with my draft
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-end gap-3">
             <Button
-              onClick={() => void loadLatest()}
+              disabled={writePending || remoteChanged}
               size="sm"
-              type="button"
-              variant="outline"
+              type="submit"
             >
-              Load latest
-            </Button>
-            <Button
-              disabled={writePending}
-              onClick={() => save(document.revision)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Overwrite with my draft
+              {writePending ? "Saving…" : "Save notes"}
             </Button>
           </div>
-        </div>
-      ) : null}
-      <div className="flex items-center justify-end gap-3">
-        <Button disabled={writePending || remoteChanged} size="sm" type="submit">
-          {writePending ? "Saving…" : "Save notes"}
-        </Button>
-      </div>
-      {writeError ? (
-        <div className="flex items-center justify-between gap-3 text-sm text-destructive">
-          <span>The notes may have changed before this save completed.</span>
-          <Button
-            onClick={() => void loadLatest()}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            Check latest
-          </Button>
-        </div>
-      ) : null}
+          {writeError ? (
+            <div className="flex items-center justify-between gap-3 text-sm text-destructive">
+              <span>
+                The notes may have changed before this save completed.
+              </span>
+              <Button
+                onClick={() => void loadLatest()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Check latest
+              </Button>
+            </div>
+          ) : null}
         </form>
       )}
     </div>

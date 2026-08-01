@@ -19,10 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { LiveVoiceControl } from "@/components/agent/live-voice-control"
 import { voiceAudioFocus, type AudioFocusManager } from "@/lib/audio-focus"
-import {
-  nextLiveVoiceState,
-  type LiveVoiceState,
-} from "@/lib/voice-live-state"
+import { nextLiveVoiceState, type LiveVoiceState } from "@/lib/voice-live-state"
 import {
   browserAudioSink,
   browserMicrophone,
@@ -39,8 +36,7 @@ import {
   type VoiceSessionStore,
 } from "@/lib/voice-session-binding"
 
-const DICTATION_ACTIVE =
-  "Finish dictation before starting a live voice call."
+const DICTATION_ACTIVE = "Finish dictation before starting a live voice call."
 const NO_THREAD = "Open a conversation before starting a live voice call."
 /** Plain wording naming the mode that is in the way. A live call and a voice
  *  conversation are two different agents on one pair of speakers — never

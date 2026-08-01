@@ -12,7 +12,12 @@ import { projectSwitchHref, workspaceSwitchHref } from "./shell-omnibar"
 
 const NAV: Pick<ProjectWorkspaceNavSummary, "projects"> = {
   projects: [
-    { id: "project:commerce", slug: "commerce", name: "Commerce", description: "" },
+    {
+      id: "project:commerce",
+      slug: "commerce",
+      name: "Commerce",
+      description: "",
+    },
     { id: "project:brand", slug: "brand", name: "Brand", description: "" },
   ],
 }

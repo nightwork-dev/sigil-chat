@@ -26,10 +26,21 @@ import {
   useTransitionStory,
   useUpsertStory,
 } from "@/lib/work-items"
-import { isOwnerGate, Story, STORY_STATUS, STORY_STATUS_ORDER } from "@/components/roadmap/story"
-import { type AttentionContext, type AttentionSelection } from "@zigil/agent/react"
+import {
+  isOwnerGate,
+  Story,
+  STORY_STATUS,
+  STORY_STATUS_ORDER,
+} from "@/components/roadmap/story"
+import {
+  type AttentionContext,
+  type AttentionSelection,
+} from "@zigil/agent/react"
 import { useAttentionTelemetry } from "@zigil/agent/react"
-import { usePublishWorkspaceAttention } from "@/components/agent/workspace-attention"
+import {
+  usePublishWorkspaceAttention,
+  usePublishWorkspaceResourceScope,
+} from "@/components/agent/workspace-attention"
 import type {
   ReviewDecision,
   ReviewItem,
@@ -40,10 +51,19 @@ import type {
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { ChatMarkdown } from "@workspace/chat/components/chat-markdown"
-import { KanbanBoard, type KanbanColumn } from "@workspace/ui/components/blocks/kanban-board"
+import {
+  KanbanBoard,
+  type KanbanColumn,
+} from "@workspace/ui/components/blocks/kanban-board"
 import type { SortableItemRenderProps } from "@workspace/ui/components/dnd/sortable"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@workspace/ui/components/empty"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@workspace/ui/components/empty"
 import { Input } from "@workspace/ui/components/input"
+import { SectionHeader } from "@workspace/ui/components/section-header"
 import {
   Select,
   SelectContent,
@@ -112,9 +132,13 @@ export function RoadmapWorkspace({
   const stories = addressedOnly ? addressedStoriesQuery : allStoriesQuery
   const reviews = useReviews()
   const isMobile = useIsMobile()
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSelectedId ?? null,
+  )
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [pane, setPane] = useState<AsidePane>(initialSelectedId ? "detail" : "queue")
+  const [pane, setPane] = useState<AsidePane>(
+    initialSelectedId ? "detail" : "queue",
+  )
   const [sheetOpen, setSheetOpen] = useState(Boolean(initialSelectedId))
 
   const boardStories = stories.data ?? []
@@ -124,7 +148,8 @@ export function RoadmapWorkspace({
     (reviews.data ?? []).filter((review) => review.assignee === "Owner"),
   )
   const pendingCount = ownerReviews.filter((review) => !review.completed).length
-  const selectedStory = allStories.find((story) => story.id === selectedId) ?? null
+  const selectedStory =
+    allStories.find((story) => story.id === selectedId) ?? null
   const storiesById = new Map(allStories.map((story) => [story.id, story]))
   const relationships = storyRelationships(allStories, hoveredId ?? selectedId)
   const selectedDependents = selectedStory
@@ -144,13 +169,23 @@ export function RoadmapWorkspace({
     title: STORY_STATUS[status].label,
   }))
   const boardColumnItems: Record<string, string[]> = Object.fromEntries(
-    STORY_STATUS_ORDER.map((status) => [status, (grouped[status] ?? []).map((story) => story.id)]),
+    STORY_STATUS_ORDER.map((status) => [
+      status,
+      (grouped[status] ?? []).map((story) => story.id),
+    ]),
   )
-  function handleBoardMove(id: string, _from: string, to: string, _newIndex: number) {
+  function handleBoardMove(
+    id: string,
+    _from: string,
+    to: string,
+    _newIndex: number,
+  ) {
     transition
       .mutateAsync({ id, status: to as StoryStatus })
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : "Could not move story"),
+        toast.error(
+          error instanceof Error ? error.message : "Could not move story",
+        ),
       )
   }
 
@@ -167,6 +202,7 @@ export function RoadmapWorkspace({
     history: telemetry.history,
   }
   usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   // On phones the aside is a sheet; opening a story or the queue drives it.
   // On ≥md the aside is inline and `sheetOpen` is inert.
@@ -201,7 +237,10 @@ export function RoadmapWorkspace({
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] grid-cols-1 overflow-hidden bg-background md:grid-cols-[minmax(0,1fr)_380px]">
-      <section aria-label="Story board" className="flex min-h-0 flex-col overflow-hidden">
+      <section
+        aria-label="Story board"
+        className="flex min-h-0 flex-col overflow-hidden"
+      >
         <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
           <Button
             size="sm"
@@ -214,7 +253,12 @@ export function RoadmapWorkspace({
           </Button>
           {/* On phones the review queue / story detail live in a sheet, so keep
               the queue reachable without selecting a card first. */}
-          <Button size="sm" variant="outline" className="md:hidden" onClick={openQueue}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="md:hidden"
+            onClick={openQueue}
+          >
             <InboxIcon />
             Review queue
             {pendingCount > 0 ? (
@@ -225,9 +269,13 @@ export function RoadmapWorkspace({
           </Button>
         </div>
         {stories.isLoading ? (
-          <p className="p-4 text-sm text-muted-foreground">Loading the roadmap…</p>
+          <p className="p-4 text-sm text-muted-foreground">
+            Loading the roadmap…
+          </p>
         ) : stories.error ? (
-          <p className="p-4 text-sm text-destructive">Could not load the roadmap.</p>
+          <p className="p-4 text-sm text-destructive">
+            Could not load the roadmap.
+          </p>
         ) : boardStories.length === 0 ? (
           <Empty className="m-4 border">
             <EmptyHeader>
@@ -255,7 +303,10 @@ export function RoadmapWorkspace({
                   selected={story.id === selectedId}
                   relationship={relationshipForStory(relationships, story.id)}
                   relationshipsActive={relationships.activeId !== null}
-                  unresolvedPrerequisites={unresolvedPrerequisitesForStory(storiesById, story)}
+                  unresolvedPrerequisites={unresolvedPrerequisitesForStory(
+                    storiesById,
+                    story,
+                  )}
                   onSelect={openDetail}
                   onHover={setHoveredId}
                   drag={drag}
@@ -279,7 +330,10 @@ export function RoadmapWorkspace({
 
       {isMobile ? (
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent side="right" className="flex w-[88%] max-w-sm flex-col gap-0 p-0">
+          <SheetContent
+            side="right"
+            className="flex w-[88%] max-w-sm flex-col gap-0 p-0"
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>Roadmap review</SheetTitle>
               <SheetDescription>Review queue and story detail</SheetDescription>
@@ -342,7 +396,11 @@ function AsidePaneBody({
       </div>
       <div className="scroll-area min-h-0 flex-1 overflow-y-auto">
         {pane === "queue" ? (
-          <ReviewQueue reviews={ownerReviews} storiesById={storiesById} onOpenStory={onOpenStory} />
+          <ReviewQueue
+            reviews={ownerReviews}
+            storiesById={storiesById}
+            onOpenStory={onOpenStory}
+          />
         ) : selectedStory ? (
           <StoryDetail
             key={selectedStory.id}
@@ -351,7 +409,8 @@ function AsidePaneBody({
             storiesById={storiesById}
             onOpenStory={onOpenStory}
             pendingReview={ownerReviews.some(
-              (review) => review.storyId === selectedStory.id && !review.completed,
+              (review) =>
+                review.storyId === selectedStory.id && !review.completed,
             )}
           />
         ) : (
@@ -434,7 +493,8 @@ function RoadmapCard({
             >
               <TriangleAlertIcon className="size-3.5" aria-hidden="true" />
               <span className="sr-only">
-                Blocked by {unresolvedPrerequisites.length} unresolved prerequisite
+                Blocked by {unresolvedPrerequisites.length} unresolved
+                prerequisite
                 {unresolvedPrerequisites.length === 1 ? "" : "s"}
               </span>
             </span>
@@ -469,8 +529,8 @@ function ReviewQueue({
           <EmptyHeader>
             <EmptyTitle>Queue is clear</EmptyTitle>
             <EmptyDescription>
-              Reviews assigned to you appear here. Open a story that needs your review and send it
-              to your queue, or let the agent assign one.
+              Reviews assigned to you appear here. Open a story that needs your
+              review and send it to your queue, or let the agent assign one.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -483,28 +543,45 @@ function ReviewQueue({
         const story = storiesById.get(review.storyId)
         if (!story) return null
         return (
-          <ReviewQueueRow key={review.id} review={review} story={story} onOpenStory={onOpenStory} />
+          <ReviewQueueRow
+            key={review.id}
+            review={review}
+            story={story}
+            onOpenStory={onOpenStory}
+          />
         )
       })}
     </div>
   )
 }
 
-function decisionBadge(decision: ReviewDecision | undefined) {
-  if (decision === "approved")
+/**
+ * A completed review's verdict. Renders nothing for a review with no decision
+ * on record — an absent verdict is not a third outcome to label.
+ */
+function DecisionBadge({ decision }: { decision: ReviewDecision | undefined }) {
+  if (decision === "approved") {
     return (
-      <Badge variant="outline" className="border-transparent bg-success/15 text-success">
+      <Badge
+        variant="outline"
+        className="border-transparent bg-success/15 text-success"
+      >
         <CheckIcon />
         Approved
       </Badge>
     )
-  if (decision === "changes-requested")
+  }
+  if (decision === "changes-requested") {
     return (
-      <Badge variant="outline" className="border-transparent bg-warning/15 text-warning">
+      <Badge
+        variant="outline"
+        className="border-transparent bg-warning/15 text-warning"
+      >
         <XIcon />
         Changes requested
       </Badge>
     )
+  }
   return null
 }
 
@@ -521,9 +598,15 @@ function ReviewQueueRow({
   const act = (decision: ReviewDecision) =>
     decide
       .mutateAsync({ reviewId: review.id, decision })
-      .then(() => toast.success(decision === "approved" ? "Review approved" : "Changes requested"))
+      .then(() =>
+        toast.success(
+          decision === "approved" ? "Review approved" : "Changes requested",
+        ),
+      )
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : "Could not record decision"),
+        toast.error(
+          error instanceof Error ? error.message : "Could not record decision",
+        ),
       )
 
   return (
@@ -535,20 +618,32 @@ function ReviewQueueRow({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={() => onOpenStory(story.id)} className="min-w-0 text-left">
+        <button
+          type="button"
+          onClick={() => onOpenStory(story.id)}
+          className="min-w-0 text-left"
+        >
           <Story.Title className="text-sm underline-offset-4 hover:underline" />
         </button>
         <Story.Status className="shrink-0" />
       </div>
       {review.summary ? (
-        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{review.summary}</p>
+        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+          {review.summary}
+        </p>
       ) : null}
       <Story.Meta />
       {review.completed ? (
-        <div className="flex items-center gap-2">{decisionBadge(review.decision)}</div>
+        <div className="flex items-center gap-2">
+          <DecisionBadge decision={review.decision} />
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button size="xs" disabled={decide.isPending} onClick={() => act("approved")}>
+          <Button
+            size="xs"
+            disabled={decide.isPending}
+            onClick={() => act("approved")}
+          >
             <CheckIcon />
             Approve
           </Button>
@@ -562,7 +657,9 @@ function ReviewQueueRow({
             Request changes
           </Button>
           {decide.error ? (
-            <span className="text-[0.625rem] text-destructive">{decide.error.message}</span>
+            <span className="text-[0.625rem] text-destructive">
+              {decide.error.message}
+            </span>
           ) : null}
         </div>
       )}
@@ -603,14 +700,18 @@ function StoryDetail({
         toast.success("Story saved")
       })
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : "Could not save story"),
+        toast.error(
+          error instanceof Error ? error.message : "Could not save story",
+        ),
       )
 
   const move = (status: StoryStatus) =>
     transition
       .mutateAsync({ id: story.id, status })
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : "Could not move story"),
+        toast.error(
+          error instanceof Error ? error.message : "Could not move story",
+        ),
       )
 
   const requestReview = () =>
@@ -618,7 +719,9 @@ function StoryDetail({
       .mutateAsync({ id: story.id, gate: story.reviewGate })
       .then(() => toast.success("Sent to your review queue"))
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : "Could not assign review"),
+        toast.error(
+          error instanceof Error ? error.message : "Could not assign review",
+        ),
       )
 
   return (
@@ -629,9 +732,7 @@ function StoryDetail({
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Title
-        </label>
+        <SectionHeader>Title</SectionHeader>
         <Input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -640,20 +741,21 @@ function StoryDetail({
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Intent
-          </span>
-          <Button
-            onClick={() => setEditingIntent((current) => !current)}
-            size="xs"
-            type="button"
-            variant="ghost"
-          >
-            {editingIntent ? <EyeIcon /> : <PencilLineIcon />}
-            {editingIntent ? "Preview" : "Edit"}
-          </Button>
-        </div>
+        <SectionHeader
+          action={
+            <Button
+              onClick={() => setEditingIntent((current) => !current)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              {editingIntent ? <EyeIcon /> : <PencilLineIcon />}
+              {editingIntent ? "Preview" : "Edit"}
+            </Button>
+          }
+        >
+          Intent
+        </SectionHeader>
         {editingIntent ? (
           <Textarea
             value={intent}
@@ -672,14 +774,14 @@ function StoryDetail({
           Save changes
         </Button>
         {dirty ? (
-          <span className="text-[0.625rem] text-muted-foreground">Unsaved edits</span>
+          <span className="text-[0.625rem] text-muted-foreground">
+            Unsaved edits
+          </span>
         ) : null}
       </div>
 
       <div className="space-y-1.5 border-t border-border pt-4">
-        <label className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Status
-        </label>
+        <SectionHeader>Status</SectionHeader>
         <Select
           value={story.status}
           onValueChange={(value) => void move(value as StoryStatus)}
@@ -699,17 +801,13 @@ function StoryDetail({
       </div>
 
       <div className="space-y-2 border-t border-border pt-4">
-        <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Acceptance criteria
-        </span>
+        <SectionHeader>Acceptance criteria</SectionHeader>
         <Story.AcceptanceList />
       </div>
 
       {story.deps.length > 0 ? (
         <div className="space-y-2 border-t border-border pt-4">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Depends on
-          </span>
+          <SectionHeader>Depends on</SectionHeader>
           <div className="flex flex-wrap gap-1.5">
             {story.deps.map((dep) => (
               <Button
@@ -729,9 +827,7 @@ function StoryDetail({
 
       {dependents.length > 0 ? (
         <div className="space-y-2 border-t border-border pt-4">
-          <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Required by
-          </span>
+          <SectionHeader>Required by</SectionHeader>
           <div className="flex flex-wrap gap-1.5">
             {dependents.map((dependent) => (
               <Button
@@ -751,7 +847,12 @@ function StoryDetail({
 
       {isOwnerGate(story.reviewGate) && !pendingReview ? (
         <div className="border-t border-border pt-4">
-          <Button size="sm" variant="outline" disabled={assign.isPending} onClick={requestReview}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={assign.isPending}
+            onClick={requestReview}
+          >
             <SendHorizonalIcon />
             Send to review queue
           </Button>
@@ -779,7 +880,9 @@ const COMMENT_KINDS: { value: StoryComment["kind"]; label: string }[] = [
 ]
 
 function addresseeLabel(addressee: string): string {
-  return COMMENT_ADDRESSEES.find((a) => a.value === addressee)?.label ?? addressee
+  return (
+    COMMENT_ADDRESSEES.find((a) => a.value === addressee)?.label ?? addressee
+  )
 }
 
 // In-app feedback ON a story (S1.7): the write-side of the review loop. A comment
@@ -793,7 +896,9 @@ function StoryComments({ story }: { story: StoryData }) {
   const [kind, setKind] = useState<StoryComment["kind"]>("suggestion")
   const [addressee, setAddressee] = useState("general")
 
-  const thread = [...(comments.data ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const thread = [...(comments.data ?? [])].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  )
   const canSend = body.trim().length > 0 && !addComment.isPending
 
   const send = () =>
@@ -809,20 +914,27 @@ function StoryComments({ story }: { story: StoryData }) {
         toast.success("Feedback added")
       })
       .catch((error: unknown) =>
-        toast.error(error instanceof Error ? error.message : "Could not add feedback"),
+        toast.error(
+          error instanceof Error ? error.message : "Could not add feedback",
+        ),
       )
 
   return (
     <div className="space-y-3 border-t border-border pt-4">
-      <div className="flex items-center gap-1.5">
-        <MessageSquareIcon className="size-3.5 text-muted-foreground" />
-        <span className="text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+      <SectionHeader
+        action={
+          thread.length > 0 ? (
+            <span className="font-mono text-[0.625rem] text-muted-foreground">
+              {thread.length}
+            </span>
+          ) : null
+        }
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <MessageSquareIcon className="size-3.5" />
           Feedback
         </span>
-        {thread.length > 0 ? (
-          <span className="font-mono text-[0.625rem] text-muted-foreground">{thread.length}</span>
-        ) : null}
-      </div>
+      </SectionHeader>
 
       {comments.isLoading ? (
         <p className="text-xs text-muted-foreground">Loading feedback…</p>
@@ -847,8 +959,14 @@ function StoryComments({ story }: { story: StoryData }) {
           className="min-h-20"
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={kind} onValueChange={(value) => setKind(value as StoryComment["kind"])}>
-            <SelectTrigger className="h-8 w-auto min-w-28" aria-label="Feedback kind">
+          <Select
+            value={kind}
+            onValueChange={(value) => setKind(value as StoryComment["kind"])}
+          >
+            <SelectTrigger
+              className="h-8 w-auto min-w-28"
+              aria-label="Feedback kind"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -859,19 +977,32 @@ function StoryComments({ story }: { story: StoryData }) {
               ))}
             </SelectContent>
           </Select>
-          <Select value={addressee} onValueChange={(value) => setAddressee(value ?? "general")}>
-            <SelectTrigger className="h-8 w-auto min-w-24" aria-label="Addressee">
+          <Select
+            value={addressee}
+            onValueChange={(value) => setAddressee(value ?? "general")}
+          >
+            <SelectTrigger
+              className="h-8 w-auto min-w-24"
+              aria-label="Addressee"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {COMMENT_ADDRESSEES.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.value === "general" ? option.label : `For ${option.label}`}
+                  {option.value === "general"
+                    ? option.label
+                    : `For ${option.label}`}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" className="ml-auto" disabled={!canSend} onClick={send}>
+          <Button
+            size="sm"
+            className="ml-auto"
+            disabled={!canSend}
+            onClick={send}
+          >
             <SendHorizonalIcon />
             Send
           </Button>
@@ -886,14 +1017,21 @@ function CommentRow({ comment }: { comment: StoryComment }) {
     <li className="rounded-md border border-border bg-card/40 p-2.5 text-xs">
       <div className="mb-1 flex flex-wrap items-center gap-1.5">
         <span className="font-medium">{comment.author}</span>
-        <Badge variant="outline" className="h-4 px-1 text-[0.5625rem] capitalize">
+        <Badge
+          variant="outline"
+          className="h-4 px-1 text-[0.5625rem] capitalize"
+        >
           {comment.kind}
         </Badge>
         {comment.addressee ? (
-          <Badge className="h-4 px-1 text-[0.5625rem]">→ {addresseeLabel(comment.addressee)}</Badge>
+          <Badge className="h-4 px-1 text-[0.5625rem]">
+            → {addresseeLabel(comment.addressee)}
+          </Badge>
         ) : null}
       </div>
-      <p className="whitespace-pre-wrap leading-5 text-foreground/90">{comment.body}</p>
+      <p className="whitespace-pre-wrap leading-5 text-foreground/90">
+        {comment.body}
+      </p>
     </li>
   )
 }

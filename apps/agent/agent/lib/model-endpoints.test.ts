@@ -10,6 +10,7 @@ import {
   probeModelEndpoint,
   readModelIds,
   resolveProbeCredentialEnv,
+  slugifyModelId,
 } from "./model-endpoints"
 
 const AGENT: SigilAgentConfig = {
@@ -196,6 +197,7 @@ describe("model endpoint inventory", () => {
             enabled: true,
             contextWindowTokens: 200_000,
             isDeploymentDefault: true,
+            fastMode: false,
           },
         ],
       },
@@ -233,6 +235,182 @@ describe("model endpoint inventory", () => {
       required: true,
       present: false,
     })
+  })
+})
+
+describe("model catalog discovery", () => {
+  it("does nothing when discovery is not requested — the default", async () => {
+    const inventory = await buildModelEndpointInventory(AGENT, {
+      env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-live-secret" },
+      hasCodexModelAuth: async () => true,
+      fetch: refuseNetwork(),
+    })
+    // No `discoverCatalogs: true` — a fetch would throw, so reaching this
+    // line at all proves discovery never touched the network.
+    expect(inventory.providers[1]?.catalog).toBeUndefined()
+    expect(inventory.providers[1]?.models).toHaveLength(1)
+  })
+
+  it("appends a served model the fixture did not author, disabled like any other new model", async () => {
+    const inventory = await buildModelEndpointInventory(AGENT, {
+      env: {},
+      hasCodexModelAuth: async () => true,
+      discoverCatalogs: true,
+      fetch: async (input) => {
+        expect(String(input)).toBe("http://127.0.0.1:1234/v1/models")
+        return Response.json({
+          data: [{ id: "qwen3.6-27b" }, { id: "gemma-3-27b-it" }],
+        })
+      },
+    })
+
+    const lmstudio = inventory.providers[1]
+    expect(lmstudio?.catalog).toMatchObject({ checkedAt: expect.any(String) })
+    // "qwen3.6-27b" is already authored under id "qwen" — discovery must not
+    // duplicate it, only add what is genuinely new.
+    expect(lmstudio?.models).toEqual([
+      {
+        id: "lmstudio-local/qwen",
+        label: "qwen3.6-27b",
+        model: "qwen3.6-27b",
+        capability: "chat",
+        enabled: true,
+        contextWindowTokens: 200_000,
+        isDeploymentDefault: false,
+        fastMode: false,
+      },
+      {
+        id: "lmstudio-local/gemma-3-27b-it",
+        label: "gemma-3-27b-it",
+        model: "gemma-3-27b-it",
+        capability: "chat",
+        enabled: true,
+        contextWindowTokens: 200_000,
+        isDeploymentDefault: false,
+        discovered: true,
+        fastMode: false,
+      },
+    ])
+  })
+
+  it("slugifies a served model id that would not survive the allow-list's id grammar", async () => {
+    expect(slugifyModelId("Qwen3.6-27B")).toBe("qwen3-6-27b")
+    expect(slugifyModelId("moonshotai/kimi-k2:free")).toBe(
+      "moonshotai-kimi-k2-free",
+    )
+
+    const inventory = await buildModelEndpointInventory(AGENT, {
+      env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-live-secret" },
+      hasCodexModelAuth: async () => true,
+      discoverCatalogs: true,
+      fetch: async (input) => {
+        if (String(input).includes("deepseek")) {
+          return Response.json({ data: [{ id: "deepseek-chat" }] })
+        }
+        return Response.json({ data: [{ id: "moonshotai/kimi-k2:free" }] })
+      },
+    })
+
+    const discovered = inventory.providers[1]?.models.find(
+      (model) => model.discovered,
+    )
+    expect(discovered?.id).toBe("lmstudio-local/moonshotai-kimi-k2-free")
+    expect(discovered?.model).toBe("moonshotai/kimi-k2:free")
+  })
+
+  it("disambiguates two served ids that would collide on the same slug", async () => {
+    const inventory = await buildModelEndpointInventory(AGENT, {
+      env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-live-secret" },
+      hasCodexModelAuth: async () => true,
+      discoverCatalogs: true,
+      fetch: async (input) => {
+        if (String(input).includes("deepseek")) {
+          return Response.json({ data: [{ id: "deepseek-chat" }] })
+        }
+        return Response.json({ data: [{ id: "Model X" }, { id: "model x" }] })
+      },
+    })
+
+    const discoveredIds = inventory.providers[1]?.models
+      .filter((model) => model.discovered)
+      .map((model) => model.id)
+    expect(discoveredIds).toEqual([
+      "lmstudio-local/model-x",
+      "lmstudio-local/model-x-2",
+    ])
+  })
+
+  it("surfaces a catalog failure honestly instead of silently keeping quiet", async () => {
+    const inventory = await buildModelEndpointInventory(AGENT, {
+      env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-live-secret" },
+      hasCodexModelAuth: async () => true,
+      discoverCatalogs: true,
+      fetch: async (input) => {
+        if (String(input).includes("deepseek")) {
+          return Response.json({ data: [{ id: "deepseek-chat" }] })
+        }
+        throw new Error("ECONNREFUSED")
+      },
+    })
+
+    const lmstudio = inventory.providers[1]
+    expect(lmstudio?.catalog?.error).toContain("No response")
+    // The authored model stands even though discovery failed.
+    expect(lmstudio?.models).toHaveLength(1)
+  })
+
+  // SSRF regression: discovery must go through the SAME hardened path as the
+  // operator probe — manual redirects, the checkProbeUrl gate — rather than a
+  // second, less careful implementation. A provider's baseUrl is authored
+  // (trusted) rather than caller-supplied, but a redirect response is still
+  // attacker-influenced if the endpoint is ever compromised, so the same
+  // "never follow" rule applies.
+  it("treats a catalog redirect as unreachable rather than following it", async () => {
+    const inventory = await buildModelEndpointInventory(AGENT, {
+      env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-live-secret" },
+      hasCodexModelAuth: async () => true,
+      discoverCatalogs: true,
+      fetch: async (input, init) => {
+        if (String(input).includes("deepseek")) {
+          return Response.json({ data: [{ id: "deepseek-chat" }] })
+        }
+        expect(init?.redirect).toBe("manual")
+        return new Response(null, {
+          status: 302,
+          headers: { location: "http://169.254.169.254/latest/meta-data/" },
+        })
+      },
+    })
+
+    expect(inventory.providers[1]?.catalog?.error).toContain("redirected")
+    expect(inventory.providers[1]?.models).toHaveLength(1)
+  })
+
+  it("never attempts discovery for a provider with no baseUrl (codex) or the fixture disabled", async () => {
+    const inventory = await buildModelEndpointInventory(
+      {
+        model: "gpt-5.6-terra",
+        providers: [
+          {
+            id: "retired",
+            label: "Retired",
+            kind: "openai-compatible",
+            baseUrl: "http://127.0.0.1:9/v1",
+            enabled: false,
+            models: [{ id: "a", model: "a" }],
+          },
+        ],
+      },
+      {
+        hasCodexModelAuth: async () => true,
+        discoverCatalogs: true,
+        fetch: refuseNetwork(),
+      },
+    )
+
+    // Reaching this line at all proves neither provider hit the network.
+    expect(inventory.providers[0]?.catalog).toBeUndefined()
+    expect(inventory.providers[1]?.catalog).toBeUndefined()
   })
 })
 

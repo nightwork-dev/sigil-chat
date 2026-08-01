@@ -1,25 +1,25 @@
-"use client";
+"use client"
 
 // AgentInline (app adapter) — the portable inline variant shell from
 // @workspace/ui/agent-variants wired to the app session. The shell owns the
 // popover + conversation core (Q5); this file only supplies the session.
 
-import type { ReactNode } from "react";
+import type { ReactNode } from "react"
 
-import { AgentInline as AgentInlineShell } from "@workspace/ui/components/agent-variants";
-import { useAppAgentSession } from "@/hooks/use-app-agent-session";
+import { AgentInline as AgentInlineShell } from "@workspace/ui/components/agent-variants"
+import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 
 export interface AgentInlineProps {
   /** The trigger element — the thing the agent is "about" (a passage, a node). */
-  readonly children: ReactNode;
+  readonly children: ReactNode
   /** What this inline panel is about (composer placeholder). */
-  readonly subject: string;
+  readonly subject: string
   /** Extra className on the trigger wrapper. */
-  readonly className?: string;
+  readonly className?: string
   /** Popover alignment against the trigger. */
-  readonly align?: "start" | "center" | "end";
+  readonly align?: "start" | "center" | "end"
   /** Popover side. */
-  readonly side?: "top" | "bottom" | "left" | "right";
+  readonly side?: "top" | "bottom" | "left" | "right"
 }
 
 /**
@@ -34,7 +34,7 @@ export function AgentInline({
   align = "center",
   side = "bottom",
 }: AgentInlineProps) {
-  const session = useAppAgentSession();
+  const session = useAppAgentSession()
 
   return (
     <AgentInlineShell
@@ -46,5 +46,5 @@ export function AgentInline({
     >
       {children}
     </AgentInlineShell>
-  );
+  )
 }

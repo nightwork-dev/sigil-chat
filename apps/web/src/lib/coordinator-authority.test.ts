@@ -130,7 +130,9 @@ describe("grant narrowness (criterion 3)", () => {
     expect(
       rejectionForGrant({
         ...GRANT,
-        actions: ["approve"] as unknown as CoordinatorAuthorityGrantInput["actions"],
+        actions: [
+          "approve",
+        ] as unknown as CoordinatorAuthorityGrantInput["actions"],
       }),
     ).toBe("actions-unknown")
   })
@@ -374,9 +376,10 @@ describe("coordinator output cannot approve (criterion 2, behavioural)", () => {
     )
     await coordinator.whenIdle()
 
-    expect(
-      decideDelegatedApproval({ request: REQUEST, grants: [] }),
-    ).toEqual({ status: "out-of-band", reason: "no-grant" })
+    expect(decideDelegatedApproval({ request: REQUEST, grants: [] })).toEqual({
+      status: "out-of-band",
+      reason: "no-grant",
+    })
   })
 })
 

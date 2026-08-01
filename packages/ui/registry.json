@@ -3495,6 +3495,25 @@
       ]
     },
     {
+      "name": "tone-chip",
+      "type": "registry:ui",
+      "dependencies": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "@sigil/tone",
+        "@sigil/utils"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/tone-chip.tsx",
+          "type": "registry:ui",
+          "target": "@ui/tone-chip.tsx"
+        }
+      ]
+    },
+    {
       "name": "tool-call",
       "type": "registry:ui",
       "dependencies": [

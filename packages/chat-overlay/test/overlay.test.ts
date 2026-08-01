@@ -56,6 +56,7 @@ describe("Sigil Chat overlay", () => {
       ...(doctor.requiredFiles ?? []).map((entry: { path: string }) => entry.path),
       ...(doctor.packageJson ?? []).map((entry: { path: string }) => entry.path),
       ...(doctor.environment ?? []).map((entry: { path: string }) => entry.path),
+      ...(doctor.sourceChecks ?? []).map((entry: { path: string }) => entry.path),
     ];
     for (const doctorPath of doctorPaths) {
       expect(pathIsCovered(doctorPath), doctorPath).toBe(true);
@@ -72,7 +73,7 @@ describe("Sigil Chat overlay", () => {
     }
     for (const staged of walk(filesRoot)) {
       const sourceRelativePath = relative(filesRoot, staged);
-      for (const privateSegment of [".env", ".agents", ".data", ".omc"]) {
+      for (const privateSegment of [".env", ".data", ".omc"]) {
         expect(sourceRelativePath.split("/")).not.toContain(privateSegment);
       }
       expect(sourceRelativePath.endsWith("routeTree.gen.ts")).toBe(false);
@@ -152,6 +153,10 @@ describe("Sigil Chat overlay", () => {
       "pnpm-workspace.yaml",
       "scripts/dev.mjs",
       "fixtures/application/sigil-chat.yaml",
+      ".agents/skills/agentic-workspace-development/SKILL.md",
+      ".claude/skills/agentic-workspace-development/SKILL.md",
+      ".pi/skills/agentic-workspace-development/SKILL.md",
+      "docs/guides/building-workspaces.md",
       "apps/web/src/routes/_app/chat.tsx",
       "apps/web/src/router.tsx",
       "packages/agent-tools/package.json",
@@ -209,6 +214,20 @@ describe("Sigil Chat overlay", () => {
     expect(
       statSync(join(target, "apps/web/src/routes/_app/chat.tsx")).isFile(),
     ).toBe(true);
+    expect(
+      statSync(
+        join(
+          target,
+          ".agents/skills/agentic-workspace-development/SKILL.md",
+        ),
+      ).isFile(),
+    ).toBe(true);
+    expect(
+      readFileSync(
+        join(target, "docs/guides/building-workspaces.md"),
+        "utf8",
+      ),
+    ).toContain("usePublishWorkspaceResourceScope");
 
     expect(item.overlay.name).toBe("sigil-chat");
     expect(item.digest).toBe(
@@ -293,6 +312,14 @@ describe("Sigil Chat overlay", () => {
     ).toBe(true);
     expect(
       statSync(join(target, "apps/web/src/routes/_app/chat.tsx")).isFile(),
+    ).toBe(true);
+    expect(
+      statSync(
+        join(
+          target,
+          ".agents/skills/agentic-workspace-development/SKILL.md",
+        ),
+      ).isFile(),
     ).toBe(true);
   });
 });

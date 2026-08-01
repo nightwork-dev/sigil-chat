@@ -21,6 +21,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react"
 
@@ -133,17 +134,26 @@ export function useRegisterAgentPresentation(
 /**
  * A minimal matchMedia hook for breakpoint-conditional presentation claims
  * (the sidecar rail is hidden below lg, so its suppression must be too).
- * Returns false during SSR / before the first effect — the dock's first
- * paint is never suppressed by a presentation that isn't visible yet.
+ *
+ * matchMedia is an external store, so it is read as one: the server snapshot
+ * is false, which is also what hydration renders, so the dock's first paint is
+ * never suppressed by a presentation that isn't visible yet.
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
-  useEffect(() => {
-    const mql = window.matchMedia(query)
-    const onChange = () => setMatches(mql.matches)
-    onChange()
-    mql.addEventListener("change", onChange)
-    return () => mql.removeEventListener("change", onChange)
-  }, [query])
-  return matches
+  const mql = useMemo(
+    () => (typeof window === "undefined" ? null : window.matchMedia(query)),
+    [query],
+  )
+  return useSyncExternalStore(
+    useCallback(
+      (onChange: () => void) => {
+        if (!mql) return () => {}
+        mql.addEventListener("change", onChange)
+        return () => mql.removeEventListener("change", onChange)
+      },
+      [mql],
+    ),
+    () => mql?.matches ?? false,
+    () => false,
+  )
 }

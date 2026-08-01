@@ -40,7 +40,10 @@ afterEach(() => {
   container = undefined
 })
 
-function speechPart(output: unknown, state = "output-available"): AgentToolCallPart {
+function speechPart(
+  output: unknown,
+  state = "output-available",
+): AgentToolCallPart {
   return {
     type: "tool-call",
     toolCallId: "call-1",
@@ -51,8 +54,7 @@ function speechPart(output: unknown, state = "output-available"): AgentToolCallP
   } as unknown as AgentToolCallPart
 }
 
-const url =
-  "/api/media/artifact?key=uploads%2Fabc.mp3&scope=session%3Athread-1"
+const url = "/api/media/artifact?key=uploads%2Fabc.mp3&scope=session%3Athread-1"
 
 describe("SynthesizedSpeechRenderer", () => {
   it("plays the stored audio artifact from its authenticated media URL", () => {
