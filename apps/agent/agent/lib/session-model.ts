@@ -26,10 +26,15 @@ import {
 } from "@workspace/agent-contracts/model-binding"
 import {
   normalizeSigilAgentModelPresets,
+  normalizeSigilAgentProviders,
   type NormalizedSigilAgentModelPreset,
   type SigilAgentConfig,
 } from "@workspace/runtime-env/config"
 
+import {
+  readDiscoveredModelCache,
+  type DiscoveredModelCacheEntry,
+} from "./discovered-model-cache"
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   resolveSigilAgentModel,
@@ -62,6 +67,12 @@ export interface ResolveSessionModelOptions
    * operator reading a transcript later.
    */
   readonly onUnresolved?: (event: UnresolvedBoundModelEvent) => void
+  /**
+   * MDL.2's discovery cache. Defaults to the real cache; overridable so tests
+   * exercise the merge without a store, and so a future caller that already
+   * has a fresher read can pass it through instead of paying a second one.
+   */
+  readonly discovered?: readonly DiscoveredModelCacheEntry[]
 }
 
 /** Default sink: a warning naming the id that no longer resolves. */
@@ -84,13 +95,62 @@ export interface SessionModelSelection {
   readonly modelId: string
 }
 
+/**
+ * `discovered` defaults to the real MDL.2 cache but is overridable so callers
+ * (and every test in this file) can exercise the merge without a real store.
+ */
 export function findModelPreset(
   agent: SigilAgentConfig,
   presetId: string,
+  discovered: readonly DiscoveredModelCacheEntry[] = readDiscoveredModelCache(),
 ): NormalizedSigilAgentModelPreset | undefined {
-  return normalizeSigilAgentModelPresets(agent).find(
+  const authored = normalizeSigilAgentModelPresets(agent).find(
     (preset) => preset.id === presetId,
   )
+  if (authored) return authored
+  return synthesizeDiscoveredPreset(agent, presetId, discovered)
+}
+
+/**
+ * Turn a cached discovery entry into a resolvable preset by borrowing its
+ * PROVIDER's transport facts from the current fixture — the cache never
+ * carries a `baseUrl` or credential reference of its own (see
+ * discovered-model-cache.ts). A provider the fixture has since removed or
+ * disabled yields undefined, same as any other preset that no longer
+ * resolves: the caller falls back to the deployment default rather than
+ * failing the session.
+ */
+function synthesizeDiscoveredPreset(
+  agent: SigilAgentConfig,
+  presetId: string,
+  discovered: readonly DiscoveredModelCacheEntry[],
+): NormalizedSigilAgentModelPreset | undefined {
+  const entry = discovered.find((candidate) => candidate.id === presetId)
+  if (!entry) return undefined
+  const provider = normalizeSigilAgentProviders(agent).find(
+    (candidate) => candidate.id === entry.providerId,
+  )
+  if (!provider || !provider.enabled) return undefined
+  return {
+    id: entry.id,
+    label: entry.label,
+    providerId: provider.id,
+    providerLabel: provider.label,
+    provider: provider.kind,
+    model: entry.model,
+    capability: "chat",
+    enabled: true,
+    isDeploymentDefault: false,
+    source: "object",
+    ...(provider.baseUrl !== undefined ? { baseUrl: provider.baseUrl } : {}),
+    ...(provider.apiKeyEnv !== undefined
+      ? { apiKeyEnv: provider.apiKeyEnv }
+      : {}),
+    contextWindowTokens:
+      entry.contextWindowTokens ??
+      provider.models[0]?.contextWindowTokens ??
+      DEFAULT_CONTEXT_WINDOW_TOKENS,
+  }
 }
 
 /**
@@ -137,7 +197,10 @@ export function resolveSessionModel(
   // not get it.
   if (!bound) return null
   const report = options.onUnresolved ?? warnUnresolvedBoundModel
-  const preset = findModelPreset(agent, bound.presetId)
+  const preset =
+    options.discovered !== undefined
+      ? findModelPreset(agent, bound.presetId, options.discovered)
+      : findModelPreset(agent, bound.presetId)
   if (!preset) {
     report({ presetId: bound.presetId, reason: "preset-not-found" })
     return null

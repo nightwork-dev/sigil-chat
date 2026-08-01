@@ -8,7 +8,7 @@ import { mirkBackendFactory } from "@gonk/store/sqlite"
 import type { KvStore } from "@gonk/store/types"
 import { describe, expect, it } from "vitest"
 
-import { ENABLED_MODELS_KEY } from "./registry"
+import { DISCOVERED_MODELS_KEY, ENABLED_MODELS_KEY } from "./registry"
 import {
   InstallationSettingRejectedError,
   InstallationSettingsStore,
@@ -77,5 +77,81 @@ describe("InstallationSettingsStore", () => {
     expect(new InstallationSettingsStore({ kv }).get(ENABLED_MODELS_KEY)).toEqual(
       [],
     )
+  })
+})
+
+describe("InstallationSettingsStore — models.discovered (MDL.2)", () => {
+  const entry = {
+    id: "deepseek/reasoner",
+    providerId: "deepseek",
+    model: "deepseek-reasoner",
+    label: "deepseek-reasoner",
+  }
+
+  it("resolves to an empty cache before anything is written", () => {
+    const store = new InstallationSettingsStore({ kv: realKv() })
+    expect(store.get(DISCOVERED_MODELS_KEY)).toEqual([])
+  })
+
+  it("round-trips a discovered entry through persistence", () => {
+    const kv = realKv()
+    new InstallationSettingsStore({ kv }).set(DISCOVERED_MODELS_KEY, [entry])
+    expect(
+      new InstallationSettingsStore({ kv }).get(DISCOVERED_MODELS_KEY),
+    ).toEqual([entry])
+  })
+
+  it("refuses an id that is not shaped provider/model", () => {
+    const store = new InstallationSettingsStore({ kv: realKv() })
+    for (const invalid of [
+      // Single-segment — that grammar is reserved for deployment-default.
+      { ...entry, id: "deepseek" },
+      // Uppercase / punctuation a live catalog can report but the grammar refuses.
+      { ...entry, id: "deepseek/Reasoner" },
+      { ...entry, id: "deepseek/reasoner.v2" },
+    ]) {
+      expect(
+        () => store.set(DISCOVERED_MODELS_KEY, [invalid as never]),
+        JSON.stringify(invalid),
+      ).toThrow(InstallationSettingRejectedError)
+    }
+  })
+
+  it("refuses an id whose provider prefix does not match providerId", () => {
+    const store = new InstallationSettingsStore({ kv: realKv() })
+    expect(() =>
+      store.set(DISCOVERED_MODELS_KEY, [
+        { ...entry, id: "other-provider/reasoner" },
+      ]),
+    ).toThrow(InstallationSettingRejectedError)
+  })
+
+  it("refuses a rogue field — a discovered entry never carries a baseUrl or credential", () => {
+    const store = new InstallationSettingsStore({ kv: realKv() })
+    expect(() =>
+      store.set(DISCOVERED_MODELS_KEY, [
+        { ...entry, baseUrl: "http://127.0.0.1:1234/v1" } as never,
+      ]),
+    ).toThrow(InstallationSettingRejectedError)
+    expect(() =>
+      store.set(DISCOVERED_MODELS_KEY, [
+        { ...entry, apiKeyEnv: "SIGIL_MODEL_X" } as never,
+      ]),
+    ).toThrow(InstallationSettingRejectedError)
+  })
+
+  it("refuses duplicate ids in one write", () => {
+    const store = new InstallationSettingsStore({ kv: realKv() })
+    expect(() =>
+      store.set(DISCOVERED_MODELS_KEY, [entry, entry]),
+    ).toThrow(InstallationSettingRejectedError)
+  })
+
+  it("reads an invalid stored record as an empty cache", () => {
+    const kv = realKv()
+    kv.set(DISCOVERED_MODELS_KEY, "not a list")
+    expect(
+      new InstallationSettingsStore({ kv }).get(DISCOVERED_MODELS_KEY),
+    ).toEqual([])
   })
 })

@@ -39,6 +39,25 @@ export interface ModelEndpointRecord {
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from the fixture's agent.model. */
   isDeploymentDefault: boolean
+  /**
+   * True when Eve's live catalog fetch reported this model and the fixture
+   * did not author it (MDL.2). Absent for every authored row.
+   */
+  discovered?: boolean
+}
+
+/**
+ * Whether Eve attempted a live catalog fetch for a provider, and what
+ * happened. Present only when discovery was attempted — a provider with no
+ * catalog endpoint (no `baseUrl`, or a kind discovery does not support) never
+ * carries this field, so its absence means "not applicable", never "silently
+ * failed".
+ */
+export interface ModelCatalogStatus {
+  /** ISO timestamp of the attempt, success or failure. */
+  checkedAt: string
+  /** Operator-facing reason discovery could not add anything this time. */
+  error?: string
 }
 
 /**
@@ -56,6 +75,8 @@ export interface ModelProviderRecord {
   enabled: boolean
   credential: ModelEndpointCredentialStatus
   models: readonly ModelEndpointRecord[]
+  /** Present only when Eve attempted a live catalog fetch for this provider. */
+  catalog?: ModelCatalogStatus
 }
 
 export interface ModelEndpointInventory {

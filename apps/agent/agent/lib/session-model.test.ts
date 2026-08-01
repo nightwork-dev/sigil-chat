@@ -60,6 +60,83 @@ describe("preset lookup", () => {
     expect(findModelPreset(AGENT, "codex/luna")?.model).toBe("gpt-5.6-luna")
     expect(findModelPreset(AGENT, "nope")).toBeUndefined()
   })
+
+  // MDL.2: a model Eve's catalog discovery found but the fixture never
+  // authored resolves by borrowing its PROVIDER's transport facts from the
+  // fixture — the discovery cache itself carries no baseUrl or credential.
+  describe("a model from the discovery cache", () => {
+    const discovered = [
+      {
+        id: "deepseek/reasoner",
+        providerId: "deepseek",
+        model: "deepseek-reasoner",
+        label: "deepseek-reasoner",
+      },
+    ]
+
+    it("resolves against its authored provider's baseUrl and credential", () => {
+      const preset = findModelPreset(AGENT, "deepseek/reasoner", discovered)
+      expect(preset).toMatchObject({
+        id: "deepseek/reasoner",
+        provider: "openai-compatible",
+        model: "deepseek-reasoner",
+        baseUrl: "https://api.deepseek.com/v1",
+        apiKeyEnv: "SIGIL_MODEL_DEEPSEEK_API_KEY",
+        contextWindowTokens: 65_536,
+        isDeploymentDefault: false,
+      })
+    })
+
+    it("lets an authored preset with the same id win, unreachable in practice but not a crash", () => {
+      // "codex/luna" IS authored — a discovery-cache entry that somehow named
+      // it must never shadow the fixture's own row.
+      const preset = findModelPreset(AGENT, "codex/luna", [
+        { id: "codex/luna", providerId: "codex", model: "impostor", label: "x" },
+      ])
+      expect(preset?.model).toBe("gpt-5.6-luna")
+    })
+
+    it("refuses to resolve when the entry's provider is no longer in the fixture", () => {
+      expect(
+        findModelPreset(AGENT, "ghost/model", [
+          { id: "ghost/model", providerId: "ghost", model: "x", label: "x" },
+        ]),
+      ).toBeUndefined()
+    })
+
+    it("refuses to resolve when the provider has since been disabled", () => {
+      const agentWithDisabledProvider: SigilAgentConfig = {
+        ...AGENT,
+        providers: AGENT.providers?.map((provider) =>
+          provider.id === "deepseek" ? { ...provider, enabled: false } : provider,
+        ),
+      }
+      expect(
+        findModelPreset(agentWithDisabledProvider, "deepseek/reasoner", discovered),
+      ).toBeUndefined()
+    })
+
+    it("actually resolves and runs through resolveSessionModel, not just the lookup", () => {
+      const selection = resolveSessionModel(
+        AGENT,
+        {
+          presetId: "deepseek/reasoner",
+          provider: "openai-compatible",
+          modelId: "deepseek-reasoner",
+        },
+        {
+          env: { SIGIL_MODEL_DEEPSEEK_API_KEY: "sk-test" },
+          discovered,
+        },
+      )
+      expect(selection).toMatchObject({
+        presetId: "deepseek/reasoner",
+        provider: "openai-compatible",
+        modelId: "deepseek-reasoner",
+        modelContextWindowTokens: 65_536,
+      })
+    })
+  })
 })
 
 describe("reading the bound model from verified attributes", () => {

@@ -95,6 +95,26 @@ describe("applyOwnerModelEnablement", () => {
     expect(deps.store.get(ENABLED_MODELS_KEY)).toEqual([])
   })
 
+  // MDL.2c: the whole reason `presets()` is `allModelPresets` in production
+  // rather than `authoredModelPresets` — without a discovered candidate in
+  // this list, enabling one would always hit the "not authored" refusal
+  // below, and Settings → Models would render a toggle that can never
+  // succeed.
+  it("lets the owner enable a model that only exists because discovery found it", () => {
+    const deps = dependencies()
+    deps.presets = () => [
+      ...dependencies().presets(),
+      { id: "deepseek/reasoner", enabled: true, isDeploymentDefault: false },
+    ]
+    expect(
+      applyOwnerModelEnablement(
+        session("owner"),
+        { presetIds: ["deepseek/reasoner"], enabled: true },
+        deps,
+      ),
+    ).toEqual(["deepseek/reasoner"])
+  })
+
   it("refuses an id this deployment does not author", () => {
     const deps = dependencies()
     expect(() =>
