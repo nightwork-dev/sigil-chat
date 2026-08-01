@@ -9,11 +9,14 @@
 
 import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"
 import {
-  DEPLOYMENT_DEFAULT_PRESET_ID,
   loadSigilConfigFixture,
   normalizeSigilAgentModelPresets,
   type NormalizedSigilAgentModelPreset,
 } from "@workspace/runtime-env/config"
+
+import { ENABLED_MODELS_KEY } from "./installation-settings/registry"
+import { installationSettings } from "./installation-settings/store"
+import { isModelEnabledForNewSessions } from "./model-enablement"
 
 const { value: sigilConfig } = await loadSigilConfigFixture()
 
@@ -25,35 +28,33 @@ export function authoredModelPresets(): NormalizedSigilAgentModelPreset[] {
 /**
  * Whether a preset may be selected for a NEW session.
  *
- * ALLOW-LIST SEAM (David, 2026-07-31: "New should default to disabled — so
+ * ALLOW-LIST (David, 2026-07-31: "New should default to disabled — so
  * something like Fable gets added and suddenly users can burn through
- * quota"). The intended policy is that nothing is selectable until an owner
- * explicitly enables it, with the deployment default implicitly enabled so a
- * fresh install can still create sessions.
+ * quota"). Nothing is selectable until an owner explicitly enables it, with
+ * the deployment default implicitly enabled so a fresh install can still
+ * create sessions. The set is installation-scoped, so this verdict is the
+ * same for every principal — that is what makes it a spending control rather
+ * than a per-account preference.
  *
- * That policy is NOT yet enforced here, deliberately and visibly: the
- * owner-writable enabled set and its toggle UI have not landed. Enforcing
- * default-disabled before the toggle exists would make every non-default
- * preset permanently unreachable — a worse failure than the one the policy
- * prevents, and one no user could resolve. So this round admits any authored
- * preset, and the policy lands with its control in the same change.
- *
- * When that happens, only this function's body changes. Callers already treat
- * undefined as "refused", so the create path, its validation, and its tests
- * do not move.
+ * `enabledIds` is a parameter with a default rather than a lookup inside the
+ * body so the policy can be exercised against a known set; production callers
+ * never pass it and therefore cannot pass a wider one.
  */
 export function isSelectableModelPreset(
   preset: NormalizedSigilAgentModelPreset,
+  enabledIds: readonly string[] = installationSettings().get(
+    ENABLED_MODELS_KEY,
+  ),
 ): boolean {
-  if (preset.id === DEPLOYMENT_DEFAULT_PRESET_ID) return true
-  return true
+  return isModelEnabledForNewSessions(preset, enabledIds)
 }
 
 /**
  * Resolve a requested preset id into the immutable snapshot to bind.
  *
- * Returns undefined for unknown ids and for ids that are not selectable —
- * one rejection path, by construction.
+ * Returns undefined for unknown ids, for ids the fixture author disabled, and
+ * for ids no owner has enabled — one rejection path, by construction, so a
+ * hand-crafted create request cannot tell them apart or slip between them.
  */
 export function resolveSelectableModelPreset(
   presetId: string,
