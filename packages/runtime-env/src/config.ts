@@ -29,6 +29,25 @@ export interface SigilAgentModelObjectConfig {
 
 export type SigilAgentModelConfig = string | SigilAgentModelObjectConfig;
 
+/**
+ * A named, fixture-authored model entry.
+ *
+ * This is the seam that keeps *vendors* out of TypeScript. `provider` names a
+ * transport kind the resolver already knows how to build (`codex`,
+ * `openai-compatible`, `openrouter`, `anthropic`); everything that
+ * distinguishes DeepSeek from Moonshot from a local LM Studio server — base
+ * URL, credential variable name, default model id, context window — is data in
+ * this record. Adding a hosted OpenAI-compatible vendor is a fixture edit plus
+ * a credential, never a new enum member or a code branch.
+ */
+export interface SigilAgentModelPresetConfig
+  extends SigilAgentModelObjectConfig {
+  /** Stable slug used by selection UI and per-session bindings. */
+  id: string;
+  /** Human-facing name shown in the endpoint list. */
+  label: string;
+}
+
 export interface NormalizedSigilAgentModelConfig {
   provider: SigilAgentModelProvider;
   model: string;
@@ -38,8 +57,27 @@ export interface NormalizedSigilAgentModelConfig {
   source: "bare-slug" | "object";
 }
 
+export interface NormalizedSigilAgentModelPreset
+  extends NormalizedSigilAgentModelConfig {
+  id: string;
+  label: string;
+  /**
+   * True for the single entry derived from `agent.model` — the model Eve
+   * resolves at startup today. Exactly one normalized preset carries it.
+   */
+  isDeploymentDefault: boolean;
+}
+
+/** Reserved id for the entry synthesized from `agent.model`. */
+export const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default";
+
+export interface SigilAgentConfig {
+  model: SigilAgentModelConfig;
+  presets?: SigilAgentModelPresetConfig[];
+}
+
 export interface SigilProductConfig {
-  agent: { model: SigilAgentModelConfig };
+  agent: SigilAgentConfig;
   auth: { registration: "closed" | "open" };
   branding: {
     accent: string;
@@ -87,6 +125,43 @@ export function normalizeSigilAgentModelConfig(
       : {}),
     source: "object",
   };
+}
+
+/**
+ * The full selectable model inventory for a deployment, deployment default
+ * first.
+ *
+ * The default is synthesized from `agent.model` rather than required as a
+ * preset so an existing fixture that never declares `presets` still produces a
+ * one-row inventory — the list UI is never empty, and the entry Eve actually
+ * runs today is always identifiable by `isDeploymentDefault`.
+ */
+export function normalizeSigilAgentModelPresets(
+  agent: SigilAgentConfig,
+): NormalizedSigilAgentModelPreset[] {
+  const fallback = normalizeSigilAgentModelConfig(agent.model);
+  return [
+    {
+      ...fallback,
+      id: DEPLOYMENT_DEFAULT_PRESET_ID,
+      label: deploymentDefaultLabel(fallback),
+      isDeploymentDefault: true,
+    },
+    ...(agent.presets ?? []).map((preset) => ({
+      ...normalizeSigilAgentModelConfig(preset),
+      id: preset.id,
+      label: preset.label,
+      isDeploymentDefault: false,
+    })),
+  ];
+}
+
+function deploymentDefaultLabel(
+  model: NormalizedSigilAgentModelConfig,
+): string {
+  return model.provider === "codex"
+    ? `${model.model} (Codex subscription)`
+    : `${model.model} (${model.provider})`;
 }
 
 function defaultConfigPath(): string {
@@ -146,6 +221,7 @@ function validateConfig(value: unknown): StandardSchemaV1Issue[] {
   const imageEdit = requireRecord(value, "imageEdit", issues);
 
   requireModelConfig(agent?.model, issues, ["agent", "model"]);
+  requireModelPresets(agent?.presets, issues, ["agent", "presets"]);
   const registration = auth?.registration;
   if (registration !== "closed" && registration !== "open") {
     issues.push({
@@ -259,6 +335,56 @@ function requireModelConfig(
   issues.push({ message: "must be a non-empty slug without whitespace", path });
 }
 
+/**
+ * Presets are optional. When present each entry must carry a unique routable
+ * id and a label on top of a valid model config — the fixture is the only
+ * place a vendor is ever named, so a malformed entry has to fail here rather
+ * than surface as an unselectable row in the endpoint list.
+ */
+function requireModelPresets(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (candidate === undefined) return;
+  if (!Array.isArray(candidate)) {
+    issues.push({ message: "must be a list of model presets", path });
+    return;
+  }
+  const seen = new Set<string>();
+  candidate.forEach((entry, index) => {
+    const entryPath = [...path, String(index)];
+    if (!isRecord(entry)) {
+      issues.push({ message: "must be an object", path: entryPath });
+      return;
+    }
+    const id = entry.id;
+    const idPath = [...entryPath, "id"];
+    if (!isPresetId(id)) {
+      issues.push({
+        message: "must be a lowercase slug (letters, digits, hyphens)",
+        path: idPath,
+      });
+    } else if (id === DEPLOYMENT_DEFAULT_PRESET_ID) {
+      issues.push({
+        message: `must not be "${DEPLOYMENT_DEFAULT_PRESET_ID}" — that id is reserved for agent.model`,
+        path: idPath,
+      });
+    } else if (seen.has(id)) {
+      issues.push({ message: "must be unique across presets", path: idPath });
+    } else {
+      seen.add(id);
+    }
+    if (!isNonEmptyText(entry.label)) {
+      issues.push({
+        message: "must be a non-empty string",
+        path: [...entryPath, "label"],
+      });
+    }
+    requireModelConfig(entry, issues, entryPath);
+  });
+}
+
 function isSupportedModelProvider(
   value: unknown,
 ): value is SigilAgentModelProvider {
@@ -267,6 +393,12 @@ function isSupportedModelProvider(
     value === "openai-compatible" ||
     value === "openrouter" ||
     value === "anthropic"
+  );
+}
+
+function isPresetId(value: unknown): value is string {
+  return (
+    typeof value === "string" && /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(value)
   );
 }
 

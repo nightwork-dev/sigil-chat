@@ -39,7 +39,7 @@ export interface ResolveSigilAgentModelOptions {
   readonly fetch?: typeof fetch
 }
 
-const DEFAULT_CONTEXT_WINDOW_TOKENS = 200_000
+export const DEFAULT_CONTEXT_WINDOW_TOKENS = 200_000
 
 export function resolveSigilAgentModel(
   config: SigilAgentModelConfig,
@@ -116,6 +116,40 @@ export async function hasConfiguredModelCredential(
     return options.hasCodexModelAuth?.() ?? false
   }
   return hasConfiguredCredential(model, options.env)
+}
+
+export interface ModelCredentialRequirement {
+  /**
+   * Environment variable this entry's credential is read from. A NAME, never
+   * a value — this is safe to project to an operator UI. `undefined` means the
+   * credential does not come from the environment (Codex reads the local
+   * `codex login` session) or none is configured at all.
+   */
+  readonly envName?: string
+  /** Whether the provider refuses to resolve without that credential. */
+  readonly required: boolean
+}
+
+/**
+ * Which credential an entry needs, without reading it.
+ *
+ * `hasConfiguredModelCredential` answers "is it there?"; this answers "what is
+ * it, and does this provider insist on it?" so a settings surface can say
+ * "SIGIL_MODEL_DEEPSEEK_API_KEY — missing" instead of an unexplained red mark.
+ * Both derive the env name from the same policy below, so the UI can never
+ * name a variable the resolver would not actually read.
+ */
+export function describeModelCredentialRequirement(
+  config: SigilAgentModelConfig,
+): ModelCredentialRequirement {
+  const model = normalizeSigilAgentModelConfig(config)
+  if (model.provider === "codex") return { required: true }
+  if (model.provider === "openai-compatible") {
+    return model.apiKeyEnv === undefined
+      ? { required: false }
+      : { envName: model.apiKeyEnv, required: true }
+  }
+  return { envName: apiKeyEnvForModel(model), required: true }
 }
 
 function displayModelId(model: NormalizedSigilAgentModelConfig): string {

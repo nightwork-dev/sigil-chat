@@ -81,9 +81,24 @@ hosted provider such as `openrouter` or `anthropic` through the official AI SDK
 provider packages. Provider secrets stay in environment variables named by the
 fixture or by the default `SIGIL_MODEL_<PROVIDER>_API_KEY`; if an
 OpenAI-compatible fixture names `apiKeyEnv`, Eve also requires that key before
-startup. Secrets are never stored in fixtures. The web and agent processes share a private
-`SIGIL_AGENT_BINDING_SECRET` used only for signed session and scope bindings;
-local development generates it automatically.
+startup. Secrets are never stored in fixtures. `agent.presets` names additional
+selectable models as fixture data, which the owner-only Settings → Models
+surface lists with credential PRESENCE only — Eve answers it with booleans and
+environment variable names, never a value.
+
+The web and agent processes share a private `SIGIL_AGENT_BINDING_SECRET` used
+for signed session and scope bindings, and to authorize the two internal
+model-endpoint routes; local development generates it automatically. Those
+routes are the one place the secret authorizes an outbound fetch: the owner can
+ask Eve to probe a model endpoint's `/v1/models` for reachability. Owner role
+is a web-app concept Eve cannot verify, so both routes require the secret as
+the web server's assertion that it already checked, and both refuse without
+it. A probe request carries only a URL; which credential Eve attaches is
+decided from `agent.presets` by matching origin, so a caller cannot aim a
+configured key at a host of its choosing. The probe denies link-local and
+cloud-metadata addresses and does not follow redirects; loopback and RFC1918
+stay reachable by design, so Eve's own network reach is the boundary that
+matters. See `docs/guides/configuration.md` for the full target policy.
 
 The web process owns human authentication. Local development keeps the database
 and owner-only auth secret under the worktree's single `SIGIL_DATA_DIR`.
