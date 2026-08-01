@@ -20,6 +20,10 @@ import { Label } from "@workspace/ui/components/label"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Alert, AlertDescription } from "@workspace/ui/components/alert"
 
+import {
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 import { authClient } from "@/lib/auth/client"
 import type { CurrentSessionUser } from "@/lib/auth/route-guard"
 import { isAllowedUsername, normalizeUsername } from "@/lib/auth/username-rules"
@@ -95,7 +99,7 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
   }
 
   return (
-    <div className="flex max-w-xl flex-col gap-6 p-4">
+    <SettingsPanel width="xl">
       <section className="flex flex-col gap-3">
         <SectionHeader>Profile</SectionHeader>
 
@@ -177,7 +181,7 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
         </Field>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <SettingsSection className="gap-2">
         <SectionHeader>Session</SectionHeader>
         <Button
           variant="destructive"
@@ -188,7 +192,7 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
         >
           {signingOut ? "Signing out…" : "Sign out"}
         </Button>
-      </section>
-    </div>
+      </SettingsSection>
+    </SettingsPanel>
   )
 }

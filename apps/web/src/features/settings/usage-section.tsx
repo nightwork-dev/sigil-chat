@@ -4,6 +4,7 @@
 // block per breakdown axis. No charting library — the story asks for
 // dashboards later (OBS.1); this is the accounting record itself.
 
+import { FieldDescription, FieldError } from "@workspace/ui/components/field"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import {
   Table,
@@ -23,7 +24,6 @@ import {
   type UsageAggregateEntry,
 } from "@/lib/usage"
 import {
-  SettingsNote,
   SettingsPanel,
   SettingsSection,
 } from "@/features/settings/settings-panel"
@@ -34,16 +34,16 @@ export function UsageSection() {
   if (usage.isPending) {
     return (
       <SettingsPanel width="3xl">
-        <SettingsNote>Loading usage…</SettingsNote>
+        <FieldDescription>Loading usage…</FieldDescription>
       </SettingsPanel>
     )
   }
   if (usage.isError) {
     return (
       <SettingsPanel width="3xl">
-        <SettingsNote tone="error">
+        <FieldError>
           The agent runtime did not answer. Usage is unavailable until it does.
-        </SettingsNote>
+        </FieldError>
       </SettingsPanel>
     )
   }
@@ -56,7 +56,7 @@ export function UsageSection() {
       <SettingsSection>
         <SectionHeader>Usage</SectionHeader>
         <TotalsRow bucket={aggregates.app} />
-        <SettingsNote>
+        <FieldDescription>
           Every row below is metered from provider-reported token counts on
           completed turns. A turn the provider reported no usage for counts
           toward turns, not tokens — it is never estimated.{" "}
@@ -66,7 +66,7 @@ export function UsageSection() {
               {aggregates.app.turnCount} recorded turns had no usage reported.
             </>
           ) : null}
-        </SettingsNote>
+        </FieldDescription>
       </SettingsSection>
 
       <BreakdownSection
@@ -153,7 +153,7 @@ function BreakdownSection({
     <SettingsSection>
       <SectionHeader>{title}</SectionHeader>
       {entries.length === 0 ? (
-        <SettingsNote>No usage recorded yet.</SettingsNote>
+        <FieldDescription>No usage recorded yet.</FieldDescription>
       ) : (
         <Table>
           <TableHeader>

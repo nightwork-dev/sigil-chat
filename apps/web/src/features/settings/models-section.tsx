@@ -25,6 +25,7 @@ import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { CodeBlock } from "@workspace/ui/components/code-block"
+import { FieldDescription, FieldError } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
@@ -61,7 +62,6 @@ import {
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 import {
   SettingsAsyncState,
-  SettingsNote,
   SettingsPanel,
   SettingsSection,
 } from "@/features/settings/settings-panel"
@@ -141,11 +141,11 @@ export function ModelsSection({ userId }: { userId: string }) {
                   isModelEnabledForNewSessions(model, enabledIds),
               ),
             ) ? (
-              <SettingsNote tone="error">
+              <FieldError>
                 New chats are set to{" "}
                 <span className="font-mono">{preferredId}</span>, which is no
                 longer available. Choose another to start chats again.
-              </SettingsNote>
+              </FieldError>
             ) : null}
             <div className="divide-y divide-border">
               {providers.map((provider: ModelProviderRecord) => (
@@ -159,20 +159,20 @@ export function ModelsSection({ userId }: { userId: string }) {
               ))}
             </div>
             {setEnabled.isError ? (
-              <SettingsNote tone="error">
+              <FieldError>
                 {setEnabled.error instanceof Error
                   ? setEnabled.error.message
                   : "That change was refused."}
-              </SettingsNote>
+              </FieldError>
             ) : null}
-            <SettingsNote>
+            <FieldDescription>
               Providers come from{" "}
               <code className="font-mono">agent.providers</code> in the
               application fixture; a model becomes available to new chats only
               when you turn it on here, and stays unavailable until you do.
               Credentials stay in the agent runtime&apos;s environment — this
               page can see whether a variable is set, never what it contains.
-            </SettingsNote>
+            </FieldDescription>
           </>
         </SettingsAsyncState>
       </SettingsSection>

@@ -9,6 +9,7 @@
 // provider/model hierarchy in models-section.tsx, because a flag has no
 // grouping structure to reflect.
 
+import { FieldDescription, FieldError } from "@workspace/ui/components/field"
 import { Label } from "@workspace/ui/components/label"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Switch } from "@workspace/ui/components/switch"
@@ -16,7 +17,6 @@ import { Switch } from "@workspace/ui/components/switch"
 import { useFeatureFlags, useSetFeatureFlag } from "@/lib/feature-flags"
 import {
   SettingsAsyncState,
-  SettingsNote,
   SettingsPanel,
   SettingsSection,
 } from "@/features/settings/settings-panel"
@@ -72,19 +72,19 @@ export function FlagsSection() {
         </SettingsAsyncState>
 
         {setFlag.isError ? (
-          <SettingsNote tone="error">
+          <FieldError>
             {setFlag.error instanceof Error
               ? setFlag.error.message
               : "That change was refused."}
-          </SettingsNote>
+          </FieldError>
         ) : null}
 
-        <SettingsNote>
+        <FieldDescription>
           Flags are declared in{" "}
           <code className="font-mono">lib/feature-flags/registry.ts</code> and
           take effect for every principal immediately — no deploy required. A
           flag id nobody declared always evaluates default-off.
-        </SettingsNote>
+        </FieldDescription>
       </SettingsSection>
     </SettingsPanel>
   )

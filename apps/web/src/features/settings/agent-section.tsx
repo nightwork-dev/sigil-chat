@@ -14,6 +14,7 @@ import {
   SearchIcon,
 } from "lucide-react"
 
+import { FieldDescription } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
@@ -50,7 +51,6 @@ import { groupApplicationTools } from "@/lib/capability-model"
 import { useSetUserSetting } from "@/lib/user-settings"
 import {
   SettingsAsyncState,
-  SettingsNote,
   SettingsPanel,
   SettingsSection,
 } from "@/features/settings/settings-panel"
@@ -214,11 +214,11 @@ export function AgentSection({ userId }: { userId: string }) {
       <SettingsSection layout="row">
         <div className="flex flex-col gap-0.5">
           <Label htmlFor="speak-replies">Speak replies aloud</Label>
-          <SettingsNote>
+          <FieldDescription>
             Read each of Eve&apos;s replies once the turn finishes. The written
             transcript is unchanged, and tool calls, reasoning, and approvals
             are never spoken.
-          </SettingsNote>
+          </FieldDescription>
         </div>
         <Switch
           checked={localSpeakReplies}
@@ -231,10 +231,10 @@ export function AgentSection({ userId }: { userId: string }) {
       <SettingsSection>
         <div className="flex flex-col gap-1">
           <SectionHeader>Tool permissions</SectionHeader>
-          <SettingsNote>
+          <FieldDescription>
             Per-tool consent defaults are convenience preferences. Server policy
             still enforces authorization and always denies exec-tier tools.
-          </SettingsNote>
+          </FieldDescription>
         </div>
 
         <SettingsAsyncState

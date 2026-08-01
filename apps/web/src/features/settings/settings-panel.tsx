@@ -1,14 +1,16 @@
-// The scaffolding every settings tab shares: the reading-width column, the
-// bordered section block, and the three notes a section shows instead of its
-// content (loading, unavailable, nothing here yet).
+// The two things every settings tab shares that packages/ui does not already
+// answer: how wide a tab's reading column is, and what a section shows while
+// its query is still settling.
 //
-// Extracted because each tab had rebuilt them by hand, so the same block
-// carried slightly different classes in different tabs and a new tab had to
-// guess which copy was current. Nothing here decides anything — it is layout
-// and the one type scale those notes are written at.
+// The bordered block itself is no longer minted here — that is Card, and a
+// section is now Card with the settings page's padding. Supporting and error
+// lines are FieldDescription and FieldError. Both were hand-rolled in an
+// earlier pass; this file only keeps what is genuinely this page's own.
 
 import type { ReactNode } from "react"
 
+import { Card } from "@workspace/ui/components/card"
+import { FieldDescription, FieldError } from "@workspace/ui/components/field"
 import { cn } from "@workspace/ui/lib/utils"
 
 const PANEL_WIDTH = {
@@ -37,7 +39,7 @@ export function SettingsPanel({
 }
 
 /**
- * One bordered block inside a panel.
+ * One block inside a panel — a Card at the settings page's density.
  *
  * `stack` is the default: a heading over its controls. `row` is the single
  * setting whose control sits opposite its label.
@@ -52,46 +54,26 @@ export function SettingsSection({
   children: ReactNode
 }) {
   return (
-    <section
+    <Card
+      size="sm"
       className={cn(
-        "rounded-lg border border-border p-3",
-        layout === "row"
-          ? "flex items-center justify-between gap-4"
-          : "flex flex-col gap-3",
+        "px-3",
+        layout === "row" && "flex-row items-center justify-between gap-4",
         className,
       )}
     >
       {children}
-    </section>
-  )
-}
-
-/** A supporting line inside a section. `error` states what is not available. */
-export function SettingsNote({
-  tone = "muted",
-  className,
-  children,
-}: {
-  tone?: "muted" | "error"
-  className?: string
-  children: ReactNode
-}) {
-  return (
-    <p
-      className={cn(
-        "text-xs",
-        tone === "error" ? "text-destructive" : "text-muted-foreground",
-        className,
-      )}
-    >
-      {children}
-    </p>
+    </Card>
   )
 }
 
 /**
- * A section's content once its query has settled, or the note that stands in
+ * A section's content once its query has settled, or the line that stands in
  * for it.
+ *
+ * The choice being made here is this page's, not a general one: a settings
+ * section that is still loading shows one quiet line rather than a spinner or
+ * a skeleton, because a tab full of shimmering blocks reads as broken.
  *
  * `isEmpty` is the caller's own question — "settled, but there is nothing to
  * show" is domain-specific, and only the caller knows which field answers it.
@@ -111,8 +93,8 @@ export function SettingsAsyncState({
   empty?: ReactNode
   children: ReactNode
 }) {
-  if (query.isPending) return <SettingsNote>{pending}</SettingsNote>
-  if (query.isError) return <SettingsNote tone="error">{error}</SettingsNote>
-  if (isEmpty) return <SettingsNote>{empty}</SettingsNote>
+  if (query.isPending) return <FieldDescription>{pending}</FieldDescription>
+  if (query.isError) return <FieldError>{error}</FieldError>
+  if (isEmpty) return <FieldDescription>{empty}</FieldDescription>
   return <>{children}</>
 }

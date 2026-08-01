@@ -8,10 +8,19 @@ import { LaptopIcon, MonitorXIcon } from "lucide-react"
 
 import { Alert, AlertDescription } from "@workspace/ui/components/alert"
 import { Button } from "@workspace/ui/components/button"
-import { Field, FieldLabel } from "@workspace/ui/components/field"
+import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+} from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 
+import {
+  SettingsAsyncState,
+  SettingsPanel,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 import { authClient } from "@/lib/auth/client"
 import { useAuthAccounts } from "@/lib/auth/accounts"
 import { useAuthSessions, useRevokeSession } from "@/lib/auth/sessions"
@@ -126,7 +135,9 @@ function ChangePasswordForm() {
           aria-invalid={mismatch}
         />
         {mismatch ? (
-          <p className="text-xs text-destructive">Passwords don't match.</p>
+          <FieldDescription className="text-destructive">
+            Passwords don&apos;t match.
+          </FieldDescription>
         ) : null}
       </Field>
       {error ? (
@@ -158,63 +169,54 @@ function SessionsList({ userId }: { userId: string }) {
   const sessionsQuery = useAuthSessions(userId)
   const revokeSession = useRevokeSession(userId)
 
-  if (sessionsQuery.isLoading) {
-    return <p className="text-xs text-muted-foreground">Loading sessions…</p>
-  }
-
-  if (sessionsQuery.isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          Could not load sessions — sign in again to view this list.
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
   const sessions = sessionsQuery.data ?? []
 
   return (
-    <ul className="flex flex-col gap-2">
-      {sessions.map((session) => (
-        <li
-          key={session.id}
-          className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
-        >
-          <div className="flex items-start gap-2.5 min-w-0">
-            <LaptopIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="flex items-center gap-1.5 text-xs font-medium">
-                {deviceLabel(session.userAgent)}
-                {formatIpAddress(session.ipAddress) ? (
-                  <span className="font-mono text-muted-foreground">
-                    {formatIpAddress(session.ipAddress)}
-                  </span>
-                ) : null}
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                Created {formatTimestamp(session.createdAt)} · Last active{" "}
-                {formatTimestamp(session.updatedAt)} · Expires{" "}
-                {formatTimestamp(session.expiresAt)}
-              </span>
-            </div>
-          </div>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Revoke session"
-            title="Revoke session"
-            disabled={revokeSession.isPending}
-            onClick={() => revokeSession.mutate(session.token)}
+    <SettingsAsyncState
+      query={sessionsQuery}
+      pending="Loading sessions…"
+      error="Could not load sessions — sign in again to view this list."
+      isEmpty={sessions.length === 0}
+      empty="No active sessions."
+    >
+      <ul className="flex flex-col gap-2">
+        {sessions.map((session) => (
+          <li
+            key={session.id}
+            className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
           >
-            <MonitorXIcon />
-          </Button>
-        </li>
-      ))}
-      {sessions.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No active sessions.</p>
-      ) : null}
-    </ul>
+            <div className="flex items-start gap-2.5 min-w-0">
+              <LaptopIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="flex items-center gap-1.5 text-xs font-medium">
+                  {deviceLabel(session.userAgent)}
+                  {formatIpAddress(session.ipAddress) ? (
+                    <span className="font-mono text-muted-foreground">
+                      {formatIpAddress(session.ipAddress)}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Created {formatTimestamp(session.createdAt)} · Last active{" "}
+                  {formatTimestamp(session.updatedAt)} · Expires{" "}
+                  {formatTimestamp(session.expiresAt)}
+                </span>
+              </div>
+            </div>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Revoke session"
+              title="Revoke session"
+              disabled={revokeSession.isPending}
+              onClick={() => revokeSession.mutate(session.token)}
+            >
+              <MonitorXIcon />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </SettingsAsyncState>
   )
 }
 
@@ -235,22 +237,22 @@ export function SecuritySection({
   )
 
   return (
-    <div className="flex max-w-xl flex-col gap-6 p-4">
+    <SettingsPanel width="xl">
       <SignInMethods
         loginMethods={loginMethods}
         providerLinkError={providerLinkError}
         userId={userId}
       />
       {hasPassword ? (
-        <section className="rounded-lg border border-border p-3">
+        <SettingsSection>
           <ChangePasswordForm />
-        </section>
+        </SettingsSection>
       ) : null}
       <section className="flex flex-col gap-3">
         <SectionHeader>Active sessions</SectionHeader>
         <SessionsList userId={userId} />
       </section>
       {isOwner ? <InvitesSection /> : null}
-    </div>
+    </SettingsPanel>
   )
 }

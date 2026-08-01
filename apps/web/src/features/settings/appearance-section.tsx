@@ -4,13 +4,13 @@
 
 import { useEffect } from "react"
 
+import { FieldDescription } from "@workspace/ui/components/field"
 import { Switch } from "@workspace/ui/components/switch"
 import { Label } from "@workspace/ui/components/label"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 
 import { ThemePickerExpanded } from "@/components/theme-picker"
 import {
-  SettingsNote,
   SettingsPanel,
   SettingsSection,
 } from "@/features/settings/settings-panel"
@@ -54,10 +54,10 @@ export function AppearanceSection({ userId }: { userId: string }) {
       <SettingsSection layout="row">
         <div className="flex flex-col gap-0.5">
           <Label htmlFor="reduced-motion">Reduce motion</Label>
-          <SettingsNote>
+          <FieldDescription>
             Turn off color and layout transitions across the app, independent of
             your OS setting.
-          </SettingsNote>
+          </FieldDescription>
         </div>
         <Switch
           id="reduced-motion"

@@ -5,7 +5,13 @@ import { Alert, AlertDescription } from "@workspace/ui/components/alert"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
+import { FieldDescription } from "@workspace/ui/components/field"
 import { SectionHeader } from "@workspace/ui/components/section-header"
+
+import {
+  SettingsAsyncState,
+  SettingsSection,
+} from "@/features/settings/settings-panel"
 
 import {
   useAuthInvites,
@@ -42,13 +48,13 @@ export function InvitesSection() {
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+    <SettingsSection>
       <div className="flex items-center justify-between gap-3">
         <div>
           <SectionHeader>Invite links</SectionHeader>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <FieldDescription className="mt-1">
             Single-use member links that expire after 24 hours.
-          </p>
+          </FieldDescription>
         </div>
         <Button
           disabled={createInvite.isPending}
@@ -82,19 +88,15 @@ export function InvitesSection() {
         </div>
       ) : null}
 
-      {invites.isPending ? (
-        <p className="text-xs text-muted-foreground">Loading invitations…</p>
-      ) : invites.isError ? (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Could not load invitation history.
-          </AlertDescription>
-        </Alert>
-      ) : invites.data.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No invitations yet.</p>
-      ) : (
+      <SettingsAsyncState
+        query={invites}
+        pending="Loading invitations…"
+        error="Could not load invitation history."
+        isEmpty={(invites.data?.length ?? 0) === 0}
+        empty="No invitations yet."
+      >
         <ul className="flex flex-col gap-2">
-          {invites.data.map((invite) => (
+          {(invites.data ?? []).map((invite) => (
             <li
               className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5"
               key={invite.id}
@@ -131,8 +133,8 @@ export function InvitesSection() {
             </li>
           ))}
         </ul>
-      )}
-    </section>
+      </SettingsAsyncState>
+    </SettingsSection>
   )
 }
 
