@@ -34,7 +34,18 @@ function RoadmapRoute() {
   const { view, story, spec } = Route.useSearch()
   return (
     <RoadmapHub
-      key={`${view}:${story ?? ""}:${spec ?? ""}`}
+      // Each view remounts on the deep link IT consumes, and only that one.
+      // Board and Specs take their selection as initial state, so a changed
+      // `?story=`/`?spec=` has to remount them. The graph holds its own
+      // selection and writes the URL back — keying it on `?story=` tore the
+      // canvas down and refitted the viewport on every single node click.
+      key={
+        view === "graph"
+          ? "graph"
+          : view === "specs"
+            ? `specs:${spec ?? ""}`
+            : `board:${story ?? ""}`
+      }
       viewer={user}
       view={view}
       initialStoryId={story}

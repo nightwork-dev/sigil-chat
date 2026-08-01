@@ -12,8 +12,12 @@ import { useStories } from "@/lib/work-items"
 import { RoadmapGraphView } from "./roadmap-graph-view"
 import type { RoadmapGraphStory } from "./roadmap-graph"
 
-export function RoadmapGraphWorkspace() {
-  const navigate = useNavigate()
+export function RoadmapGraphWorkspace({
+  initialStoryId,
+}: {
+  initialStoryId?: string
+}) {
+  const navigate = useNavigate({ from: "/roadmap" })
   const stories = useStories()
 
   if (stories.isPending) {
@@ -55,8 +59,17 @@ export function RoadmapGraphWorkspace() {
   return (
     <RoadmapGraphView
       stories={graphStories}
+      initialStoryId={initialStoryId}
       onSelectStory={(storyId) =>
-        navigate({ to: "/roadmap", search: { view: "graph", story: storyId } })
+        // `replace` so tracing a chain doesn't bury the board under a dozen
+        // history entries; the canvas owns the selection, the URL just records
+        // it so a reload lands back on the same story.
+        void navigate({
+          search: storyId
+            ? { view: "graph" as const, story: storyId }
+            : { view: "graph" as const },
+          replace: true,
+        })
       }
     />
   )

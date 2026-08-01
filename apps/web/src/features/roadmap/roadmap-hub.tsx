@@ -59,7 +59,7 @@ export function RoadmapHub({
       {view === "specs" ? (
         <SpecsWorkspace initialSelectedId={initialSpecId} />
       ) : view === "graph" ? (
-        <RoadmapGraphWorkspace />
+        <RoadmapGraphWorkspace initialStoryId={initialStoryId} />
       ) : (
         <RoadmapWorkspace viewer={viewer} initialSelectedId={initialStoryId} />
       )}

@@ -50,6 +50,15 @@ export interface RoadmapGraphNode {
   blocks: readonly string[]
   /** True when something upstream is not shipped. */
   isBlocked: boolean
+  /**
+   * Blockers that exist in the roadmap but are not on the canvas, because a
+   * collapse hid them. The canvas shows this as a count on the node: a
+   * dependency the reader cannot see is worse than one they can, so the graph
+   * must never silently drop the edge and say nothing.
+   */
+  hiddenBlockers: number
+  /** Stories this one gates that the same collapse hid. */
+  hiddenBlocked: number
 }
 
 export interface RoadmapGraphEdge {
@@ -152,12 +161,12 @@ export function buildRoadmapGraph(
   const visibleIds = new Set(visible.map((story) => story.id))
 
   const depth = computeDepths(visible, blockedBy, visibleIds)
-  const lanes = assignLanes(visible, depth)
+  const lanes = assignLanes(visible, depth, blockedBy, visibleIds)
 
   const nodes: RoadmapGraphNode[] = visible.map((story) => {
-    const upstream = (blockedBy.get(story.id) ?? []).filter((id) =>
-      visibleIds.has(id),
-    )
+    const allUpstream = blockedBy.get(story.id) ?? []
+    const allDownstream = blocks.get(story.id) ?? []
+    const upstream = allUpstream.filter((id) => visibleIds.has(id))
     return {
       id: story.id,
       title: story.title,
@@ -169,7 +178,11 @@ export function buildRoadmapGraph(
       depth: depth.get(story.id) ?? 0,
       lane: lanes.get(story.id) ?? 0,
       blockedBy: upstream,
-      blocks: (blocks.get(story.id) ?? []).filter((id) => visibleIds.has(id)),
+      blocks: allDownstream.filter((id) => visibleIds.has(id)),
+      hiddenBlockers: allUpstream.length - upstream.length,
+      hiddenBlocked:
+        allDownstream.length -
+        allDownstream.filter((id) => visibleIds.has(id)).length,
       // Blocked means something upstream is not done — derived from the chain,
       // not from the story's own authored status, so a story nobody remembered
       // to mark blocked still reads as blocked.
@@ -235,15 +248,26 @@ function computeDepths(
 }
 
 /**
- * Row assignment within each depth column, grouped by epic.
+ * Row assignment within each depth column: epic bands, ordered by barycenter.
  *
- * Stories of one epic get adjacent rows so a lane reads as a band rather than
- * scattering across the column — the "cluster by epic" requirement, done in
- * layout rather than with a background box that would fight the edges.
+ * Two things have to be true at once. Stories of one epic get adjacent rows so
+ * a lane reads as a band rather than scattering down the column — that is the
+ * "cluster by epic" requirement, done in layout rather than with a background
+ * box that would fight the edges. And rows should sit near the work they
+ * depend on, or every long edge crosses every other one and the canvas reads
+ * as noise.
+ *
+ * So: epic grouping is the outer key and never broken, but the ORDER of the
+ * bands in a column, and the order of stories inside a band, comes from a
+ * left-to-right barycenter pass — the median row of a story's already-placed
+ * blockers. Column 0 has no blockers to average, so it falls back to the
+ * stable alphabetical order the tests pin.
  */
 function assignLanes(
   stories: readonly RoadmapGraphStory[],
   depth: ReadonlyMap<string, number>,
+  blockedBy: ReadonlyMap<string, string[]>,
+  visibleIds: ReadonlySet<string>,
 ): Map<string, number> {
   const epicOrder = [...new Set(stories.map((story) => story.epicId))].sort()
   const lanes = new Map<string, number>()
@@ -254,14 +278,60 @@ function assignLanes(
     if (bucket) bucket.push(story)
     else byDepth.set(column, [story])
   }
-  for (const bucket of byDepth.values()) {
+
+  /** Mean row of the blockers already placed to the left; null when none are. */
+  const barycenter = (story: RoadmapGraphStory): number | null => {
+    const placed = (blockedBy.get(story.id) ?? [])
+      .filter((id) => visibleIds.has(id))
+      .map((id) => lanes.get(id))
+      .filter((row): row is number => row !== undefined)
+    if (placed.length === 0) return null
+    return placed.reduce((total, row) => total + row, 0) / placed.length
+  }
+
+  for (const column of [...byDepth.keys()].sort((a, b) => a - b)) {
+    const bucket = byDepth.get(column) ?? []
+    const centers = new Map(
+      bucket.map((story) => [story.id, barycenter(story)]),
+    )
+    // An epic sits where its anchored stories sit. Epics with nothing to
+    // anchor to keep their alphabetical place, offset past the anchored ones
+    // so they settle at the bottom of the column instead of interleaving.
+    const epicCenter = new Map<string, number>()
+    for (const epicId of epicOrder) {
+      const anchored = bucket
+        .filter((story) => story.epicId === epicId)
+        .map((story) => centers.get(story.id))
+        .filter((center): center is number => center !== null && center !== undefined)
+      if (anchored.length > 0) {
+        epicCenter.set(
+          epicId,
+          anchored.reduce((total, center) => total + center, 0) /
+            anchored.length,
+        )
+      }
+    }
+
     bucket
       .slice()
-      .sort(
-        (left, right) =>
-          epicOrder.indexOf(left.epicId) - epicOrder.indexOf(right.epicId) ||
-          left.id.localeCompare(right.id),
-      )
+      .sort((left, right) => {
+        const leftEpic = epicCenter.get(left.epicId)
+        const rightEpic = epicCenter.get(right.epicId)
+        if (left.epicId !== right.epicId) {
+          if (leftEpic !== undefined && rightEpic !== undefined) {
+            if (leftEpic !== rightEpic) return leftEpic - rightEpic
+          } else if (leftEpic !== undefined) return -1
+          else if (rightEpic !== undefined) return 1
+          return epicOrder.indexOf(left.epicId) - epicOrder.indexOf(right.epicId)
+        }
+        const leftCenter = centers.get(left.id)
+        const rightCenter = centers.get(right.id)
+        if (leftCenter !== null && leftCenter !== undefined && rightCenter !== null && rightCenter !== undefined) {
+          if (leftCenter !== rightCenter) return leftCenter - rightCenter
+        } else if (leftCenter !== null && leftCenter !== undefined) return -1
+        else if (rightCenter !== null && rightCenter !== undefined) return 1
+        return left.id.localeCompare(right.id)
+      })
       .forEach((story, index) => lanes.set(story.id, index))
   }
   return lanes

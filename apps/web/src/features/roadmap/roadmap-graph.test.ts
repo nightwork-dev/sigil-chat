@@ -148,6 +148,34 @@ describe("collapsing shipped work", () => {
     )
     expect(graph.nodes).toHaveLength(2)
   })
+
+  it("counts the dependencies a collapse hid, in both directions", () => {
+    // MID is shipped but survives the collapse because it still gates LIVE.
+    // Its own blocker ROOT and its other dependent SIDE are shipped dead ends,
+    // so both leave the canvas — one on each side of MID.
+    const stories = [
+      story("ROOT", { status: "shipped" }),
+      story("MID", { status: "shipped", deps: ["ROOT"] }),
+      story("LIVE", { deps: ["MID"] }),
+      story("SIDE", { status: "shipped", deps: ["MID"] }),
+    ]
+
+    const collapsed = buildRoadmapGraph(stories, { collapseShipped: true })
+    const byId = new Map(collapsed.nodes.map((node) => [node.id, node]))
+
+    expect([...byId.keys()].sort()).toEqual(["LIVE", "MID"])
+    expect(byId.get("MID")?.hiddenBlockers).toBe(1)
+    expect(byId.get("MID")?.hiddenBlocked).toBe(1)
+    expect(byId.get("LIVE")?.hiddenBlockers).toBe(0)
+  })
+
+  it("reports nothing hidden when every dependency is on the canvas", () => {
+    const graph = buildRoadmapGraph([story("A"), story("B", { deps: ["A"] })])
+    for (const node of graph.nodes) {
+      expect(node.hiddenBlockers).toBe(0)
+      expect(node.hiddenBlocked).toBe(0)
+    }
+  })
 })
 
 describe("epic rollup and clustering", () => {
@@ -175,6 +203,25 @@ describe("epic rollup and clustering", () => {
     expect(byId.get("A1")?.depth).toBe(0)
     const aLanes = [byId.get("A1")!.lane, byId.get("A2")!.lane].sort()
     expect(Math.abs(aLanes[1]! - aLanes[0]!)).toBe(1)
+  })
+
+  it("orders epic bands by where their blockers sit, not alphabetically", () => {
+    // Column 0 is alphabetical: a=row 0, b=row 1, c=row 2. In column 1, epic
+    // "p" hangs off the BOTTOM of column 0 and epic "q" off the top, so
+    // alphabetical order would drag every edge across the column.
+    const graph = buildRoadmapGraph([
+      story("A1", { epicId: "a" }),
+      story("B1", { epicId: "b" }),
+      story("C1", { epicId: "c" }),
+      story("P1", { epicId: "p", deps: ["C1"] }),
+      story("P2", { epicId: "p", deps: ["C1"] }),
+      story("Q1", { epicId: "q", deps: ["A1"] }),
+    ])
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+
+    expect(byId.get("Q1")!.lane).toBeLessThan(byId.get("P1")!.lane)
+    // The band still holds together: p's two stories stay adjacent.
+    expect(Math.abs(byId.get("P1")!.lane - byId.get("P2")!.lane)).toBe(1)
   })
 })
 
