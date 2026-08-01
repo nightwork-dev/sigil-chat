@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest"
 
 import {
   blockingChain,
+  buildRoadmapCanvas,
   buildRoadmapEpicGraph,
   buildRoadmapGraph,
+  defaultExpandedEpics,
   rollupStatus,
   type RoadmapGraphStory,
   type StoryStatus,
@@ -263,5 +265,142 @@ describe("epic-level distillation (acceptance criterion 3)", () => {
       buildRoadmapGraph([story("A1", { epicId: "a" }), story("A2", { epicId: "a", deps: ["A1"] })]),
     )
     expect(epicGraph.edges).toEqual([])
+  })
+})
+
+describe("the unified canvas (epics and stories at one altitude)", () => {
+  // Two lanes, a cross-lane dependency, and a dependency internal to lane a.
+  const TWO_LANES: RoadmapGraphStory[] = [
+    story("A1", { epicId: "a", epicTitle: "Lane A" }),
+    story("A2", { epicId: "a", epicTitle: "Lane A", deps: ["A1"] }),
+    story("B1", { epicId: "b", epicTitle: "Lane B", deps: ["A2"] }),
+  ]
+
+  const canvas = (expanded: string[], stories = TWO_LANES) =>
+    buildRoadmapCanvas(buildRoadmapGraph(stories), {
+      expandedEpics: new Set(expanded),
+    })
+
+  it("draws story to story when both lanes are open", () => {
+    const result = canvas(["a", "b"])
+    const cross = result.edges.find((edge) => edge.id === "A2->B1")
+
+    expect(cross).toBeDefined()
+    expect(cross?.aggregated).toBe(false)
+    expect(result.stories.map((s) => s.id).sort()).toEqual(["A1", "A2", "B1"])
+  })
+
+  it("re-attaches a cross-lane dependency to the epic when one side collapses", () => {
+    const result = canvas(["b"])
+
+    // The edge must not vanish just because A2 is no longer drawn: it now
+    // runs from lane a itself to the story it still gates.
+    expect(result.edges.map((edge) => edge.id)).toEqual(["a->B1"])
+    expect(result.edges[0]?.aggregated).toBe(true)
+    expect(result.presentation.get("A2")).toBe("a")
+    expect(result.presentation.get("B1")).toBe("B1")
+  })
+
+  it("folds a dependency internal to a collapsed epic into that epic", () => {
+    const open = canvas(["a", "b"])
+    const shut = canvas(["b"])
+
+    expect(open.edges.map((edge) => edge.id)).toContain("A1->A2")
+    expect(shut.edges.map((edge) => edge.id)).not.toContain("A1->A2")
+  })
+
+  it("merges several dependencies onto one line and counts them", () => {
+    const result = canvas(
+      ["b"],
+      [
+        story("A1", { epicId: "a" }),
+        story("A2", { epicId: "a" }),
+        story("B1", { epicId: "b", deps: ["A1", "A2"] }),
+      ],
+    )
+
+    expect(result.edges).toHaveLength(1)
+    expect(result.edges[0]?.count).toBe(2)
+    expect([...(result.edges[0]?.underlying ?? [])].sort()).toEqual([
+      "A1->B1",
+      "A2->B1",
+    ])
+  })
+
+  it("keeps an aggregated edge binding while any dependency behind it gates", () => {
+    const result = canvas(
+      ["b"],
+      [
+        story("A1", { epicId: "a", status: "shipped" }),
+        story("A2", { epicId: "a", status: "in-progress" }),
+        story("B1", { epicId: "b", deps: ["A1", "A2"] }),
+      ],
+    )
+
+    expect(result.edges[0]?.binding).toBe(true)
+  })
+
+  it("lights a chain through a collapsed epic", () => {
+    const graph = buildRoadmapGraph(TWO_LANES)
+    const result = buildRoadmapCanvas(graph, { expandedEpics: new Set(["b"]) })
+    const chain = blockingChain(graph, "B1")
+
+    // A1 and A2 both gate B1 and both live in the collapsed lane, so the lane
+    // node is what the chain has to light.
+    const lit = new Set(
+      [...chain.highlighted].map((id) => result.presentation.get(id)),
+    )
+    expect(lit).toEqual(new Set(["a", "B1"]))
+    expect(
+      result.edges.filter((edge) =>
+        edge.underlying.some((id) => chain.edges.has(id)),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it("keeps epic layers still when a lane collapses", () => {
+    const open = canvas(["a", "b"])
+    const shut = canvas([])
+    const depthOf = (result: typeof open) =>
+      Object.fromEntries(result.epics.map((epic) => [epic.id, epic.depth]))
+
+    // Folding a lane up must not slide every other lane sideways.
+    expect(depthOf(shut)).toEqual(depthOf(open))
+    expect(depthOf(open)).toEqual({ a: 0, b: 1 })
+  })
+
+  it("columns an open epic by its own internal dependencies", () => {
+    const result = canvas(["a", "b"])
+    const byId = new Map(result.stories.map((s) => [s.id, s]))
+
+    // A2 depends on A1 inside the lane, so it sits one column right of it —
+    // and B1 starts its own lane's grid at column 0 rather than inheriting
+    // lane a's depth.
+    expect(byId.get("A1")?.column).toBe(0)
+    expect(byId.get("A2")?.column).toBe(1)
+    expect(byId.get("B1")?.column).toBe(0)
+    expect(result.epics.find((epic) => epic.id === "a")?.columns).toBe(2)
+  })
+
+  it("reports a collapsed lane's blocked stories so it can never look clear", () => {
+    const result = canvas([])
+    const laneB = result.epics.find((epic) => epic.id === "b")
+
+    expect(laneB?.blockedCount).toBe(1)
+    expect(result.epics.find((epic) => epic.id === "a")?.expanded).toBe(false)
+  })
+
+  it("opens the lanes someone marked blocked and no others", () => {
+    const graph = buildRoadmapGraph([
+      story("A1", { epicId: "a", status: "blocked" }),
+      story("A2", { epicId: "a", status: "idea" }),
+      story("B1", { epicId: "b", status: "in-progress" }),
+      // Derived blockage is common and cheap; it must not open a lane on its
+      // own, or most of the canvas opens and the lane-level read is lost.
+      story("C1", { epicId: "c", status: "ready", deps: ["B1"] }),
+    ])
+
+    expect(graph.nodes.find((node) => node.id === "C1")?.isBlocked).toBe(true)
+    expect([...defaultExpandedEpics(graph)]).toEqual(["a"])
   })
 })

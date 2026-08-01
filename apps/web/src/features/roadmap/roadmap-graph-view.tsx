@@ -1,30 +1,37 @@
 "use client"
 
-// Roadmap graph: the dependency reading of the same stories the board shows.
+// Roadmap graph: one canvas that answers both of David's questions at once.
 //
-// Row order and depth are computed in roadmap-graph.ts, not here — this file
-// turns that projection into pixels and owns interaction only. Two altitudes
-// over one data set: Stories (every story, epic-clustered) and Epics (one node
-// per lane, the "what gates what" answer). Selecting a node lights its full
-// blocking chain in both directions and dims everything else, which is the
-// one-glance requirement.
+// "What blocks this story" and "what gates this lane" used to be two views
+// behind a toggle. They are the same graph read at two altitudes, so there is
+// now one surface holding both: every epic is a container, either expanded
+// into its stories or collapsed to a rollup node, and a dependency is drawn
+// between whatever each of its ends currently presents as. The two old views
+// are just the extremes of this one — expand all, collapse all.
 //
-// Design language, and the reason this file looks the way it does:
+// What lives where: roadmap-graph.ts decides structure (which lane gates which,
+// which cell a story occupies inside its lane, how an edge re-attaches when a
+// lane folds up) and is pure and tested. This file turns that into pixels and
+// owns interaction only.
 //
-//   * Every node carries a CUSTOM type name. Using React Flow's `default` type
-//     name also applies `.react-flow__node-default` from its stylesheet — a
-//     150px white box with a dark border — which showed as a ghost rectangle
-//     behind each card.
-//   * Custom nodes render <Handle>s. Without them React Flow has no endpoint
-//     to attach an edge to and every edge silently disappears, which is why
-//     this read as disconnected columns rather than a graph.
+// Design language, and the reasons this file looks the way it does:
+//
+//   * Containers are owner-drawn, not React Flow subflows. Every node —
+//     container included — sits in absolute canvas coordinates and declares its
+//     own width and height. Subflows would have React Flow auto-size each group
+//     by MEASURING it, which is the same measure-driven path that made both
+//     canvases flicker (see use-stable-flow-nodes), and we need none of what
+//     they buy: nodes here are not draggable and never need clamping to a
+//     parent's extent.
+//   * Every node carries a CUSTOM type name. React Flow's `default` type name
+//     also applies `.react-flow__node-default` — a 150px white box — which
+//     showed as a ghost rectangle behind each card.
+//   * Custom nodes render <Handle>s, or React Flow has no endpoint to attach an
+//     edge to and drops it silently.
 //   * Colour means exactly one thing: destructive is BLOCKED, primary is the
-//     current selection and its chain. Blocked is a tinted border and a single
-//     dot rather than red text on every card — with dozens blocked, red prose
-//     everywhere stops being a signal. Status is quiet text at all times.
-//   * Epic clustering is a band behind each contiguous run of one epic's
-//     stories in a column, labelled once. The nodes were already grouped; the
-//     band is what makes the grouping visible.
+//     selection and its chain. Blocked is a tinted border and one dot rather
+//     than red text on every card — with dozens blocked, red everywhere stops
+//     being a signal. Status is quiet text at every status.
 
 import { useMemo, useState } from "react"
 import {
@@ -40,6 +47,7 @@ import {
   type Node,
   type NodeTypes,
 } from "@xyflow/react"
+import { ChevronDownIcon, ChevronRightIcon } from "lucide-react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Label } from "@workspace/ui/components/label"
@@ -50,31 +58,32 @@ import { useStableFlowNodes } from "@/features/graph-canvas/use-stable-flow-node
 
 import {
   blockingChain,
-  buildRoadmapEpicGraph,
+  buildRoadmapCanvas,
   buildRoadmapGraph,
-  type RoadmapGraph,
+  defaultExpandedEpics,
+  type RoadmapCanvas,
   type RoadmapGraphStory,
 } from "./roadmap-graph"
 
 import "@xyflow/react/dist/style.css"
 
-const NODE_WIDTH = 232
-const COLUMN_GAP = 84
-const COLUMN_WIDTH = NODE_WIDTH + COLUMN_GAP
-const NODE_HEIGHT = 52
-const ROW_HEIGHT = 62
-/** Room for a band's label plus air between two epics stacked in one column. */
-const BAND_GAP = 30
-const BAND_LABEL_OFFSET = 20
-const BAND_PAD_X = 10
-
-export type RoadmapGraphAltitude = "stories" | "epics"
+const STORY_WIDTH = 232
+const STORY_HEIGHT = 52
+const STORY_COLUMN_GAP = 56
+const STORY_ROW_GAP = 10
+/** Container chrome: the header strip, and air around the cards inside. */
+const PAD_X = 12
+const PAD_TOP = 30
+const PAD_BOTTOM = 12
+const EPIC_HEIGHT = 68
+const EPIC_COLUMN_GAP = 140
+const EPIC_ROW_GAP = 36
 
 interface StoryNodeData extends Record<string, unknown> {
   label: string
   status: string
   detail: string
-  /** Rendered as "+N" when a collapse hid dependencies of this node. */
+  /** Rendered as "+n" when the shipped collapse hid dependencies of this node. */
   hidden: number
   blocked: boolean
   dimmed: boolean
@@ -82,18 +91,35 @@ interface StoryNodeData extends Record<string, unknown> {
   selected: boolean
 }
 
-interface BandNodeData extends Record<string, unknown> {
+interface EpicNodeData extends Record<string, unknown> {
   label: string
+  title: string
+  status: string
+  total: number
+  blockedCount: number
+  dimmed: boolean
+  onChain: boolean
+}
+
+interface ContainerNodeData extends Record<string, unknown> {
+  label: string
+  title: string
+  total: number
+  blockedCount: number
   dimmed: boolean
 }
 
-type GraphNode = Node<StoryNodeData, "story"> | Node<BandNodeData, "epic-band">
+type GraphNode =
+  | Node<StoryNodeData, "story">
+  | Node<EpicNodeData, "epic">
+  | Node<ContainerNodeData, "epic-container">
 
 // Hoisted: React Flow treats a new nodeTypes object as a type-table change and
-// remounts every node, which is a second, independent source of flicker.
+// remounts every node, which is an independent source of flicker.
 const nodeTypes: NodeTypes = {
   story: StoryFlowNode,
-  "epic-band": EpicBandNode,
+  epic: EpicRollupNode,
+  "epic-container": EpicContainerNode,
 }
 
 export function RoadmapGraphView({
@@ -105,146 +131,175 @@ export function RoadmapGraphView({
   initialStoryId?: string
   onSelectStory?: (storyId: string | null) => void
 }) {
-  const [altitude, setAltitude] = useState<RoadmapGraphAltitude>("stories")
   const [showShipped, setShowShipped] = useState(false)
   const [selected, setSelected] = useState<string | null>(initialStoryId ?? null)
+
+  // Open the lanes with work in flight, plus the lane of a deep-linked story so
+  // the link lands on the story itself rather than on the lane hiding it.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => {
+    const initial = defaultExpandedEpics(
+      buildRoadmapGraph(stories, { collapseShipped: true }),
+    )
+    const target = stories.find((story) => story.id === initialStoryId)
+    if (target) initial.add(target.epicId)
+    return initial
+  })
 
   const graph = useMemo(
     () => buildRoadmapGraph(stories, { collapseShipped: !showShipped }),
     [stories, showShipped],
   )
-  const epicGraph = useMemo(() => buildRoadmapEpicGraph(graph), [graph])
+  const canvas = useMemo(
+    () => buildRoadmapCanvas(graph, { expandedEpics: expanded }),
+    [graph, expanded],
+  )
   const chain = useMemo(
     () => (selected ? blockingChain(graph, selected) : null),
     [graph, selected],
   )
+  const layout = useMemo(() => layoutCanvas(canvas), [canvas])
 
   const derived = useMemo(() => {
-    if (altitude === "epics") {
-      const rowOf = new Map<number, number>()
-      const flowNodes: GraphNode[] = epicGraph.nodes.map((epic) => {
-        const row = rowOf.get(epic.depth) ?? 0
-        rowOf.set(epic.depth, row + 1)
-        const total = Object.values(epic.counts).reduce((a, b) => a + b, 0)
-        return {
+    // A chain is expressed in story ids, and on this canvas some of those
+    // stories are currently a lane. Light whatever stands for them.
+    const lit = chain
+      ? new Set(
+          [...chain.highlighted].map((id) => canvas.presentation.get(id) ?? id),
+        )
+      : null
+
+    const containers: GraphNode[] = []
+    const cards: GraphNode[] = []
+
+    for (const epic of canvas.epics) {
+      const box = layout.epics.get(epic.id)
+      if (!box) continue
+      const total = Object.values(epic.counts).reduce((a, b) => a + b, 0)
+
+      if (!epic.expanded) {
+        cards.push({
           id: epic.id,
-          type: "story" as const,
-          position: { x: epic.depth * COLUMN_WIDTH, y: row * (ROW_HEIGHT + 8) },
-          width: NODE_WIDTH,
-          height: NODE_HEIGHT,
+          type: "epic",
+          position: { x: box.x, y: box.y },
+          width: box.width,
+          height: box.height,
           data: {
             label: epic.id,
+            title: epic.title,
             status: epic.status,
-            detail: `${epic.title} · ${total} ${total === 1 ? "story" : "stories"}`,
-            hidden: 0,
-            blocked: epic.status === "blocked",
-            dimmed: false,
-            onChain: false,
-            selected: false,
+            total,
+            blockedCount: epic.blockedCount,
+            dimmed: lit ? !lit.has(epic.id) : false,
+            onChain: lit ? lit.has(epic.id) : false,
           },
-        }
-      })
-      return {
-        nodes: flowNodes,
-        edges: epicGraph.edges.map((edge) => toFlowEdge(edge, true)),
+        })
+        continue
       }
+
+      containers.push({
+        id: `container:${epic.id}`,
+        type: "epic-container",
+        position: { x: box.x, y: box.y },
+        width: box.width,
+        height: box.height,
+        selectable: false,
+        focusable: false,
+        // Scenery: clicks fall through to the pane, except on the header strip,
+        // which re-enables them so the lane can be folded back up.
+        style: { pointerEvents: "none" as const },
+        data: {
+          label: epic.id,
+          title: epic.title,
+          total,
+          blockedCount: epic.blockedCount,
+          dimmed: lit ? !epic.storyIds.some((id) => lit.has(id)) : false,
+        },
+      })
     }
 
-    const { rows, bands } = layoutStories(graph)
-    const bandNodes: GraphNode[] = bands.map((band) => ({
-      id: `band:${band.key}`,
-      type: "epic-band" as const,
-      position: { x: band.x, y: band.y },
-      draggable: false,
-      selectable: false,
-      focusable: false,
-      width: NODE_WIDTH + BAND_PAD_X * 2,
-      height: band.height,
-      // A band is scenery: clicks belong to the pane underneath it, so
-      // clicking away from a card still clears the selection.
-      style: { pointerEvents: "none" as const },
-      data: { label: band.label, dimmed: chain !== null },
-    }))
-    const storyNodes: GraphNode[] = graph.nodes.map((node) => ({
-      id: node.id,
-      type: "story" as const,
-      position: rows.get(node.id) ?? { x: 0, y: 0 },
-      // Declared, not measured: these cards are a fixed size, and a node that
-      // arrives with dimensions is never hidden waiting for a ResizeObserver.
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-      data: {
-        label: node.id,
-        status: node.status,
-        detail: node.title,
-        hidden: node.hiddenBlockers + node.hiddenBlocked,
-        blocked: node.isBlocked,
-        dimmed: chain ? !chain.highlighted.has(node.id) : false,
-        onChain: chain ? chain.highlighted.has(node.id) : false,
-        selected: node.id === selected,
-      },
-    }))
+    for (const story of canvas.stories) {
+      const at = layout.stories.get(story.id)
+      if (!at) continue
+      cards.push({
+        id: story.id,
+        type: "story",
+        position: at,
+        // Declared, not measured: these cards are a fixed size, and a node that
+        // arrives with dimensions is never hidden waiting for a ResizeObserver.
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        data: {
+          label: story.id,
+          status: story.status,
+          detail: story.title,
+          hidden: story.hiddenBlockers + story.hiddenBlocked,
+          blocked: story.isBlocked,
+          dimmed: lit ? !lit.has(story.id) : false,
+          onChain: lit ? lit.has(story.id) : false,
+          selected: story.id === selected,
+        },
+      })
+    }
 
     return {
-      // Bands first so they paint behind the cards they group.
-      nodes: [...bandNodes, ...storyNodes],
-      edges: graph.edges.map((edge) =>
-        toFlowEdge(edge, chain ? chain.edges.has(edge.id) : true),
+      // Containers first so they paint behind the cards they hold.
+      nodes: [...containers, ...cards],
+      edges: canvas.edges.map((edge) =>
+        toFlowEdge(
+          edge,
+          chain ? edge.underlying.some((id) => chain.edges.has(id)) : true,
+        ),
       ),
     }
-  }, [altitude, graph, epicGraph, chain, selected])
+  }, [canvas, layout, chain, selected])
 
-  // Carries React Flow's own measurements across these re-derivations. Without
-  // it every node is re-measured — and hidden for the frame that takes — on
-  // every click and drag.
   const { nodes, onNodesChange } = useStableFlowNodes<GraphNode>(derived.nodes)
 
-  const hiddenTotal = useMemo(
-    () =>
-      graph.nodes.reduce(
-        (total, node) => total + node.hiddenBlockers + node.hiddenBlocked,
-        0,
-      ),
-    [graph],
+  const allExpanded = canvas.epics.every((epic) => epic.expanded)
+  const hiddenTotal = graph.nodes.reduce(
+    (total, node) => total + node.hiddenBlockers + node.hiddenBlocked,
+    0,
   )
 
   const select = (next: string | null) => {
     setSelected(next)
     onSelectStory?.(next)
   }
+  const toggleEpic = (epicId: string) => {
+    setExpanded((current) => {
+      const next = new Set(current)
+      if (!next.delete(epicId)) next.add(epicId)
+      return next
+    })
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-3 py-2">
-        <div className="flex items-center gap-1">
-          {(["stories", "epics"] as const).map((value) => (
-            <Button
-              key={value}
-              size="sm"
-              variant={altitude === value ? "secondary" : "ghost"}
-              aria-pressed={altitude === value}
-              onClick={() => {
-                setAltitude(value)
-                select(null)
-              }}
-            >
-              {value === "stories" ? "Stories" : "Epics"}
-            </Button>
-          ))}
-        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            setExpanded(
+              allExpanded
+                ? new Set()
+                : new Set(canvas.epics.map((epic) => epic.id)),
+            )
+          }
+        >
+          {allExpanded ? "Collapse all" : "Expand all"}
+        </Button>
 
-        {altitude === "stories" ? (
-          <div className="flex items-center gap-2">
-            <Switch
-              id="roadmap-graph-shipped"
-              checked={showShipped}
-              onCheckedChange={setShowShipped}
-            />
-            <Label htmlFor="roadmap-graph-shipped" className="text-xs">
-              Show shipped
-            </Label>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2">
+          <Switch
+            id="roadmap-graph-shipped"
+            checked={showShipped}
+            onCheckedChange={setShowShipped}
+          />
+          <Label htmlFor="roadmap-graph-shipped" className="text-xs">
+            Show shipped
+          </Label>
+        </div>
 
         {chain && selected ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -259,13 +314,12 @@ export function RoadmapGraphView({
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            {altitude === "stories"
-              ? "Select a story to trace its blocking chain. Blockers sit to the left."
-              : "One node per lane. An arrow means the lane on the left gates the one on the right."}
+            Blockers sit to the left. Click a lane to open it, a story to trace
+            its chain.
           </p>
         )}
 
-        {altitude === "stories" && hiddenTotal > 0 ? (
+        {hiddenTotal > 0 ? (
           <p className="text-xs text-muted-foreground">
             <span className="font-mono">+n</span> counts dependencies hidden by
             the shipped collapse.
@@ -290,13 +344,25 @@ export function RoadmapGraphView({
             nodesDraggable={false}
             nodesConnectable={false}
             edgesFocusable={false}
+            // Selection is ours, not React Flow's: `selected` here means "this
+            // is the story whose chain is lit", which the projection decides.
+            // Letting React Flow keep a second, internal notion of selected
+            // would elevate node z-order and fight it for no gain — and node
+            // clicks are still delivered when elements aren't selectable.
+            elementsSelectable={false}
             fitView
-            fitViewOptions={{ padding: 0.15 }}
-            minZoom={0.15}
+            fitViewOptions={{ padding: 0.12 }}
+            minZoom={0.08}
             proOptions={{ hideAttribution: true }}
             onNodeClick={(_event, node) => {
-              if (altitude === "epics" || node.type !== "story") return
-              select(node.id === selected ? null : node.id)
+              if (node.type === "story") {
+                select(node.id === selected ? null : node.id)
+                return
+              }
+              if (node.type === "epic") toggleEpic(node.id)
+              if (node.type === "epic-container") {
+                toggleEpic(node.id.slice("container:".length))
+              }
             }}
             onPaneClick={() => select(null)}
             nodeTypes={nodeTypes}
@@ -315,70 +381,82 @@ export function RoadmapGraphView({
   )
 }
 
-interface BandBox {
-  key: string
-  label: string
+interface Box {
   x: number
   y: number
+  width: number
   height: number
 }
 
 /**
- * Pixel placement for the story altitude.
+ * Pixels for the whole canvas: lanes laid out in layers, stories inside them.
  *
- * The projection already decided which column a story sits in and its order
- * within that column. This walks each column in that order, keeps a run of one
- * epic contiguous, and opens a gap between runs so a band's label has somewhere
- * to live — the tighter vertical rhythm David asked for, without letting two
- * epics touch.
+ * The projection decided each lane's layer and its order within that layer, and
+ * each story's cell inside its lane. This turns that into coordinates: a layer
+ * is as wide as its widest lane, and every story sits at an absolute position
+ * derived from its container's box rather than being parented to it.
  */
-function layoutStories(graph: RoadmapGraph): {
-  rows: Map<string, { x: number; y: number }>
-  bands: BandBox[]
+function layoutCanvas(canvas: RoadmapCanvas): {
+  epics: Map<string, Box>
+  stories: Map<string, { x: number; y: number }>
 } {
-  const columns = new Map<number, typeof graph.nodes>()
-  for (const node of graph.nodes) {
-    const bucket = columns.get(node.depth)
-    if (bucket) (bucket as RoadmapGraph["nodes"][number][]).push(node)
-    else columns.set(node.depth, [node])
+  const sized = canvas.epics.map((epic) => ({
+    epic,
+    width: epic.expanded
+      ? epic.columns * STORY_WIDTH +
+        (epic.columns - 1) * STORY_COLUMN_GAP +
+        PAD_X * 2
+      : STORY_WIDTH,
+    height: epic.expanded
+      ? epic.rows * STORY_HEIGHT +
+        (epic.rows - 1) * STORY_ROW_GAP +
+        PAD_TOP +
+        PAD_BOTTOM
+      : EPIC_HEIGHT,
+  }))
+
+  const layers = new Map<number, typeof sized>()
+  for (const entry of sized) {
+    const bucket = layers.get(entry.epic.depth)
+    if (bucket) bucket.push(entry)
+    else layers.set(entry.epic.depth, [entry])
   }
 
-  const rows = new Map<string, { x: number; y: number }>()
-  const bands: BandBox[] = []
-
-  for (const [depth, bucket] of columns) {
-    const ordered = [...bucket].sort((left, right) => left.lane - right.lane)
-    const x = depth * COLUMN_WIDTH
+  const epics = new Map<string, Box>()
+  let x = 0
+  for (const depth of [...layers.keys()].sort((a, b) => a - b)) {
+    const bucket = (layers.get(depth) ?? [])
+      .slice()
+      .sort((left, right) => left.epic.order - right.epic.order)
     let y = 0
-    let index = 0
-    while (index < ordered.length) {
-      const epicId = ordered[index]!.epicId
-      const run = []
-      while (index < ordered.length && ordered[index]!.epicId === epicId) {
-        run.push(ordered[index]!)
-        index += 1
-      }
-      const top = y
-      for (const node of run) {
-        rows.set(node.id, { x, y })
-        y += ROW_HEIGHT
-      }
-      bands.push({
-        key: `${depth}:${epicId}`,
-        label: epicId,
-        x: x - BAND_PAD_X,
-        y: top - BAND_LABEL_OFFSET,
-        height: run.length * ROW_HEIGHT + BAND_LABEL_OFFSET,
-      })
-      y += BAND_GAP
+    for (const entry of bucket) {
+      epics.set(entry.epic.id, { x, y, width: entry.width, height: entry.height })
+      y += entry.height + EPIC_ROW_GAP
     }
+    x += Math.max(...bucket.map((entry) => entry.width)) + EPIC_COLUMN_GAP
   }
 
-  return { rows, bands }
+  const stories = new Map<string, { x: number; y: number }>()
+  for (const story of canvas.stories) {
+    const box = epics.get(story.epicId)
+    if (!box) continue
+    stories.set(story.id, {
+      x: box.x + PAD_X + story.column * (STORY_WIDTH + STORY_COLUMN_GAP),
+      y: box.y + PAD_TOP + story.row * (STORY_HEIGHT + STORY_ROW_GAP),
+    })
+  }
+
+  return { epics, stories }
 }
 
 function toFlowEdge(
-  edge: { id: string; source: string; target: string; binding: boolean },
+  edge: {
+    id: string
+    source: string
+    target: string
+    binding: boolean
+    count: number
+  },
   active: boolean,
 ): Edge {
   return {
@@ -387,6 +465,20 @@ function toFlowEdge(
     target: edge.target,
     type: "smoothstep",
     animated: false,
+    // The count only earns ink when one line stands for several dependencies.
+    ...(edge.count > 1
+      ? {
+          label: `×${edge.count}`,
+          labelShowBg: true,
+          labelBgPadding: [4, 2] as [number, number],
+          labelBgBorderRadius: 3,
+          labelStyle: {
+            fill: "var(--color-muted-foreground)",
+            fontSize: 10,
+          },
+          labelBgStyle: { fill: "var(--color-background)" },
+        }
+      : {}),
     markerEnd: {
       type: MarkerType.ArrowClosed,
       width: 14,
@@ -396,9 +488,7 @@ function toFlowEdge(
     // A satisfied dependency is history, not a live constraint — it stays
     // visible so the chain is complete, but dashed so it stops competing.
     style: {
-      stroke: active
-        ? "var(--color-muted-foreground)"
-        : "var(--color-border)",
+      stroke: active ? "var(--color-muted-foreground)" : "var(--color-border)",
       strokeWidth: edge.binding ? 1.4 : 1,
       strokeDasharray: edge.binding ? undefined : "4 4",
       opacity: active ? (edge.binding ? 0.75 : 0.4) : 0.15,
@@ -406,11 +496,30 @@ function toFlowEdge(
   }
 }
 
+function EdgeHandles() {
+  return (
+    <>
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
+        className="h-1! w-1! border-0! bg-transparent! opacity-0"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={false}
+        className="h-1! w-1! border-0! bg-transparent! opacity-0"
+      />
+    </>
+  )
+}
+
 function StoryFlowNode({ data }: { data: StoryNodeData }) {
   return (
     <div
       className={cn(
-        "flex size-full flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
+        "flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
         // Blocked is the tinted edge of the card, not a shouted label.
         data.blocked ? "border-destructive/40" : "border-border",
         data.onChain && !data.selected && "border-primary/50",
@@ -418,12 +527,7 @@ function StoryFlowNode({ data }: { data: StoryNodeData }) {
         data.dimmed && "opacity-20",
       )}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={false}
-        className="h-1! w-1! border-0! bg-transparent! opacity-0"
-      />
+      <EdgeHandles />
       <div className="flex items-center gap-1.5">
         {data.blocked ? (
           <span
@@ -447,27 +551,73 @@ function StoryFlowNode({ data }: { data: StoryNodeData }) {
         ) : null}
       </div>
       <p className="truncate text-xs text-muted-foreground">{data.detail}</p>
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={false}
-        className="h-1! w-1! border-0! bg-transparent! opacity-0"
-      />
     </div>
   )
 }
 
-function EpicBandNode({ data }: { data: BandNodeData }) {
+/** A lane folded up: one node standing for every story inside it. */
+function EpicRollupNode({ data }: { data: EpicNodeData }) {
   return (
     <div
       className={cn(
-        "pointer-events-none size-full rounded-lg border border-dashed border-border/60 bg-muted/20 transition-opacity",
+        "flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-md border bg-card px-3 py-2 text-left transition-opacity",
+        data.blockedCount > 0 ? "border-destructive/40" : "border-border",
+        data.onChain && "border-primary/50",
+        data.dimmed && "opacity-20",
+      )}
+    >
+      <EdgeHandles />
+      <div className="flex items-center gap-1.5">
+        <ChevronRightIcon className="size-3 shrink-0 text-muted-foreground" />
+        <span className="truncate font-mono text-xs font-medium text-foreground">
+          {data.label}
+        </span>
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+          {data.status}
+        </span>
+      </div>
+      <p className="truncate text-xs text-muted-foreground">{data.title}</p>
+      <p className="text-[10px] text-muted-foreground">
+        {data.total} {data.total === 1 ? "story" : "stories"}
+        {data.blockedCount > 0 ? (
+          <span className="text-destructive/80">
+            {" · "}
+            {data.blockedCount} blocked
+          </span>
+        ) : null}
+      </p>
+    </div>
+  )
+}
+
+/** A lane opened up: chrome around its stories, and the way to fold it back. */
+function EpicContainerNode({ data }: { data: ContainerNodeData }) {
+  return (
+    <div
+      className={cn(
+        "pointer-events-none size-full rounded-lg border border-dashed bg-muted/20 transition-opacity",
+        data.blockedCount > 0 ? "border-destructive/25" : "border-border/60",
         data.dimmed && "opacity-40",
       )}
     >
-      <span className="px-2 font-mono text-[10px] leading-4 text-muted-foreground">
-        {data.label}
-      </span>
+      <div className="pointer-events-auto flex cursor-pointer items-center gap-1 px-2 py-1">
+        <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
+        <span className="font-mono text-[10px] text-foreground">
+          {data.label}
+        </span>
+        <span className="truncate text-[10px] text-muted-foreground">
+          {data.title}
+        </span>
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+          {data.total}
+          {data.blockedCount > 0 ? (
+            <span className="text-destructive/80">
+              {" · "}
+              {data.blockedCount} blocked
+            </span>
+          ) : null}
+        </span>
+      </div>
     </div>
   )
 }

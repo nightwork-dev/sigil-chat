@@ -489,3 +489,311 @@ export function blockingChain(
 
   return { upstream, downstream, highlighted, edges }
 }
+
+// ---------------------------------------------------------------------------
+// The unified canvas: one surface that answers both questions at once.
+//
+// "What blocks this story" and "what gates this lane" used to be two views
+// behind a toggle. They are the same graph read at two altitudes, so this
+// projection renders both simultaneously: every epic is a container, expanded
+// into its stories or collapsed to a single rollup node, and a dependency is
+// drawn between whatever each of its two ends currently presents as.
+//
+// The invariant that governs all of it: collapsing an epic changes how a
+// dependency is DRAWN, never whether it exists. A cross-epic edge whose far
+// end collapsed re-attaches to the epic node; it is never dropped, because a
+// story that looks unblocked when it isn't is the one failure this view cannot
+// have.
+// ---------------------------------------------------------------------------
+
+export interface RoadmapCanvasEpic {
+  id: string
+  title: string
+  status: StoryStatus
+  counts: Readonly<Record<StoryStatus, number>>
+  storyIds: readonly string[]
+  expanded: boolean
+  /** Layer in the epic-level dependency DAG. */
+  depth: number
+  /** Position within that layer, top to bottom. */
+  order: number
+  /** Internal extent when expanded, counted in story cells. */
+  columns: number
+  rows: number
+  /** Stories here whose blockers have not all shipped. */
+  blockedCount: number
+}
+
+export interface RoadmapCanvasStory {
+  id: string
+  title: string
+  status: StoryStatus
+  epicId: string
+  isBlocked: boolean
+  hiddenBlockers: number
+  hiddenBlocked: number
+  /** Cell within the parent epic's internal grid. */
+  column: number
+  row: number
+}
+
+export interface RoadmapCanvasEdge {
+  id: string
+  source: string
+  target: string
+  /** True while any underlying dependency is still gating. */
+  binding: boolean
+  /** How many story-level dependencies this one line stands for. */
+  count: number
+  /** True when either end presents as a collapsed epic rather than a story. */
+  aggregated: boolean
+  /** The story-edge ids behind it, so a chain can light through an epic. */
+  underlying: readonly string[]
+}
+
+export interface RoadmapCanvas {
+  epics: readonly RoadmapCanvasEpic[]
+  stories: readonly RoadmapCanvasStory[]
+  edges: readonly RoadmapCanvasEdge[]
+  /** Story id → the canvas node that stands for it at the moment. */
+  presentation: ReadonlyMap<string, string>
+}
+
+export interface BuildRoadmapCanvasOptions {
+  /** Epics drawn as open containers; every other epic collapses to one node. */
+  readonly expandedEpics: ReadonlySet<string>
+}
+
+export function buildRoadmapCanvas(
+  graph: RoadmapGraph,
+  options: BuildRoadmapCanvasOptions,
+): RoadmapCanvas {
+  const epicGraph = buildRoadmapEpicGraph(graph)
+  const members = new Map<string, RoadmapGraphNode[]>()
+  for (const node of graph.nodes) {
+    const bucket = members.get(node.epicId)
+    if (bucket) bucket.push(node)
+    else members.set(node.epicId, [node])
+  }
+
+  // Epic depth comes from the FULL cross-epic DAG, not from what is currently
+  // open. Collapsing a lane should fold it up in place, not shuffle every
+  // other lane sideways.
+  const epicDepth = new Map(epicGraph.nodes.map((epic) => [epic.id, epic.depth]))
+  const epicOrder = orderEpics(epicGraph, epicDepth)
+
+  const stories: RoadmapCanvasStory[] = []
+  const epics: RoadmapCanvasEpic[] = []
+  const presentation = new Map<string, string>()
+
+  for (const epic of graph.epics) {
+    const own = members.get(epic.id) ?? []
+    const expanded = options.expandedEpics.has(epic.id)
+    let columns = 1
+    let rows = 1
+
+    if (expanded) {
+      const cells = internalLayout(own)
+      columns = Math.max(1, ...[...cells.values()].map((cell) => cell.column + 1))
+      rows = Math.max(1, ...[...cells.values()].map((cell) => cell.row + 1))
+      for (const node of own) {
+        const cell = cells.get(node.id) ?? { column: 0, row: 0 }
+        presentation.set(node.id, node.id)
+        stories.push({
+          id: node.id,
+          title: node.title,
+          status: node.status,
+          epicId: node.epicId,
+          isBlocked: node.isBlocked,
+          hiddenBlockers: node.hiddenBlockers,
+          hiddenBlocked: node.hiddenBlocked,
+          column: cell.column,
+          row: cell.row,
+        })
+      }
+    } else {
+      for (const node of own) presentation.set(node.id, epic.id)
+    }
+
+    epics.push({
+      id: epic.id,
+      title: epic.title,
+      status: epic.status,
+      counts: epic.counts,
+      storyIds: epic.storyIds,
+      expanded,
+      depth: epicDepth.get(epic.id) ?? 0,
+      order: epicOrder.get(epic.id) ?? 0,
+      columns,
+      rows,
+      blockedCount: own.filter((node) => node.isBlocked).length,
+    })
+  }
+
+  return {
+    epics,
+    stories,
+    edges: aggregateEdges(graph, presentation),
+    presentation,
+  }
+}
+
+/**
+ * Redraw every dependency between whatever its two ends currently present as.
+ *
+ * A dependency inside a collapsed epic disappears into that epic's node, which
+ * is the point of collapsing it. Every other dependency survives: when one end
+ * collapses the line re-attaches to the epic, and several dependencies that
+ * land on the same pair merge into one line carrying a count.
+ */
+function aggregateEdges(
+  graph: RoadmapGraph,
+  presentation: ReadonlyMap<string, string>,
+): RoadmapCanvasEdge[] {
+  const merged = new Map<string, RoadmapCanvasEdge & { underlying: string[] }>()
+  for (const edge of graph.edges) {
+    const source = presentation.get(edge.source)
+    const target = presentation.get(edge.target)
+    if (!source || !target) continue
+    if (source === target) continue // folded into one collapsed epic
+    const id = `${source}->${target}`
+    const existing = merged.get(id)
+    if (existing) {
+      existing.count += 1
+      existing.binding ||= edge.binding
+      existing.underlying.push(edge.id)
+      continue
+    }
+    merged.set(id, {
+      id,
+      source,
+      target,
+      binding: edge.binding,
+      count: 1,
+      aggregated: source !== edge.source || target !== edge.target,
+      underlying: [edge.id],
+    })
+  }
+  return [...merged.values()]
+}
+
+/**
+ * Where each story sits inside its own epic's container.
+ *
+ * Columns come from dependencies WITHIN the epic, so a lane reads left to
+ * right on its own terms rather than inheriting a column from work in some
+ * other lane. Row order keeps the global barycenter order the base layout
+ * already worked out, so opening an epic doesn't scramble what was on screen.
+ */
+function internalLayout(
+  own: readonly RoadmapGraphNode[],
+): Map<string, { column: number; row: number }> {
+  const ids = new Set(own.map((node) => node.id))
+  const localBlockers = new Map(
+    own.map((node) => [node.id, node.blockedBy.filter((id) => ids.has(id))]),
+  )
+  const depth = computeDepths(
+    own.map((node) => ({
+      id: node.id,
+      title: node.title,
+      status: node.status,
+      epicId: node.epicId,
+      epicTitle: node.epicTitle,
+      deps: localBlockers.get(node.id) ?? [],
+    })),
+    localBlockers,
+    ids,
+  )
+
+  const byColumn = new Map<number, RoadmapGraphNode[]>()
+  for (const node of own) {
+    const column = depth.get(node.id) ?? 0
+    const bucket = byColumn.get(column)
+    if (bucket) bucket.push(node)
+    else byColumn.set(column, [node])
+  }
+
+  const cells = new Map<string, { column: number; row: number }>()
+  for (const [column, bucket] of byColumn) {
+    bucket
+      .slice()
+      .sort((left, right) => left.lane - right.lane || left.id.localeCompare(right.id))
+      .forEach((node, row) => cells.set(node.id, { column, row }))
+  }
+  return cells
+}
+
+/**
+ * Top-to-bottom order of the epics sharing a layer, by barycenter.
+ *
+ * Same idea as the story rows: a lane sits near the lanes that gate it, so the
+ * long cross-lane arrows stop crossing each other.
+ */
+function orderEpics(
+  epicGraph: RoadmapEpicGraph,
+  epicDepth: ReadonlyMap<string, number>,
+): Map<string, number> {
+  const upstream = new Map<string, string[]>()
+  for (const epic of epicGraph.nodes) upstream.set(epic.id, [])
+  for (const edge of epicGraph.edges) upstream.get(edge.target)?.push(edge.source)
+
+  const byDepth = new Map<number, string[]>()
+  for (const epic of epicGraph.nodes) {
+    const depth = epicDepth.get(epic.id) ?? 0
+    const bucket = byDepth.get(depth)
+    if (bucket) bucket.push(epic.id)
+    else byDepth.set(depth, [epic.id])
+  }
+
+  const order = new Map<string, number>()
+  for (const depth of [...byDepth.keys()].sort((a, b) => a - b)) {
+    const bucket = byDepth.get(depth) ?? []
+    const centers = new Map<string, number | null>()
+    for (const id of bucket) {
+      const placed = (upstream.get(id) ?? [])
+        .map((source) => order.get(source))
+        .filter((row): row is number => row !== undefined)
+      centers.set(
+        id,
+        placed.length === 0
+          ? null
+          : placed.reduce((total, row) => total + row, 0) / placed.length,
+      )
+    }
+    bucket
+      .slice()
+      .sort((left, right) => {
+        const leftCenter = centers.get(left) ?? null
+        const rightCenter = centers.get(right) ?? null
+        if (leftCenter !== null && rightCenter !== null) {
+          if (leftCenter !== rightCenter) return leftCenter - rightCenter
+        } else if (leftCenter !== null) return -1
+        else if (rightCenter !== null) return 1
+        return left.localeCompare(right)
+      })
+      .forEach((id, index) => order.set(id, index))
+  }
+  return order
+}
+
+/**
+ * Which epics the canvas opens with: the ones that are stuck.
+ *
+ * The first read should be "what needs attention", so open the lanes holding a
+ * story someone has actually marked blocked and summarize the rest. Measured
+ * against the live roadmap — 131 stories across 39 lanes — that is four open
+ * containers against thirty-five rollup nodes, which reads as a map. The
+ * tempting alternatives do not survive the same measurement: "work in flight"
+ * opens twelve lanes and derived-blocked opens fourteen, and at that point most
+ * of the canvas is open and the lane-level answer is gone.
+ *
+ * Authored status, not the derived `isBlocked`, precisely because derived
+ * blockage is common and cheap while someone typing "blocked" is a signal.
+ */
+export function defaultExpandedEpics(graph: RoadmapGraph): Set<string> {
+  const expanded = new Set<string>()
+  for (const node of graph.nodes) {
+    if (node.status === "blocked") expanded.add(node.epicId)
+  }
+  return expanded
+}
