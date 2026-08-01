@@ -106,7 +106,10 @@ function assertGeneratedConsumerIdentity(target, targetName, digest) {
     ),
     "dev preparation does not seed through apps/web",
   );
-  assert(webPackage.name === targetName, "web package name was not rewritten");
+  assert(
+    webPackage.name === `${targetName}-web`,
+    "web package name was not rewritten",
+  );
   assert(
     webPackage.scripts?.dev === `portless ${targetName} vite dev --host`,
     "web dev service name was not rewritten",
@@ -120,7 +123,7 @@ function assertGeneratedConsumerIdentity(target, targetName, digest) {
       `portless run --name ${targetName}-agent eve dev --no-ui --host 127.0.0.1`,
     "agent dev service name was not rewritten",
   );
-  assert(doctor.id === targetName, "doctor id was not rewritten");
+  assert(doctor.id === `sigil-${targetName}`, "doctor id was not rewritten");
   assert(
     doctor.serviceProbes?.[0]?.url ===
       `http://${targetName}-agent.localhost:1355/eve/v1/health`,

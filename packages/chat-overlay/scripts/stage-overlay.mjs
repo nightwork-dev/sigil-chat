@@ -13,8 +13,6 @@ import { fileURLToPath } from "node:url";
 import {
   consumerTransformedPaths,
   coverageRoots,
-  overlayTombstoneContent,
-  overlayTombstonePaths,
   overlayPaths,
   requiredWorkspacePackages,
 } from "./overlay-paths.mjs";
@@ -41,11 +39,6 @@ export function stageOverlay() {
       dereference: true,
       filter: (candidate) => !isGeneratedPath(candidate),
     });
-  }
-  for (const relativePath of overlayTombstonePaths) {
-    const target = join(filesRoot, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, overlayTombstoneContent, "utf8");
   }
   transformConsumerFiles();
 }

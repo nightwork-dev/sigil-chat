@@ -23,8 +23,6 @@ import {
 import {
   consumerTransformedPaths,
   coverageRoots,
-  overlayTombstoneContent,
-  overlayTombstonePaths,
   overlayPaths,
   requiredWorkspacePackages,
 } from "../scripts/overlay-paths.mjs";
@@ -71,26 +69,49 @@ describe("Sigil Chat overlay", () => {
         statSync(source).isDirectory(),
       );
     }
+    const stagedPaths = walk(filesRoot).map((path) => relative(filesRoot, path));
+    expect(stagedPaths).not.toContain("apps/web/src/routes/-types.ts");
+    for (const path of [
+      "apps/web/src/routes/footer.tsx",
+      "apps/web/src/routes/footer/index.tsx",
+      "apps/web/src/routes/index.tsx",
+      "apps/web/src/routes/inspector.tsx",
+      "apps/web/src/routes/inspector/index.tsx",
+      "apps/web/src/routes/menubar.tsx",
+      "apps/web/src/routes/menubar/index.tsx",
+      "apps/web/src/routes/menubar/workflow.tsx",
+      "apps/web/src/routes/settings.tsx",
+      "apps/web/src/routes/settings/appearance.tsx",
+      "apps/web/src/routes/settings/general.tsx",
+      "apps/web/src/routes/settings/index.tsx",
+      "apps/web/src/routes/settings/notifications.tsx",
+      "apps/web/src/routes/sidebar.tsx",
+      "apps/web/src/routes/sidebar/canvas.tsx",
+      "apps/web/src/routes/sidebar/index.tsx",
+      "apps/web/src/routes/split.tsx",
+      "apps/web/src/routes/split/$id.tsx",
+      "apps/web/src/routes/split/index.tsx",
+    ]) {
+      expect(stagedPaths).not.toContain(path);
+    }
+    expect(
+      stagedPaths.some((path) =>
+        /^packages\/agent-(?:eve|gonk|react|react-query|surface)(?:\/|$)/.test(
+          path,
+        ),
+      ),
+    ).toBe(false);
     for (const staged of walk(filesRoot)) {
       const sourceRelativePath = relative(filesRoot, staged);
       for (const privateSegment of [".env", ".data", ".omc"]) {
         expect(sourceRelativePath.split("/")).not.toContain(privateSegment);
       }
       expect(sourceRelativePath.endsWith("routeTree.gen.ts")).toBe(false);
-      if (overlayTombstonePaths.includes(sourceRelativePath)) {
-        expect(readFileSync(staged, "utf8")).toBe(overlayTombstoneContent);
-        continue;
-      }
       if (consumerTransformedPaths.includes(sourceRelativePath)) {
         continue;
       }
       const source = join(repositoryRoot, sourceRelativePath);
       expect(readFileSync(staged)).toEqual(readFileSync(source));
-    }
-    for (const tombstonePath of overlayTombstonePaths) {
-      expect(readFileSync(join(filesRoot, tombstonePath), "utf8")).toBe(
-        overlayTombstoneContent,
-      );
     }
     const stagedRootPackage = JSON.parse(
       readFileSync(join(filesRoot, "package.json"), "utf8"),
@@ -170,9 +191,10 @@ describe("Sigil Chat overlay", () => {
     }
   }, 30_000);
 
-  it("is consumable with the registry payload by the Sigil Design CLI", () => {
-    const cli = resolveOptionalDesignCli();
-    if (!cli) return;
+  it.skipIf(!process.env.SIGIL_DESIGN_ROOT)(
+    "is consumable with the registry payload by the Sigil Design CLI",
+    () => {
+    const cli = resolveConfiguredDesignCli();
 
     const registryRoot = join(scratch, "registry");
     const targetName = "registry-generated-chat";
@@ -194,8 +216,6 @@ describe("Sigil Chat overlay", () => {
         "chat",
         "--registry",
         registryRoot,
-        "--overlay",
-        packageRoot,
         "--no-install",
         "--no-git",
       ],
@@ -265,13 +285,13 @@ describe("Sigil Chat overlay", () => {
     expect(
       readFileSync(join(target, "pnpm-workspace.yaml"), "utf8"),
     ).not.toContain("packages/chat-overlay");
-    expect(webPackage.name).toBe(targetName);
+    expect(webPackage.name).toBe(`${targetName}-web`);
     expect(webPackage.scripts.dev).toBe(
       `portless ${targetName} vite dev --host`,
     );
     expect(agentPackage.name).toBe(`${targetName}-agent`);
     expect(agentPackage.scripts.dev).toContain(`--name ${targetName}-agent `);
-    expect(doctor.id).toBe(targetName);
+    expect(doctor.id).toBe(`sigil-${targetName}`);
     expect(doctor.serviceProbes[0].url).toBe(
       `http://${targetName}-agent.localhost:1355/eve/v1/health`,
     );
@@ -281,9 +301,10 @@ describe("Sigil Chat overlay", () => {
     );
   }, 30_000);
 
-  it("is consumable by the landed Sigil Design overlay protocol", () => {
-    const cli = resolveOptionalDesignCli();
-    if (!cli) return;
+  it.skipIf(!process.env.SIGIL_DESIGN_ROOT)(
+    "is consumable by the landed Sigil Design overlay protocol",
+    () => {
+    const cli = resolveConfiguredDesignCli();
     const target = join(scratch, "generated-chat");
     execFileSync(
       "node",
@@ -353,26 +374,21 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function resolveOptionalDesignCli(): { designRoot: string; path: string } | undefined {
-  const candidates = [
-    process.env.SIGIL_DESIGN_ROOT,
-    join(repositoryRoot, "..", "sigil-design"),
-    join(repositoryRoot, "..", "sigil-design-game-integration"),
-    join(repositoryRoot, "..", "..", "sigil-design"),
-    join(repositoryRoot, "..", "..", "sigil-design-game-integration"),
-  ].filter((candidate): candidate is string => Boolean(candidate));
-
-  for (const designRoot of candidates) {
-    const path = join(designRoot, "packages/cli/dist/sigil.js");
-    if (existsSync(path)) return { designRoot, path };
-  }
-
-  if (process.env.SIGIL_DESIGN_ROOT) {
+function resolveConfiguredDesignCli(): { designRoot: string; path: string } {
+  const configuredRoot = process.env.SIGIL_DESIGN_ROOT;
+  if (!configuredRoot) {
     throw new Error(
-      `SIGIL_DESIGN_ROOT was set, but packages/cli/dist/sigil.js was not found under ${process.env.SIGIL_DESIGN_ROOT}`,
+      "SIGIL_DESIGN_ROOT is required for Sigil Design CLI integration tests",
     );
   }
-  return undefined;
+
+  const designRoot = configuredRoot;
+  const path = join(designRoot, "packages/cli/dist/sigil.js");
+  if (existsSync(path)) return { designRoot, path };
+
+  throw new Error(
+    `SIGIL_DESIGN_ROOT was set, but packages/cli/dist/sigil.js was not found under ${configuredRoot}`,
+  );
 }
 
 function walk(root: string): string[] {
