@@ -37,6 +37,22 @@ export interface SigilAgentModelObjectConfig {
 
 export type SigilAgentModelConfig = string | SigilAgentModelObjectConfig;
 
+/**
+ * Ordered reasoning-effort levels a model accepts, weakest first, plus which
+ * one a session starts on.
+ *
+ * Declared, never sniffed (MDL.4): a model with no `reasoning` block shows no
+ * reasoning control at all, rather than the app guessing what a provider
+ * supports. The level strings are provider vocabulary passed through
+ * verbatim by the resolver (e.g. codex/openai: "minimal" | "low" | "medium" |
+ * "high" | "xhigh" | "max") — this schema does not constrain the set, because
+ * that vocabulary is a provider fact, not an app one.
+ */
+export interface SigilAgentModelReasoningConfig {
+  levels: string[];
+  default: string;
+}
+
 /** One model offered by a provider. */
 export interface SigilAgentProviderModelConfig {
   /** Slug, unique within its provider. Full id is `<providerId>/<id>`. */
@@ -54,6 +70,16 @@ export interface SigilAgentProviderModelConfig {
    */
   enabled?: boolean;
   contextWindowTokens?: number;
+  /**
+   * Reasoning-effort levels this model accepts. Absent means the model shows
+   * no reasoning control (MDL.4 AC2/AC5) — never a hardcoded app default.
+   */
+  reasoning?: SigilAgentModelReasoningConfig;
+  /**
+   * Whether this model accepts a faster/cheaper request mode. Absent or
+   * false means no fast-mode control is shown for it (MDL.4 AC3).
+   */
+  fastMode?: boolean;
 }
 
 /**
@@ -108,6 +134,10 @@ export interface NormalizedSigilAgentModelPreset
   /** Both levels resolved: a model in a disabled provider is disabled. */
   enabled: boolean;
   isDeploymentDefault: boolean;
+  /** Absent means this preset declares no reasoning control (MDL.4). */
+  reasoning?: SigilAgentModelReasoningConfig;
+  /** Defaults to false — the deployment default and any undeclared preset. */
+  fastMode: boolean;
 }
 
 /** Provider-shaped inventory: the authored structure, normalized. */
@@ -202,6 +232,13 @@ export function normalizeSigilAgentProviders(
     capability: "chat",
     enabled: true,
     isDeploymentDefault: true,
+    // The deployment default is authored as `agent.model`, a bare slug or a
+    // credential-only object — that shape has no room for a reasoning/fastMode
+    // declaration today, so it never shows either control. Declaring one for
+    // the default would need widening SigilAgentModelObjectConfig, which is
+    // out of MDL.4's scope; every AUTHORED provider preset below can declare
+    // both.
+    fastMode: false,
   };
 
   return [
@@ -254,6 +291,8 @@ export function normalizeSigilAgentProviders(
             // its own flag: the provider is the credential holder.
             enabled: providerEnabled && (entry.enabled ?? true),
             isDeploymentDefault: false,
+            ...(entry.reasoning ? { reasoning: entry.reasoning } : {}),
+            fastMode: entry.fastMode ?? false,
           };
         }),
       };
@@ -615,7 +654,56 @@ function requireProviderModels(
         path: [...entryPath, "contextWindowTokens"],
       });
     }
+    if (entry.fastMode !== undefined && typeof entry.fastMode !== "boolean") {
+      issues.push({
+        message: "must be true or false",
+        path: [...entryPath, "fastMode"],
+      });
+    }
+    requireReasoningConfig(entry.reasoning, issues, [...entryPath, "reasoning"]);
   });
+}
+
+/**
+ * Optional per-model reasoning declaration (MDL.4): an ordered, non-empty
+ * list of provider-vocabulary levels plus a default that is one of them. Not
+ * validating the level strings against a fixed set is deliberate — that
+ * vocabulary belongs to the provider, not this schema.
+ */
+function requireReasoningConfig(
+  candidate: unknown,
+  issues: StandardSchemaV1Issue[],
+  path: string[],
+): void {
+  if (candidate === undefined) return;
+  if (!isRecord(candidate)) {
+    issues.push({ message: "must be an object", path });
+    return;
+  }
+  const levels = candidate.levels;
+  const levelsPath = [...path, "levels"];
+  const validLevels =
+    Array.isArray(levels) &&
+    levels.length > 0 &&
+    levels.every((level) => isNonEmptyText(level));
+  if (!validLevels) {
+    issues.push({
+      message: "must be a non-empty list of non-empty strings",
+      path: levelsPath,
+    });
+  }
+  const defaultLevel = candidate.default;
+  if (!isNonEmptyText(defaultLevel)) {
+    issues.push({
+      message: "must be a non-empty string",
+      path: [...path, "default"],
+    });
+  } else if (validLevels && !(levels as unknown[]).includes(defaultLevel)) {
+    issues.push({
+      message: "must be one of reasoning.levels",
+      path: [...path, "default"],
+    });
+  }
 }
 
 function isSupportedModelProvider(

@@ -48,6 +48,13 @@ export default defineAgent({
           ? {
               model: selection.model,
               modelContextWindowTokens: selection.modelContextWindowTokens,
+              // MDL.4: reasoning level / fast mode, resolved fresh every step
+              // alongside the model itself — see session-model.ts's
+              // applyReasoningSelection for how this is clamped against the
+              // preset's declaration.
+              ...(selection.modelOptions
+                ? { modelOptions: selection.modelOptions }
+                : {}),
             }
           : null
       },

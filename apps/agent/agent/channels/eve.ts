@@ -182,6 +182,14 @@ const channel = createOwnedEveChannel({
                 ...(sessionBinding.model
                   ? { model: sessionBinding.model }
                   : {}),
+                // MDL.4: mutable reasoning level / fast mode. Riding the same
+                // blob as `model` means it is re-minted fresh every turn (see
+                // agent-session-binding.ts), which is what makes it mutable
+                // without a fork — unlike `model`, this is a REQUEST
+                // parameter, not session identity.
+                ...(sessionBinding.requestOptions
+                  ? { requestOptions: sessionBinding.requestOptions }
+                  : {}),
               }),
               ...(sessionBinding.model
                 ? { sigilModelPresetId: sessionBinding.model.presetId }

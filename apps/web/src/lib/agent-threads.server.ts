@@ -4,7 +4,10 @@ import { mirkBackendFactory } from "@gonk/store/sqlite";
 import { MirkAgentContextReceiptRepository } from "@workspace/agent-tools/context-receipts";
 
 import { AgentThreadRepository } from "@/lib/agent-threads-domain";
-import type { AgentThreadExecutionBinding } from "@/lib/agent-threads-domain";
+import type {
+  AgentThreadExecutionBinding,
+  AgentThreadRequestOptions,
+} from "@/lib/agent-threads-domain";
 import { createThreadBindingService } from "@/lib/agent-thread-bindings.server";
 import { resolveSelectableModelPreset } from "@/lib/model-selection.server";
 import {
@@ -42,6 +45,14 @@ export const agentThreadBindingService = createThreadBindingService({
 export interface AgentThreadExecutionBindingRecord extends AgentThreadExecutionBinding {
   eveSessionId?: string;
   threadId: string;
+  /**
+   * The thread's LIVE mutable reasoning/fast-mode state (MDL.4), read fresh
+   * on every call — unlike every other field on this record, which is a
+   * snapshot of the immutable `executionBinding`. This is what lets
+   * agent-session-binding.ts mint a proof that reflects a mid-conversation
+   * reasoning change without touching session identity.
+   */
+  requestOptions?: AgentThreadRequestOptions;
 }
 
 export function ownedAgentThreadHomeScope(
@@ -70,6 +81,9 @@ export function resolveAgentThreadExecutionBinding(
     ...thread.executionBinding,
     ...(thread.runtime.session.sessionId
       ? { eveSessionId: thread.runtime.session.sessionId }
+      : {}),
+    ...(thread.requestOptions
+      ? { requestOptions: thread.requestOptions }
       : {}),
   };
 }

@@ -174,10 +174,89 @@ imageEdit:
             capability: "chat",
             enabled: true,
             isDeploymentDefault: true,
+            fastMode: false,
           },
         ],
       },
     ]);
+  });
+
+  it("declares reasoning levels and fast mode per model (MDL.4)", async () => {
+    const fixture = await loadSigilConfigFixture(
+      fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+          reasoning:
+            levels: [off, low, medium, high, xhigh, max]
+            default: medium
+          fastMode: true
+        - id: sol
+          model: gpt-5.6-sol
+${REST}`),
+    );
+
+    const presets = normalizeSigilAgentModelPresets(fixture.value.agent);
+    const luna = presets.find((preset) => preset.id === "codex/luna");
+    const sol = presets.find((preset) => preset.id === "codex/sol");
+    const deploymentDefault = presets.find(
+      (preset) => preset.id === "deployment-default",
+    );
+
+    expect(luna?.reasoning).toEqual({
+      levels: ["off", "low", "medium", "high", "xhigh", "max"],
+      default: "medium",
+    });
+    expect(luna?.fastMode).toBe(true);
+
+    // No declaration → no control (AC2/AC3/AC5): absent, not a guessed default.
+    expect(sol?.reasoning).toBeUndefined();
+    expect(sol?.fastMode).toBe(false);
+    expect(deploymentDefault?.reasoning).toBeUndefined();
+    expect(deploymentDefault?.fastMode).toBe(false);
+  });
+
+  it("fails before startup on a malformed reasoning declaration", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+          reasoning:
+            levels: []
+            default: medium
+${REST}`),
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+          reasoning:
+            levels: [low, medium, high]
+            default: extreme
+${REST}`),
+      ),
+    ).rejects.toThrow();
   });
 
   it("adds a hosted vendor with fixture data alone, models namespaced by provider", async () => {

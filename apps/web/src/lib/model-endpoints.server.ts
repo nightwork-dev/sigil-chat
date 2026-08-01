@@ -22,6 +22,7 @@ import {
   type ModelEndpointInventory,
   type ModelEndpointProbeInput,
   type ModelEndpointProbeResult,
+  type ModelEndpointReasoningConfig,
   type ModelEndpointRecord,
   type ModelProviderRecord,
 } from "./model-endpoints"
@@ -155,6 +156,10 @@ function projectModel(candidate: unknown): ModelEndpointRecord[] {
           : 0,
       isDeploymentDefault: entry.isDeploymentDefault === true,
       ...(entry.discovered === true ? { discovered: true } : {}),
+      ...(projectReasoning(entry.reasoning)
+        ? { reasoning: projectReasoning(entry.reasoning) }
+        : {}),
+      fastMode: entry.fastMode === true,
     },
   ]
 }
@@ -166,6 +171,19 @@ function projectCatalogStatus(value: unknown): ModelCatalogStatus | undefined {
   if (!checkedAt) return undefined
   const error = text(entry.error)
   return { checkedAt, ...(error ? { error } : {}) }
+}
+
+function projectReasoning(
+  candidate: unknown,
+): ModelEndpointReasoningConfig | undefined {
+  if (typeof candidate !== "object" || candidate === null) return undefined
+  const entry = candidate as Record<string, unknown>
+  const levels = Array.isArray(entry.levels)
+    ? entry.levels.filter((level): level is string => typeof level === "string")
+    : []
+  const defaultLevel = text(entry.default)
+  if (levels.length === 0 || !defaultLevel) return undefined
+  return { levels, default: defaultLevel }
 }
 
 export function projectProbeResult(payload: unknown): ModelEndpointProbeResult {

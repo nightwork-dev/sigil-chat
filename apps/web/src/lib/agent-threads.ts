@@ -11,6 +11,7 @@ import { projectAgentThreadSummary } from "@/lib/agent-threads-domain";
 import type {
   AgentThread,
   AgentThreadPreference,
+  AgentThreadRequestOptions,
   AgentThreadSnapshot,
   AgentThreadSummary,
   ForkAgentThreadInput,
@@ -26,6 +27,7 @@ export type {
   AgentThreadForkMessage,
   AgentThreadForkSeed,
   AgentThreadPreference,
+  AgentThreadRequestOptions,
   AgentThreadSnapshot,
   AgentThreadStatus,
   AgentThreadSummary,
@@ -200,6 +202,26 @@ const renameAgentThreadFn = createServerFn({ method: "POST" })
       session.user.id,
       data.id,
       data.title,
+      data.expectedRevision,
+    );
+  });
+
+const setAgentThreadRequestOptionsFn = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      id: string;
+      requestOptions: AgentThreadRequestOptions;
+      expectedRevision?: number;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { agentThreadRepository } =
+      await import("@/lib/agent-threads.server");
+    const session = await requireThreadSession();
+    return agentThreadRepository.setRequestOptions(
+      session.user.id,
+      data.id,
+      data.requestOptions,
       data.expectedRevision,
     );
   });
@@ -462,6 +484,28 @@ export function useRenameAgentThread() {
     onSuccess: async (thread) => {
       cacheThread(queryClient, principalId, thread);
       await invalidateHomeSignals(queryClient, principalId);
+    },
+  });
+}
+
+/**
+ * MDL.4: mutate a thread's reasoning level / fast mode. Unlike model
+ * selection, this never forks — the mutation targets the live thread, and
+ * `onSuccess` caches the server's returned thread so the composer always
+ * shows what is actually persisted (and therefore what the next turn will
+ * run with), never an optimistic echo of the request.
+ */
+export function useSetAgentThreadRequestOptions() {
+  const queryClient = useQueryClient();
+  const principalId = useAgentPrincipalId();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      requestOptions: AgentThreadRequestOptions;
+      expectedRevision?: number;
+    }) => setAgentThreadRequestOptionsFn({ data: input }),
+    onSuccess: (thread) => {
+      cacheThread(queryClient, principalId, thread);
     },
   });
 }

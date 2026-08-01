@@ -62,6 +62,21 @@ export interface AgentThreadExecutionBinding {
   model?: BoundAgentModel;
 }
 
+/**
+ * Mutable per-turn request parameters (MDL.4): reasoning level and fast
+ * mode.
+ *
+ * Lives as a sibling of `executionBinding`, never inside it — the binding is
+ * immutable session identity once set (`bindExecution` refuses a second
+ * write), while this is meant to change freely mid-conversation. See
+ * `setRequestOptions` below and `agent-session-binding.ts`, which re-mints
+ * the signed proof from this live field on every turn.
+ */
+export interface AgentThreadRequestOptions {
+  reasoningLevel?: string;
+  fastMode?: boolean;
+}
+
 export interface AgentThread {
   members: string[];
   id: string;
@@ -76,6 +91,8 @@ export interface AgentThread {
   slug: string;
   personaId: string;
   executionBinding?: AgentThreadExecutionBinding;
+  /** See {@link AgentThreadRequestOptions}. Absent is the ordinary state. */
+  requestOptions?: AgentThreadRequestOptions;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -113,6 +130,7 @@ export interface AgentThreadSummary {
   slug: string;
   personaId: string;
   executionBinding?: AgentThreadExecutionBinding;
+  requestOptions?: AgentThreadRequestOptions;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -473,6 +491,32 @@ export class AgentThreadRepository {
     }));
   }
 
+  /**
+   * Replaces the thread's mutable reasoning level / fast mode (MDL.4).
+   *
+   * Unlike `bindExecution`, this never refuses a second write — that is the
+   * entire point of keeping it out of `executionBinding`. An empty object
+   * clears both fields rather than requiring a separate "unset" call.
+   */
+  setRequestOptions(
+    userId: string,
+    id: string,
+    requestOptions: AgentThreadRequestOptions,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => {
+      const normalized = normalizeRequestOptions(requestOptions);
+      const next = { ...thread };
+      if (normalized) next.requestOptions = normalized;
+      else delete next.requestOptions;
+      return {
+        ...next,
+        updatedAt: timestamp,
+        revision: thread.revision + 1,
+      };
+    });
+  }
+
   archive(userId: string, id: string, expectedRevision?: number): AgentThread {
     const archived = this.update(
       userId,
@@ -751,6 +795,9 @@ export function projectAgentThreadSummary(
     ...(thread.executionBinding
       ? { executionBinding: cloneExecutionBinding(thread.executionBinding) }
       : {}),
+    ...(thread.requestOptions
+      ? { requestOptions: { ...thread.requestOptions } }
+      : {}),
     title: thread.title,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
@@ -823,6 +870,20 @@ function trimmedForkMessage(
 function normalizeTitle(title?: string): string {
   const normalized = title?.trim();
   return normalized || DEFAULT_THREAD_TITLE;
+}
+
+/** Returns undefined when both fields are absent, so the caller can delete
+ *  the thread's `requestOptions` key rather than store an empty object. */
+function normalizeRequestOptions(
+  input: AgentThreadRequestOptions,
+): AgentThreadRequestOptions | undefined {
+  const reasoningLevel = input.reasoningLevel?.trim() || undefined;
+  const fastMode = input.fastMode === true ? true : undefined;
+  if (reasoningLevel === undefined && fastMode === undefined) return undefined;
+  return {
+    ...(reasoningLevel !== undefined ? { reasoningLevel } : {}),
+    ...(fastMode !== undefined ? { fastMode } : {}),
+  };
 }
 
 function normalizePersonaId(personaId: string): string {

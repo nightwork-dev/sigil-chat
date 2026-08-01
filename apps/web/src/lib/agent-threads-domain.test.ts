@@ -449,6 +449,69 @@ describe("AgentThreadRepository", () => {
     ).toThrow(AgentThreadConflictError);
   });
 
+  it("sets and replaces mutable request options without a fork (MDL.4)", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
+    expect(thread.requestOptions).toBeUndefined();
+
+    const withLevel = repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "high" },
+      thread.revision,
+    );
+    expect(withLevel.requestOptions).toEqual({ reasoningLevel: "high" });
+    // A second write is not "immutable execution binding" — unlike
+    // bindExecution, this never throws on a change.
+    const withBoth = repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "low", fastMode: true },
+      withLevel.revision,
+    );
+    expect(withBoth.requestOptions).toEqual({
+      reasoningLevel: "low",
+      fastMode: true,
+    });
+    expect(repo.get(USER_A, thread.id)?.requestOptions).toEqual(
+      withBoth.requestOptions,
+    );
+  });
+
+  it("clears request options when both fields are empty", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
+    const set = repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "high" },
+      thread.revision,
+    );
+    const cleared = repo.setRequestOptions(USER_A, thread.id, {}, set.revision);
+    expect(cleared.requestOptions).toBeUndefined();
+    expect("requestOptions" in cleared).toBe(false);
+  });
+
+  it("rejects a stale request-options write", () => {
+    const repo = repository();
+    const thread = repo.create(USER_A);
+    repo.setRequestOptions(
+      USER_A,
+      thread.id,
+      { reasoningLevel: "high" },
+      thread.revision,
+    );
+
+    expect(() =>
+      repo.setRequestOptions(
+        USER_A,
+        thread.id,
+        { reasoningLevel: "low" },
+        thread.revision,
+      ),
+    ).toThrow(AgentThreadConflictError);
+  });
+
   it("archives a thread and moves the active preference to another thread", () => {
     const repo = repository();
     const first = repo.create(USER_A, { title: "First" });

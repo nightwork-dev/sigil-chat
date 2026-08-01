@@ -38,6 +38,7 @@ import {
   type NormalizedSigilAgentModelPreset,
   type NormalizedSigilAgentProvider,
   type SigilAgentConfig,
+  type SigilAgentModelReasoningConfig,
 } from "@workspace/runtime-env/config"
 
 import {
@@ -97,6 +98,13 @@ export interface ModelEndpointRecord {
    * matches an authored row exactly.
    */
   discovered?: boolean
+  /**
+   * MDL.4: declared, never sniffed. Absent means this model shows no
+   * reasoning control at all in the chat composer.
+   */
+  reasoning?: SigilAgentModelReasoningConfig
+  /** MDL.4: absent/false means no fast-mode control for this model. */
+  fastMode: boolean
 }
 
 /**
@@ -365,6 +373,8 @@ async function describeProvider(
       contextWindowTokens:
         model.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
       isDeploymentDefault: model.isDeploymentDefault,
+      ...(model.reasoning ? { reasoning: model.reasoning } : {}),
+      fastMode: model.fastMode,
     }),
   )
 
@@ -398,6 +408,9 @@ async function describeProvider(
       contextWindowTokens: defaultContextWindowTokens,
       isDeploymentDefault: false,
       discovered: true,
+      // A discovered model has no fixture declaration, so it can't declare
+      // reasoning levels or fast mode (MDL.4: declared, never sniffed).
+      fastMode: false,
     })
   }
 
