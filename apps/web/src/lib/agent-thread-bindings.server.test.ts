@@ -1,4 +1,5 @@
 import type { KvStore } from "@gonk/store/types"
+import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"
 import { describe, expect, it } from "vitest"
 
 import { PersonalScopeRegistry } from "../../../agent/agent/lib/personal-scope"
@@ -57,7 +58,9 @@ class MemoryKv<T> implements AgentThreadKvStore<T>, KvStore<T> {
   }
 }
 
-function fixture() {
+function fixture(
+  resolveModelPreset?: (presetId: string) => BoundAgentModel | undefined,
+) {
   const projects = new ProjectRegistry({ store: new MemoryKv<unknown>() })
   projects.upsert({
     id: PROJECT,
@@ -119,6 +122,7 @@ function fixture() {
     registries: { projects, workspaces, personalScopes, scopes, grants },
     loadNav: () => nav,
     resolvePerspective: resolveScopePerspective,
+    ...(resolveModelPreset ? { resolveModelPreset } : {}),
   })
   return {
     grants,
@@ -334,5 +338,108 @@ describe("agent thread binding service", () => {
     expect(() =>
       service.resolveExecution("user-other", executionLegacy.id),
     ).toThrow(`Agent thread ${executionLegacy.id} was not found.`)
+  })
+})
+
+describe("mid-session model rebinding (MDL.5)", () => {
+  const LUNA: BoundAgentModel = {
+    presetId: "codex/luna",
+    provider: "codex",
+    modelId: "gpt-5.6-luna",
+  }
+  const SOL: BoundAgentModel = {
+    presetId: "codex/sol",
+    provider: "codex",
+    modelId: "gpt-5.6-sol",
+  }
+
+  /** Stands in for the installation allow-list: sol is enabled, luna is not. */
+  const allowList = (presetId: string) =>
+    presetId === "codex/sol" ? SOL : undefined
+
+  it("rebinds a live thread without forking it", () => {
+    const { service, repository } = fixture((presetId) =>
+      presetId === "codex/luna" ? LUNA : allowList(presetId),
+    )
+    const thread = service.create(PRINCIPAL, {
+      personaId: "sigil-chat-eve",
+      modelPresetId: "codex/luna",
+    })
+    expect(thread.executionBinding?.model).toEqual(LUNA)
+
+    const rebound = service.rebindModel(
+      PRINCIPAL,
+      thread.id,
+      "codex/sol",
+      thread.revision,
+    )
+
+    expect(rebound.id).toBe(thread.id)
+    expect(rebound.executionBinding?.model).toEqual(SOL)
+    // Same thread, not a new one: one record before and after.
+    expect(repository.list(PRINCIPAL, true).map((each) => each.id)).toEqual([
+      thread.id,
+    ])
+  })
+
+  it("refuses a preset the allow-list does not resolve, and leaves the model bound", () => {
+    const { service } = fixture(allowList)
+    const thread = service.create(PRINCIPAL, {
+      personaId: "sigil-chat-eve",
+      modelPresetId: "codex/sol",
+    })
+
+    // The identical id the create path would also refuse, refused by the same
+    // function — naming it directly gains the caller nothing.
+    expect(() =>
+      service.rebindModel(PRINCIPAL, thread.id, "codex/luna", thread.revision),
+    ).toThrow("EVE_MODEL_PRESET_NOT_SELECTABLE")
+    expect(() =>
+      service.create(PRINCIPAL, {
+        personaId: "sigil-chat-eve",
+        modelPresetId: "codex/luna",
+      }),
+    ).toThrow("EVE_MODEL_PRESET_NOT_SELECTABLE")
+
+    expect(
+      service.resolveExecution(PRINCIPAL, thread.id).executionBinding?.model,
+    ).toEqual(SOL)
+  })
+
+  it("clears the selection back to the deployment default", () => {
+    const { service } = fixture(allowList)
+    const thread = service.create(PRINCIPAL, {
+      personaId: "sigil-chat-eve",
+      modelPresetId: "codex/sol",
+    })
+
+    const cleared = service.rebindModel(
+      PRINCIPAL,
+      thread.id,
+      undefined,
+      thread.revision,
+    )
+    expect(cleared.executionBinding?.model).toBeUndefined()
+    expect(cleared.executionBinding?.homeScopeId).toBe(
+      `personal-scope:${PRINCIPAL}`,
+    )
+  })
+
+  it("binds a pre-binding thread before swapping its model", () => {
+    const { service, repository } = fixture(allowList)
+    const legacy = repository.create(PRINCIPAL, { personaId: "sigil-chat-eve" })
+    expect(legacy.executionBinding).toBeUndefined()
+
+    // The client's revision expectation is legitimately stale here: binding
+    // the legacy thread consumed one. The service reconciles rather than
+    // failing a change the user did make.
+    const rebound = service.rebindModel(
+      PRINCIPAL,
+      legacy.id,
+      "codex/sol",
+      legacy.revision,
+    )
+    expect(rebound.executionBinding?.model).toEqual(SOL)
+    expect(rebound.executionBinding?.principalId).toBe(PRINCIPAL)
   })
 })

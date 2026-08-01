@@ -21,7 +21,6 @@ import {
   type UploadedFile,
 } from "@workspace/ui/hooks/use-attachments"
 import { imageMediaTypeFromUrl } from "@workspace/ui/lib/image-url"
-import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 import {
   Alert,
   AlertDescription,
@@ -47,26 +46,19 @@ import { cn } from "@workspace/ui/lib/utils"
 import { AddMenu } from "@/components/agent/add-menu"
 import { AgentChatHeader } from "@/components/agent/agent-chat-header"
 import { AgentTranscriptMessage } from "@/components/agent/agent-message"
+import { ComposerModelControl } from "@/components/agent/composer-model-control"
 import { ComposerVoiceControl } from "@/components/agent/voice-composer-control"
 import { LiveVoiceComposerControl } from "@/components/agent/live-voice-composer-control"
 import { VoiceConversationControl } from "@/components/agent/voice-conversation-control"
 import { useWorkspaceResourceScope } from "@/components/agent/workspace-attention"
 import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
-import { useAgentRuntimeCatalog } from "@/lib/agent-catalog"
-import {
-  useAgentThread,
-  useSetAgentThreadRequestOptions,
-  type AgentThread,
-  type AgentThreadRequestOptions,
-} from "@/lib/agent-threads"
-import { useModelEndpoints } from "@/lib/model-endpoints"
+import { useAgentThread } from "@/lib/agent-threads"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
 import { appendDictationDraft } from "@/lib/voice-dictation"
 import { useSpeakReplies } from "@/lib/agent-preferences"
 import { useSpokenAgentReplies } from "@/lib/spoken-replies"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
-import type { BoundAgentModel } from "@workspace/agent-contracts/model-binding"
 import type { VoiceBoundThread } from "@/lib/voice-session-binding"
 import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
@@ -360,12 +352,12 @@ export function AgentChat({
         }
         trailingControls={
           <>
-            {hideHeader ? (
-              <ModelLabel bound={activeThread.data?.executionBinding?.model} />
-            ) : null}
-            {hideHeader && activeThread.data ? (
-              <ReasoningControls thread={activeThread.data} />
-            ) : null}
+            {/* MDL.5 — unconditional, in both header modes and at every
+                width. Its predecessors (a label rendered only when the
+                header was hidden, plus reasoning chips that vanish for a
+                model declaring no tunables) meant a user in a chat could
+                neither see nor change the model. */}
+            <ComposerModelControl thread={activeThread.data} />
             {/* The mode switch sits immediately before the mic it changes:
                 with it on, the same press-to-talk gesture sends instead of
                 drafting, and Eve's finished replies are spoken back. */}
@@ -436,97 +428,6 @@ function ApprovalChip({
         <SelectItem value="always">Always allow</SelectItem>
       </SelectContent>
     </Select>
-  )
-}
-
-/** §9.7 — the model this thread actually runs. The thread's immutable bound
- *  model wins; the runtime catalog's deployment default is only the fallback
- *  for threads that made no selection. A deployment-global label here would
- *  misreport every non-default session (it did, before per-session binding). */
-function ModelLabel({ bound }: { bound?: BoundAgentModel }) {
-  const catalog = useAgentRuntimeCatalog()
-  const name = catalog.data?.agent.name ?? "Eve"
-  const model = bound
-    ? `${bound.provider}/${bound.modelId}`
-    : catalog.data?.agent.model
-  return (
-    <span className="hidden shrink-0 truncate px-1.5 font-mono text-[10px] text-muted-foreground sm:inline">
-      {name}
-      {model ? ` · ${model}` : ""}
-    </span>
-  )
-}
-
-/**
- * MDL.4 — reasoning level and fast mode, seated beside the model label they
- * describe. Renders nothing when the bound model declares neither control
- * (AC2/AC3): a model with no `reasoning`/`fastMode` fixture declaration is
- * indistinguishable from one this component has never heard of.
- *
- * Reads `thread.requestOptions` — never local state — so what is shown is
- * always the last value the server persisted, i.e. what the NEXT turn will
- * actually run with. `useSetAgentThreadRequestOptions`'s `onSuccess` caches
- * the server's returned thread, so a change round-trips through the same
- * "resolved, not optimistic" path the model label already uses.
- */
-function ReasoningControls({ thread }: { thread: AgentThread }) {
-  const endpoints = useModelEndpoints()
-  const setRequestOptions = useSetAgentThreadRequestOptions()
-  const presetId =
-    thread.executionBinding?.model?.presetId ?? DEPLOYMENT_DEFAULT_PRESET_ID
-  const record = endpoints.data?.providers
-    .flatMap((provider) => provider.models)
-    .find((model) => model.id === presetId)
-  if (!record || (!record.reasoning && !record.fastMode)) return null
-
-  const current = thread.requestOptions
-  function apply(next: AgentThreadRequestOptions) {
-    setRequestOptions.mutate({
-      id: thread.id,
-      requestOptions: { ...current, ...next },
-      expectedRevision: thread.revision,
-    })
-  }
-
-  return (
-    <>
-      {record.reasoning ? (
-        <Select
-          disabled={setRequestOptions.isPending}
-          onValueChange={(value) => {
-            if (value) apply({ reasoningLevel: value })
-          }}
-          value={current?.reasoningLevel ?? record.reasoning.default}
-        >
-          <ToneChip
-            aria-label="Reasoning level"
-            render={<SelectTrigger size="sm" />}
-            title="Reasoning level"
-          >
-            <SelectValue />
-          </ToneChip>
-          <SelectContent align="start">
-            {record.reasoning.levels.map((level) => (
-              <SelectItem key={level} value={level}>
-                {level}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : null}
-      {record.fastMode ? (
-        <ToneChip
-          aria-label="Fast mode"
-          aria-pressed={current?.fastMode === true}
-          disabled={setRequestOptions.isPending}
-          onClick={() => apply({ fastMode: !current?.fastMode })}
-          title="Fast mode"
-          tone={current?.fastMode === true ? "info" : "muted"}
-        >
-          Fast
-        </ToneChip>
-      ) : null}
-    </>
   )
 }
 

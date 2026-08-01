@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  findModelRecord,
   InvalidProbeRequestError,
   parseProbeInput,
   providerFixtureSnippet,
+  selectableModelProviders,
   suggestProviderId,
+  type ModelProviderRecord,
 } from "./model-endpoints"
 import { projectProviders, projectProbeResult } from "./model-endpoints.server"
 
@@ -388,5 +391,104 @@ describe("fixture snippet", () => {
       "127-0-0-1-qwen3-6-27b",
     )
     expect(suggestProviderId("not a url", "")).toBe("local")
+  })
+})
+
+describe("selectable narrowing (MDL.5)", () => {
+  const providers: ModelProviderRecord[] = [
+    {
+      id: "codex",
+      label: "Codex",
+      kind: "codex",
+      enabled: true,
+      credential: { required: false, present: true },
+      models: [
+        {
+          id: "default",
+          label: "Deployment default",
+          model: "gpt-5.6-terra",
+          capability: "chat",
+          enabled: true,
+          contextWindowTokens: 372_000,
+          isDeploymentDefault: true,
+          fastMode: true,
+          reasoning: { levels: ["low", "high"], default: "low" },
+        },
+        {
+          id: "codex/luna",
+          label: "Luna",
+          model: "gpt-5.6-luna",
+          capability: "chat",
+          enabled: true,
+          contextWindowTokens: 372_000,
+          isDeploymentDefault: false,
+          fastMode: false,
+        },
+        {
+          id: "codex/retired",
+          label: "Retired",
+          model: "gpt-5.5",
+          capability: "chat",
+          // The fixture author's veto, which an owner cannot override.
+          enabled: false,
+          contextWindowTokens: 200_000,
+          isDeploymentDefault: false,
+          fastMode: false,
+        },
+      ],
+    },
+    {
+      id: "local",
+      label: "LM Studio",
+      kind: "openai-compatible",
+      enabled: true,
+      credential: { required: false, present: true },
+      models: [
+        {
+          id: "local/qwen",
+          label: "Qwen",
+          model: "qwen3-30b",
+          capability: "chat",
+          enabled: true,
+          contextWindowTokens: 32_000,
+          isDeploymentDefault: false,
+          fastMode: false,
+        },
+      ],
+    },
+  ]
+
+  it("offers only enabled models and drops providers left with none", () => {
+    const selectable = selectableModelProviders(providers, ["codex/luna"])
+
+    expect(selectable.map((provider) => provider.id)).toEqual(["codex"])
+    expect(selectable[0]?.models.map((model) => model.id)).toEqual([
+      // The deployment default is always available — a chat with no model of
+      // its own runs it, so it cannot be switched off.
+      "default",
+      "codex/luna",
+    ])
+  })
+
+  it("keeps a fixture-vetoed model unofferable even when an owner enables its id", () => {
+    const selectable = selectableModelProviders(providers, [
+      "codex/retired",
+      "local/qwen",
+    ])
+
+    expect(
+      selectable.flatMap((provider) =>
+        provider.models.map((model) => model.id),
+      ),
+    ).toEqual(["default", "local/qwen"])
+  })
+
+  it("finds a model row across providers, and reports a miss", () => {
+    expect(findModelRecord(providers, "local/qwen")?.model).toBe("qwen3-30b")
+    expect(findModelRecord(providers, "default")?.reasoning?.levels).toEqual([
+      "low",
+      "high",
+    ])
+    expect(findModelRecord(providers, "codex/nothing")).toBeUndefined()
   })
 })

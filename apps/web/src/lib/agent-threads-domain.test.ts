@@ -429,6 +429,82 @@ describe("AgentThreadRepository", () => {
     ).toThrow("execution binding is immutable")
   })
 
+  it("swaps the bound model mid-session while identity stays frozen (MDL.5)", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    const binding = {
+      principalId: USER_A,
+      personaId: thread.personaId,
+      homeScopeId: "workspace-1",
+      initialPerspective: { focusScopeId: "workspace-1", viaScopeIds: [] },
+      additionalContextScopeIds: [],
+      model: {
+        presetId: "codex/luna",
+        provider: "codex",
+        modelId: "gpt-5.6-luna",
+      },
+    }
+    const bound = repo.bindExecution(USER_A, thread.id, binding, thread.revision)
+
+    const swapped = repo.setExecutionModel(
+      USER_A,
+      thread.id,
+      { presetId: "codex/sol", provider: "codex", modelId: "gpt-5.6-sol" },
+      bound.revision,
+    )
+    expect(swapped.executionBinding?.model).toEqual({
+      presetId: "codex/sol",
+      provider: "codex",
+      modelId: "gpt-5.6-sol",
+    })
+    // The point of narrowing rather than removing the guard: everything that
+    // authorizes the session is untouched by a model change.
+    expect(swapped.executionBinding?.principalId).toBe(USER_A)
+    expect(swapped.executionBinding?.homeScopeId).toBe("workspace-1")
+    expect(swapped.executionBinding?.initialPerspective).toEqual(
+      binding.initialPerspective,
+    )
+    expect(swapped.revision).toBe(bound.revision + 1)
+    expect(repo.get(USER_A, thread.id)?.executionBinding?.model?.presetId).toBe(
+      "codex/sol",
+    )
+
+    // ...and the whole-binding rewrite is still refused, on the same thread,
+    // after a model change has been made.
+    expect(() =>
+      repo.bindExecution(USER_A, thread.id, {
+        ...binding,
+        homeScopeId: "workspace-2",
+      }),
+    ).toThrow("execution binding is immutable")
+
+    // Clearing returns the thread to the deployment default rather than
+    // inventing a third state.
+    const cleared = repo.setExecutionModel(
+      USER_A,
+      thread.id,
+      undefined,
+      swapped.revision,
+    )
+    expect(cleared.executionBinding?.model).toBeUndefined()
+    expect(cleared.executionBinding?.homeScopeId).toBe("workspace-1")
+  })
+
+  it("refuses a model change on a thread that has no binding yet (MDL.5)", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    expect(thread.executionBinding).toBeUndefined()
+
+    expect(() =>
+      repo.setExecutionModel(
+        USER_A,
+        thread.id,
+        { presetId: "codex/luna", provider: "codex", modelId: "gpt-5.6-luna" },
+        thread.revision,
+      ),
+    ).toThrow("no execution binding")
+  })
+
   it("rejects stale optimistic writes", () => {
     const repo = repository()
     const thread = repo.create(USER_A)

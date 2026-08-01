@@ -45,6 +45,7 @@ import {
   formatContextWindow,
   formatRelativeTime,
   providerFixtureSnippet,
+  selectableModelProviders,
   suggestProviderId,
   useModelEndpoints,
   useProbeModelEndpoint,
@@ -200,17 +201,9 @@ function NewChatModelPicker({
   disabled: boolean
   onChange: (next: string) => void
 }) {
-  // Only what a new chat can actually be created on. Offering an unavailable
-  // model would produce a control that appears to work and a chat that refuses
-  // to start — the server applies the same rule regardless of what is listed.
-  const selectable = providers
-    .map((provider) => ({
-      ...provider,
-      models: provider.models.filter((model) =>
-        isModelEnabledForNewSessions(model, enabledIds),
-      ),
-    }))
-    .filter((provider) => provider.models.length > 0)
+  // Only what a new chat can actually be created on — the same narrowing the
+  // composer's model control applies, from the same function.
+  const selectable = selectableModelProviders(providers, enabledIds)
 
   return (
     <div className="flex flex-col gap-1.5">
