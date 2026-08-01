@@ -39,6 +39,42 @@ import {
 /** Attribute key eve.ts writes the verified execution binding into. */
 export const EXECUTION_BINDING_ATTRIBUTE = "sigilExecutionBinding"
 
+/** Why a bound model could not be honoured. */
+export type UnresolvedBoundModelReason =
+  | "preset-not-found"
+  | "provider-unavailable"
+
+export interface UnresolvedBoundModelEvent {
+  readonly presetId: string
+  readonly reason: UnresolvedBoundModelReason
+  readonly detail?: string
+}
+
+export interface ResolveSessionModelOptions
+  extends ResolveSigilAgentModelOptions {
+  /**
+   * Called when a session's bound model cannot be honoured and the deployment
+   * default will be used instead.
+   *
+   * Falling back is correct — a conversation should not die because a fixture
+   * was edited — but it MUST NOT be silent. A user who chose luna and is
+   * quietly answered by terra has no way to tell, and neither does an
+   * operator reading a transcript later.
+   */
+  readonly onUnresolved?: (event: UnresolvedBoundModelEvent) => void
+}
+
+/** Default sink: a warning naming the id that no longer resolves. */
+export function warnUnresolvedBoundModel(
+  event: UnresolvedBoundModelEvent,
+): void {
+  console.warn(
+    `[sigil] session model "${event.presetId}" could not be resolved (${event.reason}${
+      event.detail ? `: ${event.detail}` : ""
+    }); falling back to the deployment default.`,
+  )
+}
+
 export interface SessionModelSelection {
   readonly model: LanguageModel | string
   readonly modelContextWindowTokens: number
@@ -94,11 +130,18 @@ export function readBoundModelFromAttributes(
 export function resolveSessionModel(
   agent: SigilAgentConfig,
   bound: BoundAgentModel | undefined,
-  options: ResolveSigilAgentModelOptions = {},
+  options: ResolveSessionModelOptions = {},
 ): SessionModelSelection | null {
+  // No bound model is the ordinary default-session case, not a failure, so it
+  // is silent. Everything below is a session that ASKED for something and did
+  // not get it.
   if (!bound) return null
+  const report = options.onUnresolved ?? warnUnresolvedBoundModel
   const preset = findModelPreset(agent, bound.presetId)
-  if (!preset) return null
+  if (!preset) {
+    report({ presetId: bound.presetId, reason: "preset-not-found" })
+    return null
+  }
   try {
     const resolved = resolveSigilAgentModel(
       {
@@ -122,9 +165,14 @@ export function resolveSessionModel(
       provider: preset.provider,
       modelId: preset.model,
     }
-  } catch {
+  } catch (error) {
     // MissingModelCredentialError and friends: a session should degrade to the
-    // deployment default, not fail to start.
+    // deployment default, not fail to start — but say so.
+    report({
+      presetId: bound.presetId,
+      reason: "provider-unavailable",
+      detail: error instanceof Error ? error.message : undefined,
+    })
     return null
   }
 }
@@ -137,7 +185,7 @@ export function resolveSessionModel(
 export function resolveSessionModelFromAuth(
   agent: SigilAgentConfig,
   attributes: Readonly<Record<string, string | readonly string[]>> | undefined,
-  options: ResolveSigilAgentModelOptions = {},
+  options: ResolveSessionModelOptions = {},
 ): SessionModelSelection | null {
   return resolveSessionModel(
     agent,

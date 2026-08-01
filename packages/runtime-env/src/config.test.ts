@@ -7,6 +7,7 @@ import {
   loadSigilConfigFixture,
   normalizeSigilAgentModelConfig,
   normalizeSigilAgentModelPresets,
+  normalizeSigilAgentProviders,
 } from "./config.js";
 
 const temporaryDirectories: string[] = [];
@@ -136,12 +137,8 @@ imageEdit:
   });
 });
 
-describe("Sigil model presets", () => {
-  it("yields a single deployment-default entry when no presets are authored", async () => {
-    const path = fixturePath(`
-agent:
-  model: gpt-5.6-terra
-auth:
+describe("Sigil model providers", () => {
+  const REST = `auth:
   registration: closed
 branding:
   accent: "#b58b35"
@@ -152,174 +149,201 @@ branding:
 imageEdit:
   preset: flux2klein4b
   quality: fast
-`);
+`;
 
-    const fixture = await loadSigilConfigFixture(path);
+  it("yields a single deployment-default provider when none are authored", async () => {
+    const fixture = await loadSigilConfigFixture(
+      fixturePath(`agent:\n  model: gpt-5.6-terra\n${REST}`),
+    );
 
-    expect(normalizeSigilAgentModelPresets(fixture.value.agent)).toEqual([
+    expect(normalizeSigilAgentProviders(fixture.value.agent)).toEqual([
       {
-        id: "deployment-default",
-        label: "gpt-5.6-terra (Codex subscription)",
-        provider: "codex",
-        model: "gpt-5.6-terra",
-        source: "bare-slug",
-        isDeploymentDefault: true,
+        id: "deployment",
+        label: "Codex subscription",
+        kind: "codex",
+        enabled: true,
+        models: [
+          {
+            provider: "codex",
+            model: "gpt-5.6-terra",
+            source: "bare-slug",
+            id: "deployment-default",
+            label: "gpt-5.6-terra",
+            providerId: "deployment",
+            providerLabel: "Codex subscription",
+            capability: "chat",
+            enabled: true,
+            isDeploymentDefault: true,
+          },
+        ],
       },
     ]);
   });
 
-  it("adds a hosted vendor with fixture data alone", async () => {
-    const path = fixturePath(`
-agent:
+  it("adds a hosted vendor with fixture data alone, models namespaced by provider", async () => {
+    const fixture = await loadSigilConfigFixture(
+      fixturePath(`agent:
   model: gpt-5.6-terra
-  presets:
+  providers:
     - id: deepseek
       label: DeepSeek
-      provider: openai-compatible
-      model: deepseek-chat
+      kind: openai-compatible
       baseUrl: https://api.deepseek.com/v1
       apiKeyEnv: SIGIL_MODEL_DEEPSEEK_API_KEY
       contextWindowTokens: 65536
-auth:
-  registration: closed
-branding:
-  accent: "#b58b35"
-  description: A test workspace.
-  name: Test Sigil
-  shareImageUrl: /share.png
-  title: Test Sigil — conversations
-imageEdit:
-  preset: flux2klein4b
-  quality: fast
-`);
+      models:
+        - id: chat
+          model: deepseek-chat
+        - id: reasoner
+          model: deepseek-reasoner
+          contextWindowTokens: 131072
+${REST}`),
+    );
 
-    const fixture = await loadSigilConfigFixture(path);
     const presets = normalizeSigilAgentModelPresets(fixture.value.agent);
-
-    expect(presets).toHaveLength(2);
-    expect(presets[0]?.isDeploymentDefault).toBe(true);
-    expect(presets[1]).toEqual({
-      id: "deepseek",
-      label: "DeepSeek",
+    expect(presets.map((preset) => preset.id)).toEqual([
+      "deployment-default",
+      "deepseek/chat",
+      "deepseek/reasoner",
+    ]);
+    // Provider-level facts fan out to each model; a model may override.
+    expect(presets[1]).toMatchObject({
       provider: "openai-compatible",
       model: "deepseek-chat",
       baseUrl: "https://api.deepseek.com/v1",
       apiKeyEnv: "SIGIL_MODEL_DEEPSEEK_API_KEY",
       contextWindowTokens: 65536,
-      source: "object",
-      isDeploymentDefault: false,
+      providerId: "deepseek",
+      providerLabel: "DeepSeek",
+      capability: "chat",
+      enabled: true,
+    });
+    expect(presets[2]?.contextWindowTokens).toBe(131072);
+  });
+
+  it("resolves the shaped-but-unenforced enabled and capability slots", async () => {
+    const fixture = await loadSigilConfigFixture(
+      fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: off
+      label: Disabled vendor
+      kind: openai-compatible
+      baseUrl: https://api.vendor.com/v1
+      enabled: false
+      models:
+        - id: chat
+          model: vendor-chat
+          enabled: true
+    - id: embed
+      label: Embeddings
+      kind: openai-compatible
+      baseUrl: https://api.embed.com/v1
+      models:
+        - id: small
+          model: embed-small
+          capability: embedding
+          enabled: false
+${REST}`),
+    );
+
+    const presets = normalizeSigilAgentModelPresets(fixture.value.agent);
+    // A model inside a disabled provider is disabled regardless of its flag.
+    expect(presets[1]).toMatchObject({ id: "off/chat", enabled: false });
+    expect(presets[2]).toMatchObject({
+      id: "embed/small",
+      capability: "embedding",
+      enabled: false,
     });
   });
 
-  it("fails before startup when two presets claim the same id", async () => {
-    const path = fixturePath(`
-agent:
+  it("fails before startup when two providers claim the same id", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
   model: gpt-5.6-terra
-  presets:
+  providers:
     - id: local
       label: One
-      provider: openai-compatible
-      model: a
+      kind: openai-compatible
       baseUrl: http://127.0.0.1:1234/v1
+      models:
+        - id: a
+          model: a
     - id: local
       label: Two
-      provider: openai-compatible
-      model: b
+      kind: openai-compatible
       baseUrl: http://127.0.0.1:1235/v1
-auth:
-  registration: closed
-branding:
-  accent: "#b58b35"
-  description: A test workspace.
-  name: Test Sigil
-  shareImageUrl: /share.png
-  title: Test Sigil — conversations
-imageEdit:
-  preset: flux2klein4b
-  quality: fast
-`);
-
-    await expect(loadSigilConfigFixture(path)).rejects.toThrow(
-      /must be unique across presets/,
-    );
+      models:
+        - id: b
+          model: b
+${REST}`),
+      ),
+    ).rejects.toThrow(/must be unique across providers/);
   });
 
-  it("fails before startup when a preset claims the reserved default id", async () => {
-    const path = fixturePath(`
-agent:
+  it("fails before startup when two models in one provider claim the same id", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
   model: gpt-5.6-terra
-  presets:
-    - id: deployment-default
-      label: Impostor
-      provider: openai-compatible
-      model: a
-      baseUrl: http://127.0.0.1:1234/v1
-auth:
-  registration: closed
-branding:
-  accent: "#b58b35"
-  description: A test workspace.
-  name: Test Sigil
-  shareImageUrl: /share.png
-  title: Test Sigil — conversations
-imageEdit:
-  preset: flux2klein4b
-  quality: fast
-`);
-
-    await expect(loadSigilConfigFixture(path)).rejects.toThrow(
-      /reserved for agent\.model/,
-    );
-  });
-
-  it("fails before startup when a preset omits its label or a required base URL", async () => {
-    const path = fixturePath(`
-agent:
-  model: gpt-5.6-terra
-  presets:
+  providers:
     - id: local
-      provider: openai-compatible
-      model: a
-auth:
-  registration: closed
-branding:
-  accent: "#b58b35"
-  description: A test workspace.
-  name: Test Sigil
-  shareImageUrl: /share.png
-  title: Test Sigil — conversations
-imageEdit:
-  preset: flux2klein4b
-  quality: fast
-`);
-
-    await expect(loadSigilConfigFixture(path)).rejects.toThrow(
-      /must be a non-empty string|is required when provider is/,
-    );
+      label: Local
+      kind: openai-compatible
+      baseUrl: http://127.0.0.1:1234/v1
+      models:
+        - id: a
+          model: one
+        - id: a
+          model: two
+${REST}`),
+      ),
+    ).rejects.toThrow(/must be unique within its provider/);
   });
 
-  it("fails before startup when presets is not a list", async () => {
-    const path = fixturePath(`
-agent:
+  it("fails before startup when a provider claims the reserved id", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
   model: gpt-5.6-terra
-  presets:
-    deepseek: yes
-auth:
-  registration: closed
-branding:
-  accent: "#b58b35"
-  description: A test workspace.
-  name: Test Sigil
-  shareImageUrl: /share.png
-  title: Test Sigil — conversations
-imageEdit:
-  preset: flux2klein4b
-  quality: fast
-`);
+  providers:
+    - id: deployment
+      label: Impostor
+      kind: codex
+      models:
+        - id: a
+          model: a
+${REST}`),
+      ),
+    ).rejects.toThrow(/reserved for agent\.model/);
+  });
 
-    await expect(loadSigilConfigFixture(path)).rejects.toThrow(
-      /must be a list of model presets/,
-    );
+  it("fails before startup when a provider omits models or a required base URL", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    - id: local
+      label: Local
+      kind: openai-compatible
+      models: []
+${REST}`),
+      ),
+    ).rejects.toThrow(/must be a non-empty list of models|is required when kind is/);
+  });
+
+  it("fails before startup when providers is not a list", async () => {
+    await expect(
+      loadSigilConfigFixture(
+        fixturePath(`agent:
+  model: gpt-5.6-terra
+  providers:
+    deepseek: yes
+${REST}`),
+      ),
+    ).rejects.toThrow(/must be a list of providers/);
   });
 });
 

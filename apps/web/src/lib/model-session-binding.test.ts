@@ -23,7 +23,7 @@ const BASE = {
 }
 
 const LUNA = {
-  presetId: "luna",
+  presetId: "codex/luna",
   provider: "codex",
   modelId: "gpt-5.6-luna",
 } as const
@@ -33,9 +33,9 @@ describe("create request validation", () => {
     expect(
       parseCreateAgentThreadRequest({
         personaId: "eve",
-        modelPresetId: "  luna  ",
+        modelPresetId: "  codex/luna  ",
       }),
-    ).toMatchObject({ personaId: "eve", modelPresetId: "luna" })
+    ).toMatchObject({ personaId: "eve", modelPresetId: "codex/luna" })
   })
 
   it("accepts a request that names no model at all", () => {
@@ -66,12 +66,15 @@ describe("create request validation", () => {
   it("refuses a malformed preset id before it reaches the resolver", () => {
     for (const modelPresetId of [
       "",
-      "Luna",
+      "Codex/Luna",
       "../../etc",
-      "luna luna",
+      "codex/luna/extra",
+      "codex/",
+      "/luna",
+      "codex luna",
       7,
       { id: "luna" },
-      "a".repeat(65),
+      "a".repeat(130),
     ]) {
       expect(
         () => parseCreateAgentThreadRequest({ personaId: "eve", modelPresetId }),

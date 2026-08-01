@@ -1,58 +1,77 @@
 agent:
   model: gpt-5.6-terra
 
-  # Selectable model entries. Vendors live here, never in TypeScript: the
-  # resolver only knows transport kinds (codex / openai-compatible /
-  # openrouter / anthropic), and everything that makes DeepSeek different
-  # from Moonshot from a local LM Studio server is data on these rows.
-  # Adding a hosted OpenAI-compatible provider is an entry here plus its
-  # credential in the Eve environment — no code change.
+  # Provider entries. A provider states its transport kind, endpoint, and
+  # credential ONCE and fans out the models it offers; vendors live here, never
+  # in TypeScript. Adding a hosted OpenAI-compatible vendor is an entry here
+  # plus its credential in the Eve environment — no code change.
   #
   # Credentials are read from the environment by NAME. Never put a key here.
   #
+  # A model's selectable id is "<providerId>/<modelId>" — that is what a
+  # session's immutable binding records, so renaming either slug retires the
+  # old id (sessions bound to it fall back to the deployment default, loudly).
+  #
+  # `enabled` (provider and model) and `capability` (chat/embedding/voice) are
+  # accepted and normalized but NOT yet enforced — shaped now so the allow-list
+  # and embedding work land without another reshape.
+  #
   # Base URLs below were verified to exist and require auth (HTTP 401 on
-  # /models, 2026-07-31). The `model` on each hosted row is the vendor's
-  # documented default and can drift — Settings → Models → Probe lists what a
-  # given endpoint actually serves, which is the way to confirm it.
-  presets:
-    # David's first per-session use: same Codex subscription as the default,
-    # different model. No new credential, so selecting it needs nothing beyond
-    # the `codex login` the deployment already has.
-    - id: luna
-      label: GPT-5.6 Luna (Codex subscription)
-      provider: codex
-      model: gpt-5.6-luna
+  # /models, 2026-07-31). Hosted `model` ids are the vendor's documented
+  # default and can drift — Settings -> Models -> Probe lists what an endpoint
+  # actually serves, which is the way to confirm them.
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        # David's first per-session use: same subscription as the deployment
+        # default, different model. No new credential needed.
+        - id: luna
+          model: gpt-5.6-luna
+          label: GPT-5.6 Luna
+        - id: sol
+          model: gpt-5.6-sol
+          label: GPT-5.6 Sol
 
     - id: lmstudio-local
       label: LM Studio (local)
-      provider: openai-compatible
-      model: qwen3.6-27b
+      kind: openai-compatible
       baseUrl: http://127.0.0.1:1234/v1
       contextWindowTokens: 262144
+      models:
+        - id: qwen
+          model: qwen3.6-27b
 
     - id: deepseek
       label: DeepSeek
-      provider: openai-compatible
-      model: deepseek-chat
+      kind: openai-compatible
       baseUrl: https://api.deepseek.com/v1
       apiKeyEnv: SIGIL_MODEL_DEEPSEEK_API_KEY
       contextWindowTokens: 65536
+      models:
+        - id: chat
+          model: deepseek-chat
 
     - id: moonshot
       label: Moonshot (Kimi)
-      provider: openai-compatible
-      model: kimi-k2-0905-preview
+      kind: openai-compatible
       baseUrl: https://api.moonshot.ai/v1
       apiKeyEnv: SIGIL_MODEL_MOONSHOT_API_KEY
       contextWindowTokens: 131072
+      models:
+        - id: k2
+          model: kimi-k2-0905-preview
 
     - id: zai
       label: z.ai (GLM)
-      provider: openai-compatible
-      model: glm-4.6
+      kind: openai-compatible
       baseUrl: https://api.z.ai/api/paas/v4
       apiKeyEnv: SIGIL_MODEL_ZAI_API_KEY
       contextWindowTokens: 131072
+      models:
+        - id: glm
+          model: glm-4.6
 
 auth:
   registration: closed

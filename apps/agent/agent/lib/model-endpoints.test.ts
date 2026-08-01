@@ -14,22 +14,22 @@ import {
 
 const AGENT: SigilAgentConfig = {
   model: "gpt-5.6-terra",
-  presets: [
+  providers: [
     {
       id: "lmstudio-local",
       label: "LM Studio (local)",
-      provider: "openai-compatible",
-      model: "qwen3.6-27b",
+      kind: "openai-compatible",
       baseUrl: "http://127.0.0.1:1234/v1",
+      models: [{ id: "qwen", model: "qwen3.6-27b" }],
     },
     {
       id: "deepseek",
       label: "DeepSeek",
-      provider: "openai-compatible",
-      model: "deepseek-chat",
+      kind: "openai-compatible",
       baseUrl: "https://api.deepseek.com/v1",
       apiKeyEnv: "SIGIL_MODEL_DEEPSEEK_API_KEY",
       contextWindowTokens: 65_536,
+      models: [{ id: "chat", model: "deepseek-chat" }],
     },
   ],
 }
@@ -156,14 +156,14 @@ describe("probe credential resolution", () => {
       resolveProbeCredentialEnv(
         {
           model: "gpt-5.6-terra",
-          presets: [
+          providers: [
             {
               id: "sneaky",
               label: "Sneaky",
-              provider: "openai-compatible",
-              model: "a",
+              kind: "openai-compatible",
               baseUrl: "https://sneaky.example/v1",
               apiKeyEnv: "SIGIL_AGENT_BINDING_SECRET",
+              models: [{ id: "a", model: "a" }],
             },
           ],
         },
@@ -180,15 +180,24 @@ describe("model endpoint inventory", () => {
       { hasCodexModelAuth: async () => true },
     )
 
-    expect(inventory.endpoints).toEqual([
+    expect(inventory.providers).toEqual([
       {
-        id: "deployment-default",
-        label: "gpt-5.6-terra (Codex subscription)",
-        provider: "codex",
-        model: "gpt-5.6-terra",
-        contextWindowTokens: 200_000,
-        isDeploymentDefault: true,
+        id: "deployment",
+        label: "Codex subscription",
+        kind: "codex",
+        enabled: true,
         credential: { required: true, present: true },
+        models: [
+          {
+            id: "deployment-default",
+            label: "gpt-5.6-terra",
+            model: "gpt-5.6-terra",
+            capability: "chat",
+            enabled: true,
+            contextWindowTokens: 200_000,
+            isDeploymentDefault: true,
+          },
+        ],
       },
     ])
   })
@@ -199,11 +208,12 @@ describe("model endpoint inventory", () => {
       hasCodexModelAuth: async () => false,
     })
 
-    const [defaultEntry, lmstudio, deepseek] = inventory.endpoints
+    const [defaultEntry, lmstudio, deepseek] = inventory.providers
     expect(defaultEntry?.credential).toEqual({ required: true, present: false })
     // No key configured is a valid local-endpoint state, not a missing one.
     expect(lmstudio?.credential).toEqual({ required: false, present: true })
-    expect(lmstudio?.contextWindowTokens).toBe(200_000)
+    expect(lmstudio?.models[0]?.contextWindowTokens).toBe(200_000)
+    expect(lmstudio?.models[0]?.id).toBe("lmstudio-local/qwen")
     expect(deepseek?.credential).toEqual({
       envName: "SIGIL_MODEL_DEEPSEEK_API_KEY",
       required: true,
@@ -218,7 +228,7 @@ describe("model endpoint inventory", () => {
       hasCodexModelAuth: async () => true,
     })
 
-    expect(inventory.endpoints[2]?.credential).toEqual({
+    expect(inventory.providers[2]?.credential).toEqual({
       envName: "SIGIL_MODEL_DEEPSEEK_API_KEY",
       required: true,
       present: false,

@@ -116,42 +116,78 @@ profiles or thread bindings once those exist. Provider endpoints, credentials,
 and usage are installation state governed by
 [`MODEL-ADMINISTRATION-AND-USAGE-SPEC.md`](../specs/MODEL-ADMINISTRATION-AND-USAGE-SPEC.md).
 
-### Model presets
+### Model providers
 
-`agent.model` names the one model Eve resolves at startup. `agent.presets`
-names the others the deployment knows about, so a hosted OpenAI-compatible
-vendor is data rather than a code branch — the resolver only knows transport
-kinds, and the base URL, credential variable, default model, and context
-window that distinguish one vendor from another live entirely on these rows:
+`agent.model` names the one model Eve resolves at startup. `agent.providers`
+names everything else the deployment can run. A provider states its transport
+kind, endpoint, and credential **once** and fans out the models it offers, so a
+hosted OpenAI-compatible vendor is data rather than a code branch:
 
 ```yaml
 agent:
   model: gpt-5.6-terra
-  presets:
+  providers:
+    - id: codex
+      label: Codex subscription
+      kind: codex
+      models:
+        - id: luna
+          model: gpt-5.6-luna
+          label: GPT-5.6 Luna
+
     - id: deepseek
       label: DeepSeek
-      provider: openai-compatible
-      model: deepseek-chat
+      kind: openai-compatible
       baseUrl: https://api.deepseek.com/v1
       apiKeyEnv: SIGIL_MODEL_DEEPSEEK_API_KEY
       contextWindowTokens: 65536
+      models:
+        - id: chat
+          model: deepseek-chat
+        - id: reasoner
+          model: deepseek-reasoner
+          contextWindowTokens: 131072
 ```
 
-Each entry needs a unique lowercase-slug `id` and a `label`; the rest is the
-same structured model contract as `agent.model`. The id `deployment-default`
-is reserved for the entry synthesized from `agent.model`, so the inventory is
-never empty and the running model is always identifiable. A malformed or
-duplicated preset fails fixture validation before startup rather than
-appearing as an unselectable row.
+Each provider needs a unique lowercase-slug `id`, a `label`, a supported
+`kind`, and at least one model; each model needs a slug `id` unique within its
+provider and a `model`. `baseUrl` is required for `openai-compatible`.
+Provider-level `contextWindowTokens` applies to every model beneath it and a
+model may override its own. The provider id `deployment` is reserved for the
+entry synthesized from `agent.model`, so the inventory is never empty and the
+running model is always identifiable. A malformed or duplicated entry fails
+fixture validation before startup.
 
-Never put a key in a preset. `apiKeyEnv` names the environment variable Eve
+Never put a key in a provider. `apiKeyEnv` names the environment variable Eve
 reads it from.
+
+#### Model ids and session bindings
+
+A model's selectable id is **`<providerId>/<modelId>`** — for example
+`deepseek/chat`. That id is what a session's immutable execution binding
+records, so **renaming either slug retires the old id**. Sessions bound to a
+retired id fall back to the deployment default and log a warning naming the
+unresolved id; they never fail, and they never fall back silently. Treat these
+slugs as stable identifiers, not display strings — `label` is what you change
+when you want different wording.
+
+#### Shaped but not yet enforced
+
+Two fields are accepted, validated, and normalized, but nothing consumes them:
+
+- `enabled` on a provider and on a model. A model inside a disabled provider
+  normalizes to disabled regardless of its own flag — the provider holds the
+  credential. This is the allow-list slot; selection does not yet honour it.
+- `capability` on a model: `chat` (default), `embedding`, or `voice`.
+
+They are shaped now so the allow-list and embedding work land without another
+schema change.
 
 ### Settings → Models
 
-The owner-only **Models** section of `/settings` lists these entries with
-their provider kind, model id, context window, and credential status, and
-probes a local OpenAI-compatible endpoint before you commit to it.
+The owner-only **Models** section of `/settings` lists providers with their
+kind, endpoint, and credential status, models nested beneath each, and probes a
+local OpenAI-compatible endpoint before you commit to it.
 
 - **Credential status is presence only.** Eve answers the settings surface
   with booleans and variable NAMES; a credential value never leaves the agent
@@ -160,9 +196,9 @@ probes a local OpenAI-compatible endpoint before you commit to it.
   URL has no version segment) and reports reachability plus the served model
   list.
 - **A probe request carries a URL and nothing else.** Which credential — if
-  any — Eve attaches is decided from `agent.presets` by matching the probed
-  **origin**. A preset for `https://api.deepseek.com/v1` lends its credential
-  to that origin and to no other, and an origin with no matching preset is
+  any — Eve attaches is decided from `agent.providers` by matching the probed
+  **origin**. A provider for `https://api.deepseek.com/v1` lends its credential
+  to that origin and to no other, and an origin with no matching provider is
   probed unauthenticated (the ordinary local-server case). The caller cannot
   name a variable, so it cannot aim a configured key at a host it chose.
 - **Both** model-endpoint routes require the verified `owner` role in the web
@@ -170,6 +206,13 @@ probes a local OpenAI-compatible endpoint before you commit to it.
   owner role is a web-app concept Eve cannot verify on its own; the secret is
   how the web server asserts it already checked. Without it configured, both
   routes refuse.
+- **Adding a provider** means adding a fixture entry: after a successful probe
+  the section generates the YAML to paste under `agent.providers`. Eve reads
+  the fixture at startup, so restart the agent runtime afterwards.
+
+Selecting a model in this section binds it to the sessions you start next. It
+is fixed for the life of a conversation, so chats already open keep the model
+they began with.
 
 #### Probe target policy — deployment note
 
@@ -195,9 +238,6 @@ This is a structural fence, not a full SSRF boundary: a hostname that resolves
 to a denied address at DNS time is not caught, and cannot be without resolving
 first and pinning the socket. The owner gate plus the binding secret are the
 actual control.
-- **Adding an endpoint** means adding preset rows: after a successful probe
-  the section generates the YAML to paste under `agent.presets`. Eve reads the
-  fixture at startup, so restart the agent runtime afterwards.
 
 Selecting a preferred model in this section records the choice for your
 account. Sessions do not yet carry a model of their own — the execution

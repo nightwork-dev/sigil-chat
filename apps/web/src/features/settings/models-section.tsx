@@ -33,14 +33,13 @@ import {
 import { SectionHeader } from "@workspace/ui/components/section-header"
 
 import {
-  groupEndpointsByProvider,
-  presetFixtureSnippet,
-  suggestPresetId,
+  providerFixtureSnippet,
+  suggestProviderId,
   useModelEndpoints,
   useProbeModelEndpoint,
   type ModelEndpointCredentialStatus,
   type ModelEndpointRecord,
-  type ModelProviderGroup,
+  type ModelProviderRecord,
 } from "@/lib/model-endpoints"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 
@@ -50,7 +49,7 @@ export function ModelsSection({ userId }: { userId: string }) {
   const endpoints = useModelEndpoints()
   const preferred = useUserSetting(userId, "agent.modelPresetId")
   const setPreferred = useSetUserSetting(userId, "agent.modelPresetId")
-  const providers = groupEndpointsByProvider(endpoints.data?.endpoints ?? [])
+  const providers = endpoints.data?.providers ?? []
 
   // Switching model *mid-session* is the slice after this one, and this is
   // where its UI would live. Two constraints have to be visible at the moment
@@ -90,12 +89,12 @@ export function ModelsSection({ userId }: { userId: string }) {
               onChange={handlePreferredChange}
             />
             <div className="divide-y divide-border">
-              {providers.map((provider) => (
+              {providers.map((provider: ModelProviderRecord) => (
                 <ProviderBlock key={provider.id} provider={provider} />
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Providers come from <code className="font-mono">agent.presets</code>{" "}
+              Providers come from <code className="font-mono">agent.providers</code>{" "}
               in the application fixture. Credentials stay in the agent
               runtime&apos;s environment — this page can see whether a variable
               is set, never what it contains.
@@ -120,7 +119,7 @@ function NewChatModelPicker({
   disabled,
   onChange,
 }: {
-  providers: readonly ModelProviderGroup[]
+  providers: readonly ModelProviderRecord[]
   value: string
   disabled: boolean
   onChange: (next: string) => void
@@ -144,10 +143,10 @@ function NewChatModelPicker({
             <SelectValue placeholder="Select a model" />
           </SelectTrigger>
           <SelectContent>
-            {providers.map((provider) => (
+            {providers.map((provider: ModelProviderRecord) => (
               <SelectGroup key={provider.id}>
                 <SelectLabel>{provider.label}</SelectLabel>
-                {provider.models.map((model) => (
+                {provider.models.map((model: ModelEndpointRecord) => (
                   <SelectItem key={model.id} value={model.id}>
                     {model.model}
                   </SelectItem>
@@ -165,7 +164,7 @@ function NewChatModelPicker({
   )
 }
 
-function ProviderBlock({ provider }: { provider: ModelProviderGroup }) {
+function ProviderBlock({ provider }: { provider: ModelProviderRecord }) {
   return (
     <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
       <div className="flex flex-col gap-0.5">
@@ -188,7 +187,7 @@ function ProviderBlock({ provider }: { provider: ModelProviderGroup }) {
       {/* Model rows. Fetched catalog models append here; a per-model enable
           toggle belongs at the end of each row. */}
       <div className="flex flex-col gap-1 border-l border-border pl-3">
-        {provider.models.map((model) => (
+        {provider.models.map((model: ModelEndpointRecord) => (
           <ModelRow key={model.id} model={model} />
         ))}
       </div>
@@ -375,8 +374,8 @@ function AddEndpointSection() {
           {result.reachable && model ? (
             <div className="flex flex-col gap-1.5">
               <p className="text-xs text-muted-foreground">
-                Add these rows under{" "}
-                <code className="font-mono">agent.presets</code> in{" "}
+                Add this provider under{" "}
+                <code className="font-mono">agent.providers</code> in{" "}
                 <code className="font-mono">
                   fixtures/application/sigil-chat.yaml
                 </code>
@@ -384,10 +383,11 @@ function AddEndpointSection() {
               </p>
               <CodeBlock
                 language="yaml"
-                code={presetFixtureSnippet({
-                  id: suggestPresetId(baseUrl.trim(), model),
+                code={providerFixtureSnippet({
+                  id: suggestProviderId(baseUrl.trim(), model),
                   label: model,
                   model,
+                  modelId: "default",
                   baseUrl: baseUrl.trim(),
                   ...(apiKeyEnv.trim()
                     ? { apiKeyEnv: apiKeyEnv.trim() }

@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  groupEndpointsByProvider,
   InvalidProbeRequestError,
   parseProbeInput,
-  presetFixtureSnippet,
-  suggestPresetId,
-  type ModelEndpointRecord,
+  providerFixtureSnippet,
+  suggestProviderId,
 } from "./model-endpoints"
-import { projectEndpoints, projectProbeResult } from "./model-endpoints.server"
+import { projectProviders, projectProbeResult } from "./model-endpoints.server"
 
 describe("probe request validation", () => {
   it("accepts and trims a well-formed request", () => {
@@ -56,71 +54,108 @@ describe("probe request validation", () => {
   })
 })
 
-describe("model endpoint projection", () => {
-  it("keeps credential presence and the variable name, and nothing else", () => {
-    const endpoints = projectEndpoints({
-      endpoints: [
-        {
-          id: "deepseek",
-          label: "DeepSeek",
-          provider: "openai-compatible",
-          model: "deepseek-chat",
-          baseUrl: "https://api.deepseek.com/v1",
-          contextWindowTokens: 65_536,
-          isDeploymentDefault: false,
-          credential: {
-            envName: "SIGIL_MODEL_DEEPSEEK_API_KEY",
-            required: true,
-            present: true,
-            // A future/rogue field carrying a value must not survive.
-            value: "sk-live-secret",
-          },
-        },
-      ],
-    })
-
-    expect(endpoints).toEqual([
+describe("provider projection", () => {
+  const payload = {
+    providers: [
       {
         id: "deepseek",
         label: "DeepSeek",
-        provider: "openai-compatible",
-        model: "deepseek-chat",
+        kind: "openai-compatible",
         baseUrl: "https://api.deepseek.com/v1",
-        contextWindowTokens: 65_536,
-        isDeploymentDefault: false,
+        enabled: true,
+        credential: {
+          envName: "SIGIL_MODEL_DEEPSEEK_API_KEY",
+          required: true,
+          present: true,
+          // A future/rogue field carrying a value must not survive.
+          value: "sk-live-secret",
+        },
+        models: [
+          {
+            id: "deepseek/chat",
+            label: "deepseek-chat",
+            model: "deepseek-chat",
+            capability: "chat",
+            enabled: true,
+            contextWindowTokens: 65_536,
+            isDeploymentDefault: false,
+          },
+        ],
+      },
+    ],
+  }
+
+  it("keeps credential presence and the variable name, and nothing else", () => {
+    const providers = projectProviders(payload)
+
+    expect(providers).toEqual([
+      {
+        id: "deepseek",
+        label: "DeepSeek",
+        kind: "openai-compatible",
+        baseUrl: "https://api.deepseek.com/v1",
+        enabled: true,
         credential: {
           envName: "SIGIL_MODEL_DEEPSEEK_API_KEY",
           required: true,
           present: true,
         },
+        models: [
+          {
+            id: "deepseek/chat",
+            label: "deepseek-chat",
+            model: "deepseek-chat",
+            capability: "chat",
+            enabled: true,
+            contextWindowTokens: 65_536,
+            isDeploymentDefault: false,
+          },
+        ],
       },
     ])
-    expect(JSON.stringify(endpoints)).not.toContain("sk-live-secret")
+    expect(JSON.stringify(providers)).not.toContain("sk-live-secret")
   })
 
-  it("drops entries the runtime could not describe", () => {
+  it("drops providers the runtime could not describe", () => {
     expect(
-      projectEndpoints({ endpoints: [null, {}, { id: "x" }, "nope"] }),
+      projectProviders({ providers: [null, {}, { id: "x" }, "nope"] }),
     ).toEqual([])
-    expect(projectEndpoints({})).toEqual([])
-    expect(projectEndpoints(null)).toEqual([])
+    expect(projectProviders({})).toEqual([])
+    expect(projectProviders(null)).toEqual([])
   })
 
-  it("defaults a missing credential block to required:false, present:false", () => {
-    const [entry] = projectEndpoints({
-      endpoints: [
-        { id: "local", model: "qwen3.6-27b", isDeploymentDefault: true },
+  it("drops a provider whose models are all unreadable", () => {
+    expect(
+      projectProviders({
+        providers: [{ id: "empty", label: "Empty", models: [null, {}] }],
+      }),
+    ).toEqual([])
+  })
+
+  it("defaults absent optional fields rather than inventing them", () => {
+    const [provider] = projectProviders({
+      providers: [
+        {
+          id: "local",
+          models: [{ id: "local/a", model: "qwen3.6-27b" }],
+        },
       ],
     })
 
-    expect(entry).toMatchObject({
+    expect(provider).toMatchObject({
       label: "local",
-      provider: "unknown",
-      contextWindowTokens: 0,
-      isDeploymentDefault: true,
+      kind: "unknown",
+      enabled: true,
       credential: { required: false, present: false },
     })
-    expect(entry?.baseUrl).toBeUndefined()
+    expect(provider?.baseUrl).toBeUndefined()
+    expect(provider?.models[0]).toMatchObject({
+      label: "qwen3.6-27b",
+      capability: "chat",
+      enabled: true,
+      contextWindowTokens: 0,
+      isDeploymentDefault: false,
+    })
   })
 })
 
@@ -152,12 +187,13 @@ describe("probe result projection", () => {
 })
 
 describe("fixture snippet", () => {
-  it("emits rows an operator can paste under agent.presets", () => {
+  it("emits a provider entry an operator can paste under agent.providers", () => {
     expect(
-      presetFixtureSnippet({
+      providerFixtureSnippet({
         id: "lmstudio-local",
         label: "LM Studio (local)",
         model: "qwen3.6-27b",
+        modelId: "default",
         baseUrl: "http://127.0.0.1:1234/v1",
         contextWindowTokens: 262_144,
       }),
@@ -165,10 +201,12 @@ describe("fixture snippet", () => {
       [
         '    - id: "lmstudio-local"',
         '      label: "LM Studio (local)"',
-        '      provider: "openai-compatible"',
-        '      model: "qwen3.6-27b"',
+        '      kind: "openai-compatible"',
         '      baseUrl: "http://127.0.0.1:1234/v1"',
         "      contextWindowTokens: 262144",
+        "      models:",
+        '        - id: "default"',
+        '          model: "qwen3.6-27b"',
       ].join("\n"),
     )
   })
@@ -177,122 +215,36 @@ describe("fixture snippet", () => {
   // into a config file. Unquoted, a colon or a leading anchor character would
   // change the document's meaning.
   it("quotes a model id that would otherwise reshape the YAML", () => {
-    const snippet = presetFixtureSnippet({
+    const snippet = providerFixtureSnippet({
       id: "local",
       label: "Local",
       model: 'evil: true\n      registration: "open"',
+      modelId: "default",
       baseUrl: "http://127.0.0.1:1234/v1",
     })
 
     expect(snippet).toContain(
-      '      model: "evil: true\\n      registration: \\"open\\""',
+      '          model: "evil: true\\n      registration: \\"open\\""',
     )
-    expect(snippet.split("\n")).toHaveLength(5)
+    expect(snippet.split("\n")).toHaveLength(7)
   })
 
   it("omits the credential line when no variable was named", () => {
     expect(
-      presetFixtureSnippet({
+      providerFixtureSnippet({
         id: "local",
         label: "Local",
         model: "a",
+        modelId: "default",
         baseUrl: "http://127.0.0.1:1234/v1",
       }),
     ).not.toContain("apiKeyEnv")
   })
 
-  it("suggests a fixture-legal id from the endpoint and model", () => {
-    expect(suggestPresetId("http://127.0.0.1:1234/v1", "qwen3.6-27b")).toBe(
+  it("suggests a fixture-legal provider id from the endpoint and model", () => {
+    expect(suggestProviderId("http://127.0.0.1:1234/v1", "qwen3.6-27b")).toBe(
       "127-0-0-1-qwen3-6-27b",
     )
-    expect(suggestPresetId("not a url", "")).toBe("local")
-  })
-})
-
-describe("provider grouping", () => {
-  const record = (
-    over: Partial<ModelEndpointRecord> & Pick<ModelEndpointRecord, "id">,
-  ): ModelEndpointRecord => ({
-    label: over.id,
-    provider: "openai-compatible",
-    model: over.id,
-    contextWindowTokens: 200_000,
-    isDeploymentDefault: false,
-    credential: { required: false, present: true },
-    ...over,
-  })
-
-  it("puts every model of one subscription under a single provider", () => {
-    const groups = groupEndpointsByProvider([
-      record({
-        id: "deployment-default",
-        label: "gpt-5.6-terra (Codex subscription)",
-        provider: "codex",
-        model: "gpt-5.6-terra",
-        isDeploymentDefault: true,
-        credential: { required: true, present: true },
-      }),
-      record({
-        id: "luna",
-        label: "GPT-5.6 Luna (Codex subscription)",
-        provider: "codex",
-        model: "gpt-5.6-luna",
-        credential: { required: true, present: true },
-      }),
-    ])
-
-    expect(groups).toHaveLength(1)
-    expect(groups[0]?.kind).toBe("codex")
-    // No row can name the provider once rows disagree, so it is derived —
-    // and the per-row "(Codex subscription)" suffix stops being repeated.
-    expect(groups[0]?.label).toBe("Codex subscription")
-    expect(groups[0]?.models.map((model) => model.model)).toEqual([
-      "gpt-5.6-terra",
-      "gpt-5.6-luna",
-    ])
-    expect(groups[0]?.credential).toEqual({ required: true, present: true })
-  })
-
-  it("keeps a single authored row's label as the provider name", () => {
-    const groups = groupEndpointsByProvider([
-      record({
-        id: "lmstudio-local",
-        label: "LM Studio (local)",
-        model: "qwen3.6-27b",
-        baseUrl: "http://127.0.0.1:1234/v1",
-      }),
-    ])
-
-    expect(groups[0]?.label).toBe("LM Studio (local)")
-    expect(groups[0]?.baseUrl).toBe("http://127.0.0.1:1234/v1")
-  })
-
-  it("treats one origin as one provider across differing paths", () => {
-    const groups = groupEndpointsByProvider([
-      record({ id: "a", label: "A", baseUrl: "https://api.vendor.com/v1" }),
-      record({ id: "b", label: "B", baseUrl: "https://api.vendor.com/v1/" }),
-    ])
-
-    expect(groups).toHaveLength(1)
-    expect(groups[0]?.label).toBe("api.vendor.com")
-    expect(groups[0]?.models).toHaveLength(2)
-  })
-
-  it("keeps distinct hosts and distinct kinds apart", () => {
-    const groups = groupEndpointsByProvider([
-      record({ id: "a", baseUrl: "https://one.example/v1" }),
-      record({ id: "b", baseUrl: "https://two.example/v1" }),
-      record({ id: "c", provider: "codex" }),
-    ])
-
-    expect(groups.map((group) => group.id)).toEqual([
-      "openai-compatible|https://one.example",
-      "openai-compatible|https://two.example",
-      "codex",
-    ])
-  })
-
-  it("preserves inventory order and returns an empty list for no input", () => {
-    expect(groupEndpointsByProvider([])).toEqual([])
+    expect(suggestProviderId("not a url", "")).toBe("local")
   })
 })

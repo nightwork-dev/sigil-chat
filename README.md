@@ -81,8 +81,8 @@ hosted provider such as `openrouter` or `anthropic` through the official AI SDK
 provider packages. Provider secrets stay in environment variables named by the
 fixture or by the default `SIGIL_MODEL_<PROVIDER>_API_KEY`; if an
 OpenAI-compatible fixture names `apiKeyEnv`, Eve also requires that key before
-startup. Secrets are never stored in fixtures. `agent.presets` names additional
-selectable models as fixture data, which the owner-only Settings → Models
+startup. Secrets are never stored in fixtures. `agent.providers` names additional
+providers and their models as fixture data, which the owner-only Settings → Models
 surface lists with credential PRESENCE only — Eve answers it with booleans and
 environment variable names, never a value.
 
@@ -94,7 +94,7 @@ ask Eve to probe a model endpoint's `/v1/models` for reachability. Owner role
 is a web-app concept Eve cannot verify, so both routes require the secret as
 the web server's assertion that it already checked, and both refuse without
 it. A probe request carries only a URL; which credential Eve attaches is
-decided from `agent.presets` by matching origin, so a caller cannot aim a
+decided from `agent.providers` by matching origin, so a caller cannot aim a
 configured key at a host of its choosing. The probe denies link-local and
 cloud-metadata addresses and does not follow redirects; loopback and RFC1918
 stay reachable by design, so Eve's own network reach is the boundary that

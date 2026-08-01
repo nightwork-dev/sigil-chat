@@ -21,6 +21,7 @@ import {
   type ModelEndpointProbeInput,
   type ModelEndpointProbeResult,
   type ModelEndpointRecord,
+  type ModelProviderRecord,
 } from "./model-endpoints"
 
 /** Kept in sync with `MODEL_RELAY_SECRET_HEADER` in apps/agent. */
@@ -34,7 +35,7 @@ export async function readModelEndpointInventory(): Promise<ModelEndpointInvento
       `The agent runtime could not list model endpoints (HTTP ${response.status}).`,
     )
   }
-  return { endpoints: projectEndpoints(await response.json()) }
+  return { providers: projectProviders(await response.json()) }
 }
 
 export async function probeModelEndpointThroughEve(
@@ -83,43 +84,66 @@ async function callEve(path: string, init: RequestInit): Promise<Response> {
   })
 }
 
-export function projectEndpoints(payload: unknown): ModelEndpointRecord[] {
+export function projectProviders(payload: unknown): ModelProviderRecord[] {
   if (typeof payload !== "object" || payload === null) return []
-  const endpoints = (payload as { endpoints?: unknown }).endpoints
-  if (!Array.isArray(endpoints)) return []
-  return endpoints.flatMap((candidate) => {
+  const providers = (payload as { providers?: unknown }).providers
+  if (!Array.isArray(providers)) return []
+  return providers.flatMap((candidate) => {
     if (typeof candidate !== "object" || candidate === null) return []
     const entry = candidate as Record<string, unknown>
     const id = text(entry.id)
-    const model = text(entry.model)
-    if (!id || !model) return []
+    if (!id) return []
     const credential =
       typeof entry.credential === "object" && entry.credential !== null
         ? (entry.credential as Record<string, unknown>)
         : {}
     const envName = text(credential.envName)
     const baseUrl = text(entry.baseUrl)
+    const models = Array.isArray(entry.models)
+      ? entry.models.flatMap(projectModel)
+      : []
+    // A provider with no readable models has nothing to offer; dropping it
+    // keeps an empty block off the screen.
+    if (models.length === 0) return []
     return [
       {
         id,
         label: text(entry.label) || id,
-        provider: text(entry.provider) || "unknown",
-        model,
+        kind: text(entry.kind) || "unknown",
         ...(baseUrl ? { baseUrl } : {}),
-        contextWindowTokens:
-          typeof entry.contextWindowTokens === "number" &&
-          Number.isFinite(entry.contextWindowTokens)
-            ? entry.contextWindowTokens
-            : 0,
-        isDeploymentDefault: entry.isDeploymentDefault === true,
+        enabled: entry.enabled !== false,
         credential: {
           ...(envName ? { envName } : {}),
           required: credential.required === true,
           present: credential.present === true,
         },
+        models,
       },
     ]
   })
+}
+
+function projectModel(candidate: unknown): ModelEndpointRecord[] {
+  if (typeof candidate !== "object" || candidate === null) return []
+  const entry = candidate as Record<string, unknown>
+  const id = text(entry.id)
+  const model = text(entry.model)
+  if (!id || !model) return []
+  return [
+    {
+      id,
+      label: text(entry.label) || model,
+      model,
+      capability: text(entry.capability) || "chat",
+      enabled: entry.enabled !== false,
+      contextWindowTokens:
+        typeof entry.contextWindowTokens === "number" &&
+        Number.isFinite(entry.contextWindowTokens)
+          ? entry.contextWindowTokens
+          : 0,
+      isDeploymentDefault: entry.isDeploymentDefault === true,
+    },
+  ]
 }
 
 export function projectProbeResult(payload: unknown): ModelEndpointProbeResult {

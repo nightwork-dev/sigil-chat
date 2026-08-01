@@ -109,8 +109,11 @@ export function parseCreateAgentThreadRequest(
   if (
     modelPresetId !== undefined &&
     (typeof modelPresetId !== "string" ||
-      !/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(modelPresetId.trim()) ||
-      modelPresetId.trim().length > 64)
+      // `<providerId>/<modelId>`, or the reserved deployment-default id.
+      !/^[a-z][a-z0-9]*(-[a-z0-9]+)*(\/[a-z][a-z0-9]*(-[a-z0-9]+)*)?$/.test(
+        modelPresetId.trim(),
+      ) ||
+      modelPresetId.trim().length > 129)
   ) {
     throw new Error("The requested model preset id is malformed.");
   }

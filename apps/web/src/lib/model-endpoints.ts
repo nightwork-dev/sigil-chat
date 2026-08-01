@@ -26,19 +26,37 @@ export interface ModelEndpointCredentialStatus {
 }
 
 export interface ModelEndpointRecord {
+  /** `<providerId>/<modelId>`, or the reserved deployment-default id. */
   id: string
   label: string
-  provider: string
   model: string
-  baseUrl?: string
+  capability: string
+  /** Shaped for the allow-list; nothing enforces it yet. */
+  enabled: boolean
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from the fixture's agent.model. */
   isDeploymentDefault: boolean
+}
+
+/**
+ * A provider and the models it offers.
+ *
+ * This is now the AUTHORED shape, not a projection: the fixture declares
+ * providers with nested models, so grouping is no longer something the client
+ * derives (David, 2026-07-31 — providers are the unit).
+ */
+export interface ModelProviderRecord {
+  id: string
+  label: string
+  kind: string
+  baseUrl?: string
+  enabled: boolean
   credential: ModelEndpointCredentialStatus
+  models: readonly ModelEndpointRecord[]
 }
 
 export interface ModelEndpointInventory {
-  endpoints: readonly ModelEndpointRecord[]
+  providers: readonly ModelProviderRecord[]
 }
 
 export interface ModelEndpointProbeInput {
@@ -144,9 +162,9 @@ export function useProbeModelEndpoint(): UseMutationResult<
 }
 
 /**
- * The fixture rows an operator adds to make a probed endpoint selectable.
+ * The fixture entry an operator adds to make a probed endpoint selectable.
  *
- * Eve reads `agent.presets` from the application fixture at startup, so an
+ * Eve reads `agent.providers` from the application fixture at startup, so an
  * endpoint becomes real by being written there — this returns exactly that
  * text rather than pretending the app can persist a provider on its own.
  *
@@ -155,10 +173,11 @@ export function useProbeModelEndpoint(): UseMutationResult<
  * an unquoted YAML scalar containing `:` or a leading `&`/`*`/`!` would change
  * the meaning of the document the operator pastes it into.
  */
-export function presetFixtureSnippet(input: {
+export function providerFixtureSnippet(input: {
   id: string
   label: string
   model: string
+  modelId: string
   baseUrl: string
   apiKeyEnv?: string
   contextWindowTokens?: number
@@ -166,8 +185,7 @@ export function presetFixtureSnippet(input: {
   return [
     `    - id: ${yamlString(input.id)}`,
     `      label: ${yamlString(input.label)}`,
-    `      provider: "openai-compatible"`,
-    `      model: ${yamlString(input.model)}`,
+    `      kind: "openai-compatible"`,
     `      baseUrl: ${yamlString(input.baseUrl)}`,
     ...(input.apiKeyEnv
       ? [`      apiKeyEnv: ${yamlString(input.apiKeyEnv)}`]
@@ -175,6 +193,9 @@ export function presetFixtureSnippet(input: {
     ...(input.contextWindowTokens
       ? [`      contextWindowTokens: ${input.contextWindowTokens}`]
       : []),
+    `      models:`,
+    `        - id: ${yamlString(input.modelId)}`,
+    `          model: ${yamlString(input.model)}`,
   ].join("\n")
 }
 
@@ -188,7 +209,7 @@ function yamlString(value: string): string {
 }
 
 /** A slug an operator can paste into the fixture without it being rejected. */
-export function suggestPresetId(baseUrl: string, model: string): string {
+export function suggestProviderId(baseUrl: string, model: string): string {
   const host = hostOf(baseUrl)
   const slug = `${host}-${model}`
     .toLowerCase()
@@ -203,87 +224,4 @@ function hostOf(baseUrl: string): string {
   } catch {
     return "local"
   }
-}
-
-/**
- * A provider entry with its models inside.
- *
- * David's ruling (2026-07-31, MDL.2 `6939f1e`): providers — not models — are
- * the unit. The fixture still authors one row per model, so this is a
- * PROJECTION over that data, not a schema change: rows that share a provider
- * kind and endpoint identity are one provider, and the facts that belong to
- * the provider rather than the model (endpoint, credential, sign-in state) are
- * stated once here instead of repeating on every row.
- */
-export interface ModelProviderGroup {
-  /** Stable within a render: provider kind plus endpoint origin. */
-  id: string
-  label: string
-  /** Transport kind — `codex`, `openai-compatible`, … */
-  kind: string
-  baseUrl?: string
-  /** Provider-level, because a credential authenticates an endpoint. */
-  credential: ModelEndpointCredentialStatus
-  models: readonly ModelEndpointRecord[]
-}
-
-function providerIdentity(endpoint: ModelEndpointRecord): string {
-  if (!endpoint.baseUrl) return endpoint.provider
-  // Origin, so `/v1` and `/v1/` on one host do not split into two providers.
-  try {
-    return `${endpoint.provider}|${new URL(endpoint.baseUrl).origin}`
-  } catch {
-    return `${endpoint.provider}|${endpoint.baseUrl}`
-  }
-}
-
-function providerFallbackLabel(endpoint: ModelEndpointRecord): string {
-  if (endpoint.provider === "codex") return "Codex subscription"
-  if (endpoint.baseUrl) {
-    try {
-      return new URL(endpoint.baseUrl).host
-    } catch {
-      return endpoint.baseUrl
-    }
-  }
-  return endpoint.provider
-}
-
-/**
- * Group model rows into provider entries, preserving inventory order.
- *
- * The label comes from the authored rows when they agree — today one preset
- * per hosted vendor means its label IS the provider name. When rows disagree
- * (the Codex entry now serves both terra and luna) no single row can name the
- * provider, so the name is derived instead. That divergence is the fixture
- * telling us providers want their own record; see the report.
- */
-export function groupEndpointsByProvider(
-  endpoints: readonly ModelEndpointRecord[],
-): ModelProviderGroup[] {
-  const groups = new Map<string, ModelProviderGroup>()
-  for (const endpoint of endpoints) {
-    const id = providerIdentity(endpoint)
-    const existing = groups.get(id)
-    if (!existing) {
-      groups.set(id, {
-        id,
-        label: endpoint.label,
-        kind: endpoint.provider,
-        ...(endpoint.baseUrl ? { baseUrl: endpoint.baseUrl } : {}),
-        credential: endpoint.credential,
-        models: [endpoint],
-      })
-      continue
-    }
-    groups.set(id, {
-      ...existing,
-      label:
-        existing.label === endpoint.label
-          ? existing.label
-          : providerFallbackLabel(endpoint),
-      models: [...existing.models, endpoint],
-    })
-  }
-  return [...groups.values()]
 }

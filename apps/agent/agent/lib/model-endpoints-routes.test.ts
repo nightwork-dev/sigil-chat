@@ -117,15 +117,24 @@ describe("model endpoint routes", () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
-      endpoints: [
+      providers: [
         {
-          id: "deployment-default",
-          label: "gpt-5.6-terra (Codex subscription)",
-          provider: "codex",
-          model: "gpt-5.6-terra",
-          contextWindowTokens: 200_000,
-          isDeploymentDefault: true,
+          id: "deployment",
+          label: "Codex subscription",
+          kind: "codex",
+          enabled: true,
           credential: { required: true, present: true },
+          models: [
+            {
+              id: "deployment-default",
+              label: "gpt-5.6-terra",
+              model: "gpt-5.6-terra",
+              capability: "chat",
+              enabled: true,
+              contextWindowTokens: 200_000,
+              isDeploymentDefault: true,
+            },
+          ],
         },
       ],
     })

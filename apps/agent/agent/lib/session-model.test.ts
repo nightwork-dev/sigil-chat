@@ -12,21 +12,21 @@ import {
 
 const AGENT: SigilAgentConfig = {
   model: "gpt-5.6-terra",
-  presets: [
+  providers: [
     {
-      id: "luna",
-      label: "GPT-5.6 Luna (Codex subscription)",
-      provider: "codex",
-      model: "gpt-5.6-luna",
+      id: "codex",
+      label: "Codex subscription",
+      kind: "codex",
+      models: [{ id: "luna", model: "gpt-5.6-luna", label: "GPT-5.6 Luna" }],
     },
     {
       id: "deepseek",
       label: "DeepSeek",
-      provider: "openai-compatible",
-      model: "deepseek-chat",
+      kind: "openai-compatible",
       baseUrl: "https://api.deepseek.com/v1",
       apiKeyEnv: "SIGIL_MODEL_DEEPSEEK_API_KEY",
       contextWindowTokens: 65_536,
+      models: [{ id: "chat", model: "deepseek-chat" }],
     },
   ],
 }
@@ -49,7 +49,7 @@ function authContext(binding: unknown) {
 const LUNA_BINDING = {
   applicationThreadId: "thread-1",
   personaId: "eve",
-  model: { presetId: "luna", provider: "codex", modelId: "gpt-5.6-luna" },
+  model: { presetId: "codex/luna", provider: "codex", modelId: "gpt-5.6-luna" },
 }
 
 describe("preset lookup", () => {
@@ -57,7 +57,7 @@ describe("preset lookup", () => {
     expect(findModelPreset(AGENT, "deployment-default")?.model).toBe(
       "gpt-5.6-terra",
     )
-    expect(findModelPreset(AGENT, "luna")?.model).toBe("gpt-5.6-luna")
+    expect(findModelPreset(AGENT, "codex/luna")?.model).toBe("gpt-5.6-luna")
     expect(findModelPreset(AGENT, "nope")).toBeUndefined()
   })
 })
@@ -69,7 +69,7 @@ describe("reading the bound model from verified attributes", () => {
         sigilExecutionBinding: JSON.stringify(LUNA_BINDING),
       }),
     ).toEqual({
-      presetId: "luna",
+      presetId: "codex/luna",
       provider: "codex",
       modelId: "gpt-5.6-luna",
     })
@@ -93,7 +93,9 @@ describe("reading the bound model from verified attributes", () => {
     // A malformed model must not be half-trusted.
     expect(
       readBoundModelFromAttributes({
-        sigilExecutionBinding: JSON.stringify({ model: { presetId: "luna" } }),
+        sigilExecutionBinding: JSON.stringify({
+          model: { presetId: "codex/luna" },
+        }),
       }),
     ).toBeUndefined()
   })
@@ -112,7 +114,7 @@ describe("reading the bound model from verified attributes", () => {
       },
     })
 
-    expect(readBoundModelFromAttributes(attributes)?.presetId).toBe("luna")
+    expect(readBoundModelFromAttributes(attributes)?.presetId).toBe("codex/luna")
   })
 })
 
@@ -132,7 +134,7 @@ describe("per-session model resolution", () => {
     )
 
     expect(luna).toMatchObject({
-      presetId: "luna",
+      presetId: "codex/luna",
       provider: "codex",
       modelId: "gpt-5.6-luna",
     })
@@ -144,7 +146,7 @@ describe("per-session model resolution", () => {
     const selection = resolveSessionModel(
       AGENT,
       {
-        presetId: "deepseek",
+        presetId: "deepseek/chat",
         provider: "openai-compatible",
         modelId: "deepseek-chat",
       },
@@ -164,19 +166,57 @@ describe("per-session model resolution", () => {
           provider: "openai-compatible",
           modelId: "deepseek-chat",
         },
-        { env: {} },
+        { env: {}, onUnresolved: () => {} },
       ),
     ).toBeNull()
   })
 
   it("falls back rather than failing when the preset left the fixture", () => {
     expect(
-      resolveSessionModel(AGENT, {
-        presetId: "retired",
-        provider: "codex",
-        modelId: "gpt-4",
+      resolveSessionModel(
+        AGENT,
+        { presetId: "retired/model", provider: "codex", modelId: "gpt-4" },
+        { onUnresolved: () => {} },
+      ),
+    ).toBeNull()
+  })
+
+  // A silent fallback is the failure mode this guard exists to prevent: a
+  // user who chose luna and is quietly answered by terra cannot tell.
+  it("reports the unresolved id rather than falling back silently", () => {
+    const seen: unknown[] = []
+    resolveSessionModel(
+      AGENT,
+      { presetId: "retired/model", provider: "codex", modelId: "gpt-4" },
+      { onUnresolved: (event) => seen.push(event) },
+    )
+    expect(seen).toEqual([
+      { presetId: "retired/model", reason: "preset-not-found" },
+    ])
+
+    const missingCredential: unknown[] = []
+    resolveSessionModel(
+      AGENT,
+      {
+        presetId: "deepseek/chat",
+        provider: "openai-compatible",
+        modelId: "deepseek-chat",
+      },
+      { env: {}, onUnresolved: (event) => missingCredential.push(event) },
+    )
+    expect(missingCredential).toMatchObject([
+      { presetId: "deepseek/chat", reason: "provider-unavailable" },
+    ])
+  })
+
+  it("stays silent for a session that simply made no choice", () => {
+    const seen: unknown[] = []
+    expect(
+      resolveSessionModel(AGENT, undefined, {
+        onUnresolved: (event) => seen.push(event),
       }),
     ).toBeNull()
+    expect(seen).toEqual([])
   })
 
   // Criterion 3 shape: the choice lives in the immutable binding, so anything

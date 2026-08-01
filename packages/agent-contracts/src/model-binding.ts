@@ -7,8 +7,9 @@
  *
  *   - The spec's `profileId` + `profileRevision` assume a mutable store of
  *     model profiles with revisions. There is no such store; the authoring
- *     source is `agent.presets` in the application fixture, so `presetId` is
- *     the identity and there is nothing to revise against.
+ *     source is `agent.providers` in the application fixture, so `presetId`
+ *     (`<providerId>/<modelId>`) is the identity and there is nothing to
+ *     revise against.
  *   - The spec's `providerId` names a provider RECORD. Here `provider` is the
  *     transport kind the resolver already understands.
  *

@@ -34,7 +34,9 @@ import type { AuthFn } from "eve/channels/auth"
 
 import {
   normalizeSigilAgentModelPresets,
+  normalizeSigilAgentProviders,
   type NormalizedSigilAgentModelPreset,
+  type NormalizedSigilAgentProvider,
   type SigilAgentConfig,
 } from "@workspace/runtime-env/config"
 
@@ -77,19 +79,37 @@ export interface ModelEndpointCredentialStatus {
 }
 
 export interface ModelEndpointRecord {
+  /** `<providerId>/<modelId>`, or the reserved deployment-default id. */
   id: string
   label: string
-  provider: string
   model: string
-  baseUrl?: string
+  capability: string
+  /** Shaped for the allow-list; nothing enforces it yet. */
+  enabled: boolean
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from `agent.model`. */
   isDeploymentDefault: boolean
+}
+
+/**
+ * A provider and the models it offers.
+ *
+ * Provider-level facts appear once here rather than repeating on every model,
+ * which is the whole point of the provider-shaped fixture: a credential
+ * authenticates an ENDPOINT, not a model.
+ */
+export interface ModelProviderRecord {
+  id: string
+  label: string
+  kind: string
+  baseUrl?: string
+  enabled: boolean
   credential: ModelEndpointCredentialStatus
+  models: ModelEndpointRecord[]
 }
 
 export interface ModelEndpointInventory {
-  endpoints: ModelEndpointRecord[]
+  providers: ModelProviderRecord[]
 }
 
 /**
@@ -271,33 +291,44 @@ export async function buildModelEndpointInventory(
   agent: SigilAgentConfig,
   options: ModelEndpointOptions = {},
 ): Promise<ModelEndpointInventory> {
-  const presets = normalizeSigilAgentModelPresets(agent)
-  const endpoints = await Promise.all(
-    presets.map((preset) => describeEndpoint(preset, options)),
+  const providers = await Promise.all(
+    normalizeSigilAgentProviders(agent).map((provider) =>
+      describeProvider(provider, options),
+    ),
   )
-  return { endpoints }
+  return { providers }
 }
 
-async function describeEndpoint(
-  preset: NormalizedSigilAgentModelPreset,
+async function describeProvider(
+  provider: NormalizedSigilAgentProvider,
   options: ModelEndpointOptions,
-): Promise<ModelEndpointRecord> {
-  const requirement = describeModelCredentialRequirement(toModelConfig(preset))
-  const present = await hasConfiguredModelCredential(toModelConfig(preset), {
+): Promise<ModelProviderRecord> {
+  // The credential belongs to the endpoint, so it is resolved once per
+  // provider. Any of its models describes the same credential; the first is
+  // simply the cheapest to reach.
+  const representative = provider.models[0]
+  const credentialConfig = {
+    provider: provider.kind,
+    model: representative?.model ?? provider.id,
+    ...(provider.baseUrl !== undefined ? { baseUrl: provider.baseUrl } : {}),
+    ...(provider.apiKeyEnv !== undefined
+      ? { apiKeyEnv: provider.apiKeyEnv }
+      : {}),
+  }
+  const requirement = describeModelCredentialRequirement(credentialConfig)
+  const present = await hasConfiguredModelCredential(credentialConfig, {
     ...(options.env ? { env: options.env } : {}),
     ...(options.hasCodexModelAuth
       ? { hasCodexModelAuth: options.hasCodexModelAuth }
       : {}),
   })
+
   return {
-    id: preset.id,
-    label: preset.label,
-    provider: preset.provider,
-    model: preset.model,
-    ...(preset.baseUrl !== undefined ? { baseUrl: preset.baseUrl } : {}),
-    contextWindowTokens:
-      preset.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
-    isDeploymentDefault: preset.isDeploymentDefault,
+    id: provider.id,
+    label: provider.label,
+    kind: provider.kind,
+    ...(provider.baseUrl !== undefined ? { baseUrl: provider.baseUrl } : {}),
+    enabled: provider.enabled,
     credential: {
       ...(requirement.envName !== undefined
         ? { envName: requirement.envName }
@@ -305,6 +336,16 @@ async function describeEndpoint(
       required: requirement.required,
       present,
     },
+    models: provider.models.map((model) => ({
+      id: model.id,
+      label: model.label,
+      model: model.model,
+      capability: model.capability,
+      enabled: model.enabled,
+      contextWindowTokens:
+        model.contextWindowTokens ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
+      isDeploymentDefault: model.isDeploymentDefault,
+    })),
   }
 }
 
