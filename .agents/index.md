@@ -238,6 +238,13 @@ Verified against the actual code, not inherited by assumption:
 - **Compound Root/Parts components for domain objects** rendered in more than
   one place — same standard as `sigil-design`'s `component-development`
   skill.
+- **Never author a UI primitive without running the registry loop**
+  (`building-in-sigil-chat` skill, step 0): grep `packages/ui` (150+ installed
+  components), then the sigil-design registry, and only author on a recorded
+  miss — generalizable shapes go to sigil-design FIRST. `features/*` and
+  `components/*` never host presentation primitives; a cleanup pass re-minting
+  panels/chips/labels that `packages/ui` already ships is the recorded failure
+  mode (2026-08-01), not a hypothetical.
 - **Route header comments are mandatory** — see "Routes" above.
 - **`routeTree.gen.ts` is never edited or committed** — gitignored under
   every app.
