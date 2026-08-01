@@ -52,7 +52,7 @@ import {
   type AgentMemoryRecord,
   type AgentProfile as AgentProfileData,
 } from "@/lib/agent-profile"
-import { AgentPortrait } from "@/components/agents/agent-portrait"
+import { AgentPersona } from "@/components/agents/agent-persona"
 import {
   useAgentRuntimeCatalog,
   type AgentCatalog,
@@ -115,45 +115,48 @@ function Header({ className }: { className?: string }) {
       data-slot="agent-profile-header"
       className={cn("flex items-start gap-5", className)}
     >
-      <AgentPortrait
-        personaId={persona.id}
-        name={personaName}
-        hasPortrait={hasPortrait}
-        className="size-20"
-        fallbackClassName="text-2xl font-medium text-primary"
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-1">
-        <h1 className="truncate text-xl font-semibold">
-          {persona.name ?? persona.id}
-        </h1>
-        {persona.description && (
-          <p className="text-sm text-muted-foreground">{persona.description}</p>
-        )}
-        {/* Badge's base classes are shrink-0 + w-fit (fine for short labels);
+      <AgentPersona.Root
+        className="contents"
+        persona={{
+          id: persona.id,
+          name: personaName,
+          description: persona.description,
+          hasPortrait,
+        }}
+      >
+        <AgentPersona.Portrait
+          className="size-20"
+          fallbackClassName="text-2xl font-medium text-primary"
+        />
+        <AgentPersona.Body className="gap-1.5 pt-1">
+          <AgentPersona.Name as="h1" className="text-xl font-semibold" />
+          <AgentPersona.Description />
+          {/* Badge's base classes are shrink-0 + w-fit (fine for short labels);
             this lineage string is long enough to overflow a narrow column,
             so shrink + max-w-full + truncate override that to ellipsize
             instead of clipping past the viewport edge (375px finding). */}
-        <Badge
-          variant="outline"
-          className="mt-1 min-w-0 max-w-full shrink truncate font-mono text-[10px] text-muted-foreground"
-        >
-          {lineage.authoredBaseId} · rev {lineage.policyRevision}
-        </Badge>
-        <Button
-          className="mt-2 w-fit"
-          disabled={createThread.isPending}
-          onClick={() =>
-            createThread.mutate(
-              { personaId: persona.id },
-              { onSuccess: () => void navigate({ to: "/chat" }) },
-            )
-          }
-          size="sm"
-        >
-          <MessageSquarePlusIcon />
-          Start conversation
-        </Button>
-      </div>
+          <Badge
+            variant="outline"
+            className="mt-1 min-w-0 max-w-full shrink truncate font-mono text-[10px] text-muted-foreground"
+          >
+            {lineage.authoredBaseId} · rev {lineage.policyRevision}
+          </Badge>
+          <Button
+            className="mt-2 w-fit"
+            disabled={createThread.isPending}
+            onClick={() =>
+              createThread.mutate(
+                { personaId: persona.id },
+                { onSuccess: () => void navigate({ to: "/chat" }) },
+              )
+            }
+            size="sm"
+          >
+            <MessageSquarePlusIcon />
+            Start conversation
+          </Button>
+        </AgentPersona.Body>
+      </AgentPersona.Root>
     </header>
   )
 }
@@ -910,16 +913,13 @@ function PublicAgentProfileView({ personaId }: { personaId: string }) {
 
   return (
     <div className="mx-auto max-w-xl p-6">
-      <div className="flex items-start gap-4">
-        <AgentPortrait
-          personaId={data.id}
-          name={data.name}
-          hasPortrait={data.hasPortrait}
+      <AgentPersona.Root className="gap-4" persona={data}>
+        <AgentPersona.Portrait
           className="size-16"
           fallbackClassName="text-xl font-medium text-primary"
         />
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-medium">{data.name}</h1>
+        <AgentPersona.Body>
+          <AgentPersona.Name as="h1" className="text-lg font-medium" />
           <p className="mt-1 text-sm text-muted-foreground">
             {data.description || "No description."}
           </p>
@@ -927,8 +927,8 @@ function PublicAgentProfileView({ personaId }: { personaId: string }) {
             Memory, sessions, and configuration are visible to this agent's
             owner.
           </p>
-        </div>
-      </div>
+        </AgentPersona.Body>
+      </AgentPersona.Root>
     </div>
   )
 }

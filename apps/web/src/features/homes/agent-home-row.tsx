@@ -4,6 +4,7 @@ import {
   HoverCardTrigger,
 } from "@workspace/ui/components/hover-card"
 
+import { AgentPersona } from "@/components/agents/agent-persona"
 import { AgentPortrait } from "@/components/agents/agent-portrait"
 
 import { HomeRow } from "./home-row"
@@ -18,6 +19,15 @@ export function AgentHomeRow({
   readonly compact?: boolean
   readonly first?: boolean
 }) {
+  // The hover card introduces the persona; the row's own avatar is a slot
+  // HomeRow owns, so it stays the standalone portrait.
+  const identity = {
+    id: agent.personaId,
+    name: agent.name,
+    description: agent.headline,
+    hasPortrait: agent.hasPortrait,
+  }
+
   const avatar = (
     <AgentPortrait
       personaId={agent.personaId}
@@ -41,23 +51,14 @@ export function AgentHomeRow({
         }
       />
       <HoverCardContent align="start" side="right" className="w-72 p-3">
-        <div className="flex items-start gap-3">
-          <AgentPortrait
-            personaId={agent.personaId}
-            name={agent.name}
-            hasPortrait={agent.hasPortrait}
-            size="lg"
-          />
-          <div className="min-w-0 space-y-1">
-            <p className="font-medium text-popover-foreground">{agent.name}</p>
-            {agent.headline ? (
-              <p className="text-sm text-muted-foreground">{agent.headline}</p>
-            ) : null}
-            <p className="font-mono text-[10px] text-muted-foreground">
-              {agent.personaId}
-            </p>
-          </div>
-        </div>
+        <AgentPersona.Root persona={identity}>
+          <AgentPersona.Portrait size="lg" />
+          <AgentPersona.Body className="gap-1">
+            <AgentPersona.Name as="p" className="text-popover-foreground" />
+            <AgentPersona.Description />
+            <AgentPersona.Id />
+          </AgentPersona.Body>
+        </AgentPersona.Root>
       </HoverCardContent>
     </HoverCard>
   )

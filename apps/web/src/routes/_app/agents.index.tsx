@@ -10,7 +10,7 @@ import { ArrowRightIcon } from "lucide-react"
 
 import { Card, CardContent } from "@workspace/ui/components/card"
 
-import { AgentPortrait } from "@/components/agents/agent-portrait"
+import { AgentPersona } from "@/components/agents/agent-persona"
 import { agentRosterQueryOptions } from "@/lib/agent-profile"
 import { ManagementTabs } from "@/components/management-tabs"
 
@@ -53,19 +53,19 @@ function AgentRoster() {
               >
                 <Card className="h-full transition-colors group-hover:border-primary/40 group-focus-visible:border-primary/40">
                   <CardContent className="flex items-center gap-4 p-4">
-                    <AgentPortrait
-                      personaId={persona.id}
-                      name={persona.name}
-                      hasPortrait={persona.hasPortrait}
-                      className="size-11"
-                      fallbackClassName="font-medium text-primary"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h2 className="truncate font-medium">{persona.name}</h2>
-                      <p className="line-clamp-2 text-sm text-muted-foreground">
-                        {persona.description || persona.id}
-                      </p>
-                    </div>
+                    <AgentPersona.Root className="contents" persona={persona}>
+                      <AgentPersona.Portrait
+                        className="size-11"
+                        fallbackClassName="font-medium text-primary"
+                      />
+                      <AgentPersona.Body>
+                        <AgentPersona.Name as="h2" />
+                        <AgentPersona.Description
+                          className="line-clamp-2"
+                          fallback="id"
+                        />
+                      </AgentPersona.Body>
+                    </AgentPersona.Root>
                     <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </CardContent>
                 </Card>
