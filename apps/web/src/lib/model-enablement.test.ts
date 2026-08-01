@@ -119,7 +119,10 @@ describe("applyModelEnablement", () => {
 describe("parseSetModelEnabledRequest", () => {
   it("trims the id and keeps the boolean", () => {
     expect(
-      parseSetModelEnabledRequest({ presetIds: [" codex/luna "], enabled: true }),
+      parseSetModelEnabledRequest({
+        presetIds: [" codex/luna "],
+        enabled: true,
+      }),
     ).toEqual({ presetIds: ["codex/luna"], enabled: true })
   })
 
@@ -144,7 +147,10 @@ describe("parseSetModelEnabledRequest", () => {
       parseSetModelEnabledRequest({ presetIds: ["codex/luna"] }),
     ).toThrow(ModelEnablementRefusedError)
     expect(() =>
-      parseSetModelEnabledRequest({ presetIds: ["codex/luna"], enabled: "yes" }),
+      parseSetModelEnabledRequest({
+        presetIds: ["codex/luna"],
+        enabled: "yes",
+      }),
     ).toThrow(ModelEnablementRefusedError)
   })
 })

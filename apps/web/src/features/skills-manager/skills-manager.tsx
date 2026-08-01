@@ -1,40 +1,42 @@
-import { useState } from "react";
-import { PlusIcon, SearchIcon } from "lucide-react";
-import type { ManagedSkillSummary } from "@/lib/skills";
-import { useSkills } from "@/lib/skills";
+import { useState } from "react"
+import { PlusIcon, SearchIcon } from "lucide-react"
+import type { ManagedSkillSummary } from "@/lib/skills"
+import { useSkills } from "@/lib/skills"
 import {
   ResourceManager,
   useResourceManager,
-} from "@workspace/data/components/resource-manager";
+} from "@workspace/data/components/resource-manager"
 import {
   type AttentionContext,
   type AttentionSelection,
-} from "@zigil/agent/react";
-import { useAttentionTelemetry } from "@zigil/agent/react";
+} from "@zigil/agent/react"
+import { useAttentionTelemetry } from "@zigil/agent/react"
 import {
   usePublishWorkspaceAttention,
   usePublishWorkspaceResourceScope,
-} from "@/components/agent/workspace-attention";
-import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
-import { SkillListRow } from "@/features/skills-manager/skill-list-row";
-import { SkillCreateForm } from "@/features/skills-manager/skill-create-form";
-import { SkillDetailView } from "@/features/skills-manager/skill-detail-view";
+} from "@/components/agent/workspace-attention"
+import { Button } from "@workspace/ui/components/button"
+import { Input } from "@workspace/ui/components/input"
+import { SkillListRow } from "@/features/skills-manager/skill-list-row"
+import { SkillCreateForm } from "@/features/skills-manager/skill-create-form"
+import { SkillDetailView } from "@/features/skills-manager/skill-detail-view"
 
 function matchesQuery(skill: ManagedSkillSummary, query: string): boolean {
-  if (query.length === 0) return true;
+  if (query.length === 0) return true
   return `${skill.name ?? ""} ${skill.description} ${skill.id}`
     .toLowerCase()
-    .includes(query);
+    .includes(query)
 }
 
 export function SkillsManager() {
-  const [query, setQuery] = useState("");
-  const skillsQuery = useSkills();
-  const normalizedQuery = query.trim().toLowerCase();
+  const [query, setQuery] = useState("")
+  const skillsQuery = useSkills()
+  const normalizedQuery = query.trim().toLowerCase()
   const allSkills =
-    skillsQuery.data?.status === "ok" ? skillsQuery.data.skills : [];
-  const items = allSkills.filter((skill) => matchesQuery(skill, normalizedQuery));
+    skillsQuery.data?.status === "ok" ? skillsQuery.data.skills : []
+  const items = allSkills.filter((skill) =>
+    matchesQuery(skill, normalizedQuery),
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6">
@@ -52,7 +54,7 @@ export function SkillsManager() {
         />
       </ResourceManager.Root>
     </div>
-  );
+  )
 }
 
 function skillTarget(skill: ManagedSkillSummary): AttentionSelection {
@@ -60,7 +62,7 @@ function skillTarget(skill: ManagedSkillSummary): AttentionSelection {
     kind: "skill",
     id: skill.id,
     label: skill.name ?? skill.id,
-  };
+  }
 }
 
 function SkillsManagerBody({
@@ -68,19 +70,19 @@ function SkillsManagerBody({
   onQueryChange,
   resultCount,
 }: {
-  query: string;
-  onQueryChange: (value: string) => void;
-  resultCount: number;
+  query: string
+  onQueryChange: (value: string) => void
+  resultCount: number
 }) {
   const { selectedId, select, items } =
-    useResourceManager<ManagedSkillSummary>();
-  const [isCreating, setIsCreating] = useState(false);
-  const showCreateForm = isCreating && selectedId === null;
+    useResourceManager<ManagedSkillSummary>()
+  const [isCreating, setIsCreating] = useState(false)
+  const showCreateForm = isCreating && selectedId === null
 
   // Attention coverage: the selected skill flows into agent context, so
   // "what does this skill do?" resolves against it without naming it.
-  const selectedSkill = items.find((skill) => skill.id === selectedId) ?? null;
-  const telemetry = useAttentionTelemetry();
+  const selectedSkill = items.find((skill) => skill.id === selectedId) ?? null
+  const telemetry = useAttentionTelemetry()
   const attention: AttentionContext = {
     application: "sigil-chat",
     route: "/skills",
@@ -88,9 +90,9 @@ function SkillsManagerBody({
     selection: selectedSkill ? skillTarget(selectedSkill) : undefined,
     selections: selectedSkill ? [skillTarget(selectedSkill)] : undefined,
     history: telemetry.history,
-  };
-  usePublishWorkspaceAttention(attention);
-  usePublishWorkspaceResourceScope(null);
+  }
+  usePublishWorkspaceAttention(attention)
+  usePublishWorkspaceResourceScope(null)
 
   return (
     <>
@@ -111,8 +113,8 @@ function SkillsManagerBody({
         <Button
           size="sm"
           onClick={() => {
-            select(null);
-            setIsCreating(true);
+            select(null)
+            setIsCreating(true)
           }}
         >
           <PlusIcon className="size-4" />
@@ -135,8 +137,8 @@ function SkillsManagerBody({
           <SkillCreateForm
             onCancel={() => setIsCreating(false)}
             onCreated={(id) => {
-              setIsCreating(false);
-              select(id);
+              setIsCreating(false)
+              select(id)
             }}
           />
         ) : (
@@ -152,5 +154,5 @@ function SkillsManagerBody({
         )}
       </div>
     </>
-  );
+  )
 }

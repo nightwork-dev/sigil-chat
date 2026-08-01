@@ -83,12 +83,19 @@ function ProjectSessionHomeRoute() {
   // the canonical form once resolved; everything scope-keyed downstream
   // must use it, never the raw param (session slugs, SC.10).
   const canonicalId = thread.data?.id
-  const commitments = useSessionCommitments(canonicalId ?? "", Boolean(canonicalId))
+  const commitments = useSessionCommitments(
+    canonicalId ?? "",
+    Boolean(canonicalId),
+  )
   const artifactScope = canonicalId
     ? artifactScopeForHome("session", canonicalId)
     : null
   const artifacts = useArtifacts(artifactScope)
-  const signals = useHomeSignals("session", canonicalId ?? "", Boolean(canonicalId))
+  const signals = useHomeSignals(
+    "session",
+    canonicalId ?? "",
+    Boolean(canonicalId),
+  )
 
   const state: HomeState<SessionHomeView> = useMemo(() => {
     const homeThread = thread.data
@@ -155,6 +162,10 @@ function ProjectSessionHomeRoute() {
   ])
 
   return (
-    <SessionChatSurface compact={compact} railState={state} threadId={canonicalId} />
+    <SessionChatSurface
+      compact={compact}
+      railState={state}
+      threadId={canonicalId}
+    />
   )
 }

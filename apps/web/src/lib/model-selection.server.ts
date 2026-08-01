@@ -62,7 +62,9 @@ function synthesizeDiscoveredPreset(
   entry: DiscoveredModelRecord,
   providers: ReturnType<typeof normalizeSigilAgentProviders>,
 ): NormalizedSigilAgentModelPreset[] {
-  const provider = providers.find((candidate) => candidate.id === entry.providerId)
+  const provider = providers.find(
+    (candidate) => candidate.id === entry.providerId,
+  )
   if (!provider || !provider.enabled) return []
   return [
     {
@@ -110,7 +112,9 @@ export function allModelPresets(
   const authored = authoredModelPresets()
   const authoredIds = new Set(authored.map((preset) => preset.id))
   const discovered =
-    cached === undefined ? discoveredModelPresets() : discoveredModelPresets(cached)
+    cached === undefined
+      ? discoveredModelPresets()
+      : discoveredModelPresets(cached)
   return [
     ...authored,
     ...discovered.filter((preset) => !authoredIds.has(preset.id)),

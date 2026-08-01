@@ -23,9 +23,7 @@ export function RoadmapGraphWorkspace({
   const stories = useStories()
 
   if (stories.isPending) {
-    return (
-      <p className="p-4 text-xs text-muted-foreground">Loading roadmap…</p>
-    )
+    return <p className="p-4 text-xs text-muted-foreground">Loading roadmap…</p>
   }
   if (stories.isError) {
     return (

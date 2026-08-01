@@ -27,14 +27,16 @@ const getGraphDocument = createServerFn({ method: "GET" }).handler(async () => {
 const applyGraphCommand = createServerFn({ method: "POST" })
   .validator((value: GraphCommandRequest) => value)
   .handler(async ({ data }) => {
-    const { graphRepository } = await import("@workspace/graph-store/repository")
+    const { graphRepository } =
+      await import("@workspace/graph-store/repository")
     return graphRepository.apply(data.command, data.expectedRevision)
   })
 
 const undoGraphCommand = createServerFn({ method: "POST" })
   .validator((value: { expectedRevision: number }) => value)
   .handler(async ({ data }) => {
-    const { graphRepository } = await import("@workspace/graph-store/repository")
+    const { graphRepository } =
+      await import("@workspace/graph-store/repository")
     return graphRepository.undo(data.expectedRevision)
   })
 
@@ -58,8 +60,10 @@ export function useReducerGraphCommand() {
   return useMutation({
     mutationFn: async (command: ReducerGraphCommand) => {
       const key = graphKeys.detail(sampleReducerGraph.id)
-      const previousDocument = queryClient.getQueryData<ReducerGraphDocument>(key)
-      if (!previousDocument) throw new Error("The reducer graph has not loaded.")
+      const previousDocument =
+        queryClient.getQueryData<ReducerGraphDocument>(key)
+      if (!previousDocument)
+        throw new Error("The reducer graph has not loaded.")
 
       // Optimistic write: apply the command locally (with the same pure
       // reducer the server uses in graphRepository.apply) so callers like a
@@ -68,7 +72,10 @@ export function useReducerGraphCommand() {
       // can take seconds under contention. Rolled back below if the server
       // rejects the command.
       try {
-        queryClient.setQueryData(key, reduceGraphDocument(previousDocument, command))
+        queryClient.setQueryData(
+          key,
+          reduceGraphDocument(previousDocument, command),
+        )
       } catch {
         // The command would fail the server's validation too — let the
         // round trip surface the real error instead of guessing locally.
@@ -84,7 +91,10 @@ export function useReducerGraphCommand() {
       }
     },
     onSuccess: (document) => {
-      queryClient.setQueryData(graphKeys.detail(sampleReducerGraph.id), document)
+      queryClient.setQueryData(
+        graphKeys.detail(sampleReducerGraph.id),
+        document,
+      )
     },
   })
 }
@@ -93,12 +103,17 @@ export function useReducerGraphUndo() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => {
-      const document = queryClient.getQueryData<ReducerGraphDocument>(graphKeys.detail(sampleReducerGraph.id))
+      const document = queryClient.getQueryData<ReducerGraphDocument>(
+        graphKeys.detail(sampleReducerGraph.id),
+      )
       if (!document) throw new Error("The reducer graph has not loaded.")
       return undoGraphCommand({ data: { expectedRevision: document.revision } })
     },
     onSuccess: (document) => {
-      queryClient.setQueryData(graphKeys.detail(sampleReducerGraph.id), document)
+      queryClient.setQueryData(
+        graphKeys.detail(sampleReducerGraph.id),
+        document,
+      )
     },
   })
 }

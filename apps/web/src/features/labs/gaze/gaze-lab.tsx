@@ -58,12 +58,7 @@ import {
 } from "./regions"
 
 type LabPhase =
-  | "off"
-  | "starting"
-  | "ready"
-  | "calibrating"
-  | "tracking"
-  | "error"
+  "off" | "starting" | "ready" | "calibrating" | "tracking" | "error"
 
 interface CalibrationProgress {
   targetIndex: number

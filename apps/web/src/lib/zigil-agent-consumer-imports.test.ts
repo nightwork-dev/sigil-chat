@@ -19,7 +19,8 @@ function collectTextFiles(dir: string): Array<string> {
 
     if (entry.isDirectory()) {
       const relativePath = relative(repoRoot, path)
-      return ignoredDirectories.has(entry.name) || ignoredDirectories.has(relativePath)
+      return ignoredDirectories.has(entry.name) ||
+        ignoredDirectories.has(relativePath)
         ? []
         : collectTextFiles(path)
     }
@@ -51,7 +52,10 @@ describe("canonical @zigil/agent consumer imports", () => {
   })
 
   it("declares only the canonical SDK package in consumer manifests", () => {
-    const workspaceManifest = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8")
+    const workspaceManifest = readFileSync(
+      join(repoRoot, "pnpm-workspace.yaml"),
+      "utf8",
+    )
     const catalogPinsCanonicalAgent =
       /^\s{2}"@zigil\/agent": \d+\.\d+\.\d+\s*$/m.test(workspaceManifest)
     const manifests = [
@@ -60,12 +64,15 @@ describe("canonical @zigil/agent consumer imports", () => {
       "packages/agent-contracts/package.json",
     ]
     const violations = manifests.flatMap((manifest) => {
-      const pkg = JSON.parse(readFileSync(join(repoRoot, manifest), "utf8")) as {
+      const pkg = JSON.parse(
+        readFileSync(join(repoRoot, manifest), "utf8"),
+      ) as {
         dependencies?: Record<string, string>
       }
       const dependencies = pkg.dependencies ?? {}
       const invalidKeys = Object.keys(dependencies).filter(
-        (name) => name.startsWith("@zigil/agent/") || name.startsWith("@zigil/agent-"),
+        (name) =>
+          name.startsWith("@zigil/agent/") || name.startsWith("@zigil/agent-"),
       )
       const declaredVersion = dependencies["@zigil/agent"]
       const invalidVersions =
@@ -74,7 +81,10 @@ describe("canonical @zigil/agent consumer imports", () => {
           ? []
           : [`${manifest} pins @zigil/agent to ${declaredVersion ?? "missing"}`]
 
-      return [...invalidKeys.map((name) => `${manifest} declares ${name}`), ...invalidVersions]
+      return [
+        ...invalidKeys.map((name) => `${manifest} declares ${name}`),
+        ...invalidVersions,
+      ]
     })
 
     expect(violations).toEqual([])

@@ -49,22 +49,25 @@ function micButton(el: HTMLElement): HTMLButtonElement {
 }
 
 describe("VoiceMicControl states", () => {
-  it.each(VOICE_CONTROL_STATES)("renders %s with its own affordance", (state) => {
-    const el = render(
-      <VoiceMicControl onStart={() => {}} onStop={() => {}} state={state} />,
-    )
-    const button = micButton(el)
-    expect(button.dataset.voiceState).toBe(state)
-    expect(button.getAttribute("aria-label")).toBe(
-      voiceControlPresentation(state).label,
-    )
-    // An icon is always drawn, and the "on" state is the only one that
-    // reports itself pressed.
-    expect(button.querySelector("svg")).toBeTruthy()
-    expect(button.getAttribute("aria-pressed")).toBe(
-      String(isVoiceCaptureActive(state)),
-    )
-  })
+  it.each(VOICE_CONTROL_STATES)(
+    "renders %s with its own affordance",
+    (state) => {
+      const el = render(
+        <VoiceMicControl onStart={() => {}} onStop={() => {}} state={state} />,
+      )
+      const button = micButton(el)
+      expect(button.dataset.voiceState).toBe(state)
+      expect(button.getAttribute("aria-label")).toBe(
+        voiceControlPresentation(state).label,
+      )
+      // An icon is always drawn, and the "on" state is the only one that
+      // reports itself pressed.
+      expect(button.querySelector("svg")).toBeTruthy()
+      expect(button.getAttribute("aria-pressed")).toBe(
+        String(isVoiceCaptureActive(state)),
+      )
+    },
+  )
 
   it("gives every state a distinct accessible name", () => {
     const labels = VOICE_CONTROL_STATES.map(
@@ -129,18 +132,19 @@ describe("VoiceMicControl reachability", () => {
     },
   )
 
-  it.each(
-    VOICE_CONTROL_STATES.filter((state) => !isVoiceCaptureActive(state)),
-  )("starts capture from %s — activation is an explicit click", (state) => {
-    const onStop = vi.fn()
-    const onStart = vi.fn()
-    const el = render(
-      <VoiceMicControl onStart={onStart} onStop={onStop} state={state} />,
-    )
-    const button = micButton(el)
-    expect(button.dataset.voiceAction).toBe("start")
-    act(() => button.click())
-    expect(onStart).toHaveBeenCalledTimes(1)
-    expect(onStop).not.toHaveBeenCalled()
-  })
+  it.each(VOICE_CONTROL_STATES.filter((state) => !isVoiceCaptureActive(state)))(
+    "starts capture from %s — activation is an explicit click",
+    (state) => {
+      const onStop = vi.fn()
+      const onStart = vi.fn()
+      const el = render(
+        <VoiceMicControl onStart={onStart} onStop={onStop} state={state} />,
+      )
+      const button = micButton(el)
+      expect(button.dataset.voiceAction).toBe("start")
+      act(() => button.click())
+      expect(onStart).toHaveBeenCalledTimes(1)
+      expect(onStop).not.toHaveBeenCalled()
+    },
+  )
 })

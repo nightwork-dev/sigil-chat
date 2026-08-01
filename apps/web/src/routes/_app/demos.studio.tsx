@@ -17,7 +17,9 @@ import { fetchFeatureFlags } from "@/lib/feature-flags"
 export const Route = createFileRoute("/_app/demos/studio")({
   beforeLoad: async () => {
     const { flags } = await fetchFeatureFlags()
-    const reducerStudio = flags.find((flag) => flag.id === "surfaces.reducerStudio")
+    const reducerStudio = flags.find(
+      (flag) => flag.id === "surfaces.reducerStudio",
+    )
     // Absence reads as enabled rather than refusing navigation over a
     // registry lookup that failed for an unrelated reason — the flag's own
     // default-off behavior is for an id nobody declared, not for a declared

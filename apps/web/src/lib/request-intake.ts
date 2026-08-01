@@ -38,12 +38,10 @@ const searchRequestsFn = createServerFn({ method: "GET" })
   .validator((input?: { filter?: RequestFilter }) => input ?? {})
   .handler(async ({ data }): Promise<RequestSearchResult> => {
     const { getSession } = await import("@/lib/auth/session")
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    )
-    const { currentWorkItemsScopeAccess } = await import(
-      "@/lib/work-items-access.server"
-    )
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const { currentWorkItemsScopeAccess } =
+      await import("@/lib/work-items-access.server")
     const viewer = authenticatedWorkItemsViewer(await getSession())
     const { workItemsRepository } = await import("@workspace/work-items-store")
     return filterVisibleRequestSearchResult(
@@ -57,16 +55,16 @@ const inspectRequestFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }): Promise<RequestInspectResult> => {
     const { getSession } = await import("@/lib/auth/session")
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    )
-    const { currentWorkItemsScopeAccess } = await import(
-      "@/lib/work-items-access.server"
-    )
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const { currentWorkItemsScopeAccess } =
+      await import("@/lib/work-items-access.server")
     const viewer = authenticatedWorkItemsViewer(await getSession())
     const { workItemsRepository } = await import("@workspace/work-items-store")
     return requireReadableRequestInspectResult(
-      await opaqueRequestLookup(() => workItemsRepository.inspectRequest(data.id)),
+      await opaqueRequestLookup(() =>
+        workItemsRepository.inspectRequest(data.id),
+      ),
       viewer.id,
       currentWorkItemsScopeAccess(),
     )
@@ -76,15 +74,14 @@ const createHumanRequestFn = createServerFn({ method: "POST" })
   .validator((input: HumanRequestInput) => input)
   .handler(async ({ data }): Promise<FeatureRequestProposalResult> => {
     const { getSession } = await import("@/lib/auth/session")
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    )
-    const { currentWorkItemsScopeAccess } = await import(
-      "@/lib/work-items-access.server"
-    )
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const { currentWorkItemsScopeAccess } =
+      await import("@/lib/work-items-access.server")
     const viewer = authenticatedWorkItemsViewer(await getSession())
     const targetScopeId = data.intendedScopeId?.trim()
-    if (!targetScopeId) throw new Error("Request intake requires a target scope.")
+    if (!targetScopeId)
+      throw new Error("Request intake requires a target scope.")
     if (
       !currentWorkItemsScopeAccess().canAccess({
         principalId: viewer.id,
@@ -116,12 +113,10 @@ const addRequestEvidenceFn = createServerFn({ method: "POST" })
   .validator((input: ScopedRequestEvidenceInput) => input)
   .handler(async ({ data }): Promise<WorkItemsMutationResult> => {
     const { getSession } = await import("@/lib/auth/session")
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    )
-    const { currentWorkItemsScopeAccess } = await import(
-      "@/lib/work-items-access.server"
-    )
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const { currentWorkItemsScopeAccess } =
+      await import("@/lib/work-items-access.server")
     const viewer = authenticatedWorkItemsViewer(await getSession())
     requireWritableScope(
       data.currentScopeId,

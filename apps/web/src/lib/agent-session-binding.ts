@@ -107,9 +107,8 @@ const issueAgentParticipantSessionBindingFn = createServerFn({ method: "POST" })
       const { getSession, requireSession } = await import("./auth/session")
       const { resolveAgentThreadExecutionBinding } =
         await import("./agent-threads.server")
-      const { issueAgentSessionBinding } = await import(
-        "@workspace/agent-contracts/session-binding.server"
-      )
+      const { issueAgentSessionBinding } =
+        await import("@workspace/agent-contracts/session-binding.server")
       const session = await getSession()
       const assertSession: (
         candidate: SigilAuthSession | null,
@@ -120,15 +119,20 @@ const issueAgentParticipantSessionBindingFn = createServerFn({ method: "POST" })
         data.participantThreadIds,
       )
       const targetThreadId = data.targetThreadId.trim()
-      if (!targetThreadId) throw new Error("Target agent thread id is required.")
+      if (!targetThreadId)
+        throw new Error("Target agent thread id is required.")
       if (!participantThreadIds.includes(targetThreadId)) {
-        throw new Error("Target thread is not a member of the participant channel.")
+        throw new Error(
+          "Target thread is not a member of the participant channel.",
+        )
       }
 
       const bindings = participantThreadIds.map((threadId) =>
         resolveAgentThreadExecutionBinding(session.user.id, threadId),
       )
-      const target = bindings.find((binding) => binding.threadId === targetThreadId)
+      const target = bindings.find(
+        (binding) => binding.threadId === targetThreadId,
+      )
       if (!target) {
         throw new Error("Target agent thread binding could not be resolved.")
       }
@@ -164,14 +168,18 @@ const issueAgentParticipantSessionBindingFn = createServerFn({ method: "POST" })
             ...(target.requestOptions
               ? { requestOptions: target.requestOptions }
               : {}),
-            ...(target.eveSessionId ? { runtimeSessionId: target.eveSessionId } : {}),
+            ...(target.eveSessionId
+              ? { runtimeSessionId: target.eveSessionId }
+              : {}),
             subject: session.user.id,
             expiresAt,
           },
           secret,
         ),
         subject: session.user.id,
-        targetParticipantId: agentParticipantPersonaParticipantId(target.threadId),
+        targetParticipantId: agentParticipantPersonaParticipantId(
+          target.threadId,
+        ),
         threadId: target.threadId,
       }
     },
@@ -207,7 +215,9 @@ export async function getAgentParticipantSessionBindingProof(
     receipt.subject !== principalId ||
     receipt.threadId !== input.targetThreadId.trim()
   ) {
-    throw new Error("Agent participant session binding changed during issuance.")
+    throw new Error(
+      "Agent participant session binding changed during issuance.",
+    )
   }
   return receipt
 }

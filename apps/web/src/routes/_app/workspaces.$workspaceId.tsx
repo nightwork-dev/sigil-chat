@@ -71,9 +71,7 @@ export const Route = createFileRoute("/_app/workspaces/$workspaceId")({
         workspace.mountedProjectIds.includes(resolvedVia.id))
     const targetProjectId = viaVisible ? resolvedVia.id : workspace.projectId
     if (targetProjectId) {
-      const targetProject = nav!.projects.find(
-        (p) => p.id === targetProjectId,
-      )!
+      const targetProject = nav!.projects.find((p) => p.id === targetProjectId)!
       throw redirect({
         to: "/projects/$projectId/workspaces/$workspaceId",
         params: {

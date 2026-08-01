@@ -144,13 +144,11 @@ export const fetchEnabledModelIds = createServerFn({ method: "GET" }).handler(
 
 export const setModelEnabled = createServerFn({ method: "POST" })
   .validator(parseSetModelEnabledRequest)
-  .handler(
-    async ({ data }): Promise<{ enabledIds: string[] }> => ({
-      enabledIds: await (
-        await import("./model-enablement.server")
-      ).setInstallationModelEnabled(data),
-    }),
-  )
+  .handler(async ({ data }): Promise<{ enabledIds: string[] }> => ({
+    enabledIds: await (
+      await import("./model-enablement.server")
+    ).setInstallationModelEnabled(data),
+  }))
 
 /** Real server-side validation of the bytes the client actually sent. */
 export function parseSetModelEnabledRequest(

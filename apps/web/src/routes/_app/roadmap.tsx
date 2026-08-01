@@ -10,7 +10,9 @@ import { createFileRoute, redirect } from "@tanstack/react-router"
 import { RoadmapHub, type RoadmapView } from "@/features/roadmap/roadmap-hub"
 
 export const Route = createFileRoute("/_app/roadmap")({
-  validateSearch: (search: Record<string, unknown>): { view: RoadmapView; story?: string; spec?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { view: RoadmapView; story?: string; spec?: string } => ({
     view:
       search.view === "specs" || search.view === "graph"
         ? search.view

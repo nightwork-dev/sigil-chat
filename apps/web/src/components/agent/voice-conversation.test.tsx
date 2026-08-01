@@ -159,7 +159,11 @@ function recordingSynth(options: { fails?: boolean } = {}) {
   return {
     spoken: () => spoken,
     speak: ((parts, speakOptions) =>
-      speakMessageParts(parts, speakOptions, fetchImpl)) as typeof speakMessageParts,
+      speakMessageParts(
+        parts,
+        speakOptions,
+        fetchImpl,
+      )) as typeof speakMessageParts,
   }
 }
 

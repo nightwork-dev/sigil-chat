@@ -1,6 +1,9 @@
 import type { UploadedAttachment } from "./agent-attachments"
 import { assertAuthorizedScope } from "./agent-scope-authorization.server"
-import { artifactUrlForWeb, getWebArtifactStore } from "./artifact-repository.server"
+import {
+  artifactUrlForWeb,
+  getWebArtifactStore,
+} from "./artifact-repository.server"
 import type { SigilAuthSession } from "./auth/server"
 import { requireSession } from "./auth/session"
 
@@ -72,6 +75,7 @@ export async function uploadAgentAttachmentFromRequest(
   return uploadAgentAttachment(data, {
     getSession,
     ownedThreadHomeScope: (userId, threadId) =>
-      agentThreadRepository.get(userId, threadId)?.executionBinding?.homeScopeId,
+      agentThreadRepository.get(userId, threadId)?.executionBinding
+        ?.homeScopeId,
   })
 }

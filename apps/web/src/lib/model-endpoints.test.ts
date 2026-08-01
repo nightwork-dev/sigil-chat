@@ -10,9 +10,9 @@ import { projectProviders, projectProbeResult } from "./model-endpoints.server"
 
 describe("probe request validation", () => {
   it("accepts and trims a well-formed request", () => {
-    expect(parseProbeInput({ baseUrl: "  http://127.0.0.1:1234/v1  " })).toEqual(
-      { baseUrl: "http://127.0.0.1:1234/v1" },
-    )
+    expect(
+      parseProbeInput({ baseUrl: "  http://127.0.0.1:1234/v1  " }),
+    ).toEqual({ baseUrl: "http://127.0.0.1:1234/v1" })
   })
 
   // REGRESSION (blocking, Annika 2026-07-31): the probe used to accept

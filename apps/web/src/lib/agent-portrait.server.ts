@@ -17,9 +17,7 @@ export async function readAgentPortraitFromRequest(
     return new Response(null, { status })
   }
 
-  const personaId = new URL(request.url).searchParams
-    .get("personaId")
-    ?.trim()
+  const personaId = new URL(request.url).searchParams.get("personaId")?.trim()
   if (!personaId || !personaRegistry.exists(personaId)) {
     return new Response(null, { status: 404 })
   }

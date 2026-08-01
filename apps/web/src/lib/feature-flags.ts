@@ -88,7 +88,9 @@ export interface SetFeatureFlagRequest {
 }
 
 /** Real server-side validation of the bytes the client actually sent. */
-export function parseSetFeatureFlagRequest(input: unknown): SetFeatureFlagRequest {
+export function parseSetFeatureFlagRequest(
+  input: unknown,
+): SetFeatureFlagRequest {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new FeatureFlagRefusedError("A request must be an object.")
   }
@@ -132,13 +134,11 @@ export const fetchFeatureFlags = createServerFn({ method: "GET" }).handler(
 
 export const setFeatureFlag = createServerFn({ method: "POST" })
   .validator(parseSetFeatureFlagRequest)
-  .handler(
-    async ({ data }): Promise<{ flags: FeatureFlagState[] }> => ({
-      flags: await (
-        await import("./feature-flags.server")
-      ).setInstallationFeatureFlag(data),
-    }),
-  )
+  .handler(async ({ data }): Promise<{ flags: FeatureFlagState[] }> => ({
+    flags: await (
+      await import("./feature-flags.server")
+    ).setInstallationFeatureFlag(data),
+  }))
 
 // ─── React Query ────────────────────────────────────────────────────────────
 
@@ -162,7 +162,8 @@ export function useSetFeatureFlag(): UseMutationResult<
 > {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: SetFeatureFlagRequest) => setFeatureFlag({ data: input }),
+    mutationFn: (input: SetFeatureFlagRequest) =>
+      setFeatureFlag({ data: input }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: featureFlagKeys.all() })
     },

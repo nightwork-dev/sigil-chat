@@ -229,9 +229,7 @@ const blackboardChangedHandler: AgentOutcomeReconciliationHandler = {
       return
     }
     const tier =
-      outcome.resource.kind === "workspace-blackboard"
-        ? "workspace"
-        : "project"
+      outcome.resource.kind === "workspace-blackboard" ? "workspace" : "project"
     await context.invalidate([
       blackboardKeys.scoped({ tier, id: outcome.resource.id }),
     ])

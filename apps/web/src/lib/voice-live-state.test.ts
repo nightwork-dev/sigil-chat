@@ -13,12 +13,7 @@ import {
   type LiveVoiceEvent,
 } from "./voice-live-state"
 
-const EVENTS: readonly LiveVoiceEvent[] = [
-  "start",
-  "connected",
-  "stop",
-  "fail",
-]
+const EVENTS: readonly LiveVoiceEvent[] = ["start", "connected", "stop", "fail"]
 
 describe("the state machine", () => {
   it("stays inside its own state list for every state/event pair", () => {

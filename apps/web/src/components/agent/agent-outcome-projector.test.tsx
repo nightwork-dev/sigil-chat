@@ -23,8 +23,9 @@ const domMocks = vi.hoisted(() => ({
 vi.mock("@/lib/agent-client-command", () => commandMocks)
 vi.mock("@/lib/agent-dom-effects", () => domMocks)
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | undefined
 

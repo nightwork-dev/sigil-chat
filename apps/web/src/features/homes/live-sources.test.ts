@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest"
 
-import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav";
-import type { Story } from "@workspace/work-items-store/types";
+import type { ProjectWorkspaceNavSummary } from "@/lib/project-workspace-nav"
+import type { Story } from "@workspace/work-items-store/types"
 
 import {
   artifactRowsFromRecords,
   artifactScopeForHome,
   liveWorkSource,
   routeSources,
-} from "./live-sources";
+} from "./live-sources"
 
 const nav: ProjectWorkspaceNavSummary = {
   personalProjectId: "project-personal",
@@ -31,7 +31,7 @@ const nav: ProjectWorkspaceNavSummary = {
       mountedProjectIds: [],
     },
   ],
-};
+}
 
 const story: Story = {
   id: "SC.7",
@@ -56,7 +56,7 @@ const story: Story = {
   authoredBy: "Owner",
   createdAt: "2026-07-21T00:00:00.000Z",
   updatedAt: "2026-07-21T01:00:00.000Z",
-};
+}
 
 describe("home route sources", () => {
   it("uses permission-filtered live work", () => {
@@ -64,8 +64,8 @@ describe("home route sources", () => {
       scopeId: "project-1",
       scopeStories: [story],
       nav,
-    });
-    const sources = routeSources([], live);
+    })
+    const sources = routeSources([], live)
 
     expect(sources.work.summariesForScope("project-1")).toEqual([
       expect.objectContaining({
@@ -73,31 +73,34 @@ describe("home route sources", () => {
         homeScopeName: "Checkout Reliability",
         href: "/roadmap?story=SC.7",
       }),
-    ]);
-    expect(sources.resources).toEqual([]);
-    expect(sources.attention).toEqual([]);
-  });
+    ])
+    expect(sources.resources).toEqual([])
+    expect(sources.attention).toEqual([])
+  })
 
   it("uses permission-filtered live artifacts", () => {
-    const live = liveWorkSource({ nav });
+    const live = liveWorkSource({ nav })
     const sources = routeSources([], live, {
-      resources: artifactRowsFromRecords([
-        {
-          id: "older",
-          filename: "old-plan.md",
-          mediaType: "text/markdown",
-          size: 4,
-          createdAt: "2026-07-20T00:00:00.000Z",
-        },
-        {
-          id: "newer",
-          filename: "latest-brief.png",
-          mediaType: "image/png",
-          size: 12,
-          createdAt: "2026-07-21T00:00:00.000Z",
-        },
-      ], { scope: "project:project-1" }),
-    });
+      resources: artifactRowsFromRecords(
+        [
+          {
+            id: "older",
+            filename: "old-plan.md",
+            mediaType: "text/markdown",
+            size: 4,
+            createdAt: "2026-07-20T00:00:00.000Z",
+          },
+          {
+            id: "newer",
+            filename: "latest-brief.png",
+            mediaType: "image/png",
+            size: 12,
+            createdAt: "2026-07-21T00:00:00.000Z",
+          },
+        ],
+        { scope: "project:project-1" },
+      ),
+    })
 
     expect(sources.resources).toEqual([
       {
@@ -114,12 +117,12 @@ describe("home route sources", () => {
         mediaType: "text/markdown",
         nativeHref: "/api/media/artifact?key=older&scope=project%3Aproject-1",
       },
-    ]);
-    expect(sources.artifacts).toEqual([]);
-  });
+    ])
+    expect(sources.artifacts).toEqual([])
+  })
 
   it("maps session artifacts separately from scope resources", () => {
-    const live = liveWorkSource({ nav });
+    const live = liveWorkSource({ nav })
     const sources = routeSources([], live, {
       artifacts: artifactRowsFromRecords([
         {
@@ -130,9 +133,9 @@ describe("home route sources", () => {
           createdAt: "2026-07-21T00:00:00.000Z",
         },
       ]),
-    });
+    })
 
-    expect(sources.resources).toEqual([]);
+    expect(sources.resources).toEqual([])
     expect(sources.artifacts).toEqual([
       {
         id: "matrix",
@@ -140,11 +143,11 @@ describe("home route sources", () => {
         kind: "artifact",
         mediaType: "text/csv",
       },
-    ]);
-  });
+    ])
+  })
 
   it("projects durable activity and attention without inventing a source scope", () => {
-    const live = liveWorkSource({ nav });
+    const live = liveWorkSource({ nav })
     const sources = routeSources(
       [{ personaId: "eve", name: "Eve", hasPortrait: false }],
       live,
@@ -173,7 +176,7 @@ describe("home route sources", () => {
         },
         viaProjectId: "project-1",
       },
-    );
+    )
 
     expect(sources.activity).toEqual([
       {
@@ -183,7 +186,7 @@ describe("home route sources", () => {
         occurredAt: "2026-07-21T01:00:00.000Z",
         href: "/sessions/thread-1?via=project-1",
       },
-    ]);
+    ])
     expect(sources.attention).toEqual([
       {
         id: "attention-1",
@@ -192,34 +195,32 @@ describe("home route sources", () => {
         notedFromName: undefined,
         href: "/sessions/thread-1?via=project-1",
       },
-    ]);
-  });
+    ])
+  })
 
   it("formats artifact scopes without double-prefixing qualified ids", () => {
     expect(artifactScopeForHome("project", "project-1")).toBe(
       "project:project-1",
-    );
+    )
     expect(artifactScopeForHome("project", "personal:user-1")).toBe(
       "project:personal:user-1",
-    );
+    )
     expect(artifactScopeForHome("workspace", "workspace-1")).toBe(
       "workspace:workspace-1",
-    );
-    expect(artifactScopeForHome("session", "thread-1")).toBe(
-      "session:thread-1",
-    );
+    )
+    expect(artifactScopeForHome("session", "thread-1")).toBe("session:thread-1")
     expect(artifactScopeForHome("project", "project:already-qualified")).toBe(
       "project:already-qualified",
-    );
-  });
+    )
+  })
 
   it("does not substitute presentation fixtures for live route data", () => {
-    const live = liveWorkSource({ nav });
+    const live = liveWorkSource({ nav })
     const resources = [
       { id: "real", name: "real.md", kind: "artifact" },
-    ] as const;
+    ] as const
 
-    expect(routeSources([], live).work).toBe(live);
-    expect(routeSources([], live, { resources }).resources).toEqual(resources);
-  });
-});
+    expect(routeSources([], live).work).toBe(live)
+    expect(routeSources([], live, { resources }).resources).toEqual(resources)
+  })
+})

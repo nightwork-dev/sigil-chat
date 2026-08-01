@@ -61,7 +61,10 @@ describe("derive — dark path (unchanged output for presets)", () => {
   })
 
   it("Surface Hue visibly changes the void/surface colors (not a no-op)", () => {
-    const rotated = derive({ ...amber, surfaceHue: (amber.surfaceHue + 90) % 360 }, "dark")
+    const rotated = derive(
+      { ...amber, surfaceHue: (amber.surfaceHue + 90) % 360 },
+      "dark",
+    )
     const base = derive(amber, "dark")
     expect(rotated.background).not.toBe(base.background)
     // "visible" = a real per-channel delta, not a rounding-noise flip
@@ -88,7 +91,10 @@ describe("derive — light path (surface inversion, AA-safe)", () => {
   })
 
   it("Surface Hue visibly changes the paper color (not a no-op)", () => {
-    const rotated = derive({ ...amber, surfaceHue: (amber.surfaceHue + 90) % 360 }, "light")
+    const rotated = derive(
+      { ...amber, surfaceHue: (amber.surfaceHue + 90) % 360 },
+      "light",
+    )
     const base = derive(amber, "light")
     expect(rotated.background).not.toBe(base.background)
     const delta = (a: string, b: string) =>
@@ -109,14 +115,20 @@ describe("derive — light path (surface inversion, AA-safe)", () => {
   })
 
   it("body + muted text clear AA on their surfaces", () => {
-    expect(contrastRatio(t.foreground, t.background)).toBeGreaterThanOrEqual(4.5)
-    expect(contrastRatio(t.mutedForeground, t.background)).toBeGreaterThanOrEqual(4)
+    expect(contrastRatio(t.foreground, t.background)).toBeGreaterThanOrEqual(
+      4.5,
+    )
+    expect(
+      contrastRatio(t.mutedForeground, t.background),
+    ).toBeGreaterThanOrEqual(4)
   })
 
   it("all 7 presets yield an AA-legible light signal", () => {
     for (const [, p] of Object.entries(PRESETS)) {
       const lt = derive(p, "light")
-      expect(contrastRatio(lt.primary, lt.background)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(lt.primary, lt.background)).toBeGreaterThanOrEqual(
+        4.5,
+      )
     }
   })
 })
@@ -130,34 +142,62 @@ describe("hslToHex sextant correctness (destructive hue)", () => {
   })
 
   it("pure blue (h=250) renders blue (b > r) and pure red (h=0) renders red", () => {
-    const blue = derive({ ...amber, signalHue: 250, signalChroma: 1 }, "dark").primary
-    const red = derive({ ...amber, signalHue: 0, signalChroma: 1 }, "dark").primary
-    expect(parseInt(blue.slice(5, 7), 16)).toBeGreaterThan(parseInt(blue.slice(1, 3), 16))
-    expect(parseInt(red.slice(1, 3), 16)).toBeGreaterThan(parseInt(red.slice(5, 7), 16))
+    const blue = derive(
+      { ...amber, signalHue: 250, signalChroma: 1 },
+      "dark",
+    ).primary
+    const red = derive(
+      { ...amber, signalHue: 0, signalChroma: 1 },
+      "dark",
+    ).primary
+    expect(parseInt(blue.slice(5, 7), 16)).toBeGreaterThan(
+      parseInt(blue.slice(1, 3), 16),
+    )
+    expect(parseInt(red.slice(1, 3), 16)).toBeGreaterThan(
+      parseInt(red.slice(5, 7), 16),
+    )
   })
 })
 
 describe("radius derivation", () => {
   it("radius=8 reproduces the default 6/8/12/16 stack", () => {
     const t = derive({ ...amber, radius: 8 }, "dark")
-    expect([t.radiusSm, t.radiusMd, t.radiusLg, t.radiusXl]).toEqual([6, 8, 12, 16])
+    expect([t.radiusSm, t.radiusMd, t.radiusLg, t.radiusXl]).toEqual([
+      6, 8, 12, 16,
+    ])
   })
 
   it("scales proportionally", () => {
     const t = derive({ ...amber, radius: 0 }, "dark")
-    expect([t.radiusSm, t.radiusMd, t.radiusLg, t.radiusXl]).toEqual([0, 0, 0, 0])
+    expect([t.radiusSm, t.radiusMd, t.radiusLg, t.radiusXl]).toEqual([
+      0, 0, 0, 0,
+    ])
   })
 })
 
 describe("exportBlock / exportAsCSS", () => {
   it("emits the right selector per mode", () => {
-    expect(exportBlock("neo", derive(amber, "dark"), "dark", amber.signalHue)).toMatch(/^\.theme-neo \{/)
-    expect(exportBlock("neo", derive(amber, "light"), "light", amber.signalHue)).toMatch(/^\.theme-neo\.light \{/)
+    expect(
+      exportBlock("neo", derive(amber, "dark"), "dark", amber.signalHue),
+    ).toMatch(/^\.theme-neo \{/)
+    expect(
+      exportBlock("neo", derive(amber, "light"), "light", amber.signalHue),
+    ).toMatch(/^\.theme-neo\.light \{/)
   })
 
   it("dark block carries display tokens, light block does not", () => {
-    const dark = exportBlock("neo", derive(amber, "dark"), "dark", amber.signalHue)
-    const light = exportBlock("neo", derive(amber, "light"), "light", amber.signalHue)
+    const dark = exportBlock(
+      "neo",
+      derive(amber, "dark"),
+      "dark",
+      amber.signalHue,
+    )
+    const light = exportBlock(
+      "neo",
+      derive(amber, "light"),
+      "light",
+      amber.signalHue,
+    )
     expect(dark).toContain("--display-bg")
     expect(light).not.toContain("--display-bg")
   })

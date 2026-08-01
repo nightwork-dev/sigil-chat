@@ -75,7 +75,9 @@ export function DistilledCard({ distilled }: { distilled: DistilledArtifact }) {
                   key={`${index}-${reference.slice(0, 24)}`}
                   className="flex gap-1.5 text-xs text-muted-foreground"
                 >
-                  <span className="select-none text-muted-foreground/60">›</span>
+                  <span className="select-none text-muted-foreground/60">
+                    ›
+                  </span>
                   <span className="min-w-0 break-words">{reference}</span>
                 </li>
               ))}
@@ -84,7 +86,7 @@ export function DistilledCard({ distilled }: { distilled: DistilledArtifact }) {
         ) : null}
       </div>
 
-      {distilled.sourceLabel ?? distilled.sourceArtifactId ? (
+      {(distilled.sourceLabel ?? distilled.sourceArtifactId) ? (
         <figcaption className="flex items-center gap-1.5 border-t border-border/70 px-3.5 py-2 text-[0.6875rem] text-muted-foreground">
           <FileTextIcon className="size-3 shrink-0" />
           <span className="truncate">

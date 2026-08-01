@@ -11,7 +11,9 @@ const post = (url: string, origin?: string) =>
 describe("rejectCrossOrigin", () => {
   it("lets a same-origin request through", () => {
     expect(
-      rejectCrossOrigin(post("http://sigil.test/api/voice/transcribe", "http://sigil.test")),
+      rejectCrossOrigin(
+        post("http://sigil.test/api/voice/transcribe", "http://sigil.test"),
+      ),
     ).toBeUndefined()
   })
 

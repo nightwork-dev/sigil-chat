@@ -1,9 +1,9 @@
-export const BLACKBOARD_TIERS = ["session", "workspace", "project"] as const;
-export type BlackboardTier = (typeof BLACKBOARD_TIERS)[number];
+export const BLACKBOARD_TIERS = ["session", "workspace", "project"] as const
+export type BlackboardTier = (typeof BLACKBOARD_TIERS)[number]
 
 export interface BlackboardScope {
-  tier: BlackboardTier;
-  id: string;
+  tier: BlackboardTier
+  id: string
 }
 
 /**
@@ -27,11 +27,11 @@ export function blackboardStoreKey(scope: BlackboardScope): string {
     if (scope.id.includes(":")) {
       throw new Error(
         'Session blackboard scope id must not contain ":" — it would collide with a workspace/project store key.',
-      );
+      )
     }
-    return scope.id;
+    return scope.id
   }
-  return `${scope.tier}:${scope.id}`;
+  return `${scope.tier}:${scope.id}`
 }
 
 /**
@@ -44,7 +44,7 @@ export function resolveEffectiveBlackboardTier(
   docs: Partial<Record<BlackboardTier, { content: string } | undefined>>,
 ): BlackboardTier | undefined {
   for (const tier of BLACKBOARD_TIERS) {
-    if (docs[tier]?.content) return tier;
+    if (docs[tier]?.content) return tier
   }
-  return undefined;
+  return undefined
 }

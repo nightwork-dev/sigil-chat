@@ -10,9 +10,9 @@ import { announceAuthorization, speakableText } from "./speakable-text"
 
 describe("speakableText", () => {
   it("speaks assistant text", () => {
-    expect(speakableText([{ type: "text", text: "Done — 3 files changed." }])).toBe(
-      "Done — 3 files changed.",
-    )
+    expect(
+      speakableText([{ type: "text", text: "Done — 3 files changed." }]),
+    ).toBe("Done — 3 files changed.")
   })
 
   it.each(NON_SPEAKABLE_PARTS)("never speaks $label", ({ part }) => {
@@ -38,7 +38,10 @@ describe("speakableText", () => {
   // Fails closed: the part union lives in @zigil/agent and will gain
   // members without us. An unknown part must be silence, not a leak.
   it("does not speak an unrecognized future part type", () => {
-    const future = { type: "telemetry", text: SECRET } as unknown as AgentMessagePart
+    const future = {
+      type: "telemetry",
+      text: SECRET,
+    } as unknown as AgentMessagePart
     expect(speakableText([future]) ?? "").not.toContain(SECRET)
   })
 
@@ -76,10 +79,9 @@ describe("approval announcements", () => {
   // speech — it must stay a name, not a monologue.
   it("bounds an oversized display name instead of speaking it whole", () => {
     const spoken =
-      speakableText(
-        [{ ...pending, displayName: "A".repeat(500) }],
-        { announceApprovals: true },
-      ) ?? ""
+      speakableText([{ ...pending, displayName: "A".repeat(500) }], {
+        announceApprovals: true,
+      }) ?? ""
     expect(spoken.length).toBeLessThan(120)
     expect(spoken).toContain("needs your approval")
   })

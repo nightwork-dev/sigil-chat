@@ -16,7 +16,8 @@ interface GeneratedImageOutput {
  * and status flow still work. Demonstrates the tool-renderer registry pattern.
  */
 export function GenerateImageRenderer(props: ToolRendererProps) {
-  const output = getToolOutputData(props.part) as GeneratedImageOutput | undefined
+  const output = getToolOutputData(props.part) as
+    GeneratedImageOutput | undefined
   if (!output?.url) return <ToolCall {...props} />
   return (
     <figure className="my-1 flex flex-col gap-1.5">

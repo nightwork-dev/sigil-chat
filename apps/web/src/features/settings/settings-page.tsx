@@ -38,13 +38,7 @@ import {
 } from "@/components/agent/workspace-attention"
 
 export type SettingsSection =
-  | "account"
-  | "security"
-  | "appearance"
-  | "agent"
-  | "models"
-  | "flags"
-  | "usage"
+  "account" | "security" | "appearance" | "agent" | "models" | "flags" | "usage"
 
 const SETTINGS_TABS: {
   value: SettingsSection

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest"
 
 import {
   agentCatalogKeys,
@@ -7,28 +7,26 @@ import {
   fetchAgentRuntimeCatalogFromHost,
   fetchApplicationToolCatalog,
   projectAgentCatalog,
-} from "./agent-catalog";
+} from "./agent-catalog"
 
 describe("agent catalog projection", () => {
   it("keeps runtime inspection on an independent query from the full catalog", () => {
     expect(agentRuntimeCatalogQueryOptions().queryKey).toEqual(
       agentCatalogKeys.info(),
-    );
-    expect(agentCatalogQueryOptions().queryKey).toEqual(
-      agentCatalogKeys.full(),
-    );
+    )
+    expect(agentCatalogQueryOptions().queryKey).toEqual(agentCatalogKeys.full())
     expect(agentRuntimeCatalogQueryOptions().queryKey).not.toEqual(
       agentCatalogQueryOptions().queryKey,
-    );
-  });
+    )
+  })
 
   it("authenticates runtime inspection with the verified session token", async () => {
     const fetcher = (_url: string | URL | Request, init?: RequestInit) => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer verified-agent-token",
-      );
-      return Promise.resolve(Response.json({ agent: { name: "Sigil Chat" } }));
-    };
+      )
+      return Promise.resolve(Response.json({ agent: { name: "Sigil Chat" } }))
+    }
 
     await expect(
       fetchAgentRuntimeCatalogFromHost(
@@ -36,14 +34,14 @@ describe("agent catalog projection", () => {
         "verified-agent-token",
         fetcher as typeof fetch,
       ),
-    ).resolves.toMatchObject({ agent: { name: "Sigil Chat" } });
-  });
+    ).resolves.toMatchObject({ agent: { name: "Sigil Chat" } })
+  })
 
   it("fails closed when the runtime rejects inspection credentials", async () => {
     const fetcher = () =>
       Promise.resolve(
         new Response(null, { status: 401, statusText: "Unauthorized" }),
-      );
+      )
 
     await expect(
       fetchAgentRuntimeCatalogFromHost(
@@ -51,8 +49,8 @@ describe("agent catalog projection", () => {
         "rejected-token",
         fetcher as typeof fetch,
       ),
-    ).rejects.toThrow("Agent runtime inspection failed (401 Unauthorized)");
-  });
+    ).rejects.toThrow("Agent runtime inspection failed (401 Unauthorized)")
+  })
 
   it("distinguishes model-discoverable skills from delegatable subagents", () => {
     const catalog = projectAgentCatalog({
@@ -118,18 +116,18 @@ describe("agent catalog projection", () => {
         ],
       },
       diagnostics: { discoveryErrors: 0, discoveryWarnings: 0 },
-    });
+    })
 
     expect(catalog.skills[0]).toMatchObject({
       name: "editorial-readiness",
       runtimeStatus: "model-discoverable",
       capabilities: ["read"],
-    });
+    })
     expect(catalog.subagents[0]).toMatchObject({
       name: "review-critic",
       runtimeStatus: "delegatable",
       capabilities: ["read", "delegate"],
-    });
+    })
     expect(catalog.agent).toMatchObject({
       model: "local-codex",
       instructions: {
@@ -138,7 +136,7 @@ describe("agent catalog projection", () => {
         lines: 2,
         dynamicResolvers: 1,
       },
-    });
+    })
     expect(catalog.connections).toEqual([
       {
         id: "workspace-tools",
@@ -146,7 +144,7 @@ describe("agent catalog projection", () => {
         description: "Workspace application tools.",
         protocol: "mcp",
       },
-    ]);
+    ])
     expect(catalog.runtimeTools).toEqual([
       expect.objectContaining({
         name: "web_search",
@@ -157,14 +155,14 @@ describe("agent catalog projection", () => {
         name: "connection_search",
         runtimeStatus: "discoverable",
       }),
-    ]);
+    ])
 
-    const serialized = JSON.stringify(catalog);
-    expect(serialized).not.toContain("service.invalid");
-    expect(serialized).not.toContain("credential-sentinel");
-    expect(serialized).not.toContain("host-root-sentinel");
-    expect(serialized).not.toContain("instruction-body-sentinel");
-  });
+    const serialized = JSON.stringify(catalog)
+    expect(serialized).not.toContain("service.invalid")
+    expect(serialized).not.toContain("credential-sentinel")
+    expect(serialized).not.toContain("host-root-sentinel")
+    expect(serialized).not.toContain("instruction-body-sentinel")
+  })
 
   it("does not expose host filesystem paths through the browser catalog", () => {
     const catalog = projectAgentCatalog({
@@ -188,31 +186,31 @@ describe("agent catalog projection", () => {
           },
         ],
       },
-    });
+    })
 
-    expect(catalog.skills[0]?.sourcePath).toBe("skills/safe-skill/SKILL.md");
-    expect(catalog.skills[1]?.sourcePath).toBeUndefined();
-    expect(catalog.subagents[0]?.sourcePath).toBeUndefined();
-  });
+    expect(catalog.skills[0]?.sourcePath).toBe("skills/safe-skill/SKILL.md")
+    expect(catalog.skills[1]?.sourcePath).toBeUndefined()
+    expect(catalog.subagents[0]?.sourcePath).toBeUndefined()
+  })
 
   it("represents missing instructions and connections without inventing configuration", () => {
-    const catalog = projectAgentCatalog({});
+    const catalog = projectAgentCatalog({})
 
     expect(catalog.agent.instructions).toEqual({
       loaded: false,
       name: undefined,
       lines: 0,
       dynamicResolvers: 0,
-    });
-    expect(catalog.connections).toEqual([]);
-    expect(catalog.runtimeTools).toEqual([]);
-  });
+    })
+    expect(catalog.connections).toEqual([])
+    expect(catalog.runtimeTools).toEqual([])
+  })
 
   it("lists authenticated application tools under their native names", async () => {
     const fetcher = (_url: string | URL | Request, init?: RequestInit) => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer agent-token",
-      );
+      )
       return Promise.resolve(
         Response.json({
           tools: [
@@ -223,8 +221,8 @@ describe("agent catalog projection", () => {
             },
           ],
         }),
-      );
-    };
+      )
+    }
 
     await expect(
       fetchApplicationToolCatalog(
@@ -238,8 +236,8 @@ describe("agent catalog projection", () => {
         name: "sigil-read-file",
         runtimeStatus: "discoverable",
       }),
-    ]);
-  });
+    ])
+  })
 
   it("does not promote untrusted application inventory to callable", async () => {
     const fetcher = () =>
@@ -253,7 +251,7 @@ describe("agent catalog projection", () => {
             },
           ],
         }),
-      );
+      )
 
     await expect(
       fetchApplicationToolCatalog(
@@ -261,6 +259,6 @@ describe("agent catalog projection", () => {
         "agent-token",
         fetcher as typeof fetch,
       ),
-    ).resolves.toEqual([]);
-  });
-});
+    ).resolves.toEqual([])
+  })
+})

@@ -37,8 +37,7 @@ export function UsageSection() {
     return (
       <div className="flex max-w-3xl flex-col gap-6 p-4">
         <p className="text-xs text-destructive">
-          The agent runtime did not answer. Usage is unavailable until it
-          does.
+          The agent runtime did not answer. Usage is unavailable until it does.
         </p>
       </div>
     )
@@ -58,9 +57,8 @@ export function UsageSection() {
           toward turns, not tokens — it is never estimated.{" "}
           {aggregates.app.turnCount > aggregates.app.reportedTurnCount ? (
             <>
-              {aggregates.app.turnCount - aggregates.app.reportedTurnCount}{" "}
-              of {aggregates.app.turnCount} recorded turns had no usage
-              reported.
+              {aggregates.app.turnCount - aggregates.app.reportedTurnCount} of{" "}
+              {aggregates.app.turnCount} recorded turns had no usage reported.
             </>
           ) : null}
         </p>
@@ -116,9 +114,7 @@ function TotalsRow({ bucket }: { bucket: UsageAggregateBucket }) {
       <Stat
         label="Cost"
         value={
-          bucket.pricedTurnCount > 0
-            ? formatUsd(bucket.costMicros)
-            : "Unknown"
+          bucket.pricedTurnCount > 0 ? formatUsd(bucket.costMicros) : "Unknown"
         }
         hint={
           bucket.pricedTurnCount < bucket.turnCount
@@ -170,7 +166,9 @@ function BreakdownSection({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{title === "By model" ? "Model" : title.replace("By ", "")}</TableHead>
+              <TableHead>
+                {title === "By model" ? "Model" : title.replace("By ", "")}
+              </TableHead>
               <TableHead className="text-right">Turns</TableHead>
               <TableHead className="text-right">Input</TableHead>
               <TableHead className="text-right">Output</TableHead>
@@ -181,9 +179,7 @@ function BreakdownSection({
             {entries.map((entry) => (
               <TableRow key={entry.key}>
                 <TableCell
-                  className={
-                    monospaceKey ? "font-mono text-xs" : "text-xs"
-                  }
+                  className={monospaceKey ? "font-mono text-xs" : "text-xs"}
                 >
                   {keyLabel(entry.key)}
                 </TableCell>

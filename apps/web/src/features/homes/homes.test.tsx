@@ -174,7 +174,9 @@ function workspaceRows(el: HTMLElement): HTMLElement[] {
  *  Restricted mounts are deliberately excluded: they are not roving rows. */
 function expectedRovingRows(view: ProjectHomeView): number {
   const entered = view.workspaces.filter((row) => !("restricted" in row))
-  const enteredIds = new Set(entered.flatMap((row) => ("id" in row ? [row.id] : [])))
+  const enteredIds = new Set(
+    entered.flatMap((row) => ("id" in row ? [row.id] : [])),
+  )
   const nested = view.sessions.filter(
     (session) => session.workspaceId && enteredIds.has(session.workspaceId),
   )
@@ -228,9 +230,9 @@ describe("project home", () => {
     const el = await render(
       <ProjectHome state={{ kind: "ready", view: projectView }} />,
     )
-    expect(
-      el.querySelector("header")?.getAttribute("aria-label"),
-    ).toBe("Commerce Platform overview")
+    expect(el.querySelector("header")?.getAttribute("aria-label")).toBe(
+      "Commerce Platform overview",
+    )
     expect(el.querySelector("h1")).toBeNull()
     expect(el.textContent).toContain("Checkout Reliability")
     expect(el.textContent).toContain("Retry storm triage")
@@ -305,9 +307,7 @@ describe("project home", () => {
     )
     expect(trigger).toBeTruthy()
     expect(trigger?.querySelector("img")?.getAttribute("src")).toBe(imageHref)
-    expect(
-      el.querySelector("section[aria-label='Resources'] a"),
-    ).toBeNull()
+    expect(el.querySelector("section[aria-label='Resources'] a")).toBeNull()
 
     act(() => trigger?.click())
     const preview = document.querySelector("[data-slot='lightbox-content']")
@@ -510,7 +510,9 @@ describe("containment — a session sits under the workspace that homes it", () 
     )
     expect(projectSessions?.textContent).toContain("Project scratch")
     expect(
-      workspaceList(el).map((row) => row.textContent).join(" "),
+      workspaceList(el)
+        .map((row) => row.textContent)
+        .join(" "),
     ).not.toContain("Project scratch")
   })
 

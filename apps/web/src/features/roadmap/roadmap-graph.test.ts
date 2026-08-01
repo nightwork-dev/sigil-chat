@@ -31,13 +31,48 @@ function story(
 // WGS.1 gates MEM.5, MEM.5 gates the game migration, and MEM.4 / MEM.6 /
 // REL.1 / EMB.1 hang off it.
 const MEMORY_LANE: RoadmapGraphStory[] = [
-  story("WGS.1", { status: "in-progress", epicId: "track-wgs", epicTitle: "Worldgen substrate" }),
-  story("MEM.5", { status: "blocked", epicId: "track-mem", epicTitle: "Memory", deps: ["WGS.1"] }),
-  story("MIG.1", { title: "Game migration", status: "idea", epicId: "track-game", epicTitle: "Game", deps: ["MEM.5"] }),
-  story("MEM.4", { status: "ready", epicId: "track-mem", epicTitle: "Memory", deps: ["MEM.5"] }),
-  story("MEM.6", { status: "idea", epicId: "track-mem", epicTitle: "Memory", deps: ["MEM.5"] }),
-  story("REL.1", { status: "idea", epicId: "track-rel", epicTitle: "Relationships", deps: ["MEM.5"] }),
-  story("EMB.1", { status: "spec", epicId: "track-emb", epicTitle: "Embeddings", deps: ["MEM.5"] }),
+  story("WGS.1", {
+    status: "in-progress",
+    epicId: "track-wgs",
+    epicTitle: "Worldgen substrate",
+  }),
+  story("MEM.5", {
+    status: "blocked",
+    epicId: "track-mem",
+    epicTitle: "Memory",
+    deps: ["WGS.1"],
+  }),
+  story("MIG.1", {
+    title: "Game migration",
+    status: "idea",
+    epicId: "track-game",
+    epicTitle: "Game",
+    deps: ["MEM.5"],
+  }),
+  story("MEM.4", {
+    status: "ready",
+    epicId: "track-mem",
+    epicTitle: "Memory",
+    deps: ["MEM.5"],
+  }),
+  story("MEM.6", {
+    status: "idea",
+    epicId: "track-mem",
+    epicTitle: "Memory",
+    deps: ["MEM.5"],
+  }),
+  story("REL.1", {
+    status: "idea",
+    epicId: "track-rel",
+    epicTitle: "Relationships",
+    deps: ["MEM.5"],
+  }),
+  story("EMB.1", {
+    status: "spec",
+    epicId: "track-emb",
+    epicTitle: "Embeddings",
+    deps: ["MEM.5"],
+  }),
 ]
 
 describe("dependency direction and depth", () => {
@@ -184,12 +219,22 @@ describe("collapsing shipped work", () => {
 describe("epic rollup and clustering", () => {
   it("reads an epic as its most urgent unfinished story", () => {
     const counts = (over: Partial<Record<StoryStatus, number>>) => ({
-      idea: 0, spec: 0, ready: 0, "in-progress": 0, verify: 0, shipped: 0, blocked: 0,
+      idea: 0,
+      spec: 0,
+      ready: 0,
+      "in-progress": 0,
+      verify: 0,
+      shipped: 0,
+      blocked: 0,
       ...over,
     })
 
-    expect(rollupStatus(counts({ blocked: 1, "in-progress": 3 }))).toBe("blocked")
-    expect(rollupStatus(counts({ "in-progress": 1, idea: 5 }))).toBe("in-progress")
+    expect(rollupStatus(counts({ blocked: 1, "in-progress": 3 }))).toBe(
+      "blocked",
+    )
+    expect(rollupStatus(counts({ "in-progress": 1, idea: 5 }))).toBe(
+      "in-progress",
+    )
     expect(rollupStatus(counts({ shipped: 4 }))).toBe("shipped")
     expect(rollupStatus(counts({ idea: 1, shipped: 9 }))).toBe("idea")
   })
@@ -242,9 +287,9 @@ describe("epic-level distillation (acceptance criterion 3)", () => {
     const memory = epicGraph.nodes.find((node) => node.id === "track-mem")
     expect(memory?.status).toBe("blocked")
     expect(memory?.depth).toBe(1)
-    expect(
-      epicGraph.nodes.find((node) => node.id === "track-wgs")?.depth,
-    ).toBe(0)
+    expect(epicGraph.nodes.find((node) => node.id === "track-wgs")?.depth).toBe(
+      0,
+    )
   })
 
   it("collapses many story edges between two epics into one", () => {
@@ -263,7 +308,10 @@ describe("epic-level distillation (acceptance criterion 3)", () => {
 
   it("ignores dependencies internal to one epic", () => {
     const epicGraph = buildRoadmapEpicGraph(
-      buildRoadmapGraph([story("A1", { epicId: "a" }), story("A2", { epicId: "a", deps: ["A1"] })]),
+      buildRoadmapGraph([
+        story("A1", { epicId: "a" }),
+        story("A2", { epicId: "a", deps: ["A1"] }),
+      ]),
     )
     expect(epicGraph.edges).toEqual([])
   })

@@ -10,7 +10,12 @@
 // stopping is the same key it started with, and every state's look comes from
 // `liveVoicePresentation` so a test and the render enumerate one list.
 
-import { AudioLinesIcon, Loader2Icon, PhoneOffIcon, type LucideIcon } from "lucide-react"
+import {
+  AudioLinesIcon,
+  Loader2Icon,
+  PhoneOffIcon,
+  type LucideIcon,
+} from "lucide-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 

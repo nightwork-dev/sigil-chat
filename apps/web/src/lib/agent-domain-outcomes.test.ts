@@ -57,9 +57,7 @@ describe("agent domain outcome reconciliation", () => {
       changedIds: ["release-check"],
     })
 
-    expect(queryClient.getQueryState(skillKeys.all())?.isInvalidated).toBe(
-      true,
-    )
+    expect(queryClient.getQueryState(skillKeys.all())?.isInvalidated).toBe(true)
   })
 
   it("invalidates every project/workspace nav query for container mutations", async () => {
@@ -171,9 +169,7 @@ describe("agent domain outcome reconciliation", () => {
     }
 
     await expect(isCommand(command)).resolves.toBe(true)
-    const outcome = agentDomainOutcomeFromCommand(
-      command as AgentClientCommand,
-    )
+    const outcome = agentDomainOutcomeFromCommand(command as AgentClientCommand)
     expect(outcome).not.toBeNull()
     await createAgentDomainOutcomeDispatcher(queryClient, [
       syntheticHandler,

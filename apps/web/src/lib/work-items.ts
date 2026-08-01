@@ -4,9 +4,9 @@ import {
   useQuery,
   useQueryClient,
   type QueryClient,
-} from "@tanstack/react-query";
-import { createServerFn } from "@tanstack/react-start";
-import { useAgentPrincipalId } from "@/lib/agent-principal";
+} from "@tanstack/react-query"
+import { createServerFn } from "@tanstack/react-start"
+import { useAgentPrincipalId } from "@/lib/agent-principal"
 import type {
   BoardQueryResult,
   BoardTraversal,
@@ -20,122 +20,116 @@ import type {
   StoryStatus,
   WorkItemsMutationResult,
   WorkSponsorshipDecision,
-} from "@workspace/work-items-store/types";
-import { queryBoardView } from "@workspace/work-items-store/operations";
+} from "@workspace/work-items-store/types"
+import { queryBoardView } from "@workspace/work-items-store/operations"
 
 const listStoriesFn = createServerFn({ method: "GET" })
   .validator(
     (input?: { filter?: StoryFilter; addressedToMe?: boolean }) => input ?? {},
   )
   .handler(async ({ data }) => {
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const { getSession } = await import("@/lib/auth/session");
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    );
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const stories = await workItemsRepository.list(data.filter);
-    if (!data.addressedToMe) return stories;
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const { getSession } = await import("@/lib/auth/session")
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const stories = await workItemsRepository.list(data.filter)
+    if (!data.addressedToMe) return stories
 
-    const { storiesAddressedToViewer } = await import(
-      "@/lib/story-comment-mentions"
-    );
-    const document = await workItemsRepository.get();
+    const { storiesAddressedToViewer } =
+      await import("@/lib/story-comment-mentions")
+    const document = await workItemsRepository.get()
     return storiesAddressedToViewer(stories, document.comments, {
       role: viewer.role,
       username: viewer.username,
-    });
-  });
+    })
+  })
 
 const listReviewsFn = createServerFn({ method: "GET" }).handler(async () => {
-  const { getSession } = await import("@/lib/auth/session");
-  const { authenticatedWorkItemsViewer } = await import(
-    "@/lib/work-items-viewer.server"
-  );
-  authenticatedWorkItemsViewer(await getSession());
-  const { workItemsRepository } = await import("@workspace/work-items-store");
-  const document = await workItemsRepository.get();
-  return document.reviews;
-});
+  const { getSession } = await import("@/lib/auth/session")
+  const { authenticatedWorkItemsViewer } =
+    await import("@/lib/work-items-viewer.server")
+  authenticatedWorkItemsViewer(await getSession())
+  const { workItemsRepository } = await import("@workspace/work-items-store")
+  const document = await workItemsRepository.get()
+  return document.reviews
+})
 
 const getStoryFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    );
-    authenticatedWorkItemsViewer(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
-    const story = document.stories.find(
-      (candidate) => candidate.id === data.id,
-    );
-    if (!story) throw new Error(`Unknown story id: ${data.id}.`);
-    return story;
-  });
+    const { getSession } = await import("@/lib/auth/session")
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    authenticatedWorkItemsViewer(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
+    const story = document.stories.find((candidate) => candidate.id === data.id)
+    if (!story) throw new Error(`Unknown story id: ${data.id}.`)
+    return story
+  })
 
 const listBoardViewsFn = createServerFn({ method: "GET" })
   .validator((input?: { filter?: BoardViewFilter }) => input ?? {})
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer, boardViewsVisibleToViewer } =
-      await import("@/lib/work-items-viewer.server");
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
     return boardViewsVisibleToViewer(
       await workItemsRepository.listBoardViews(data.filter),
       viewer,
-    );
-  });
+    )
+  })
 
 const getBoardViewFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
-      await import("@/lib/work-items-viewer.server");
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     return boardViewVisibleToViewer(
       document.boardViews.find((view) => view.id === data.id),
       viewer,
-    );
-  });
+    )
+  })
 
 const queryBoardViewFn = createServerFn({ method: "GET" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }): Promise<BoardQueryResult> => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { createBoardTraversalResolver } =
-      await import("@/lib/work-items-access.server");
+      await import("@/lib/work-items-access.server")
     const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
-      await import("@/lib/work-items-viewer.server");
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     const view = boardViewVisibleToViewer(
       document.boardViews.find((candidate) => candidate.id === data.id),
       viewer,
-    );
+    )
     return queryBoardView(
       document.stories,
       view,
       createBoardTraversalResolver(viewer.id),
-    );
-  });
+    )
+  })
 
 const queryScopeWorkFn = createServerFn({ method: "GET" })
   .validator((input: { scopeId: string; traversal: BoardTraversal }) => input)
   .handler(async ({ data }): Promise<BoardQueryResult> => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { createBoardTraversalResolver, currentWorkItemsScopeAccess } =
-      await import("@/lib/work-items-access.server");
+      await import("@/lib/work-items-access.server")
     const { authenticatedWorkItemsViewer } =
-      await import("@/lib/work-items-viewer.server");
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const access = currentWorkItemsScopeAccess();
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const access = currentWorkItemsScopeAccess()
     if (
       !access.canAccess({
         principalId: viewer.id,
@@ -143,10 +137,10 @@ const queryScopeWorkFn = createServerFn({ method: "GET" })
         action: "board.read",
       })
     ) {
-      throw new Error("Scoped work was not found.");
+      throw new Error("Scoped work was not found.")
     }
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     const view: BoardView = {
       id: `scope-home:${data.scopeId}`,
       ownerScopeId: data.scopeId,
@@ -158,89 +152,84 @@ const queryScopeWorkFn = createServerFn({ method: "GET" })
       filters: {},
       groupBy: "status",
       revision: 0,
-    };
+    }
     return queryBoardView(
       document.stories,
       view,
       createBoardTraversalResolver(viewer.id, access),
-    );
-  });
+    )
+  })
 
 const queryScopeHomeAccessFn = createServerFn({ method: "GET" })
   .validator((scopeId: string) => scopeId)
   .handler(async ({ data: scopeId }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer } =
-      await import("@/lib/work-items-viewer.server");
+      await import("@/lib/work-items-viewer.server")
     const { currentWorkItemsScopeAccess, scopeHomeAccessSignal } =
-      await import("@/lib/work-items-access.server");
-    const viewer = authenticatedWorkItemsViewer(await getSession());
+      await import("@/lib/work-items-access.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
     return scopeHomeAccessSignal(
       viewer.id,
       scopeId,
       currentWorkItemsScopeAccess(),
-    );
-  });
+    )
+  })
 
 const listSessionCommitmentsFn = createServerFn({ method: "GET" })
   .validator((input: { threadId: string }) => input)
   .handler(async ({ data }): Promise<Story[]> => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer } =
-      await import("@/lib/work-items-viewer.server");
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const { agentThreadRepository } =
-      await import("@/lib/agent-threads.server");
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const { agentThreadRepository } = await import("@/lib/agent-threads.server")
     if (!agentThreadRepository.get(viewer.id, data.threadId)) {
-      throw new Error("Agent session was not found.");
+      throw new Error("Agent session was not found.")
     }
     const { currentWorkItemsScopeAccess, visibleSessionCommitments } =
-      await import("@/lib/work-items-access.server");
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+      await import("@/lib/work-items-access.server")
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     return visibleSessionCommitments(
       document.stories,
       data.threadId,
       viewer.id,
       currentWorkItemsScopeAccess(),
-    );
-  });
+    )
+  })
 
 const upsertBoardViewFn = createServerFn({ method: "POST" })
   .validator((input: { view: BoardView; expectedRevision?: number }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
+    const { getSession } = await import("@/lib/auth/session")
     const { authenticatedWorkItemsViewer, boardViewVisibleToViewer } =
-      await import("@/lib/work-items-viewer.server");
+      await import("@/lib/work-items-viewer.server")
     const { prepareBoardViewForUpsert, requireBoardViewMutationAccess } =
-      await import("@/lib/work-items-access.server");
-    const session = await getSession();
-    const viewer = authenticatedWorkItemsViewer(session);
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+      await import("@/lib/work-items-access.server")
+    const session = await getSession()
+    const viewer = authenticatedWorkItemsViewer(session)
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     const existing = document.boardViews.find(
       (candidate) => candidate.id === data.view.id,
-    );
-    if (existing) boardViewVisibleToViewer(existing, viewer);
-    const view = prepareBoardViewForUpsert(data.view, viewer.id, existing);
-    requireBoardViewMutationAccess(session, view, undefined, existing);
-    return workItemsRepository.upsertBoardView(
-      view,
-      data.expectedRevision,
-    );
-  });
+    )
+    if (existing) boardViewVisibleToViewer(existing, viewer)
+    const view = prepareBoardViewForUpsert(data.view, viewer.id, existing)
+    requireBoardViewMutationAccess(session, view, undefined, existing)
+    return workItemsRepository.upsertBoardView(view, data.expectedRevision)
+  })
 
 const upsertStoryFn = createServerFn({ method: "POST" })
   .validator((input: { story: Story; expectedRevision?: number }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { requireWorkItemsMutationAccess } = await import(
-      "@/lib/work-items-access.server"
-    );
-    requireWorkItemsMutationAccess(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    return workItemsRepository.upsertStory(data.story, data.expectedRevision);
-  });
+    const { getSession } = await import("@/lib/auth/session")
+    const { requireWorkItemsMutationAccess } =
+      await import("@/lib/work-items-access.server")
+    requireWorkItemsMutationAccess(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    return workItemsRepository.upsertStory(data.story, data.expectedRevision)
+  })
 
 const transitionStoryFn = createServerFn({ method: "POST" })
   .validator(
@@ -248,36 +237,34 @@ const transitionStoryFn = createServerFn({ method: "POST" })
       input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { requireWorkItemsMutationAccess } = await import(
-      "@/lib/work-items-access.server"
-    );
-    requireWorkItemsMutationAccess(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const { getSession } = await import("@/lib/auth/session")
+    const { requireWorkItemsMutationAccess } =
+      await import("@/lib/work-items-access.server")
+    requireWorkItemsMutationAccess(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
     return workItemsRepository.transitionStory(
       data.id,
       data.status,
       data.expectedRevision,
-    );
-  });
+    )
+  })
 
 const assignReviewFn = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      id: string;
-      gate: ReviewGate;
-      title?: string;
-      summary?: string;
-      expectedRevision?: number;
+      id: string
+      gate: ReviewGate
+      title?: string
+      summary?: string
+      expectedRevision?: number
     }) => input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { requireWorkItemsMutationAccess } = await import(
-      "@/lib/work-items-access.server"
-    );
-    requireWorkItemsMutationAccess(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const { getSession } = await import("@/lib/auth/session")
+    const { requireWorkItemsMutationAccess } =
+      await import("@/lib/work-items-access.server")
+    requireWorkItemsMutationAccess(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
     return workItemsRepository.assignReview(
       data.id,
       {
@@ -287,67 +274,64 @@ const assignReviewFn = createServerFn({ method: "POST" })
         summary: data.summary,
       },
       data.expectedRevision,
-    );
-  });
+    )
+  })
 
 const decideReviewFn = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      reviewId: string;
-      decision: ReviewDecision;
-      decidedBy?: string;
-      expectedRevision?: number;
+      reviewId: string
+      decision: ReviewDecision
+      decidedBy?: string
+      expectedRevision?: number
     }) => input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { requireWorkItemsMutationAccess } = await import(
-      "@/lib/work-items-access.server"
-    );
-    requireWorkItemsMutationAccess(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const { getSession } = await import("@/lib/auth/session")
+    const { requireWorkItemsMutationAccess } =
+      await import("@/lib/work-items-access.server")
+    requireWorkItemsMutationAccess(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
     return workItemsRepository.decideReview(
       data.reviewId,
       data.decision,
       data.decidedBy ?? "Owner",
       data.expectedRevision,
-    );
-  });
+    )
+  })
 
 const listStoryCommentsFn = createServerFn({ method: "GET" })
   .validator((input: { storyId: string }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    );
-    authenticatedWorkItemsViewer(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+    const { getSession } = await import("@/lib/auth/session")
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    authenticatedWorkItemsViewer(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     return document.comments.filter(
       (comment) => comment.storyId === data.storyId,
-    );
-  });
+    )
+  })
 
 const addCommentFn = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      storyId: string;
-      kind: StoryComment["kind"];
-      body: string;
-      addressee?: string;
-      parentCommentId?: string;
-      expectedRevision?: number;
+      storyId: string
+      kind: StoryComment["kind"]
+      body: string
+      addressee?: string
+      parentCommentId?: string
+      expectedRevision?: number
     }) => input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    );
-    const session = await getSession();
-    const viewer = authenticatedWorkItemsViewer(session);
-    const { workItemsRepository } = await import("@workspace/work-items-store");
+    const { getSession } = await import("@/lib/auth/session")
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const session = await getSession()
+    const viewer = authenticatedWorkItemsViewer(session)
+    const { workItemsRepository } = await import("@workspace/work-items-store")
     // id + createdAt are minted server-side so two devices can't collide and
     // the timestamp is authoritative.
     const comment: StoryComment = {
@@ -361,27 +345,25 @@ const addCommentFn = createServerFn({ method: "POST" })
       ...(data.parentCommentId
         ? { parentCommentId: data.parentCommentId }
         : {}),
-    };
+    }
     let result = await workItemsRepository.addComment(
       comment,
       data.expectedRevision,
-    );
+    )
 
-    const { parseSingleInlineSelector, storyCommentRoutingReceipt } = await import(
-      "@/lib/story-comment-mentions"
-    );
-    const selector = parseSingleInlineSelector(comment.body);
+    const { parseSingleInlineSelector, storyCommentRoutingReceipt } =
+      await import("@/lib/story-comment-mentions")
+    const selector = parseSingleInlineSelector(comment.body)
     let receiptBody: string | undefined
     if (selector) {
       try {
-        const { depositStoryCommentMention } = await import(
-          "@/lib/story-comment-mentions.server"
-        );
+        const { depositStoryCommentMention } =
+          await import("@/lib/story-comment-mentions.server")
         const delivery = await depositStoryCommentMention({
           reference: { storyId: comment.storyId, commentId: comment.id },
           selector,
           viewer,
-        });
+        })
         receiptBody = storyCommentRoutingReceipt({
           selector,
           delivery: delivery.status,
@@ -417,56 +399,54 @@ const addCommentFn = createServerFn({ method: "POST" })
         // acknowledgement write races another roadmap mutation.
       }
     }
-    return result;
-  });
+    return result
+  })
 
 const listSponsorshipDecisionsFn = createServerFn({ method: "GET" })
   .validator((input: { workItemId: string }) => input)
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { authenticatedWorkItemsViewer } = await import(
-      "@/lib/work-items-viewer.server"
-    );
-    const viewer = authenticatedWorkItemsViewer(await getSession());
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+    const { getSession } = await import("@/lib/auth/session")
+    const { authenticatedWorkItemsViewer } =
+      await import("@/lib/work-items-viewer.server")
+    const viewer = authenticatedWorkItemsViewer(await getSession())
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     const workItem = document.stories.find(
       (candidate) => candidate.id === data.workItemId,
-    );
-    if (!workItem) throw new Error("Feature request was not found.");
-    const proposedSponsor = workItem.provenance?.proposedSponsorPrincipalId;
-    if (proposedSponsor !== viewer.id) return [];
+    )
+    if (!workItem) throw new Error("Feature request was not found.")
+    const proposedSponsor = workItem.provenance?.proposedSponsorPrincipalId
+    if (proposedSponsor !== viewer.id) return []
     return workItemsRepository.listSponsorshipDecisions({
       workItemId: workItem.id,
       sponsorPrincipalId: viewer.id,
-    });
-  });
+    })
+  })
 
 const decideSponsorshipFn = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      workItemId: string;
-      decision: WorkSponsorshipDecision["decision"];
+      workItemId: string
+      decision: WorkSponsorshipDecision["decision"]
     }) => input,
   )
   .handler(async ({ data }) => {
-    const { getSession } = await import("@/lib/auth/session");
-    const { requireSponsorshipDecisionAccess } = await import(
-      "@/lib/work-items-access.server"
-    );
-    const session = await getSession();
-    const { workItemsRepository } = await import("@workspace/work-items-store");
-    const document = await workItemsRepository.get();
+    const { getSession } = await import("@/lib/auth/session")
+    const { requireSponsorshipDecisionAccess } =
+      await import("@/lib/work-items-access.server")
+    const session = await getSession()
+    const { workItemsRepository } = await import("@workspace/work-items-store")
+    const document = await workItemsRepository.get()
     const workItem = document.stories.find(
       (candidate) => candidate.id === data.workItemId,
-    );
-    if (!workItem) throw new Error("Feature request was not found.");
-    const sponsor = requireSponsorshipDecisionAccess(session, workItem).user.id;
+    )
+    if (!workItem) throw new Error("Feature request was not found.")
+    const sponsor = requireSponsorshipDecisionAccess(session, workItem).user.id
     const prior = document.sponsorshipDecisions.filter(
       (candidate) =>
         candidate.workItemId === workItem.id &&
         candidate.sponsorPrincipalId === sponsor,
-    );
+    )
     const decision: WorkSponsorshipDecision = {
       id: crypto.randomUUID(),
       workItemId: workItem.id,
@@ -477,12 +457,12 @@ const decideSponsorshipFn = createServerFn({ method: "POST" })
       revision:
         prior.reduce((max, candidate) => Math.max(max, candidate.revision), 0) +
         1,
-    };
+    }
     return workItemsRepository.recordSponsorshipDecision(
       decision,
       document.revision,
-    );
-  });
+    )
+  })
 
 export const workItemKeys = {
   all: () => ["work-items"] as const,
@@ -512,7 +492,7 @@ export const workItemKeys = {
     ] as const,
   sessionCommitments: (viewerId: string, threadId: string) =>
     [...workItemKeys.all(), "session-commitments", viewerId, threadId] as const,
-};
+}
 
 export function useStories(
   filter?: StoryFilter,
@@ -537,7 +517,7 @@ export function useStories(
     // Temporary cross-process recovery until resource revision notifications
     // are available. Current-browser writes reconcile immediately below.
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useReviews() {
@@ -550,7 +530,7 @@ export function useReviews() {
     // Same cross-process recovery cadence as the stories board; current-browser
     // writes reconcile immediately below.
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useStory(id: string | undefined) {
@@ -562,11 +542,11 @@ export function useStory(id: string | undefined) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useBoardViews(filter?: BoardViewFilter) {
-  const principalId = useAgentPrincipalId();
+  const principalId = useAgentPrincipalId()
   return useQuery({
     queryKey: workItemKeys.boardViews(principalId, filter),
     queryFn: () => listBoardViewsFn({ data: { filter } }),
@@ -574,11 +554,11 @@ export function useBoardViews(filter?: BoardViewFilter) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useBoardView(id: string | undefined) {
-  const principalId = useAgentPrincipalId();
+  const principalId = useAgentPrincipalId()
   return useQuery({
     queryKey: workItemKeys.boardView(principalId, id ?? "none"),
     queryFn: () => getBoardViewFn({ data: { id: id ?? "" } }),
@@ -587,11 +567,11 @@ export function useBoardView(id: string | undefined) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useBoardViewQuery(id: string | undefined) {
-  const principalId = useAgentPrincipalId();
+  const principalId = useAgentPrincipalId()
   return useQuery({
     queryKey: workItemKeys.boardQuery(principalId, id ?? "none"),
     queryFn: () => queryBoardViewFn({ data: { id: id ?? "" } }),
@@ -600,7 +580,7 @@ export function useBoardViewQuery(id: string | undefined) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function scopeWorkQueryOptions(
@@ -617,7 +597,7 @@ export function scopeWorkQueryOptions(
     refetchOnReconnect: "always" as const,
     refetchOnWindowFocus: "always" as const,
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useScopeWork(
@@ -625,8 +605,10 @@ export function useScopeWork(
   traversal: BoardTraversal,
   enabled = true,
 ) {
-  const principalId = useAgentPrincipalId();
-  return useQuery(scopeWorkQueryOptions(principalId, scopeId, traversal, enabled));
+  const principalId = useAgentPrincipalId()
+  return useQuery(
+    scopeWorkQueryOptions(principalId, scopeId, traversal, enabled),
+  )
 }
 
 export function scopeHomeAccessQueryOptions(
@@ -641,12 +623,12 @@ export function scopeHomeAccessQueryOptions(
     refetchOnMount: "always" as const,
     refetchOnReconnect: "always" as const,
     refetchOnWindowFocus: "always" as const,
-  });
+  })
 }
 
 export function useScopeHomeAccess(scopeId: string, enabled = true) {
-  const principalId = useAgentPrincipalId();
-  return useQuery(scopeHomeAccessQueryOptions(principalId, scopeId, enabled));
+  const principalId = useAgentPrincipalId()
+  return useQuery(scopeHomeAccessQueryOptions(principalId, scopeId, enabled))
 }
 
 export function sessionCommitmentsQueryOptions(
@@ -662,71 +644,73 @@ export function sessionCommitmentsQueryOptions(
     refetchOnReconnect: "always" as const,
     refetchOnWindowFocus: "always" as const,
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useSessionCommitments(threadId: string, enabled = true) {
-  const principalId = useAgentPrincipalId();
-  return useQuery(sessionCommitmentsQueryOptions(principalId, threadId, enabled));
+  const principalId = useAgentPrincipalId()
+  return useQuery(
+    sessionCommitmentsQueryOptions(principalId, threadId, enabled),
+  )
 }
 
 export function useUpsertStory() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: { story: Story; expectedRevision?: number }) =>
       upsertStoryFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
-  });
+  })
 }
 
 export function useUpsertBoardView() {
-  const queryClient = useQueryClient();
-  const principalId = useAgentPrincipalId();
+  const queryClient = useQueryClient()
+  const principalId = useAgentPrincipalId()
   return useMutation({
     mutationFn: (input: { view: BoardView; expectedRevision?: number }) =>
       upsertBoardViewFn({ data: input }),
     onSuccess: (result, variables) =>
       reconcileBoardViews(queryClient, principalId, variables.view.id, result),
-  });
+  })
 }
 
 export function useTransitionStory() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: {
-      id: string;
-      status: StoryStatus;
-      expectedRevision?: number;
+      id: string
+      status: StoryStatus
+      expectedRevision?: number
     }) => transitionStoryFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
-  });
+  })
 }
 
 export function useAssignReview() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: {
-      id: string;
-      gate: ReviewGate;
-      title?: string;
-      summary?: string;
-      expectedRevision?: number;
+      id: string
+      gate: ReviewGate
+      title?: string
+      summary?: string
+      expectedRevision?: number
     }) => assignReviewFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
-  });
+  })
 }
 
 export function useDecideReview() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: {
-      reviewId: string;
-      decision: ReviewDecision;
-      decidedBy?: string;
-      expectedRevision?: number;
+      reviewId: string
+      decision: ReviewDecision
+      decidedBy?: string
+      expectedRevision?: number
     }) => decideReviewFn({ data: input }),
     onSuccess: (result) => reconcileWorkItems(queryClient, result),
-  });
+  })
 }
 
 export function useStoryComments(storyId: string | undefined) {
@@ -738,46 +722,46 @@ export function useStoryComments(storyId: string | undefined) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 15_000,
-  });
+  })
 }
 
 export function useAddComment() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: {
-      storyId: string;
-      kind: StoryComment["kind"];
-      body: string;
-      addressee?: string;
-      parentCommentId?: string;
-      expectedRevision?: number;
+      storyId: string
+      kind: StoryComment["kind"]
+      body: string
+      addressee?: string
+      parentCommentId?: string
+      expectedRevision?: number
     }) => addCommentFn({ data: input }),
     onSuccess: (result, variables) => {
       void queryClient.invalidateQueries({
         queryKey: workItemKeys.comments(variables.storyId),
-      });
-      return reconcileWorkItems(queryClient, result);
+      })
+      return reconcileWorkItems(queryClient, result)
     },
-  });
+  })
 }
 
 export function useSponsorshipDecisions(workItemId: string | undefined) {
-  const principalId = useAgentPrincipalId();
+  const principalId = useAgentPrincipalId()
   return useQuery({
     queryKey: workItemKeys.sponsorship(workItemId ?? "none", principalId),
     queryFn: () =>
       listSponsorshipDecisionsFn({ data: { workItemId: workItemId ?? "" } }),
     enabled: Boolean(workItemId),
-  });
+  })
 }
 
 export function useDecideSponsorship() {
-  const queryClient = useQueryClient();
-  const principalId = useAgentPrincipalId();
+  const queryClient = useQueryClient()
+  const principalId = useAgentPrincipalId()
   return useMutation({
     mutationFn: (input: {
-      workItemId: string;
-      decision: WorkSponsorshipDecision["decision"];
+      workItemId: string
+      decision: WorkSponsorshipDecision["decision"]
     }) => decideSponsorshipFn({ data: input }),
     onSuccess: (result, variables) => {
       queryClient.setQueryData(
@@ -787,28 +771,28 @@ export function useDecideSponsorship() {
             candidate.workItemId === variables.workItemId &&
             candidate.sponsorPrincipalId === principalId,
         ),
-      );
-      return reconcileWorkItems(queryClient, result);
+      )
+      return reconcileWorkItems(queryClient, result)
     },
-  });
+  })
 }
 
 function reconcileWorkItems(
   queryClient: QueryClient,
   result: WorkItemsMutationResult,
 ): Promise<void> {
-  queryClient.setQueryData(workItemKeys.all(), result.document.stories);
-  queryClient.setQueryData(workItemKeys.reviews(), result.document.reviews);
-  const changedIds = new Set(result.changedIds);
+  queryClient.setQueryData(workItemKeys.all(), result.document.stories)
+  queryClient.setQueryData(workItemKeys.reviews(), result.document.reviews)
+  const changedIds = new Set(result.changedIds)
   for (const story of result.document.stories) {
     const storyReviewChanged = result.document.reviews.some(
       (review) => review.storyId === story.id && changedIds.has(review.id),
-    );
+    )
     if (changedIds.has(story.id) || storyReviewChanged) {
-      queryClient.setQueryData(workItemKeys.detail(story.id), story);
+      queryClient.setQueryData(workItemKeys.detail(story.id), story)
     }
   }
-  return queryClient.invalidateQueries({ queryKey: workItemKeys.all() });
+  return queryClient.invalidateQueries({ queryKey: workItemKeys.all() })
 }
 
 function reconcileBoardViews(
@@ -819,12 +803,9 @@ function reconcileBoardViews(
 ): Promise<void> {
   const view = result.document.boardViews.find(
     (candidate) => candidate.id === viewId,
-  );
+  )
   if (view) {
-    queryClient.setQueryData(
-      workItemKeys.boardView(principalId, view.id),
-      view,
-    );
+    queryClient.setQueryData(workItemKeys.boardView(principalId, view.id), view)
   }
   return Promise.all([
     queryClient.invalidateQueries({
@@ -836,5 +817,5 @@ function reconcileBoardViews(
     queryClient.invalidateQueries({
       queryKey: workItemKeys.boardQuery(principalId, viewId),
     }),
-  ]).then(() => undefined);
+  ]).then(() => undefined)
 }

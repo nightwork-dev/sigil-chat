@@ -125,7 +125,12 @@ describe("blackboard server boundary", () => {
     // Reading the same id as a session tier hits a different store key —
     // the workspace note does not leak into a same-named session blackboard.
     await expect(
-      readOwnedBlackboard(session("user-1"), "workspace-1", { get: () => true }, blackboards),
+      readOwnedBlackboard(
+        session("user-1"),
+        "workspace-1",
+        { get: () => true },
+        blackboards,
+      ),
     ).resolves.toMatchObject({ content: "" })
   })
 

@@ -96,7 +96,8 @@ export function normalizePerAgentOverrides(
   // registry validator). A mixed object takes the nested path, where string
   // layers are malformed and dropped.
   const isLegacyFlat =
-    entries.length > 0 && entries.every(([, layer]) => typeof layer === "string")
+    entries.length > 0 &&
+    entries.every(([, layer]) => typeof layer === "string")
   if (isLegacyFlat) {
     const star = normalizeLayer(value)
     return Object.keys(star).length > 0

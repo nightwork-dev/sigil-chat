@@ -4,10 +4,7 @@ import type {
   AgentChannelPersonaSessionParticipant,
   AgentSessionChannel,
 } from "@workspace/agent-contracts/participant-channel"
-import type {
-  AgentSendInput,
-  AgentTurnResult,
-} from "@zigil/agent/contracts"
+import type { AgentSendInput, AgentTurnResult } from "@zigil/agent/contracts"
 
 import {
   createParticipantChannelRuntime,
@@ -109,9 +106,7 @@ describe("participant channel runtime", () => {
       subject: "tool-call",
       turnId: "turn-a",
     })
-    expect(runtime.events).toEqual([
-      { type: "participant.envelope", envelope },
-    ])
+    expect(runtime.events).toEqual([{ type: "participant.envelope", envelope }])
   })
 
   it("captures the target active turn, waits for target settlement, and never cancels another participant", async () => {

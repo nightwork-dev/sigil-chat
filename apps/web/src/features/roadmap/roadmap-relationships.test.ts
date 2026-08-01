@@ -8,7 +8,11 @@ import {
   unresolvedPrerequisitesForStory,
 } from "./roadmap-relationships"
 
-function story(id: string, deps: string[] = [], status: Story["status"] = "ready"): Story {
+function story(
+  id: string,
+  deps: string[] = [],
+  status: Story["status"] = "ready",
+): Story {
   return { id, deps, status } as Story
 }
 

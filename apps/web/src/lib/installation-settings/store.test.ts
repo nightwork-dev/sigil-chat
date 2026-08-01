@@ -34,7 +34,10 @@ function realKv(): KvStore<unknown> {
     sessionHome: join(root, "test-session"),
   })
   const projectHome = scope.home("project")
-  if (!projectHome || !realpathSync(projectHome).startsWith(realpathSync(root))) {
+  if (
+    !projectHome ||
+    !realpathSync(projectHome).startsWith(realpathSync(root))
+  ) {
     throw new Error("test scope escaped its tmpdir — project tier unresolved")
   }
   return createStoreProvider(scope, {
@@ -57,9 +60,9 @@ describe("InstallationSettingsStore", () => {
 
     // A second instance over the same KV: the value came back from the store,
     // not from an in-memory field.
-    expect(new InstallationSettingsStore({ kv }).get(ENABLED_MODELS_KEY)).toEqual(
-      ["codex/luna", "deepseek/chat"],
-    )
+    expect(
+      new InstallationSettingsStore({ kv }).get(ENABLED_MODELS_KEY),
+    ).toEqual(["codex/luna", "deepseek/chat"])
   })
 
   it("refuses a value the registry does not accept", () => {
@@ -72,11 +75,7 @@ describe("InstallationSettingsStore", () => {
       "codex/luna",
     ]) {
       expect(
-        () =>
-          store.set(
-            ENABLED_MODELS_KEY,
-            invalid as unknown as string[],
-          ),
+        () => store.set(ENABLED_MODELS_KEY, invalid as unknown as string[]),
         JSON.stringify(invalid),
       ).toThrow(InstallationSettingRejectedError)
     }
@@ -88,9 +87,9 @@ describe("InstallationSettingsStore", () => {
   it("reads an invalid stored record as the default", () => {
     const kv = realKv()
     kv.set(ENABLED_MODELS_KEY, { not: "a list" })
-    expect(new InstallationSettingsStore({ kv }).get(ENABLED_MODELS_KEY)).toEqual(
-      [],
-    )
+    expect(
+      new InstallationSettingsStore({ kv }).get(ENABLED_MODELS_KEY),
+    ).toEqual([])
   })
 
   // FLAG.1 acceptance criterion 4: model enablement and flags demonstrably
@@ -204,9 +203,9 @@ describe("InstallationSettingsStore — models.discovered (MDL.2)", () => {
 
   it("refuses duplicate ids in one write", () => {
     const store = new InstallationSettingsStore({ kv: realKv() })
-    expect(() =>
-      store.set(DISCOVERED_MODELS_KEY, [entry, entry]),
-    ).toThrow(InstallationSettingRejectedError)
+    expect(() => store.set(DISCOVERED_MODELS_KEY, [entry, entry])).toThrow(
+      InstallationSettingRejectedError,
+    )
   })
 
   it("reads an invalid stored record as an empty cache", () => {

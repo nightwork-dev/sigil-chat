@@ -56,8 +56,7 @@ describe("create request validation", () => {
       { executionBinding: { principalId: "someone-else" } },
     ]) {
       expect(
-        () =>
-          parseCreateAgentThreadRequest({ personaId: "eve", ...extra }),
+        () => parseCreateAgentThreadRequest({ personaId: "eve", ...extra }),
         JSON.stringify(extra),
       ).toThrow(/Unsupported thread creation fields/)
     }
@@ -77,7 +76,8 @@ describe("create request validation", () => {
       "a".repeat(130),
     ]) {
       expect(
-        () => parseCreateAgentThreadRequest({ personaId: "eve", modelPresetId }),
+        () =>
+          parseCreateAgentThreadRequest({ personaId: "eve", modelPresetId }),
         JSON.stringify(modelPresetId),
       ).toThrow(/malformed/)
     }
@@ -85,7 +85,9 @@ describe("create request validation", () => {
 
   it("refuses a request that is not an object carrying a persona", () => {
     expect(() => parseCreateAgentThreadRequest(null)).toThrow()
-    expect(() => parseCreateAgentThreadRequest([{ personaId: "eve" }])).toThrow()
+    expect(() =>
+      parseCreateAgentThreadRequest([{ personaId: "eve" }]),
+    ).toThrow()
     expect(() => parseCreateAgentThreadRequest({})).toThrow(/persona id/)
   })
 })

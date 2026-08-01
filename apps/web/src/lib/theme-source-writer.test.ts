@@ -63,7 +63,9 @@ describe("upsertThemeCss", () => {
     // dark block sits before the banner
     expect(out.indexOf(".theme-neo {")).toBeLessThan(out.indexOf("/* ═"))
     // light block sits after the banner
-    expect(out.indexOf(".theme-neo.light {")).toBeGreaterThan(out.indexOf("/* ═"))
+    expect(out.indexOf(".theme-neo.light {")).toBeGreaterThan(
+      out.indexOf("/* ═"),
+    )
     // did not clobber the existing amber blocks
     expect(out).toContain(".theme-amber {")
     expect(out).toContain(".theme-amber.light {")
@@ -79,7 +81,12 @@ describe("upsertThemeCss", () => {
 
   it("updates in place when the tokens change", () => {
     const once = upsertThemeCss(CSS, "neo", DARK, LIGHT)
-    const changed = upsertThemeCss(once, "neo", `.theme-neo {\n  --color-background: #222222;\n}`, LIGHT)
+    const changed = upsertThemeCss(
+      once,
+      "neo",
+      `.theme-neo {\n  --color-background: #222222;\n}`,
+      LIGHT,
+    )
     expect(changed).toContain("#222222")
     expect(changed).not.toContain("#101010")
     expect(changed.match(/\.theme-neo \{/g)?.length).toBe(1)
@@ -130,11 +137,19 @@ const DERIVE_TS = `export const PRESETS: Record<string, VariantParams> = {
 
 describe("upsertPreset", () => {
   const lit = paramsLiteral({
-    surfaceHue: 200, surfaceTemp: 0.5, signalHue: 300, signalChroma: 0.6, textWarmth: 0.4, radius: 10, destructiveHue: 358,
+    surfaceHue: 200,
+    surfaceTemp: 0.5,
+    signalHue: 300,
+    signalChroma: 0.6,
+    textWarmth: 0.4,
+    radius: 10,
+    destructiveHue: 358,
   })
 
   it("serializes params compactly", () => {
-    expect(lit).toBe("{ surfaceHue: 200, surfaceTemp: 0.5, signalHue: 300, signalChroma: 0.6, textWarmth: 0.4, radius: 10, destructiveHue: 358 }")
+    expect(lit).toBe(
+      "{ surfaceHue: 200, surfaceTemp: 0.5, signalHue: 300, signalChroma: 0.6, textWarmth: 0.4, radius: 10, destructiveHue: 358 }",
+    )
   })
 
   it("inserts a new preset before the record close", () => {

@@ -162,9 +162,10 @@ export function ModelsSection({ userId }: { userId: string }) {
               </p>
             ) : null}
             <p className="text-xs text-muted-foreground">
-              Providers come from <code className="font-mono">agent.providers</code>{" "}
-              in the application fixture; a model becomes available to new chats
-              only when you turn it on here, and stays unavailable until you do.
+              Providers come from{" "}
+              <code className="font-mono">agent.providers</code> in the
+              application fixture; a model becomes available to new chats only
+              when you turn it on here, and stays unavailable until you do.
               Credentials stay in the agent runtime&apos;s environment — this
               page can see whether a variable is set, never what it contains.
             </p>
@@ -431,7 +432,9 @@ function CatalogLine({ catalog }: { catalog?: ModelCatalogStatus }) {
   if (!catalog) return null
   if (catalog.error) {
     return (
-      <p className="text-xs text-destructive">Catalog check failed: {catalog.error}</p>
+      <p className="text-xs text-destructive">
+        Catalog check failed: {catalog.error}
+      </p>
     )
   }
   return (
@@ -476,9 +479,9 @@ function AddEndpointSection() {
         <SectionHeader>Add a provider</SectionHeader>
         <p className="text-xs text-muted-foreground">
           Ollama, LM Studio, vLLM, and llama.cpp all speak the same
-          OpenAI-compatible HTTP API. Probe one to confirm the agent runtime
-          can reach it and to see what it serves, then add the generated rows
-          to the application fixture.
+          OpenAI-compatible HTTP API. Probe one to confirm the agent runtime can
+          reach it and to see what it serves, then add the generated rows to the
+          application fixture.
         </p>
       </div>
 
@@ -595,9 +598,7 @@ function AddEndpointSection() {
                   model,
                   modelId: "default",
                   baseUrl: baseUrl.trim(),
-                  ...(apiKeyEnv.trim()
-                    ? { apiKeyEnv: apiKeyEnv.trim() }
-                    : {}),
+                  ...(apiKeyEnv.trim() ? { apiKeyEnv: apiKeyEnv.trim() } : {}),
                 })}
               />
             </div>

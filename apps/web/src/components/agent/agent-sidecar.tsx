@@ -1,32 +1,32 @@
-"use client";
+"use client"
 
 // AgentSidecar (app adapter) — the portable sidecar shell from
 // @workspace/ui/agent-variants wired to the app session + the app's
 // approval-mode toggle and /chat expand link. Presentation lives in the
 // design system (Q5); this file only supplies app wiring.
 
-import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
-import { ArrowUpRightIcon } from "lucide-react";
+import type { ReactNode } from "react"
+import { Link } from "@tanstack/react-router"
+import { ArrowUpRightIcon } from "lucide-react"
 
-import { AgentSidecar as AgentSidecarShell } from "@workspace/ui/components/agent-variants";
-import { useAppAgentSession } from "@/hooks/use-app-agent-session";
+import { AgentSidecar as AgentSidecarShell } from "@workspace/ui/components/agent-variants"
+import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import {
   setToolApprovalMode,
   useToolApprovalMode,
-} from "@/lib/agent-tool-approval";
+} from "@/lib/agent-tool-approval"
 
 export interface AgentSidecarProps {
   /** What this sidecar is about (the subject). Shown in the header. */
-  readonly subject: string;
+  readonly subject: string
   /** Optional detail line under the subject (e.g. the passage excerpt). */
-  readonly subjectDetail?: ReactNode;
+  readonly subjectDetail?: ReactNode
   /** Placeholder for the composer. Defaults to a subject-aware prompt. */
-  readonly placeholder?: string;
+  readonly placeholder?: string
   /** Extra className on the panel. */
-  readonly className?: string;
+  readonly className?: string
   /** Hide the "open in chat" link (defaults to shown). */
-  readonly hideExpand?: boolean;
+  readonly hideExpand?: boolean
 }
 
 export function AgentSidecar({
@@ -36,8 +36,8 @@ export function AgentSidecar({
   className,
   hideExpand,
 }: AgentSidecarProps) {
-  const session = useAppAgentSession();
-  const approvalMode = useToolApprovalMode();
+  const session = useAppAgentSession()
+  const approvalMode = useToolApprovalMode()
 
   return (
     <AgentSidecarShell
@@ -64,15 +64,15 @@ export function AgentSidecar({
       subject={subject}
       subjectDetail={subjectDetail}
     />
-  );
+  )
 }
 
 function ApprovalModeToggle({
   mode,
   onChange,
 }: {
-  mode: ReturnType<typeof useToolApprovalMode>;
-  onChange: (next: ReturnType<typeof useToolApprovalMode>) => void;
+  mode: ReturnType<typeof useToolApprovalMode>
+  onChange: (next: ReturnType<typeof useToolApprovalMode>) => void
 }) {
   // Compact approval-mode hint; the full control lives in settings. Kept quiet
   // so the sidecar reads as a conversation, not a config panel.
@@ -84,5 +84,5 @@ function ApprovalModeToggle({
     >
       Tool approval: {mode === "always" ? "auto-allow" : "ask each time"}
     </button>
-  );
+  )
 }

@@ -19,7 +19,8 @@ let listeningForStorage = false
 
 export function getSpeakReplies(): boolean {
   if (typeof window === "undefined") return false
-  if (cached === undefined) cached = parse(window.localStorage.getItem(STORAGE_KEY))
+  if (cached === undefined)
+    cached = parse(window.localStorage.getItem(STORAGE_KEY))
   return cached
 }
 
@@ -32,7 +33,11 @@ export function setSpeakReplies(enabled: boolean): void {
 }
 
 export function useSpeakReplies(): boolean {
-  return useSyncExternalStore(subscribeSpeakReplies, getSpeakReplies, () => false)
+  return useSyncExternalStore(
+    subscribeSpeakReplies,
+    getSpeakReplies,
+    () => false,
+  )
 }
 
 export function subscribeSpeakReplies(listener: () => void): () => void {

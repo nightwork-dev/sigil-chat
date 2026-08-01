@@ -59,7 +59,9 @@ export function isKnownFeatureFlagId(id: string): id is FeatureFlagId {
   return Object.prototype.hasOwnProperty.call(FEATURE_FLAG_REGISTRY, id)
 }
 
-export function getFeatureFlagDefinition(id: FeatureFlagId): FeatureFlagDefinition {
+export function getFeatureFlagDefinition(
+  id: FeatureFlagId,
+): FeatureFlagDefinition {
   return FEATURE_FLAG_REGISTRY[id]
 }
 

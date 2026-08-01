@@ -87,7 +87,8 @@ function recordingSynth(options: { fails?: boolean } = {}) {
   const spoken: string[] = []
   const fetchImpl = (_input: string, init: RequestInit) => {
     spoken.push(JSON.parse(String(init.body)).text)
-    if (options.fails) return Promise.resolve({ ok: false } as unknown as Response)
+    if (options.fails)
+      return Promise.resolve({ ok: false } as unknown as Response)
     return Promise.resolve({
       ok: true,
       blob: () => Promise.resolve(new Blob(["audio"])),
@@ -96,7 +97,11 @@ function recordingSynth(options: { fails?: boolean } = {}) {
   return {
     spoken: () => spoken,
     speak: ((parts, speakOptions) =>
-      speakMessageParts(parts, speakOptions, fetchImpl)) as typeof speakMessageParts,
+      speakMessageParts(
+        parts,
+        speakOptions,
+        fetchImpl,
+      )) as typeof speakMessageParts,
   }
 }
 

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { isAllowedUsername } from "./username-rules"
-import {
-  displayNameFromEmail,
-  usernameFromEmail,
-} from "./username-from-email"
+import { displayNameFromEmail, usernameFromEmail } from "./username-from-email"
 
 describe("usernameFromEmail", () => {
   it("derives the sanitized, lowercased local-part", () => {

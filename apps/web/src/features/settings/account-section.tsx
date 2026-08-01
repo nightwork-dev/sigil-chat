@@ -10,7 +10,11 @@ import { useRouter } from "@tanstack/react-router"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import { Field, FieldLabel, FieldDescription } from "@workspace/ui/components/field"
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+} from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { SectionHeader } from "@workspace/ui/components/section-header"
@@ -42,7 +46,8 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
   const normalizedPreview = normalizeUsername(usernameInput)
   const usernameValid = isAllowedUsername(usernameInput)
   const usernameChanged = usernameInput.trim() !== currentUsername
-  const nameChanged = nameInput.trim() !== user.name && nameInput.trim().length > 0
+  const nameChanged =
+    nameInput.trim() !== user.name && nameInput.trim().length > 0
 
   async function handleSaveUsername() {
     setUsernameError(null)
@@ -105,12 +110,13 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
           {usernameChanged ? (
             usernameValid ? (
               <FieldDescription>
-                Will save as <span className="font-mono">@{normalizedPreview}</span>
+                Will save as{" "}
+                <span className="font-mono">@{normalizedPreview}</span>
               </FieldDescription>
             ) : (
               <FieldDescription className="text-destructive">
-                Not a valid username — lowercase letters, numbers, dots, dashes, or
-                underscores only.
+                Not a valid username — lowercase letters, numbers, dots, dashes,
+                or underscores only.
               </FieldDescription>
             )
           ) : null}
@@ -156,7 +162,9 @@ export function AccountSection({ user }: { user: CurrentSessionUser }) {
         <Field>
           <Label>Email</Label>
           <p className="text-xs text-muted-foreground">{email}</p>
-          <FieldDescription>Private — never shown to other users.</FieldDescription>
+          <FieldDescription>
+            Private — never shown to other users.
+          </FieldDescription>
         </Field>
 
         <Field>

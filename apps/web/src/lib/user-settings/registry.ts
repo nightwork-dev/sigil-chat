@@ -78,7 +78,9 @@ export interface SettingDefinition<T = unknown> {
   isValid(value: unknown): value is T
 }
 
-export function defineSetting<T>(def: SettingDefinition<T>): SettingDefinition<T> {
+export function defineSetting<T>(
+  def: SettingDefinition<T>,
+): SettingDefinition<T> {
   if (
     def.affectsSecurity &&
     (def.allowsPersonalOverride ||
@@ -118,7 +120,8 @@ const TOOL_APPROVAL_DEFAULTS = ["ask", "always"] as const
 const MAX_TOOL_APPROVAL_AGENTS = 16
 const MAX_TOOL_APPROVAL_OVERRIDES = 64
 const MAX_TOOL_NAME_LENGTH = 160
-export type RegisteredToolApprovalDefault = (typeof TOOL_APPROVAL_DEFAULTS)[number]
+export type RegisteredToolApprovalDefault =
+  (typeof TOOL_APPROVAL_DEFAULTS)[number]
 /**
  * MA.4 per-agent shape: agent name (or `"*"` for account-wide) → tool id →
  * mode. The legacy flat map (tool id → mode) remains VALID stored data —
@@ -168,16 +171,14 @@ function isToolApprovalOverrides(
   )
 }
 
-function isWorkspacePanelState(value: unknown): value is Record<string, unknown> {
+function isWorkspacePanelState(
+  value: unknown,
+): value is Record<string, unknown> {
   // Validated workspace-specific object: a plain JSON-serializable record.
   // No workspace UI reads this yet (S10.4 registers the key ahead of the
   // consumer); the shape is intentionally permissive but excludes arrays,
   // null, and primitives so it stays a namespaced bag of fields.
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  )
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 export const SETTINGS_REGISTRY = {
@@ -414,10 +415,13 @@ export function getSettingDefinition<K extends SettingKey>(
   return SETTINGS_REGISTRY[key]
 }
 
-export function isScopeAllowed(key: SettingKey, scopeKind: SettingScopeKind): boolean {
-  return (SETTINGS_REGISTRY[key].allowedScopes as readonly SettingScopeKind[]).includes(
-    scopeKind,
-  )
+export function isScopeAllowed(
+  key: SettingKey,
+  scopeKind: SettingScopeKind,
+): boolean {
+  return (
+    SETTINGS_REGISTRY[key].allowedScopes as readonly SettingScopeKind[]
+  ).includes(scopeKind)
 }
 
 export function validateSettingValue(key: SettingKey, value: unknown): boolean {

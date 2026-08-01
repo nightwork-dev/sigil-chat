@@ -488,7 +488,9 @@ function ParticipantAgentSessionMount({
   useEffect(() => {
     if (!thread) return
     eventsRef.current = [...agentEventsForReplay(thread.runtime.events)]
-    persistence.current = new AgentSessionPersistenceCoordinator(thread.revision)
+    persistence.current = new AgentSessionPersistenceCoordinator(
+      thread.revision,
+    )
   }, [thread])
 
   const persistSnapshot = useCallback(
@@ -691,7 +693,9 @@ function commandLike(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-function normalizedParticipantThreadIdsKey(threadIds: readonly string[]): string {
+function normalizedParticipantThreadIdsKey(
+  threadIds: readonly string[],
+): string {
   return normalizeParticipantThreadIds(threadIds).join("\u0000")
 }
 

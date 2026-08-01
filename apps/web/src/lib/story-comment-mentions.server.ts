@@ -4,30 +4,26 @@ import {
   deliverMessage,
   type CommsEnvelope,
   type PresenceEntry,
-} from "@gonk/comms";
-import { createScope, FsScopeStore } from "@gonk/scope";
-import {
-  createStoreProvider,
-  type Store,
-} from "@gonk/store";
-import { mirkBackendFactory } from "@gonk/store/sqlite";
+} from "@gonk/comms"
+import { createScope, FsScopeStore } from "@gonk/scope"
+import { createStoreProvider, type Store } from "@gonk/store"
+import { mirkBackendFactory } from "@gonk/store/sqlite"
 
-const SENDER_HOST = "sigil-chat";
-const PRESENCE_SESSION_ID = "sigil-chat-roadmap";
+const SENDER_HOST = "sigil-chat"
+const PRESENCE_SESSION_ID = "sigil-chat-roadmap"
 
 export interface StoryCommentReference {
-  storyId: string;
-  commentId: string;
+  storyId: string
+  commentId: string
 }
 
 export interface AuthenticatedMentionViewer {
-  role: "owner" | "member";
-  username: string | null;
+  role: "owner" | "member"
+  username: string | null
 }
 
 export type MentionDepositResult =
-  | { status: "delivered"; sessionId: string }
-  | { status: "unresolved" };
+  { status: "delivered"; sessionId: string } | { status: "unresolved" }
 
 export function storyCommentReferenceBody(
   reference: StoryCommentReference,
@@ -35,14 +31,14 @@ export function storyCommentReferenceBody(
   return JSON.stringify({
     storyRef: `story:${reference.storyId}`,
     commentRef: `comment:${reference.commentId}`,
-  });
+  })
 }
 
 export function createStoryCommentMentionEnvelope(input: {
-  reference: StoryCommentReference;
-  selector: string;
-  recipientHost: string;
-  viewer: AuthenticatedMentionViewer;
+  reference: StoryCommentReference
+  selector: string
+  recipientHost: string
+  viewer: AuthenticatedMentionViewer
 }): CommsEnvelope {
   return buildEnvelope({
     from: {
@@ -56,7 +52,7 @@ export function createStoryCommentMentionEnvelope(input: {
     visibility: "shared",
     conversationId: input.reference.storyId,
     replyTo: input.reference.commentId,
-  });
+  })
 }
 
 export function selectMentionRecipient(
@@ -65,7 +61,7 @@ export function selectMentionRecipient(
 ): PresenceEntry | undefined {
   return [...entries]
     .filter((entry) => entry.persona === selector)
-    .sort((a, b) => b.lastSeen - a.lastSeen)[0];
+    .sort((a, b) => b.lastSeen - a.lastSeen)[0]
 }
 
 function openRecipientStore(entry: PresenceEntry): Store {
@@ -73,40 +69,40 @@ function openRecipientStore(entry: PresenceEntry): Store {
     cwd: entry.cwd,
     sessionId: entry.sessionId,
     sessionHome: entry.scopeHome,
-  });
+  })
   return createStoreProvider(scope, {
     backendFactory: mirkBackendFactory(scope),
-  });
+  })
 }
 
 export function depositStoryCommentMention(input: {
-  reference: StoryCommentReference;
-  selector: string;
-  viewer: AuthenticatedMentionViewer;
-  now?: number;
+  reference: StoryCommentReference
+  selector: string
+  viewer: AuthenticatedMentionViewer
+  now?: number
 }): MentionDepositResult {
-  const now = input.now ?? Date.now();
+  const now = input.now ?? Date.now()
   const scope = createScope({
     cwd: process.cwd(),
     sessionId: PRESENCE_SESSION_ID,
-  });
+  })
   const store = createStoreProvider(scope, {
     backendFactory: mirkBackendFactory(scope),
-  });
+  })
   const recipient = selectMentionRecipient(
     new PresenceDirectory(store).listLive(now),
     input.selector,
-  );
-  if (!recipient) return { status: "unresolved" };
+  )
+  if (!recipient) return { status: "unresolved" }
 
   const envelope = createStoryCommentMentionEnvelope({
     ...input,
     recipientHost: recipient.host,
-  });
+  })
   deliverMessage({
     recipientScope: openRecipientStore(recipient),
     envelope,
     clock: { now: () => now },
-  });
-  return { status: "delivered", sessionId: recipient.sessionId };
+  })
+  return { status: "delivered", sessionId: recipient.sessionId }
 }

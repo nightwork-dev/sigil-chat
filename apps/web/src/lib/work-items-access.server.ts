@@ -1,13 +1,13 @@
-import { getProjectWorkspaceRegistries } from "../../../agent/agent/lib/project-workspace-registries";
-import { assertAuthorizedScope } from "./agent-scope-authorization.server";
-import type { SigilAuthSession } from "./auth/server";
-import { requireOwner, requireSession } from "./auth/session";
+import { getProjectWorkspaceRegistries } from "../../../agent/agent/lib/project-workspace-registries"
+import { assertAuthorizedScope } from "./agent-scope-authorization.server"
+import type { SigilAuthSession } from "./auth/server"
+import { requireOwner, requireSession } from "./auth/session"
 import type {
   BoardScopeMatch,
   BoardTraversalResolver,
   BoardView,
   Story,
-} from "@workspace/work-items-store/types";
+} from "@workspace/work-items-store/types"
 
 /**
  * The SC.3 grant service will become the authority for this adapter. Keeping
@@ -15,23 +15,21 @@ import type {
  * membership policy while that service is not materialized here yet.
  */
 export interface WorkItemsScopeAccess {
-  canAccess(input: WorkItemsScopeAuthorizationRequest): boolean;
-  canonicalDescendants(scopeId: string): readonly string[];
-  rollupSubjects(scopeId: string): readonly string[];
+  canAccess(input: WorkItemsScopeAuthorizationRequest): boolean
+  canonicalDescendants(scopeId: string): readonly string[]
+  rollupSubjects(scopeId: string): readonly string[]
 }
 
 export type WorkItemsScopeAction =
-  | "board.discover"
-  | "board.read"
-  | "board.write";
+  "board.discover" | "board.read" | "board.write"
 
 export interface WorkItemsScopeAuthorizationRequest {
-  principalId: string;
-  scopeId: string;
-  action: WorkItemsScopeAction;
+  principalId: string
+  scopeId: string
+  action: WorkItemsScopeAction
 }
 
-export type ScopeHomeAccessSignal = "readable" | "denied" | "not-found";
+export type ScopeHomeAccessSignal = "readable" | "denied" | "not-found"
 
 /**
  * Route projection signal: a discover-only grant may name a scope without
@@ -50,7 +48,7 @@ export function scopeHomeAccessSignal(
       action: "board.read",
     })
   ) {
-    return "readable";
+    return "readable"
   }
   return access.canAccess({
     principalId,
@@ -58,7 +56,7 @@ export function scopeHomeAccessSignal(
     action: "board.discover",
   })
     ? "denied"
-    : "not-found";
+    : "not-found"
 }
 
 export function requireWorkItemsMutationAccess(
@@ -73,11 +71,11 @@ export function requireSponsorshipDecisionAccess(
   session: SigilAuthSession | null,
   workItem: Story,
 ): SigilAuthSession {
-  requireSession(session);
+  requireSession(session)
   if (workItem.provenance?.proposedSponsorPrincipalId !== session.user.id) {
-    throw new Error("Feature request was not found.");
+    throw new Error("Feature request was not found.")
   }
-  return session;
+  return session
 }
 
 /**
@@ -85,19 +83,19 @@ export function requireSponsorshipDecisionAccess(
  * authorization. It deliberately owns no grant or membership data.
  */
 export function currentWorkItemsScopeAccess(): WorkItemsScopeAccess {
-  const registries = getProjectWorkspaceRegistries();
+  const registries = getProjectWorkspaceRegistries()
   return {
     canAccess({ principalId, scopeId, action }) {
-      const scope = registries.scopes.get(scopeId);
+      const scope = registries.scopes.get(scopeId)
       if (!scope || (scope.kind !== "project" && scope.kind !== "workspace")) {
-        return false;
+        return false
       }
       const scopeAction =
         action === "board.discover"
           ? "discover"
           : action === "board.read"
             ? "read"
-            : "tool";
+            : "tool"
       try {
         assertAuthorizedScope(
           `${scope.kind}:${scopeId}`,
@@ -106,27 +104,27 @@ export function currentWorkItemsScopeAccess(): WorkItemsScopeAccess {
           registries,
           undefined,
           scopeAction,
-        );
-        return true;
+        )
+        return true
       } catch {
-        return false;
+        return false
       }
     },
     canonicalDescendants(scopeId) {
-      const scope = registries.scopes.get(scopeId);
-      if (!scope) return [];
-      if (scope.kind !== "project") return [scope.id];
+      const scope = registries.scopes.get(scopeId)
+      if (!scope) return []
+      if (scope.kind !== "project") return [scope.id]
       return [
         scope.id,
         ...registries.workspaces
           .list(scope.id)
           .map((workspace) => workspace.id),
-      ];
+      ]
     },
     rollupSubjects(scopeId) {
-      return registries.links.traverseSubjects(scopeId, "rolls-up-to");
+      return registries.links.traverseSubjects(scopeId, "rolls-up-to")
     },
-  };
+  }
 }
 
 /**
@@ -142,8 +140,8 @@ export function createBoardTraversalResolver(
 ): BoardTraversalResolver {
   return {
     resolve(roots, traversal) {
-      const matches: BoardScopeMatch[] = [];
-      const seen = new Set<string>();
+      const matches: BoardScopeMatch[] = []
+      const seen = new Set<string>()
       for (const rootScopeId of roots) {
         if (
           !access.canAccess({
@@ -152,12 +150,12 @@ export function createBoardTraversalResolver(
             action: "board.read",
           })
         ) {
-          continue;
+          continue
         }
         const scopeIds =
           traversal === "self"
             ? [rootScopeId]
-            : resolveRollupScopes(rootScopeId, access);
+            : resolveRollupScopes(rootScopeId, access)
         for (const scopeId of scopeIds) {
           if (
             seen.has(scopeId) ||
@@ -167,15 +165,15 @@ export function createBoardTraversalResolver(
               action: "board.read",
             })
           ) {
-            continue;
+            continue
           }
-          seen.add(scopeId);
-          matches.push({ scopeId, rootScopeId });
+          seen.add(scopeId)
+          matches.push({ scopeId, rootScopeId })
         }
       }
-      return matches;
+      return matches
     },
-  };
+  }
 }
 
 /**
@@ -189,22 +187,22 @@ export function visibleSessionCommitments(
   principalId: string,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): Story[] {
-  const sessionScopeIds = new Set([threadId, `session:${threadId}`]);
+  const sessionScopeIds = new Set([threadId, `session:${threadId}`])
   return stories.filter((story) => {
     const linked =
       (story.homeScopeId !== undefined &&
         sessionScopeIds.has(story.homeScopeId)) ||
       story.scopeBindings?.some((binding) =>
         sessionScopeIds.has(binding.scopeId),
-      );
-    if (!linked || !story.homeScopeId) return false;
-    if (sessionScopeIds.has(story.homeScopeId)) return true;
+      )
+    if (!linked || !story.homeScopeId) return false
+    if (sessionScopeIds.has(story.homeScopeId)) return true
     return access.canAccess({
       principalId,
       scopeId: story.homeScopeId,
       action: "board.read",
-    });
-  });
+    })
+  })
 }
 
 /** A board is never evaluated if any saved root is outside the viewer grant. */
@@ -213,7 +211,7 @@ export function canDiscoverBoardView(
   principalId: string,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): boolean {
-  return canAccessBoardView(view, principalId, "board.discover", access);
+  return canAccessBoardView(view, principalId, "board.discover", access)
 }
 
 export function canReadBoardView(
@@ -221,7 +219,7 @@ export function canReadBoardView(
   principalId: string,
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
 ): boolean {
-  return canAccessBoardView(view, principalId, "board.read", access);
+  return canAccessBoardView(view, principalId, "board.read", access)
 }
 
 function canAccessBoardView(
@@ -236,7 +234,7 @@ function canAccessBoardView(
     view.roots.every((scopeId) =>
       access.canAccess({ principalId, scopeId, action }),
     )
-  );
+  )
 }
 
 /**
@@ -249,14 +247,17 @@ export function prepareBoardViewForUpsert(
   existing?: BoardView,
 ): BoardView {
   if (existing?.visibility === "private") {
-    if (!existing.ownerPrincipalId || existing.ownerPrincipalId !== principalId) {
-      throw new Error("Board view was not found.");
+    if (
+      !existing.ownerPrincipalId ||
+      existing.ownerPrincipalId !== principalId
+    ) {
+      throw new Error("Board view was not found.")
     }
-    return { ...view, ownerPrincipalId: existing.ownerPrincipalId };
+    return { ...view, ownerPrincipalId: existing.ownerPrincipalId }
   }
   return view.visibility === "private"
     ? { ...view, ownerPrincipalId: principalId }
-    : view;
+    : view
 }
 
 /**
@@ -269,16 +270,16 @@ export function requireBoardViewMutationAccess(
   access: WorkItemsScopeAccess = currentWorkItemsScopeAccess(),
   existing?: BoardView,
 ): SigilAuthSession {
-  requireSession(session);
+  requireSession(session)
   // Updates retain the authority required by the persisted surface. Otherwise
   // a member who can read a published board could submit the same id as a
   // private board and turn proposed visibility into an authorization bypass.
-  if (existing?.visibility === "published") requireOwner(session);
+  if (existing?.visibility === "published") requireOwner(session)
   if (
     existing?.visibility === "private" &&
     existing.ownerPrincipalId !== session.user.id
   ) {
-    throw new Error("Board view was not found.");
+    throw new Error("Board view was not found.")
   }
   if (
     !access.canAccess({
@@ -294,39 +295,39 @@ export function requireBoardViewMutationAccess(
       }),
     )
   ) {
-    throw new Error("Board view scope is not available to this principal.");
+    throw new Error("Board view scope is not available to this principal.")
   }
   if (view.visibility === "published") {
-    requireOwner(session);
+    requireOwner(session)
   } else if (
     session.user.role !== "owner" &&
     view.ownerPrincipalId !== session.user.id
   ) {
     throw new Error(
       "Private board views must be owned by the current principal.",
-    );
+    )
   }
-  return session;
+  return session
 }
 
 function resolveRollupScopes(
   rootScopeId: string,
   access: WorkItemsScopeAccess,
 ): string[] {
-  const seen = new Set<string>();
-  const queue = [rootScopeId];
-  const scopeIds: string[] = [];
+  const seen = new Set<string>()
+  const queue = [rootScopeId]
+  const scopeIds: string[] = []
   while (queue.length > 0) {
-    const scopeId = queue.shift();
-    if (!scopeId || seen.has(scopeId)) continue;
-    seen.add(scopeId);
-    scopeIds.push(scopeId);
+    const scopeId = queue.shift()
+    if (!scopeId || seen.has(scopeId)) continue
+    seen.add(scopeId)
+    scopeIds.push(scopeId)
     for (const descendant of access.canonicalDescendants(scopeId)) {
-      if (!seen.has(descendant)) queue.push(descendant);
+      if (!seen.has(descendant)) queue.push(descendant)
     }
     for (const rollupSubject of access.rollupSubjects(scopeId)) {
-      if (!seen.has(rollupSubject)) queue.push(rollupSubject);
+      if (!seen.has(rollupSubject)) queue.push(rollupSubject)
     }
   }
-  return scopeIds;
+  return scopeIds
 }

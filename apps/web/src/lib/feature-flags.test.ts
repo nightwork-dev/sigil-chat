@@ -31,9 +31,9 @@ describe("isFeatureFlagEnabled", () => {
   // default-off and are surfaced in dev logs.
   it("evaluates an undeclared id default-off and warns loudly", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined)
-    expect(isFeatureFlagEnabled("not.a.real.flag", { "not.a.real.flag": true })).toBe(
-      false,
-    )
+    expect(
+      isFeatureFlagEnabled("not.a.real.flag", { "not.a.real.flag": true }),
+    ).toBe(false)
     expect(warn).toHaveBeenCalledTimes(1)
     expect(warn.mock.calls[0]?.[0]).toContain("not.a.real.flag")
   })

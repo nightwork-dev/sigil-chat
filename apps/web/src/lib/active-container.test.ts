@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest"
 
-import { resolveActiveContainerSelection } from "./active-container";
+import { resolveActiveContainerSelection } from "./active-container"
 
 describe("resolveActiveContainerSelection", () => {
   it("does not expose a hidden canonical project for a directly granted workspace", () => {
@@ -16,7 +16,12 @@ describe("resolveActiveContainerSelection", () => {
       {
         personalProjectId: "project-a",
         projects: [
-          { id: "project-a", slug: "project-a", name: "Project A", description: "" },
+          {
+            id: "project-a",
+            slug: "project-a",
+            name: "Project A",
+            description: "",
+          },
         ],
         workspaces: [
           {
@@ -29,7 +34,7 @@ describe("resolveActiveContainerSelection", () => {
           },
         ],
       },
-    );
+    )
 
     expect(selection).toEqual({
       perspective: { focusScopeId: "workspace-b", viaScopeIds: [] },
@@ -37,7 +42,7 @@ describe("resolveActiveContainerSelection", () => {
       workspaceId: "workspace-b",
       projectName: undefined,
       workspaceName: "Direct grant",
-    });
-    expect(JSON.stringify(selection)).not.toContain("project-b");
-  });
-});
+    })
+    expect(JSON.stringify(selection)).not.toContain("project-b")
+  })
+})

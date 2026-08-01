@@ -78,9 +78,9 @@ export function FlagsSection() {
 
         <p className="text-xs text-muted-foreground">
           Flags are declared in{" "}
-          <code className="font-mono">lib/feature-flags/registry.ts</code>{" "}
-          and take effect for every principal immediately — no deploy
-          required. A flag id nobody declared always evaluates default-off.
+          <code className="font-mono">lib/feature-flags/registry.ts</code> and
+          take effect for every principal immediately — no deploy required. A
+          flag id nobody declared always evaluates default-off.
         </p>
       </section>
     </div>

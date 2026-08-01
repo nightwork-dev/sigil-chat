@@ -160,7 +160,10 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
   for (const epic of canvas.epics) {
     bandWidth.set(
       epic.depth,
-      Math.max(bandWidth.get(epic.depth) ?? COLUMN_WIDTH, widthOf(epic) + PAD_X * 2),
+      Math.max(
+        bandWidth.get(epic.depth) ?? COLUMN_WIDTH,
+        widthOf(epic) + PAD_X * 2,
+      ),
     )
   }
 
@@ -169,7 +172,10 @@ export function layoutCanvas(canvas: RoadmapCanvas): Placement {
   for (const level of levels) {
     xOf.set(level, x)
     const lanes = Math.min(traffic.get(level) ?? 0, GUTTER_MAX_LANES)
-    x += (bandWidth.get(level) ?? COLUMN_WIDTH) + GUTTER_BASE + lanes * GUTTER_LANE_STEP
+    x +=
+      (bandWidth.get(level) ?? COLUMN_WIDTH) +
+      GUTTER_BASE +
+      lanes * GUTTER_LANE_STEP
   }
 
   const epics = new Map<string, Box>()
@@ -225,7 +231,9 @@ export function routeEdges(
   // Lane assignment per seam. Sorting by the vertical span each edge covers
   // keeps neighbouring edges in neighbouring lanes instead of interleaving.
   const crossing = canvas.edges
-    .filter((edge) => place.laneOf.get(edge.source) !== place.laneOf.get(edge.target))
+    .filter(
+      (edge) => place.laneOf.get(edge.source) !== place.laneOf.get(edge.target),
+    )
     .slice()
     .sort(
       (left, right) =>
@@ -247,7 +255,9 @@ export function routeEdges(
   return canvas.edges.map((edge) => {
     const sourceLane = place.laneOf.get(edge.source)
     const targetLane = place.laneOf.get(edge.target)
-    const crossLane = Boolean(sourceLane && targetLane && sourceLane !== targetLane)
+    const crossLane = Boolean(
+      sourceLane && targetLane && sourceLane !== targetLane,
+    )
     const active = chainEdges
       ? edge.underlying.some((id) => chainEdges.has(id))
       : true
@@ -328,7 +338,8 @@ export function routeEdges(
       // visible so the chain is complete, but dashed so it stops competing.
       style: {
         stroke,
-        strokeWidth: onGoalPath || direction !== null ? 1.8 : edge.binding ? 1.4 : 1,
+        strokeWidth:
+          onGoalPath || direction !== null ? 1.8 : edge.binding ? 1.4 : 1,
         strokeDasharray: edge.binding ? undefined : "4 4",
         opacity: active
           ? onGoalPath || direction !== null
@@ -341,4 +352,3 @@ export function routeEdges(
     }
   })
 }
-

@@ -48,8 +48,8 @@ export function AppearanceSection({ userId }: { userId: string }) {
         <div className="flex flex-col gap-0.5">
           <Label htmlFor="reduced-motion">Reduce motion</Label>
           <p className="text-xs text-muted-foreground">
-            Turn off color and layout transitions across the app, independent
-            of your OS setting.
+            Turn off color and layout transitions across the app, independent of
+            your OS setting.
           </p>
         </div>
         <Switch

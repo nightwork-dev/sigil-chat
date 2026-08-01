@@ -1,18 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest"
 
 import {
   AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
   AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
-} from "@workspace/agent-contracts/context-receipt";
+} from "@workspace/agent-contracts/context-receipt"
 import {
   AGENT_EVENT_RETENTION_POLICY,
   agentEventsForReplay,
   sanitizeAndBoundAgentEvents,
   type AgentRuntimeStreamEvent,
-} from "./agent-event-retention";
+} from "./agent-event-retention"
 
 function event(value: unknown): AgentRuntimeStreamEvent {
-  return value as AgentRuntimeStreamEvent;
+  return value as AgentRuntimeStreamEvent
 }
 
 describe("agent event retention", () => {
@@ -127,12 +127,12 @@ describe("agent event retention", () => {
           turnId: "turn-1",
         },
       }),
-    ];
+    ]
 
     const snapshot = sanitizeAndBoundAgentEvents(events, {
       now: () => new Date("2026-07-16T12:00:00.000Z"),
-    });
-    const serialized = JSON.stringify(snapshot);
+    })
+    const serialized = JSON.stringify(snapshot)
 
     expect(snapshot.events.map(({ type }) => type)).toEqual([
       "message.received",
@@ -141,10 +141,10 @@ describe("agent event retention", () => {
       "action.result",
       "authorization.completed",
       "message.completed",
-    ]);
-    expect(serialized).toContain("visible user text");
-    expect(serialized).toContain("visible assistant text");
-    expect(serialized).toContain("review.annotate");
+    ])
+    expect(serialized).toContain("visible user text")
+    expect(serialized).toContain("visible assistant text")
+    expect(serialized).toContain("review.annotate")
     // Retention v2: action inputs/outputs and approval prompts persist.
     for (const retained of [
       "tool-input-secret",
@@ -153,7 +153,7 @@ describe("agent event retention", () => {
       "Approve the secret action?",
       "tool-output-secret",
     ]) {
-      expect(serialized).toContain(retained);
+      expect(serialized).toContain(retained)
     }
     // Still dropped: reasoning, file part URLs, device authorizations,
     // continuation tokens.
@@ -166,15 +166,15 @@ describe("agent event retention", () => {
       "secret reason",
       "resume-secret",
     ]) {
-      expect(serialized).not.toContain(secret);
+      expect(serialized).not.toContain(secret)
     }
     expect(snapshot.compaction).toEqual({
       policyVersion: AGENT_EVENT_RETENTION_POLICY,
       firstRetainedStreamIndex: 1,
       omittedEventCount: 3,
       compactedAt: "2026-07-16T12:00:00.000Z",
-    });
-  });
+    })
+  })
 
   it("bounds sanitized events by count and serialized bytes from newest to oldest", () => {
     const events = Array.from({ length: 6 }, (_, index) =>
@@ -188,27 +188,27 @@ describe("agent event retention", () => {
           turnId: "turn-1",
         },
       }),
-    );
+    )
 
     const countBound = sanitizeAndBoundAgentEvents(events, {
       maxBytes: 1_000_000,
       maxEvents: 3,
       now: () => new Date("2026-07-16T12:00:00.000Z"),
-    });
+    })
     const byteBound = sanitizeAndBoundAgentEvents(events, {
       maxBytes: JSON.stringify(events[5]).length + 5,
       maxEvents: 1_000,
       now: () => new Date("2026-07-16T12:00:00.000Z"),
-    });
+    })
 
-    expect(countBound.events.map(eventSequence)).toEqual([4, 5, 6]);
-    expect(countBound.compaction.omittedEventCount).toBe(3);
-    expect(byteBound.events).toHaveLength(1);
+    expect(countBound.events.map(eventSequence)).toEqual([4, 5, 6])
+    expect(countBound.compaction.omittedEventCount).toBe(3)
+    expect(byteBound.events).toHaveLength(1)
     expect(
       byteBound.events[0] ? eventSequence(byteBound.events[0]) : undefined,
-    ).toBe(6);
-    expect(byteBound.compaction.omittedEventCount).toBe(5);
-  });
+    ).toBe(6)
+    expect(byteBound.compaction.omittedEventCount).toBe(5)
+  })
 
   it("replays retained tool payloads verbatim", () => {
     const retained = sanitizeAndBoundAgentEvents([
@@ -243,12 +243,12 @@ describe("agent event retention", () => {
           turnId: "turn-1",
         },
       }),
-    ]);
+    ])
 
-    const replay = agentEventsForReplay(retained.events);
-    const serialized = JSON.stringify(replay);
+    const replay = agentEventsForReplay(retained.events)
+    const serialized = JSON.stringify(replay)
 
-    expect(replay).toHaveLength(2);
+    expect(replay).toHaveLength(2)
     expect(replay[0]).toMatchObject({
       type: "actions.requested",
       data: {
@@ -261,7 +261,7 @@ describe("agent event retention", () => {
           },
         ],
       },
-    });
+    })
     expect(replay[1]).toMatchObject({
       type: "action.result",
       data: {
@@ -272,9 +272,9 @@ describe("agent event retention", () => {
           toolName: "review.annotate",
         },
       },
-    });
-    expect(serialized).not.toContain("redacted");
-  });
+    })
+    expect(serialized).not.toContain("redacted")
+  })
 
   it("truncates oversized action payloads instead of evicting the snapshot", () => {
     const retained = sanitizeAndBoundAgentEvents([
@@ -293,17 +293,17 @@ describe("agent event retention", () => {
           turnId: "turn-1",
         },
       }),
-    ]);
+    ])
 
-    expect(retained.events).toHaveLength(1);
-    const first = retained.events[0];
-    expect(first?.type).toBe("action.result");
-    if (first?.type !== "action.result") throw new Error("unreachable");
+    expect(retained.events).toHaveLength(1)
+    const first = retained.events[0]
+    expect(first?.type).toBe("action.result")
+    if (first?.type !== "action.result") throw new Error("unreachable")
     expect(first.data.result.output).toMatchObject({
       sigilRetentionTruncated: true,
-    });
-    expect(JSON.stringify(retained).length).toBeLessThan(10_000);
-  });
+    })
+    expect(JSON.stringify(retained).length).toBeLessThan(10_000)
+  })
 
   it("replays v1 redacted records without the redaction marker", () => {
     const v1Events = [
@@ -342,13 +342,13 @@ describe("agent event retention", () => {
           turnId: "turn-1",
         },
       },
-    ] as Parameters<typeof agentEventsForReplay>[0];
+    ] as Parameters<typeof agentEventsForReplay>[0]
 
-    const replay = agentEventsForReplay(v1Events);
+    const replay = agentEventsForReplay(v1Events)
 
-    expect(replay).toHaveLength(2);
-    expect(JSON.stringify(replay)).not.toContain("redacted");
-  });
+    expect(replay).toHaveLength(2)
+    expect(JSON.stringify(replay)).not.toContain("redacted")
+  })
 
   it("retains context compile receipts for inspection but never replays them into Eve", () => {
     const retained = sanitizeAndBoundAgentEvents([
@@ -393,21 +393,21 @@ describe("agent event retention", () => {
         },
         meta: { at: "2026-07-29T14:30:00.000Z" },
       },
-    ]);
+    ])
 
-    expect(retained.events).toHaveLength(1);
-    expect(retained.events[0]?.type).toBe(AGENT_CONTEXT_COMPILE_RECEIPT_EVENT);
-    expect(JSON.stringify(retained)).toContain("skill:editorial-readiness");
-    expect(agentEventsForReplay(retained.events)).toEqual([]);
-  });
-});
+    expect(retained.events).toHaveLength(1)
+    expect(retained.events[0]?.type).toBe(AGENT_CONTEXT_COMPILE_RECEIPT_EVENT)
+    expect(JSON.stringify(retained)).toContain("skill:editorial-readiness")
+    expect(agentEventsForReplay(retained.events)).toEqual([])
+  })
+})
 
 function eventSequence(value: unknown): number | undefined {
   if (!value || typeof value !== "object" || !("data" in value))
-    return undefined;
-  const data = value.data;
+    return undefined
+  const data = value.data
   if (!data || typeof data !== "object" || !("sequence" in data))
-    return undefined;
-  const sequence = data.sequence;
-  return typeof sequence === "number" ? sequence : undefined;
+    return undefined
+  const sequence = data.sequence
+  return typeof sequence === "number" ? sequence : undefined
 }

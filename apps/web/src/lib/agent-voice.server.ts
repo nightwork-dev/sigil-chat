@@ -52,7 +52,9 @@ const FORMAT_CONTENT_TYPES: Record<
   pcm: "audio/pcm",
 }
 
-async function readSpeakableText(request: Request): Promise<string | undefined> {
+async function readSpeakableText(
+  request: Request,
+): Promise<string | undefined> {
   try {
     const body: unknown = await request.json()
     if (typeof body !== "object" || body === null) return undefined
@@ -108,18 +110,16 @@ export async function synthesizeSpeechFromRequest(
     const personaVoice = dependencies.personaVoice
       ? dependencies.personaVoice(personaId)
       : personaId
-        ? (
-            await import("./agent-profile.server")
-          ).resolvePersonaVoice(personaId)
+        ? (await import("./agent-profile.server")).resolvePersonaVoice(
+            personaId,
+          )
         : undefined
     const tts = resolveTtsConfig(voice.tts, personaVoice)
     const upstream = await fetch(`${tts.baseURL}/audio/speech`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(tts.apiKey
-          ? { Authorization: `Bearer ${tts.apiKey}` }
-          : {}),
+        ...(tts.apiKey ? { Authorization: `Bearer ${tts.apiKey}` } : {}),
       },
       body: JSON.stringify({
         model: tts.model,

@@ -1,6 +1,7 @@
 import type { Story } from "@workspace/work-items-store/types"
 
-export type StoryRelationship = "active" | "prerequisite" | "dependent" | "unrelated"
+export type StoryRelationship =
+  "active" | "prerequisite" | "dependent" | "unrelated"
 
 export interface StoryRelationshipSet {
   activeId: string | null
@@ -25,7 +26,9 @@ export function storyRelationships(
     activeId,
     prerequisites: new Set(activeStory.deps),
     dependents: new Set(
-      stories.filter((story) => story.deps.includes(activeId)).map((story) => story.id),
+      stories
+        .filter((story) => story.deps.includes(activeId))
+        .map((story) => story.id),
     ),
   }
 }
@@ -46,6 +49,9 @@ export function unresolvedPrerequisitesForStory(
 ): string[] {
   return story.deps.filter((dependencyId) => {
     const dependency = storiesById.get(dependencyId)
-    return !dependency || (dependency.status !== "verify" && dependency.status !== "shipped")
+    return (
+      !dependency ||
+      (dependency.status !== "verify" && dependency.status !== "shipped")
+    )
   })
 }

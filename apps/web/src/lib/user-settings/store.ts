@@ -42,7 +42,12 @@ interface Row {
 
 async function readRow(
   client: Client,
-  input: { userId: string; scopeKind: SettingScopeKind; scopeId: string; key: string },
+  input: {
+    userId: string
+    scopeKind: SettingScopeKind
+    scopeId: string
+    key: string
+  },
 ): Promise<Row | null> {
   const result = await client.execute({
     sql: `SELECT value, revision, updated_at FROM user_settings
@@ -60,7 +65,12 @@ async function readRow(
 
 export async function getUserSettingRecord(
   client: Client,
-  input: { userId: string; scopeKind: SettingScopeKind; scopeId: string; key: SettingKey },
+  input: {
+    userId: string
+    scopeKind: SettingScopeKind
+    scopeId: string
+    key: SettingKey
+  },
 ): Promise<UserSettingRecord | null> {
   const row = await readRow(client, input)
   if (!row) return null
@@ -307,7 +317,11 @@ export async function resolveUserSetting<K extends SettingKey>(
 
   const hit = await resolveFromTiers(client, key, input.userId, tiers)
   if (hit) {
-    return { value: hit.record.value, source: hit.source, revision: hit.record.revision }
+    return {
+      value: hit.record.value,
+      source: hit.source,
+      revision: hit.record.revision,
+    }
   }
   return { value: definition.defaultValue, source: "default", revision: null }
 }
@@ -370,7 +384,10 @@ export async function setUserSetting(
     }
   }
 
-  if (input.expectedRevision === undefined || input.expectedRevision !== existing.revision) {
+  if (
+    input.expectedRevision === undefined ||
+    input.expectedRevision !== existing.revision
+  ) {
     throw new SettingRevisionConflictError(input.key)
   }
 

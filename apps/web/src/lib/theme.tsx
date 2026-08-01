@@ -212,7 +212,10 @@ interface ModeSnapshot {
 
 let currentMode: ThemeMode = DEFAULT_MODE
 let currentResolved: ResolvedMode = DEFAULT_RESOLVED_MODE
-let modeSnapshot: ModeSnapshot = { mode: currentMode, resolvedMode: currentResolved }
+let modeSnapshot: ModeSnapshot = {
+  mode: currentMode,
+  resolvedMode: currentResolved,
+}
 const SERVER_MODE_SNAPSHOT: ModeSnapshot = {
   mode: DEFAULT_MODE,
   resolvedMode: DEFAULT_RESOLVED_MODE,

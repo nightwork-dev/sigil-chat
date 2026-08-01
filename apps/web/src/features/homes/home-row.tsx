@@ -109,7 +109,10 @@ export function HomeRow({
   const className = cn(
     "flex w-full items-center gap-2.5 rounded-md border border-transparent text-left transition-colors",
     compact ? "min-h-11 px-2 py-1.5" : "px-3 py-2",
-    indent && (compact ? "ml-6 border-l border-border/60 pl-2" : "ml-8 border-l border-border/60 pl-3"),
+    indent &&
+      (compact
+        ? "ml-6 border-l border-border/60 pl-2"
+        : "ml-8 border-l border-border/60 pl-3"),
     href || nativeHref
       ? "hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       : "cursor-default",
@@ -147,11 +150,7 @@ export function HomeRow({
     )
   }
   return (
-    <div
-      data-testid={testId}
-      role="listitem"
-      className={className}
-    >
+    <div data-testid={testId} role="listitem" className={className}>
       {body}
     </div>
   )

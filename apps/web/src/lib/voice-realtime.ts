@@ -15,7 +15,10 @@
 
 import { createServerFn } from "@tanstack/react-start"
 
-import { createCaptureLifecycle, type MediaTrackLike } from "./capture-lifecycle"
+import {
+  createCaptureLifecycle,
+  type MediaTrackLike,
+} from "./capture-lifecycle"
 
 /** The data channel OpenAI's realtime API expects on a WebRTC call. */
 export const REALTIME_EVENT_CHANNEL = "oai-events"

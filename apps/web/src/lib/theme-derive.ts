@@ -90,15 +90,39 @@ function hslToHex(h: number, s: number, l: number): string {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
   const m = l - c / 2
 
-  let r = 0, g = 0, b = 0
-  if (h < 60) { r = c; g = x; b = 0 }
-  else if (h < 120) { r = x; g = c; b = 0 }
-  else if (h < 180) { r = 0; g = c; b = x }
-  else if (h < 240) { r = 0; g = x; b = c }
-  else if (h < 300) { r = x; g = 0; b = c }
-  else { r = c; g = 0; b = x }
+  let r = 0,
+    g = 0,
+    b = 0
+  if (h < 60) {
+    r = c
+    g = x
+    b = 0
+  } else if (h < 120) {
+    r = x
+    g = c
+    b = 0
+  } else if (h < 180) {
+    r = 0
+    g = c
+    b = x
+  } else if (h < 240) {
+    r = 0
+    g = x
+    b = c
+  } else if (h < 300) {
+    r = x
+    g = 0
+    b = c
+  } else {
+    r = c
+    g = 0
+    b = x
+  }
 
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0")
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, "0")
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
@@ -139,7 +163,13 @@ export function wcagRating(ratio: number): "AAA" | "AA" | "fail" {
  * text/fill threshold (4.5:1) against `bg`, so a light-mode signal is provably
  * legible on paper. Floors at l=0.12 to avoid muddy near-black.
  */
-function darkenToContrast(h: number, s: number, bg: string, startL: number, target = 4.5): string {
+function darkenToContrast(
+  h: number,
+  s: number,
+  bg: string,
+  startL: number,
+  target = 4.5,
+): string {
   let l = startL
   for (let i = 0; i < 48; i++) {
     const c = hslToHex(h, s, l)
@@ -172,11 +202,18 @@ function radiusStack(radius: number) {
 // preset hex values — see theme-derive.test.ts.
 
 function deriveDark(params: VariantParams): DerivedTokens {
-  const { surfaceHue, surfaceTemp, signalHue, signalChroma, textWarmth, destructiveHue } = params
+  const {
+    surfaceHue,
+    surfaceTemp,
+    signalHue,
+    signalChroma,
+    textWarmth,
+    destructiveHue,
+  } = params
 
   // Surface saturation based on temperature — high enough that a surfaceHue
   // rotation is visibly perceptible even at near-black lightness.
-  const baseSat = lerp(0.30, 0.70, surfaceTemp)
+  const baseSat = lerp(0.3, 0.7, surfaceTemp)
 
   // Surface stack: void → ground → surface → raised → elevated
   const void_ = hsl(surfaceHue, baseSat, 0.06)
@@ -188,7 +225,7 @@ function deriveDark(params: VariantParams): DerivedTokens {
   // Text stack: warm cream to cool silver based on textWarmth
   const textHue = lerp(220, 35, textWarmth)
   const textSat = lerp(0.04, 0.12, textWarmth)
-  const text = hsl(textHue, textSat, 0.90)
+  const text = hsl(textHue, textSat, 0.9)
   const textMuted = hsl(textHue, textSat * 0.6, 0.52)
 
   // Signal (primary)
@@ -201,12 +238,13 @@ function deriveDark(params: VariantParams): DerivedTokens {
   const chart1 = signal
   const chart2 = hsl(signalHue - 12, signalChroma * 0.8, 0.48)
   const chart3 = hsl(signalHue + 8, signalChroma * 0.7, 0.65)
-  const chart4 = hsl(signalHue - 20, signalChroma * 0.6, 0.40)
+  const chart4 = hsl(signalHue - 20, signalChroma * 0.6, 0.4)
   const chart5 = hsl(signalHue - 28, signalChroma * 0.5, 0.32)
 
   // Grain opacity — lighter backgrounds need less noise
   const bgLightness = 0.04
-  const grainOpacity = lerp(0.020, 0.030, surfaceTemp) * (bgLightness < 0.05 ? 1 : 0.85)
+  const grainOpacity =
+    lerp(0.02, 0.03, surfaceTemp) * (bgLightness < 0.05 ? 1 : 0.85)
 
   // Status — recognizable hues, mid lightness on near-black. Destructive is
   // parameterized; success/warning/info are stable recognizable signals.
@@ -252,7 +290,8 @@ function deriveDark(params: VariantParams): DerivedTokens {
 // anything). The signal itself still keys off signalHue, unchanged.
 
 function deriveLight(params: VariantParams): DerivedTokens {
-  const { surfaceHue, surfaceTemp, signalHue, signalChroma, destructiveHue } = params
+  const { surfaceHue, surfaceTemp, signalHue, signalChroma, destructiveHue } =
+    params
 
   // Paper tint = the SURFACE hue at low saturation. Surfaces invert the dark
   // ladder: paper (bg) mid, cards a step LIGHTER (near-white), chips a step
@@ -260,7 +299,7 @@ function deriveLight(params: VariantParams): DerivedTokens {
   const ph = surfaceHue
   const sBase = lerp(0.14, 0.42, surfaceTemp)
 
-  const paper = hsl(ph, sBase, 0.90)
+  const paper = hsl(ph, sBase, 0.9)
   const raised = hsl(ph, sBase * 1.4, 0.955) // card / popover — near-white
   const chip = hsl(ph, sBase * 0.88, 0.855) // secondary / accent — filled
   const between = hsl(ph, sBase * 0.95, 0.878) // muted
@@ -268,19 +307,39 @@ function deriveLight(params: VariantParams): DerivedTokens {
   const seam = hsl(ph, sBase * 0.78, 0.79) // border / input
 
   // Ink flips light-on-dark → dark-on-light, tinted to the surface hue.
-  const ink = hsl(ph, 0.20, 0.11)
+  const ink = hsl(ph, 0.2, 0.11)
   const inkMuted = hsl(ph, 0.14, 0.39)
 
   // Signal darkens/saturates until it clears AA as fill/text on paper.
   const sigSat = Math.min(1, signalChroma * 1.15 + 0.08)
-  const signal = darkenToContrast(signalHue, sigSat, paper, 0.30)
+  const signal = darkenToContrast(signalHue, sigSat, paper, 0.3)
 
   // Charts — a legible-on-light ramp radiating from the signal hue.
   const chart1 = signal
-  const chart2 = darkenToContrast(signalHue - 12, signalChroma * 0.85, paper, 0.43)
-  const chart3 = darkenToContrast(signalHue + 6, signalChroma * 0.65, paper, 0.33)
-  const chart4 = darkenToContrast(signalHue + 2, signalChroma * 0.62, paper, 0.50)
-  const chart5 = darkenToContrast(signalHue - 6, signalChroma * 0.45, paper, 0.26)
+  const chart2 = darkenToContrast(
+    signalHue - 12,
+    signalChroma * 0.85,
+    paper,
+    0.43,
+  )
+  const chart3 = darkenToContrast(
+    signalHue + 6,
+    signalChroma * 0.65,
+    paper,
+    0.33,
+  )
+  const chart4 = darkenToContrast(
+    signalHue + 2,
+    signalChroma * 0.62,
+    paper,
+    0.5,
+  )
+  const chart5 = darkenToContrast(
+    signalHue - 6,
+    signalChroma * 0.45,
+    paper,
+    0.26,
+  )
 
   // Status re-tuned for paper (deeper, still recognizable).
   const destructive = darkenToContrast(destructiveHue, 0.62, paper, 0.46)
@@ -320,7 +379,10 @@ function deriveLight(params: VariantParams): DerivedTokens {
   }
 }
 
-export function derive(params: VariantParams, mode: Mode = "dark"): DerivedTokens {
+export function derive(
+  params: VariantParams,
+  mode: Mode = "dark",
+): DerivedTokens {
   return mode === "light" ? deriveLight(params) : deriveDark(params)
 }
 
@@ -381,17 +443,48 @@ export function applyDerivedTokens(tokens: DerivedTokens): void {
 }
 
 const OVERRIDE_PROPS = [
-  "--color-background", "--color-foreground", "--color-card", "--color-card-foreground",
-  "--color-popover", "--color-popover-foreground", "--color-primary", "--color-primary-foreground",
-  "--color-secondary", "--color-secondary-foreground", "--color-muted", "--color-muted-foreground",
-  "--color-accent", "--color-accent-foreground", "--color-destructive", "--color-destructive-foreground",
-  "--color-success", "--color-success-foreground", "--color-warning", "--color-warning-foreground",
-  "--color-info", "--color-info-foreground", "--color-border", "--color-input", "--color-ring",
-  "--color-sidebar", "--color-sidebar-foreground", "--color-sidebar-primary",
-  "--color-sidebar-primary-foreground", "--color-sidebar-border", "--color-sidebar-accent",
-  "--color-sidebar-accent-foreground", "--color-sidebar-ring",
-  "--color-chart-1", "--color-chart-2", "--color-chart-3", "--color-chart-4", "--color-chart-5",
-  "--radius-sm", "--radius-md", "--radius-lg", "--radius-xl",
+  "--color-background",
+  "--color-foreground",
+  "--color-card",
+  "--color-card-foreground",
+  "--color-popover",
+  "--color-popover-foreground",
+  "--color-primary",
+  "--color-primary-foreground",
+  "--color-secondary",
+  "--color-secondary-foreground",
+  "--color-muted",
+  "--color-muted-foreground",
+  "--color-accent",
+  "--color-accent-foreground",
+  "--color-destructive",
+  "--color-destructive-foreground",
+  "--color-success",
+  "--color-success-foreground",
+  "--color-warning",
+  "--color-warning-foreground",
+  "--color-info",
+  "--color-info-foreground",
+  "--color-border",
+  "--color-input",
+  "--color-ring",
+  "--color-sidebar",
+  "--color-sidebar-foreground",
+  "--color-sidebar-primary",
+  "--color-sidebar-primary-foreground",
+  "--color-sidebar-border",
+  "--color-sidebar-accent",
+  "--color-sidebar-accent-foreground",
+  "--color-sidebar-ring",
+  "--color-chart-1",
+  "--color-chart-2",
+  "--color-chart-3",
+  "--color-chart-4",
+  "--color-chart-5",
+  "--radius-sm",
+  "--radius-md",
+  "--radius-lg",
+  "--radius-xl",
   "--grain-opacity",
 ]
 
@@ -410,7 +503,12 @@ export function clearDerivedTokens(): void {
  * contrast — display tokens intentionally inherit the dark block (a lit
  * instrument screen stays dark in any room), matching the hand-tuned recipe.
  */
-export function exportBlock(name: string, tokens: DerivedTokens, mode: Mode, signalHue?: number): string {
+export function exportBlock(
+  name: string,
+  tokens: DerivedTokens,
+  mode: Mode,
+  signalHue?: number,
+): string {
   const selector = mode === "light" ? `.theme-${name}.light` : `.theme-${name}`
   const lines: string[] = [`${selector} {`]
   const push = (k: string, v: string | number) => lines.push(`  ${k}: ${v};`)
@@ -484,8 +582,18 @@ function hslToRgba(h: number, s: number, l: number, a: number): string {
 
 /** Export both mode blocks as a copy/paste CSS string. */
 export function exportAsCSS(name: string, params: VariantParams): string {
-  const dark = exportBlock(name, derive(params, "dark"), "dark", params.signalHue)
-  const light = exportBlock(name, derive(params, "light"), "light", params.signalHue)
+  const dark = exportBlock(
+    name,
+    derive(params, "dark"),
+    "dark",
+    params.signalHue,
+  )
+  const light = exportBlock(
+    name,
+    derive(params, "light"),
+    "light",
+    params.signalHue,
+  )
   return `${dark}\n\n${light}`
 }
 
@@ -494,11 +602,67 @@ export function exportAsCSS(name: string, params: VariantParams): string {
 /** Preset params for the named themes. radius/destructiveHue are the shared
  *  defaults (the 7 built-ins inherit :root radius + the canonical red). */
 export const PRESETS: Record<string, VariantParams> = {
-  amber:       { surfaceHue: 270, surfaceTemp: 0.80, signalHue: 40,  signalChroma: 0.65, textWarmth: 0.70, radius: 8, destructiveHue: 358 },
-  copper:      { surfaceHue: 340, surfaceTemp: 0.85, signalHue: 25,  signalChroma: 0.60, textWarmth: 0.75, radius: 8, destructiveHue: 358 },
-  midnight:    { surfaceHue: 220, surfaceTemp: 0.20, signalHue: 195, signalChroma: 0.55, textWarmth: 0.20, radius: 8, destructiveHue: 358 },
-  "rose-gold": { surfaceHue: 280, surfaceTemp: 0.75, signalHue: 15,  signalChroma: 0.45, textWarmth: 0.60, radius: 8, destructiveHue: 358 },
-  jade:        { surfaceHue: 220, surfaceTemp: 0.25, signalHue: 155, signalChroma: 0.50, textWarmth: 0.35, radius: 8, destructiveHue: 358 },
-  bone:        { surfaceHue: 30,  surfaceTemp: 0.90, signalHue: 42,  signalChroma: 0.35, textWarmth: 0.80, radius: 8, destructiveHue: 358 },
-  ultraviolet: { surfaceHue: 275, surfaceTemp: 0.80, signalHue: 45,  signalChroma: 0.70, textWarmth: 0.55, radius: 8, destructiveHue: 358 },
+  amber: {
+    surfaceHue: 270,
+    surfaceTemp: 0.8,
+    signalHue: 40,
+    signalChroma: 0.65,
+    textWarmth: 0.7,
+    radius: 8,
+    destructiveHue: 358,
+  },
+  copper: {
+    surfaceHue: 340,
+    surfaceTemp: 0.85,
+    signalHue: 25,
+    signalChroma: 0.6,
+    textWarmth: 0.75,
+    radius: 8,
+    destructiveHue: 358,
+  },
+  midnight: {
+    surfaceHue: 220,
+    surfaceTemp: 0.2,
+    signalHue: 195,
+    signalChroma: 0.55,
+    textWarmth: 0.2,
+    radius: 8,
+    destructiveHue: 358,
+  },
+  "rose-gold": {
+    surfaceHue: 280,
+    surfaceTemp: 0.75,
+    signalHue: 15,
+    signalChroma: 0.45,
+    textWarmth: 0.6,
+    radius: 8,
+    destructiveHue: 358,
+  },
+  jade: {
+    surfaceHue: 220,
+    surfaceTemp: 0.25,
+    signalHue: 155,
+    signalChroma: 0.5,
+    textWarmth: 0.35,
+    radius: 8,
+    destructiveHue: 358,
+  },
+  bone: {
+    surfaceHue: 30,
+    surfaceTemp: 0.9,
+    signalHue: 42,
+    signalChroma: 0.35,
+    textWarmth: 0.8,
+    radius: 8,
+    destructiveHue: 358,
+  },
+  ultraviolet: {
+    surfaceHue: 275,
+    surfaceTemp: 0.8,
+    signalHue: 45,
+    signalChroma: 0.7,
+    textWarmth: 0.55,
+    radius: 8,
+    destructiveHue: 358,
+  },
 }

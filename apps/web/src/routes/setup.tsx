@@ -10,7 +10,13 @@ import { useState, type FormEvent } from "react"
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router"
 
 import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@workspace/ui/components/card"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Alert, AlertDescription } from "@workspace/ui/components/alert"
@@ -79,7 +85,11 @@ function SetupPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={handleSubmit}
+            noValidate
+          >
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>
               <Input

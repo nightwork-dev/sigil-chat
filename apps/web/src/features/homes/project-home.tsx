@@ -191,11 +191,7 @@ export function ProjectHome({ state, compact }: ProjectHomeProps) {
         }
         compact={compact}
       >
-        <HomeResources
-          resources={view.resources}
-          compact={compact}
-          showKind
-        />
+        <HomeResources resources={view.resources} compact={compact} showKind />
       </HomeSection>
 
       <HomeSection

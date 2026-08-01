@@ -93,7 +93,9 @@ export interface DiscoveredModelRecord {
   contextWindowTokens?: number
 }
 
-function isDiscoveredModelRecord(value: unknown): value is DiscoveredModelRecord {
+function isDiscoveredModelRecord(
+  value: unknown,
+): value is DiscoveredModelRecord {
   if (typeof value !== "object" || value === null) return false
   const entry = value as Record<string, unknown>
   if (typeof entry.id !== "string" || !DISCOVERED_MODEL_ID.test(entry.id)) {
@@ -139,7 +141,9 @@ function isDiscoveredModelRecord(value: unknown): value is DiscoveredModelRecord
   return Object.keys(entry).every((key) => allowedKeys.has(key))
 }
 
-function isDiscoveredModelList(value: unknown): value is DiscoveredModelRecord[] {
+function isDiscoveredModelList(
+  value: unknown,
+): value is DiscoveredModelRecord[] {
   return (
     Array.isArray(value) &&
     value.length <= MAX_DISCOVERED_MODELS &&
@@ -174,7 +178,9 @@ const MAX_FEATURE_FLAG_ID_LENGTH = 128
  * `isFeatureFlagEnabled` in ../feature-flags.ts treats an undeclared id as
  * default-off regardless of what a stored override map says about it.
  */
-function isFeatureFlagOverrideMap(value: unknown): value is Record<string, boolean> {
+function isFeatureFlagOverrideMap(
+  value: unknown,
+): value is Record<string, boolean> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false
   }
@@ -212,7 +218,9 @@ export const INSTALLATION_SETTINGS_REGISTRY = {
   // Per-flag overrides away from each flag's authored default (FLAG.1). An
   // empty map is the correct bootstrap state: every declared flag reads its
   // own registered default until an owner overrides it.
-  [FEATURE_FLAG_OVERRIDES_KEY]: defineInstallationSetting<Record<string, boolean>>({
+  [FEATURE_FLAG_OVERRIDES_KEY]: defineInstallationSetting<
+    Record<string, boolean>
+  >({
     key: FEATURE_FLAG_OVERRIDES_KEY,
     defaultValue: {},
     isValid: isFeatureFlagOverrideMap,
@@ -240,7 +248,7 @@ export function isKnownInstallationSettingKey(
 export function getInstallationSettingDefinition<
   K extends InstallationSettingKey,
 >(key: K): InstallationSettingDefinition<InstallationSettingValue<K>> {
-  return INSTALLATION_SETTINGS_REGISTRY[
-    key
-  ] as InstallationSettingDefinition<InstallationSettingValue<K>>
+  return INSTALLATION_SETTINGS_REGISTRY[key] as InstallationSettingDefinition<
+    InstallationSettingValue<K>
+  >
 }

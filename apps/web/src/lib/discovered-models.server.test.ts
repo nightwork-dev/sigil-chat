@@ -31,7 +31,10 @@ function realKv(): KvStore<unknown> {
     sessionHome: join(root, "test-session"),
   })
   const projectHome = scope.home("project")
-  if (!projectHome || !realpathSync(projectHome).startsWith(realpathSync(root))) {
+  if (
+    !projectHome ||
+    !realpathSync(projectHome).startsWith(realpathSync(root))
+  ) {
     throw new Error("test scope escaped its tmpdir — project tier unresolved")
   }
   return createStoreProvider(scope, {

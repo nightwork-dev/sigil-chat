@@ -440,10 +440,10 @@ function ArtifactIcon({ artifact }: { artifact: ArtifactRecord }) {
         : artifact.mediaType.startsWith("audio/")
           ? AudioLinesIcon
           : artifact.mediaType.includes("json")
-          ? FileJsonIcon
-          : artifact.mediaType.startsWith("text/")
-            ? FileTextIcon
-            : FileIcon
+            ? FileJsonIcon
+            : artifact.mediaType.startsWith("text/")
+              ? FileTextIcon
+              : FileIcon
   return <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 }
 

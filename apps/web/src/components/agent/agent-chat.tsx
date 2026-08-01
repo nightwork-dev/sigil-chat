@@ -449,7 +449,9 @@ function ApprovalChip({
 function ModelLabel({ bound }: { bound?: BoundAgentModel }) {
   const catalog = useAgentRuntimeCatalog()
   const name = catalog.data?.agent.name ?? "Eve"
-  const model = bound ? `${bound.provider}/${bound.modelId}` : catalog.data?.agent.model
+  const model = bound
+    ? `${bound.provider}/${bound.modelId}`
+    : catalog.data?.agent.model
   return (
     <span className="hidden shrink-0 truncate px-1.5 font-mono text-[10px] text-muted-foreground sm:inline">
       {name}

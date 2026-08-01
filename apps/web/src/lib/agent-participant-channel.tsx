@@ -194,7 +194,8 @@ export function AgentParticipantChannelProvider({
 
   const value = useMemo<AgentParticipantChannelValue | null>(() => {
     if (!channel || !runtime) return null
-    const coordinatorParticipantId = agentParticipantOwnerParticipantId(principalId)
+    const coordinatorParticipantId =
+      agentParticipantOwnerParticipantId(principalId)
     return {
       channel,
       events,
@@ -305,7 +306,9 @@ export function participantBindingRequest(input: {
   readonly targetThreadId: string
 }): AgentParticipantSessionBindingRequest {
   return {
-    participantThreadIds: normalizeParticipantThreadIds(input.participantThreadIds),
+    participantThreadIds: normalizeParticipantThreadIds(
+      input.participantThreadIds,
+    ),
     targetThreadId: input.targetThreadId,
   }
 }

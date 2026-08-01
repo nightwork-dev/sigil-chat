@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest"
 
 import { buildRoadmapCanvas, buildRoadmapGraph } from "./roadmap-graph"
 import type { RoadmapGraphStory } from "./roadmap-graph"
-import { HANDLE, layoutCanvas, routeEdges, STORY_WIDTH } from "./roadmap-graph-layout"
+import {
+  HANDLE,
+  layoutCanvas,
+  routeEdges,
+  STORY_WIDTH,
+} from "./roadmap-graph-layout"
 
 function story(
   id: string,
@@ -70,7 +75,10 @@ describe("swimlane geometry", () => {
 
   it("puts a gated lane to the right of the lane gating it", () => {
     const { placement } = place(
-      [story("A1", { epicId: "a" }), story("B1", { epicId: "b", deps: ["A1"] })],
+      [
+        story("A1", { epicId: "a" }),
+        story("B1", { epicId: "b", deps: ["A1"] }),
+      ],
       [],
     )
 
@@ -81,7 +89,10 @@ describe("swimlane geometry", () => {
 
   it("widens a gutter that more edges have to cross", () => {
     const thin = place(
-      [story("A1", { epicId: "a" }), story("B1", { epicId: "b", deps: ["A1"] })],
+      [
+        story("A1", { epicId: "a" }),
+        story("B1", { epicId: "b", deps: ["A1"] }),
+      ],
       ["a", "b"],
     )
     const thick = place(
@@ -121,7 +132,10 @@ describe("edge routing", () => {
 
   it("sends a cross-lane edge out the right and into the left", () => {
     const edges = routed(
-      [story("A1", { epicId: "a" }), story("B1", { epicId: "b", deps: ["A1"] })],
+      [
+        story("A1", { epicId: "a" }),
+        story("B1", { epicId: "b", deps: ["A1"] }),
+      ],
       ["a", "b"],
     )
     const edge = edges.get("A1->B1")
@@ -131,10 +145,7 @@ describe("edge routing", () => {
   })
 
   it("drops a short hop straight down between neighbours in a lane", () => {
-    const edges = routed(
-      [story("A1"), story("A2", { deps: ["A1"] })],
-      ["a"],
-    )
+    const edges = routed([story("A1"), story("A2", { deps: ["A1"] })], ["a"])
     const edge = edges.get("A1->A2")
 
     expect(edge?.sourceHandle).toBe(HANDLE.bottom)
@@ -145,7 +156,11 @@ describe("edge routing", () => {
     // A1 gates both A2 and A3, which sit side by side. A3 is not in A1's
     // column, so a straight drop would cut across A2.
     const edges = routed(
-      [story("A1"), story("A2", { deps: ["A1"] }), story("A3", { deps: ["A1"] })],
+      [
+        story("A1"),
+        story("A2", { deps: ["A1"] }),
+        story("A3", { deps: ["A1"] }),
+      ],
       ["a"],
     )
 

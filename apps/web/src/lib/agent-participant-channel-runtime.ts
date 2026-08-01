@@ -14,10 +14,7 @@ import {
   isAgentParticipantInterruptionRequestForTarget,
   isAgentSessionChannel,
 } from "@workspace/agent-contracts/participant-channel"
-import type {
-  AgentSendInput,
-  AgentTurnResult,
-} from "@zigil/agent/contracts"
+import type { AgentSendInput, AgentTurnResult } from "@zigil/agent/contracts"
 
 export interface ParticipantCancelResult {
   readonly outcome?: "accepted" | "no-active-turn"
@@ -83,7 +80,9 @@ export interface ParticipantChannelRuntime {
   participantState(
     participantId: string,
   ): AgentChannelPersonaSessionParticipant["state"] | undefined
-  record(input: ParticipantProvenanceRecordInput): AgentParticipantProvenanceEnvelope
+  record(
+    input: ParticipantProvenanceRecordInput,
+  ): AgentParticipantProvenanceEnvelope
   sentCount(participantId: string): number
 }
 

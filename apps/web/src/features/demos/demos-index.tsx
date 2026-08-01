@@ -52,11 +52,7 @@ const demos: readonly DemoEntry[] = [
   },
 ]
 
-export function DemosIndex({
-  flags,
-}: {
-  flags: readonly FeatureFlagState[]
-}) {
+export function DemosIndex({ flags }: { flags: readonly FeatureFlagState[] }) {
   // A card whose flag is declared and explicitly off is hidden. A card whose
   // flag is undeclared, or whose id didn't come back in this response, stays
   // visible — this list only ever HIDES on a positive "off", never on a

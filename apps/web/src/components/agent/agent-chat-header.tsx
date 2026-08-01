@@ -99,8 +99,7 @@ export function AgentChatHeader({
     (thread) => thread.id === threadControls?.activeThreadId,
   )
   let activeContainers:
-    | { workspaceId: string | undefined; projectId: string }
-    | undefined
+    { workspaceId: string | undefined; projectId: string } | undefined
   if (activeThreadSummary && projectNav.data) {
     const nav = projectNav.data
     const projectId = deriveThreadProjectId(

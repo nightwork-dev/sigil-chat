@@ -29,7 +29,11 @@ export function setAgentHudDock(dock: AgentHudDock): void {
 }
 
 export function useAgentHudDock(): AgentHudDock {
-  return useSyncExternalStore(subscribeAgentHudDock, getAgentHudDock, () => null)
+  return useSyncExternalStore(
+    subscribeAgentHudDock,
+    getAgentHudDock,
+    () => null,
+  )
 }
 
 export function subscribeAgentHudDock(listener: () => void): () => void {

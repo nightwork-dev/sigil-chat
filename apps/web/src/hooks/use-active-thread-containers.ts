@@ -11,8 +11,7 @@ import { useProjectWorkspaceNav } from "@/lib/project-workspace-nav"
  *  menu's "Session note" entry and any other container-aware surface share
  *  one resolution, not a copy each. */
 export function useActiveThreadContainers():
-  | { workspaceId: string | undefined; projectId: string }
-  | undefined {
+  { workspaceId: string | undefined; projectId: string } | undefined {
   const threadControls = useAgentThreadControls()
   const activeThreads = useAgentThreads()
   const projectNav = useProjectWorkspaceNav()

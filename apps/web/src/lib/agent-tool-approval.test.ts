@@ -28,9 +28,9 @@ describe("tool approval preference header", () => {
 
 describe("per-agent overrides (MA.4)", () => {
   it("migrates a legacy flat map into the account-wide layer", () => {
-    expect(
-      normalizePerAgentOverrides({ "sigil-read-file": "always" }),
-    ).toEqual({ "*": { "sigil-read-file": "always" } })
+    expect(normalizePerAgentOverrides({ "sigil-read-file": "always" })).toEqual(
+      { "*": { "sigil-read-file": "always" } },
+    )
   })
 
   it("resolves identically after migration — flat and migrated agree", () => {

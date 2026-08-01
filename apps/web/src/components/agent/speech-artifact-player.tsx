@@ -20,8 +20,7 @@ interface SynthesizedSpeechOutput {
  */
 export function SynthesizedSpeechRenderer(props: ToolRendererProps) {
   const output = getToolOutputData(props.part) as
-    | SynthesizedSpeechOutput
-    | undefined
+    SynthesizedSpeechOutput | undefined
   if (!output?.url) return <ToolCall {...props} />
   return (
     <figure className="my-1 flex max-w-md flex-col gap-1.5">

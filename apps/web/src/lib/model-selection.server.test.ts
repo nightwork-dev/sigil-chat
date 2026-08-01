@@ -120,7 +120,11 @@ describe("a newly discovered model, end to end", () => {
 
   it("refuses to resolve a discovered model on an installation that enabled nothing", () => {
     expect(
-      resolveSelectableModelPreset("deepseek/reasoner", [], [DEEPSEEK_REASONER]),
+      resolveSelectableModelPreset(
+        "deepseek/reasoner",
+        [],
+        [DEEPSEEK_REASONER],
+      ),
     ).toBeUndefined()
   })
 
@@ -150,9 +154,11 @@ describe("a newly discovered model, end to end", () => {
 
   it("refuses an id discovery never cached at all — no hand-crafted request can invent one", () => {
     expect(
-      resolveSelectableModelPreset("deepseek/nonexistent", ["deepseek/nonexistent"], [
-        DEEPSEEK_REASONER,
-      ]),
+      resolveSelectableModelPreset(
+        "deepseek/nonexistent",
+        ["deepseek/nonexistent"],
+        [DEEPSEEK_REASONER],
+      ),
     ).toBeUndefined()
   })
 })

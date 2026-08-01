@@ -139,7 +139,11 @@ describe("resolveUserSetting", () => {
     const resolved = await resolveUserSetting(client, "appearance.mode", {
       userId: "user-1",
     })
-    expect(resolved).toEqual({ value: "system", source: "default", revision: null })
+    expect(resolved).toEqual({
+      value: "system",
+      source: "default",
+      revision: null,
+    })
   })
 
   it("gates resolution to only the tiers the registry allows for that key", async () => {
@@ -164,7 +168,11 @@ describe("resolveUserSetting", () => {
       workspaceId: "ws-1",
       channelId: "ch-1",
     })
-    expect(resolved).toEqual({ value: "user-value", source: "user", revision: 1 })
+    expect(resolved).toEqual({
+      value: "user-value",
+      source: "user",
+      revision: 1,
+    })
   })
 })
 
@@ -182,33 +190,49 @@ describe("resolveFromTiers", () => {
       })
     }
 
-    const allThree = await resolveFromTiers(client, "workspace.panelState", "user-1", [
-      { kind: "channel", id: "ch-1" },
-      { kind: "workspace", id: "ws-1" },
-      { kind: "user", id: "" },
-    ])
+    const allThree = await resolveFromTiers(
+      client,
+      "workspace.panelState",
+      "user-1",
+      [
+        { kind: "channel", id: "ch-1" },
+        { kind: "workspace", id: "ws-1" },
+        { kind: "user", id: "" },
+      ],
+    )
     expect(allThree?.source).toBe("channel")
     expect(allThree?.record.value).toBe("channel-value")
 
     // Drop the channel tier from the candidate list — workspace should win.
-    const withoutChannel = await resolveFromTiers(client, "workspace.panelState", "user-1", [
-      { kind: "workspace", id: "ws-1" },
-      { kind: "user", id: "" },
-    ])
+    const withoutChannel = await resolveFromTiers(
+      client,
+      "workspace.panelState",
+      "user-1",
+      [
+        { kind: "workspace", id: "ws-1" },
+        { kind: "user", id: "" },
+      ],
+    )
     expect(withoutChannel?.source).toBe("workspace")
     expect(withoutChannel?.record.value).toBe("workspace-value")
 
     // Drop workspace too — user should win.
-    const userOnly = await resolveFromTiers(client, "workspace.panelState", "user-1", [
-      { kind: "user", id: "" },
-    ])
+    const userOnly = await resolveFromTiers(
+      client,
+      "workspace.panelState",
+      "user-1",
+      [{ kind: "user", id: "" }],
+    )
     expect(userOnly?.source).toBe("user")
     expect(userOnly?.record.value).toBe("user-value")
 
     // No candidates written for → null, so the caller falls back to default.
-    const none = await resolveFromTiers(client, "workspace.panelState", "user-1", [
-      { kind: "channel", id: "ch-missing" },
-    ])
+    const none = await resolveFromTiers(
+      client,
+      "workspace.panelState",
+      "user-1",
+      [{ kind: "channel", id: "ch-missing" }],
+    )
     expect(none).toBeNull()
   })
 })

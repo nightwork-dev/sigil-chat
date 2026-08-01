@@ -159,11 +159,10 @@ export const fetchModelEndpoints = createServerFn({ method: "GET" }).handler(
 
 export const probeModelEndpoint = createServerFn({ method: "POST" })
   .validator(parseProbeInput)
-  .handler(
-    async ({ data }): Promise<ModelEndpointProbeResult> =>
-      (await import("./model-endpoints.server")).probeModelEndpointThroughEve(
-        data,
-      ),
+  .handler(async ({ data }): Promise<ModelEndpointProbeResult> =>
+    (await import("./model-endpoints.server")).probeModelEndpointThroughEve(
+      data,
+    ),
   )
 
 export const modelEndpointKeys = {
