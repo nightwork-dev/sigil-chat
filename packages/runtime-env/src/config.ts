@@ -11,6 +11,10 @@ import {
 import { createMemoryFixtureSource } from "@mirk/fixtures/memory";
 import { parse as parseYaml } from "yaml";
 
+import {
+  DEPLOYMENT_DEFAULT_PRESET_ID,
+  DEPLOYMENT_DEFAULT_PROVIDER_ID,
+} from "@workspace/runtime-env/constants";
 import { resolveSigilProjectRoot } from "@workspace/runtime-env/project-root";
 
 /** Transport kinds the resolver knows how to build. Not vendors. */
@@ -168,10 +172,9 @@ export interface NormalizedSigilAgentProvider {
   models: NormalizedSigilAgentModelPreset[];
 }
 
-/** Reserved id for the entry synthesized from `agent.model`. */
-export const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default";
-/** Reserved provider id for that synthesized entry. */
-export const DEPLOYMENT_DEFAULT_PROVIDER_ID = "deployment";
+// Defined in ./constants (client-safe, no Node imports) and re-exported here so
+// existing importers of this module keep resolving them from one definition.
+export { DEPLOYMENT_DEFAULT_PRESET_ID, DEPLOYMENT_DEFAULT_PROVIDER_ID };
 
 export interface SigilAgentConfig {
   model: SigilAgentModelConfig;

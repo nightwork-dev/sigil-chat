@@ -21,6 +21,7 @@ import {
   type UploadedFile,
 } from "@workspace/ui/hooks/use-attachments"
 import { imageMediaTypeFromUrl } from "@workspace/ui/lib/image-url"
+import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 import {
   Alert,
   AlertDescription,
@@ -472,12 +473,6 @@ function ModelLabel({ bound }: { bound?: BoundAgentModel }) {
  * the server's returned thread, so a change round-trips through the same
  * "resolved, not optimistic" path the model label already uses.
  */
-// Mirrors the reserved id from @workspace/runtime-env/config's
-// DEPLOYMENT_DEFAULT_PRESET_ID — not imported directly, same reasoning as
-// models-section.tsx's own local copy: that package is server-oriented and
-// this is client component code.
-const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default"
-
 function ReasoningControls({ thread }: { thread: AgentThread }) {
   const endpoints = useModelEndpoints()
   const setRequestOptions = useSetAgentThreadRequestOptions()

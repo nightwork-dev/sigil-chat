@@ -24,6 +24,7 @@
   },
   "exports": {
     "./config": "./src/config.ts",
+    "./constants": "./src/constants.ts",
     "./project-root": "./src/project-root.ts",
     "./topology": "./src/topology.ts",
     "./server": "./src/server.ts",

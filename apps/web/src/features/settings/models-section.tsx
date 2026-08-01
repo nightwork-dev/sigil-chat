@@ -38,6 +38,7 @@ import {
 } from "@workspace/ui/components/select"
 import { SectionHeader } from "@workspace/ui/components/section-header"
 import { Switch } from "@workspace/ui/components/switch"
+import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 
 import {
   providerFixtureSnippet,
@@ -56,8 +57,6 @@ import {
   useSetModelEnabled,
 } from "@/lib/model-enablement"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
-
-const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default"
 
 export function ModelsSection({ userId }: { userId: string }) {
   const endpoints = useModelEndpoints()
