@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,14 +16,24 @@ import { DISCOVERED_MODELS_KEY } from "./installation-settings/registry"
 import { InstallationSettingsStore } from "./installation-settings/store"
 import type { ModelProviderRecord } from "./model-endpoints"
 
+// A bare tmpdir carries no project marker, and an unresolved project tier
+// silently falls back to the REAL home directory — durable state shared
+// across every test run on the machine (David, 2026-07-31, 0e8ab4fd). The
+// marker keeps the tier inside this throwaway root; the assertion keeps the
+// fallback from ever coming back quietly.
 function realKv(): KvStore<unknown> {
   const root = mkdtempSync(join(tmpdir(), "sigil-discovered-models-server-"))
+  mkdirSync(join(root, ".agents"))
   const scope = new FsScopeStore({
     cwd: root,
     homeRoot: root,
     sessionId: "test-session",
     sessionHome: join(root, "test-session"),
   })
+  const projectHome = scope.home("project")
+  if (!projectHome || !realpathSync(projectHome).startsWith(realpathSync(root))) {
+    throw new Error("test scope escaped its tmpdir — project tier unresolved")
+  }
   return createStoreProvider(scope, {
     backendFactory: mirkBackendFactory(scope),
   }).kv("project", "sigil-chat.installation-settings.v1")
