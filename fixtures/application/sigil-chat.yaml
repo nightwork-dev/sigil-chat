@@ -12,9 +12,14 @@ agent:
   # session's immutable binding records, so renaming either slug retires the
   # old id (sessions bound to it fall back to the deployment default, loudly).
   #
-  # `enabled` (provider and model) and `capability` (chat/embedding/voice) are
-  # accepted and normalized but NOT yet enforced — shaped now so the allow-list
-  # and embedding work land without another reshape.
+  # Authoring a provider here does NOT make its models usable. A new chat may
+  # only run a model an owner has switched on in Settings -> Models; everything
+  # below therefore starts unavailable, and codex/sol in particular stays
+  # unreachable until David enables it. `enabled` (provider and model) is the
+  # author's veto over that: `false` means no owner can turn it on from the UI.
+  #
+  # `capability` (chat/embedding/voice) is accepted and normalized but not yet
+  # consumed — shaped now so the embedding work lands without another reshape.
   #
   # Base URLs below were verified to exist and require auth (HTTP 401 on
   # /models, 2026-07-31). Hosted `model` ids are the vendor's documented

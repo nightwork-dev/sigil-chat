@@ -31,7 +31,10 @@ export interface ModelEndpointRecord {
   label: string
   model: string
   capability: string
-  /** Shaped for the allow-list; nothing enforces it yet. */
+  /**
+   * The fixture author's verdict, not the installation's. Availability to new
+   * chats is this AND the owner's allow-list — see ./model-enablement.ts.
+   */
   enabled: boolean
   contextWindowTokens: number
   /** True for the entry Eve resolved at startup from the fixture's agent.model. */

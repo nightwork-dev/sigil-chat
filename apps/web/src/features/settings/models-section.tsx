@@ -12,8 +12,14 @@
 // configured" and "this is chosen".
 //
 // Shape is deliberately forward-compatible: fetched catalog models append to a
-// provider's `models` array, and a per-model enable toggle sits at the end of a
-// model row. Neither needs this layout rebuilt.
+// provider's `models` array. A discovered model arrives disabled like every
+// other, so the allow-list already covers it.
+//
+// The availability switches answer ONE question — may a NEW chat be started on
+// this? — at two grains: a model row, and the provider that bills for it. They
+// are not a health, credential, or reachability indicator; those are the text
+// lines above them, which say different things and are never recolored to
+// agree with a switch.
 
 import { useState } from "react"
 
@@ -31,6 +37,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { SectionHeader } from "@workspace/ui/components/section-header"
+import { Switch } from "@workspace/ui/components/switch"
 
 import {
   providerFixtureSnippet,
@@ -41,15 +48,24 @@ import {
   type ModelEndpointRecord,
   type ModelProviderRecord,
 } from "@/lib/model-endpoints"
+import {
+  isModelEnabledForNewSessions,
+  isModelEnablementLocked,
+  useEnabledModelIds,
+  useSetModelEnabled,
+} from "@/lib/model-enablement"
 import { useSetUserSetting, useUserSetting } from "@/lib/user-settings"
 
 const DEPLOYMENT_DEFAULT_PRESET_ID = "deployment-default"
 
 export function ModelsSection({ userId }: { userId: string }) {
   const endpoints = useModelEndpoints()
+  const enablement = useEnabledModelIds()
+  const setEnabled = useSetModelEnabled()
   const preferred = useUserSetting(userId, "agent.modelPresetId")
   const setPreferred = useSetUserSetting(userId, "agent.modelPresetId")
   const providers = endpoints.data?.providers ?? []
+  const enabledIds = enablement.data?.enabledIds ?? []
 
   // Switching model *mid-session* is the slice after this one, and this is
   // where its UI would live. Two constraints have to be visible at the moment
@@ -68,6 +84,25 @@ export function ModelsSection({ userId }: { userId: string }) {
     })
   }
 
+  const preferredId = preferred.data?.value ?? DEPLOYMENT_DEFAULT_PRESET_ID
+
+  /**
+   * Turning a model off, and releasing anyone still pointed at it.
+   *
+   * The create path REFUSES an unavailable model rather than quietly
+   * substituting one — that refusal is the whole rule. So an owner who
+   * switches off the model their own new chats are set to would break their
+   * own next chat. Releasing the preference in the same interaction is the
+   * honest fix: it happens because the owner acted, at the moment they acted,
+   * not silently at creation time.
+   */
+  function handleEnablementChange(presetIds: string[], enabled: boolean) {
+    if (!enabled && presetIds.includes(preferredId)) {
+      handlePreferredChange(DEPLOYMENT_DEFAULT_PRESET_ID)
+    }
+    setEnabled.mutate({ presetIds, enabled })
+  }
+
   return (
     <div className="flex max-w-2xl flex-col gap-6 p-4">
       <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
@@ -84,20 +119,53 @@ export function ModelsSection({ userId }: { userId: string }) {
           <>
             <NewChatModelPicker
               providers={providers}
-              value={preferred.data?.value ?? DEPLOYMENT_DEFAULT_PRESET_ID}
+              enabledIds={enabledIds}
+              value={preferredId}
               disabled={setPreferred.isPending}
               onChange={handlePreferredChange}
             />
+            {/* Catches what the reset-on-disable path above cannot: a model
+                retired in the fixture while it was still someone's choice.
+                New chats are refused until a different one is picked, so the
+                page has to say so rather than render an empty control. */}
+            {providers.length > 0 &&
+            !providers.some((provider) =>
+              provider.models.some(
+                (model) =>
+                  model.id === preferredId &&
+                  isModelEnabledForNewSessions(model, enabledIds),
+              ),
+            ) ? (
+              <p className="text-xs text-destructive">
+                New chats are set to{" "}
+                <span className="font-mono">{preferredId}</span>, which is no
+                longer available. Choose another to start chats again.
+              </p>
+            ) : null}
             <div className="divide-y divide-border">
               {providers.map((provider: ModelProviderRecord) => (
-                <ProviderBlock key={provider.id} provider={provider} />
+                <ProviderBlock
+                  key={provider.id}
+                  provider={provider}
+                  enabledIds={enabledIds}
+                  pending={setEnabled.isPending || enablement.isPending}
+                  onChange={handleEnablementChange}
+                />
               ))}
             </div>
+            {setEnabled.isError ? (
+              <p className="text-xs text-destructive">
+                {setEnabled.error instanceof Error
+                  ? setEnabled.error.message
+                  : "That change was refused."}
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               Providers come from <code className="font-mono">agent.providers</code>{" "}
-              in the application fixture. Credentials stay in the agent
-              runtime&apos;s environment — this page can see whether a variable
-              is set, never what it contains.
+              in the application fixture; a model becomes available to new chats
+              only when you turn it on here, and stays unavailable until you do.
+              Credentials stay in the agent runtime&apos;s environment — this
+              page can see whether a variable is set, never what it contains.
             </p>
           </>
         )}
@@ -115,15 +183,29 @@ export function ModelsSection({ userId }: { userId: string }) {
  */
 function NewChatModelPicker({
   providers,
+  enabledIds,
   value,
   disabled,
   onChange,
 }: {
   providers: readonly ModelProviderRecord[]
+  enabledIds: readonly string[]
   value: string
   disabled: boolean
   onChange: (next: string) => void
 }) {
+  // Only what a new chat can actually be created on. Offering an unavailable
+  // model would produce a control that appears to work and a chat that refuses
+  // to start — the server applies the same rule regardless of what is listed.
+  const selectable = providers
+    .map((provider) => ({
+      ...provider,
+      models: provider.models.filter((model) =>
+        isModelEnabledForNewSessions(model, enabledIds),
+      ),
+    }))
+    .filter((provider) => provider.models.length > 0)
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
@@ -143,7 +225,7 @@ function NewChatModelPicker({
             <SelectValue placeholder="Select a model" />
           </SelectTrigger>
           <SelectContent>
-            {providers.map((provider: ModelProviderRecord) => (
+            {selectable.map((provider: ModelProviderRecord) => (
               <SelectGroup key={provider.id}>
                 <SelectLabel>{provider.label}</SelectLabel>
                 {provider.models.map((model: ModelEndpointRecord) => (
@@ -164,52 +246,127 @@ function NewChatModelPicker({
   )
 }
 
-function ProviderBlock({ provider }: { provider: ModelProviderRecord }) {
+function ProviderBlock({
+  provider,
+  enabledIds,
+  pending,
+  onChange,
+}: {
+  provider: ModelProviderRecord
+  enabledIds: readonly string[]
+  pending: boolean
+  onChange: (presetIds: string[], enabled: boolean) => void
+}) {
+  // What an owner may actually turn on here: a model the fixture disabled is
+  // the author's call, and the deployment default is permanently available.
+  const toggleable = provider.models.filter(
+    (model) => model.enabled && !isModelEnablementLocked(model),
+  )
+  const allOn =
+    toggleable.length > 0 &&
+    toggleable.every((model) => enabledIds.includes(model.id))
+  const availableCount = provider.models.filter((model) =>
+    isModelEnabledForNewSessions(model, enabledIds),
+  ).length
+
   return (
     <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-      <div className="flex flex-col gap-0.5">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-xs font-medium text-foreground">
-            {provider.label}
-          </span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {provider.kind}
-          </span>
-        </div>
-        {provider.baseUrl ? (
-          <p className="truncate font-mono text-xs text-muted-foreground">
-            {provider.baseUrl}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-xs font-medium text-foreground">
+              {provider.label}
+            </span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {provider.kind}
+            </span>
+          </div>
+          {provider.baseUrl ? (
+            <p className="truncate font-mono text-xs text-muted-foreground">
+              {provider.baseUrl}
+            </p>
+          ) : null}
+          <CredentialLine credential={provider.credential} />
+          <p className="text-xs text-muted-foreground">
+            {availableCount} of {provider.models.length} available to new chats
           </p>
-        ) : null}
-        <CredentialLine credential={provider.credential} />
+        </div>
+        <Switch
+          size="sm"
+          className="mt-0.5 shrink-0"
+          aria-label={`Make every ${provider.label} model available to new chats`}
+          checked={toggleable.length === 0 ? availableCount > 0 : allOn}
+          disabled={pending || toggleable.length === 0}
+          onCheckedChange={(next) =>
+            onChange(
+              toggleable.map((model) => model.id),
+              next,
+            )
+          }
+        />
       </div>
 
-      {/* Model rows. Fetched catalog models append here; a per-model enable
-          toggle belongs at the end of each row. */}
+      {/* Model rows. Fetched catalog models append here, disabled like any
+          other until an owner turns them on. */}
       <div className="flex flex-col gap-1 border-l border-border pl-3">
         {provider.models.map((model: ModelEndpointRecord) => (
-          <ModelRow key={model.id} model={model} />
+          <ModelRow
+            key={model.id}
+            model={model}
+            enabledIds={enabledIds}
+            pending={pending}
+            onChange={(enabled) => onChange([model.id], enabled)}
+          />
         ))}
       </div>
     </div>
   )
 }
 
-function ModelRow({ model }: { model: ModelEndpointRecord }) {
+function ModelRow({
+  model,
+  enabledIds,
+  pending,
+  onChange,
+}: {
+  model: ModelEndpointRecord
+  enabledIds: readonly string[]
+  pending: boolean
+  onChange: (enabled: boolean) => void
+}) {
+  const locked = isModelEnablementLocked(model) || !model.enabled
+
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2">
-      <span className="font-mono text-xs text-foreground">{model.model}</span>
-      <span className="text-xs text-muted-foreground">
-        {formatContextWindow(model.contextWindowTokens)}
-      </span>
-      {model.isDeploymentDefault ? (
-        // Post-binding this marker means something narrower than it used to:
-        // sessions now carry their own model, so the fixture default is what
-        // a session falls back to when it has none.
-        <span className="text-xs text-muted-foreground">
-          Fallback for chats with no model of their own
-        </span>
-      ) : null}
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-mono text-xs text-foreground">
+            {model.model}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {formatContextWindow(model.contextWindowTokens)}
+          </span>
+        </div>
+        {locked ? (
+          <p className="text-xs text-muted-foreground">
+            {model.isDeploymentDefault
+              ? // Post-binding this means something narrower than it used to:
+                // sessions carry their own model, so the fixture default is
+                // what a session falls back to when it has none — which is why
+                // it cannot be switched off from here.
+                "Always available: chats with no model of their own run this one."
+              : "Turned off in the application fixture."}
+          </p>
+        ) : null}
+      </div>
+      <Switch
+        size="sm"
+        className="mt-0.5 shrink-0"
+        aria-label={`Make ${model.model} available to new chats`}
+        checked={isModelEnabledForNewSessions(model, enabledIds)}
+        disabled={pending || locked}
+        onCheckedChange={onChange}
+      />
     </div>
   )
 }

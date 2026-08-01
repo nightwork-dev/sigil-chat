@@ -46,9 +46,11 @@ export interface SigilAgentProviderModelConfig {
   /** Defaults to `chat`. */
   capability?: SigilModelCapability;
   /**
-   * Whether this model may be selected. UNIMPLEMENTED — the field is accepted
-   * and normalized so the allow-list lands without a reshape, but nothing
-   * enforces it yet (see model-selection.server.ts).
+   * The author's veto. `false` makes this model unselectable everywhere, and
+   * an installation owner cannot override it — enforced by
+   * `isSelectableModelPreset` in the web app's model-selection.server.ts.
+   * Note what `true` does NOT mean: a model still has to be enabled by an
+   * owner before a new session may run it.
    */
   enabled?: boolean;
   contextWindowTokens?: number;
@@ -71,7 +73,11 @@ export interface SigilAgentProviderConfig {
   apiKeyEnv?: string;
   /** Default context window for this provider's models. */
   contextWindowTokens?: number;
-  /** UNIMPLEMENTED, as per the model-level `enabled`. */
+  /**
+   * The author's veto over this provider and every model beneath it. An owner
+   * cannot re-enable it from the installation allow-list — that set narrows
+   * what the author permitted, it never widens it.
+   */
   enabled?: boolean;
   models: SigilAgentProviderModelConfig[];
 }
