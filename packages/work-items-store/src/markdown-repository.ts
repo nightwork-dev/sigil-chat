@@ -17,6 +17,7 @@ import {
   isBoardView,
   isReviewItem,
   isWorkSponsorshipDecision,
+  parseStoryVerification,
   proposeFeatureRequest,
   recordSponsorshipDecision,
   isStory,
@@ -579,6 +580,7 @@ function serializeStoryMarkdown(
   frontmatter.reviewGate = story.reviewGate;
   frontmatter.deps = story.deps;
   if (story.extraction !== undefined) frontmatter.extraction = story.extraction;
+  if (story.verify !== undefined) frontmatter.verify = story.verify;
   if (story.assignee !== undefined) frontmatter.assignee = story.assignee;
   if (story.assigneePrincipalId !== undefined)
     frontmatter.assigneePrincipalId = story.assigneePrincipalId;
@@ -621,6 +623,9 @@ function parseStoryMarkdown(raw: string, fileName: string): Story {
     ...data,
     intent,
     acceptanceCriteria,
+    // Same permissive read as the Mirk path (VQ.1): a malformed hand-authored
+    // block degrades to no block rather than declaring the file corrupt.
+    verify: parseStoryVerification(data.verify),
   };
   if (!isStory(candidate))
     throw new Error(

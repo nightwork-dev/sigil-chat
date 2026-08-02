@@ -7,7 +7,10 @@ import {
   readAgentSessionBinding,
 } from "@workspace/agent-contracts/session-binding.server"
 
-import { parseCreateAgentThreadRequest } from "./agent-threads"
+import {
+  parseCreateAgentThreadRequest,
+  parseSetAgentThreadModelRequest,
+} from "./agent-threads"
 
 const SECRET = "worktree-binding-secret"
 const NOW = 1_800_000_000
@@ -151,5 +154,61 @@ describe("signed binding round trip", () => {
     expect(
       readAgentSessionBinding(`${swapped}.${signature}`, NOW, SECRET),
     ).toBeUndefined()
+  })
+})
+
+describe("mid-session model rebind request validation (MDL.5)", () => {
+  it("accepts an id plus a preset id, and normalizes both", () => {
+    expect(
+      parseSetAgentThreadModelRequest({
+        id: "  thread-1  ",
+        modelPresetId: "  codex/luna  ",
+        expectedRevision: 4,
+      }),
+    ).toEqual({
+      id: "thread-1",
+      modelPresetId: "codex/luna",
+      expectedRevision: 4,
+    })
+  })
+
+  it("accepts an omitted preset id as a clear back to the default", () => {
+    expect(
+      parseSetAgentThreadModelRequest({ id: "thread-1" }),
+    ).toEqual({ id: "thread-1" })
+  })
+
+  // Same contract as the create path: an id and nothing else. A body naming an
+  // endpoint, provider, or credential is refused rather than ignored, so the
+  // rebind route cannot become a wider hole than creation.
+  it("refuses a body that supplies transport, credential, or a resolved model", () => {
+    for (const extra of [
+      { baseUrl: "http://127.0.0.1:1234/v1" },
+      { provider: "openai-compatible" },
+      { apiKeyEnv: "SIGIL_MODEL_DEEPSEEK_API_KEY" },
+      { model: { presetId: "luna", provider: "codex", modelId: "x" } },
+      { executionBinding: { principalId: "someone-else" } },
+    ]) {
+      expect(
+        () =>
+          parseSetAgentThreadModelRequest({ id: "thread-1", ...extra }),
+        JSON.stringify(extra),
+      ).toThrow(/Unsupported model rebind fields/)
+    }
+  })
+
+  it("refuses a malformed preset id and a missing thread id", () => {
+    expect(() =>
+      parseSetAgentThreadModelRequest({
+        id: "thread-1",
+        modelPresetId: "Codex/../etc/passwd",
+      }),
+    ).toThrow("malformed")
+    expect(() => parseSetAgentThreadModelRequest({ id: "   " })).toThrow(
+      "agent thread id is required",
+    )
+    expect(() => parseSetAgentThreadModelRequest(null)).toThrow(
+      "must be an object",
+    )
   })
 })

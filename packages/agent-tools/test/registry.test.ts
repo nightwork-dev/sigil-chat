@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { AuthContext } from "@gonk/auth";
+import { ScopedKnowledgeStore } from "@gonk/knowledge/scoped";
 import type { KvStore } from "@gonk/store/types";
 import {
   FilesystemManagedSkillRegistry,
@@ -46,6 +47,9 @@ afterEach(async () => {
 async function makeRegistry(
   artifacts?: SessionArtifactStore,
   skillRegistry?: WritableManagedSkillRegistry,
+  scopedKnowledge?: {
+    store: ScopedKnowledgeStore
+  },
 ) {
   const directory = await mkdtemp(join(tmpdir(), "sigil-chat-gonk-"));
   temporaryDirectories.push(directory);
@@ -69,6 +73,11 @@ async function makeRegistry(
       containers: { projects: projectRegistry, workspaces: workspaceRegistry },
       graph: repository,
       reviews: reviewRepository,
+      ...(scopedKnowledge
+        ? {
+            scopedKnowledgeStore: scopedKnowledge.store,
+          }
+        : {}),
       skills:
         skillRegistry ??
         new FilesystemManagedSkillRegistry({
@@ -776,6 +785,7 @@ describe("Sigil Chat Gonk registry", () => {
     });
     const { registry } = await makeRegistry(artifacts);
     const context = makeBaseContext({
+      auth: humanAuth("owner-1", "session:evidence-room-demo"),
       host: { resourceScope: "session:evidence-room-demo" },
     });
 
@@ -793,6 +803,7 @@ describe("Sigil Chat Gonk registry", () => {
         citations: [
           {
             citationId: "c1",
+            source: "artifact",
             artifactId: stored.id,
             filename: "cerebras-knowledge-base.md",
             quote: expect.stringContaining("biggest stated accuracy win"),
@@ -836,6 +847,7 @@ describe("Sigil Chat Gonk registry", () => {
         "sigil-evidence-ask",
         { question: "biggest accuracy win" },
         makeBaseContext({
+          auth: humanAuth("owner-1", "session:another-session"),
           host: { resourceScope: "session:another-session" },
         }),
       ),
@@ -843,6 +855,246 @@ describe("Sigil Chat Gonk registry", () => {
     expect(otherScope).toMatchObject({
       ok: true,
       data: { grounding: "no-evidence", citations: [] },
+    });
+  });
+
+  it("requires authenticated evidence retrieval", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-evidence-auth-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    await artifacts.putFile({
+      bytes: new TextEncoder().encode("A private note about Slack evidence."),
+      filename: "private-note.md",
+      mediaType: "text/markdown",
+      scope: "session:evidence-room-demo",
+    });
+    const { registry } = await makeRegistry(artifacts);
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "What evidence exists about Slack?" },
+        makeBaseContext({
+          host: { resourceScope: "session:evidence-room-demo" },
+        }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: expect.stringContaining("requires an authenticated"),
+    });
+  });
+
+  it("contributes scoped knowledge evidence through the shared retrieval receipt", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-knowledge-evidence-"));
+    temporaryDirectories.push(directory);
+    const scopedKnowledge = new ScopedKnowledgeStore({
+      authority: {
+        resolveWorkspaceParentProject: () => undefined,
+        authorizeRead: ({ principal, container }) =>
+          principal.principalId === "user-1" &&
+          container.tier === "project" &&
+          container.id === "project-a"
+            ? { allowed: true, role: "owner" }
+            : { allowed: false, reason: "test denies scoped knowledge" },
+        authorizeWrite: ({ principal, container }) =>
+          principal.principalId === "user-1" &&
+          container.tier === "project" &&
+          container.id === "project-a"
+            ? { allowed: true, role: "owner" }
+            : { allowed: false, reason: "test denies scoped knowledge" },
+      },
+      containerHome: (container) =>
+        join(directory, "knowledge", container.tier, encodeURIComponent(container.id)),
+      scanWrites: () => ({ allowed: true }),
+      now: () => 1_000,
+    });
+    await scopedKnowledge.write({
+      principal: { principalId: "user-1" },
+      targetContainer: { tier: "project", id: "project-a" },
+      id: "lantern-economy",
+      title: "Lantern economy",
+      body: "Lantern loot uses governed spoils and receipts.",
+      category: "reference",
+      expectedRevision: 0,
+    });
+    const { registry } = await makeRegistry(undefined, undefined, {
+      store: scopedKnowledge,
+    });
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "What uses governed spoils?", scope: { tier: "project", id: "project-a" } },
+        makeBaseContext({
+          auth: humanAuth("user-1", "project:project-a"),
+          host: { resourceScope: "project:project-a" },
+        }),
+      ),
+    );
+    scopedKnowledge.close();
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "grounded",
+        citations: [
+          expect.objectContaining({
+            source: "knowledge",
+            pageId: "lantern-economy",
+            title: "Lantern economy",
+            container: { tier: "project", id: "project-a" },
+            revision: 1,
+          }),
+        ],
+        evidenceReceipt: {
+          sources: expect.arrayContaining(["sigil.knowledge"]),
+        },
+      },
+    });
+  });
+
+  it("preserves a sanitary evidence diagnostic when scoped knowledge is denied", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-knowledge-denied-"));
+    temporaryDirectories.push(directory);
+    let readAllowed = true;
+    const scopedKnowledge = new ScopedKnowledgeStore({
+      authority: {
+        resolveWorkspaceParentProject: () => undefined,
+        authorizeRead: ({ principal, container }) =>
+          readAllowed &&
+          principal.principalId === "user-1" &&
+          container.tier === "project" &&
+          container.id === "project-a"
+            ? { allowed: true, role: "owner" }
+            : { allowed: false, reason: "test denies scoped knowledge" },
+        authorizeWrite: ({ principal, container }) =>
+          principal.principalId === "user-1" &&
+          container.tier === "project" &&
+          container.id === "project-a"
+            ? { allowed: true, role: "owner" }
+            : { allowed: false, reason: "test denies scoped knowledge" },
+      },
+      containerHome: (container) =>
+        join(
+          directory,
+          "knowledge",
+          container.tier,
+          encodeURIComponent(container.id),
+        ),
+      scanWrites: () => ({ allowed: true }),
+      now: () => 1_000,
+    });
+    await scopedKnowledge.write({
+      principal: { principalId: "user-1" },
+      targetContainer: { tier: "project", id: "project-a" },
+      id: "secret-page-id",
+      title: "Secret knowledge title",
+      body: "Secret body content about hidden cinder lanterns.",
+      category: "reference",
+      expectedRevision: 0,
+    });
+    readAllowed = false;
+    const { registry } = await makeRegistry(undefined, undefined, {
+      store: scopedKnowledge,
+    });
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        {
+          question: "What hidden cinder lantern evidence exists?",
+          scope: { tier: "project", id: "project-a" },
+        },
+        makeBaseContext({
+          auth: humanAuth("user-1", "project:project-a"),
+          host: { resourceScope: "project:project-a" },
+        }),
+      ),
+    );
+    scopedKnowledge.close();
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "no-evidence",
+        citations: [],
+        evidenceReceipt: {
+          diagnostics: [
+            {
+              sourceId: "sigil.knowledge",
+              outcome: "unqueried",
+              reason: "scoped knowledge read denied for active container",
+              activeContainer: { tier: "project", id: "project-a" },
+            },
+          ],
+        },
+      },
+    });
+    const serializedDiagnostics = JSON.stringify(
+      outcome.ok
+        ? (outcome.data as {
+            evidenceReceipt?: { diagnostics?: unknown[] };
+          }).evidenceReceipt?.diagnostics
+        : undefined,
+    );
+    expect(serializedDiagnostics).not.toContain("secret-page-id");
+    expect(serializedDiagnostics).not.toContain("Secret knowledge title");
+    expect(serializedDiagnostics).not.toContain("Secret body content");
+  });
+
+  it("does not expose raw Gonk knowledge or triple tools without the scoped Sigil adapter", async () => {
+    const { registry } = await makeRegistry();
+    const rawToolNames = [
+      "knowledge_write",
+      "knowledge_query",
+      "knowledge_get",
+      "knowledge_links",
+      "triple_assert",
+      "triple_query",
+      "triple_invalidate",
+    ];
+
+    const catalogNames = registry.list().map((tool) => tool.name);
+    for (const name of rawToolNames) {
+      expect(catalogNames).not.toContain(name);
+    }
+
+    const writeAttempt = await collectToolOutcome(
+      registry.invoke(
+        "knowledge_write",
+        {
+          id: "unsafe-write",
+          title: "Unsafe Write",
+          body: "This must wait for the scoped Sigil adapter.",
+          category: "project",
+        },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "project:sigil-chat"),
+          host: { resourceScope: "project:sigil-chat" },
+        }),
+      ),
+    );
+    expect(writeAttempt).toMatchObject({
+      ok: false,
+      code: "TOOL_NOT_FOUND",
+    });
+
+    const tripleAttempt = await collectToolOutcome(
+      registry.invoke(
+        "triple_assert",
+        { subject: "project", predicate: "has", object: "boundary" },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "project:sigil-chat"),
+          host: { resourceScope: "project:sigil-chat" },
+        }),
+      ),
+    );
+    expect(tripleAttempt).toMatchObject({
+      ok: false,
+      code: "TOOL_NOT_FOUND",
     });
   });
 

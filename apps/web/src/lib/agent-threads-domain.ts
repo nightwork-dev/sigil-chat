@@ -54,10 +54,18 @@ export interface AgentThreadExecutionBinding {
   /** Ordered, deduped, server-authorized context scope ids. */
   additionalContextScopeIds: string[]
   /**
-   * Model this session runs, chosen once at creation. Absent means the
-   * deployment default, which is what every thread created before per-session
-   * selection existed carries — so an absent model is a normal state, not a
-   * migration gap.
+   * Model this session runs. Absent means the deployment default, which is
+   * what every thread created before per-session selection existed carries —
+   * so an absent model is a normal state, not a migration gap.
+   *
+   * The one MUTABLE field on this binding (MDL.5), changed only through
+   * `setExecutionModel`. `bindExecution` still refuses to rewrite the binding
+   * as a whole, so principal, persona, home scope, and perspective remain
+   * immutable — those are what authorize the session. The model is what it
+   * runs, and David's 2026-08-01 direction is that a conversation may change
+   * it. Eve resolves the model at `step.started` from a proof re-minted every
+   * turn, so a change lands on the next turn without a fork or a runtime
+   * session rotation.
    */
   model?: BoundAgentModel
 }
@@ -483,6 +491,49 @@ export class AgentThreadRepository {
     })
   }
 
+  /**
+   * Replaces the bound model of an ALREADY-bound thread (MDL.5).
+   *
+   * Deliberately not a second `bindExecution`: it reads the existing binding
+   * and swaps one field, so there is no shape in which a caller can supply a
+   * principal, persona, or scope here at all. `bindExecution` keeps refusing
+   * a whole-binding rewrite, which is the guard that matters — this narrows
+   * it to the model rather than removing it.
+   *
+   * An unbound thread is refused rather than bound implicitly: binding is
+   * `bindExecution`'s job (it authorizes scopes), and inventing a binding
+   * from a model choice would skip that.
+   *
+   * `undefined` clears the selection, returning the thread to the deployment
+   * default — the same state a thread created without a model is in, not a
+   * distinct third state.
+   */
+  setExecutionModel(
+    userId: string,
+    id: string,
+    model: BoundAgentModel | undefined,
+    expectedRevision?: number,
+  ): AgentThread {
+    return this.update(userId, id, expectedRevision, (thread, timestamp) => {
+      if (!thread.executionBinding) {
+        throw new Error(
+          "Agent thread has no execution binding to change the model of.",
+        )
+      }
+      const next = { ...thread.executionBinding }
+      if (model === undefined) delete next.model
+      else if (isBoundAgentModel(model)) next.model = cloneBoundAgentModel(model)
+      else throw new Error("Agent thread model binding is malformed.")
+      if (bindingsEqual(thread.executionBinding, next)) return thread
+      return {
+        ...thread,
+        executionBinding: next,
+        updatedAt: timestamp,
+        revision: thread.revision + 1,
+      }
+    })
+  }
+
   rename(
     userId: string,
     id: string,
@@ -558,10 +609,20 @@ export class AgentThreadRepository {
     snapshot: AgentThreadSnapshot,
     expectedRevision?: number,
   ): AgentThread {
-    return this.update(userId, id, expectedRevision, (thread, timestamp) => ({
-      ...thread,
+    const current = this.require(userId, id)
+    if (
+      expectedRevision !== undefined &&
+      expectedRevision !== current.revision &&
+      snapshotMatchesRuntime(current, snapshot)
+    ) {
+      return current
+    }
+    assertRevision(current, expectedRevision)
+    const timestamp = this.now().toISOString()
+    const updated: AgentThread = {
+      ...current,
       updatedAt: timestamp,
-      revision: thread.revision + 1,
+      revision: current.revision + 1,
       runtime: {
         schemaVersion: 1,
         session: cloneSession(snapshot.session),
@@ -569,7 +630,9 @@ export class AgentThreadRepository {
           now: () => new Date(timestamp),
         }),
       },
-    }))
+    }
+    this.write(updated)
+    return cloneThread(updated)
   }
 
   fork(userId: string, input: ForkAgentThreadInput): AgentThread {
@@ -1127,6 +1190,26 @@ function cloneSession(
     ...(session.sessionId ? { sessionId: session.sessionId } : {}),
     streamIndex: session.streamIndex,
   }
+}
+
+function snapshotMatchesRuntime(
+  thread: AgentThread,
+  snapshot: AgentThreadSnapshot,
+): boolean {
+  const retained = sanitizeAndBoundAgentEvents(snapshot.events, {
+    now: () => new Date(thread.runtime.compaction.compactedAt),
+  })
+  return (
+    JSON.stringify(thread.runtime.session) ===
+      JSON.stringify(cloneSession(snapshot.session)) &&
+    JSON.stringify(thread.runtime.events) === JSON.stringify(retained.events) &&
+    thread.runtime.compaction.policyVersion ===
+      retained.compaction.policyVersion &&
+    thread.runtime.compaction.firstRetainedStreamIndex ===
+      retained.compaction.firstRetainedStreamIndex &&
+    thread.runtime.compaction.omittedEventCount ===
+      retained.compaction.omittedEventCount
+  )
 }
 
 function cloneThread(thread: AgentThread): AgentThread {

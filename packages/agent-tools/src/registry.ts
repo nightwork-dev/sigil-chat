@@ -4,6 +4,7 @@ import type {
   ImageGenerateInput,
   ImageGenerateOutput,
 } from "@gonk/image-gen"
+import type { ScopedKnowledgeStore } from "@gonk/knowledge/scoped"
 import type { SessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { GraphRepository } from "@workspace/graph-store/repository"
 import type { ReviewRepository } from "@workspace/review-store"
@@ -20,6 +21,7 @@ import {
 import { registerDemoSeedTools } from "./demo-seed.js"
 import { registerDistillTools } from "./distill.js"
 import { registerEvidenceTools } from "./evidence.js"
+import type { SigilRetrievalEvidenceCoordinator } from "./evidence.js"
 import { registerFeatureRequestTools } from "./feature-request.js"
 import { registerFileTools, type ResourceUniverseRegistries } from "./files.js"
 import { registerGraphTools } from "./graph.js"
@@ -42,6 +44,9 @@ export interface SigilAgentToolDependencies {
   specs?: SpecsRepository
   sessions?: ResourceUniverseRegistries["sessions"]
   skills: SkillRegistryResolver
+  scopedKnowledgeTools?: readonly ToolDefinition[]
+  scopedKnowledgeStore?: ScopedKnowledgeStore
+  retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator
   personaVoice?: PersonaVoiceResolver
   portableImageGeneration?: ToolDefinition<
     ImageGenerateInput,
@@ -65,6 +70,9 @@ export function createSigilAgentToolRegistry(
   if (dependencies.specs) registerSpecTools(registry, dependencies.specs)
   registerContainerTools(registry, dependencies.containers)
   registerAnnotationTools(registry)
+  for (const tool of dependencies.scopedKnowledgeTools ?? []) {
+    registry.register(tool)
+  }
   registerSkillTools(registry, dependencies.skills)
   registerUiCommandTools(registry)
   registerImageTools(
@@ -86,7 +94,12 @@ export function createSigilAgentToolRegistry(
     ...dependencies.containers,
     ...(dependencies.sessions ? { sessions: dependencies.sessions } : {}),
   })
-  registerEvidenceTools(registry, dependencies.artifacts)
+  registerEvidenceTools(
+    registry,
+    dependencies.artifacts,
+    dependencies.retrievalEvidenceCoordinator,
+    dependencies.scopedKnowledgeStore,
+  )
   registerDistillTools(registry, dependencies.artifacts)
   registerDemoSeedTools(registry, dependencies.artifacts)
   registerBlackboardTools(registry)

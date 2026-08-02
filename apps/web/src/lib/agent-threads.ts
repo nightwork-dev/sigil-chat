@@ -223,6 +223,61 @@ const setAgentThreadRequestOptionsFn = createServerFn({ method: "POST" })
     )
   })
 
+/**
+ * MDL.5 — the mid-session model rebind.
+ *
+ * Validated with the same parser the create path uses for its preset id, so
+ * the two entry points cannot drift on what an id is allowed to look like.
+ * The id is all the browser may send; what it resolves to is decided
+ * server-side by the installation allow-list, never supplied.
+ */
+export function parseSetAgentThreadModelRequest(input: unknown): {
+  id: string
+  modelPresetId?: string
+  expectedRevision?: number
+} {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error("A model rebind request must be an object.")
+  }
+  const candidate = input as Record<string, unknown>
+  const unexpected = Object.keys(candidate).filter(
+    (key) => !["id", "modelPresetId", "expectedRevision"].includes(key),
+  )
+  if (unexpected.length > 0) {
+    throw new Error(`Unsupported model rebind fields: ${unexpected.join(", ")}.`)
+  }
+  if (typeof candidate.id !== "string" || candidate.id.trim().length === 0) {
+    throw new Error("An agent thread id is required.")
+  }
+  const { modelPresetId } = parseCreateAgentThreadRequest({
+    personaId: "validation-only",
+    ...(candidate.modelPresetId !== undefined
+      ? { modelPresetId: candidate.modelPresetId }
+      : {}),
+  })
+  return {
+    id: candidate.id.trim(),
+    ...(modelPresetId ? { modelPresetId } : {}),
+    ...(typeof candidate.expectedRevision === "number"
+      ? { expectedRevision: candidate.expectedRevision }
+      : {}),
+  }
+}
+
+const setAgentThreadModelFn = createServerFn({ method: "POST" })
+  .validator(parseSetAgentThreadModelRequest)
+  .handler(async ({ data }) => {
+    const { agentThreadBindingService } =
+      await import("@/lib/agent-threads.server")
+    const session = await requireThreadSession()
+    return agentThreadBindingService.rebindModel(
+      session.user.id,
+      data.id,
+      data.modelPresetId,
+      data.expectedRevision,
+    )
+  })
+
 const archiveAgentThreadFn = createServerFn({ method: "POST" })
   .validator((input: { id: string; expectedRevision?: number }) => input)
   .handler(async ({ data }) => {
@@ -496,6 +551,27 @@ export function useSetAgentThreadRequestOptions() {
       requestOptions: AgentThreadRequestOptions
       expectedRevision?: number
     }) => setAgentThreadRequestOptionsFn({ data: input }),
+    onSuccess: (thread) => {
+      cacheThread(queryClient, principalId, thread)
+    },
+  })
+}
+
+/**
+ * MDL.5: rebind a live thread's model. Caches the server's returned thread,
+ * so the composer shows what actually bound — a refused change leaves the
+ * previous model on screen and surfaces the error, rather than an optimistic
+ * echo the next read would silently correct.
+ */
+export function useSetAgentThreadModel() {
+  const queryClient = useQueryClient()
+  const principalId = useAgentPrincipalId()
+  return useMutation({
+    mutationFn: (input: {
+      id: string
+      modelPresetId?: string
+      expectedRevision?: number
+    }) => setAgentThreadModelFn({ data: input }),
     onSuccess: (thread) => {
       cacheThread(queryClient, principalId, thread)
     },

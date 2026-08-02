@@ -2359,6 +2359,25 @@
       ]
     },
     {
+      "name": "quest-log",
+      "type": "registry:ui",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "@sigil/button",
+        "@sigil/popover",
+        "@sigil/progress"
+      ],
+      "files": [
+        {
+          "path": ".registry-staging/src/components/quest-log.tsx",
+          "type": "registry:ui",
+          "target": "@ui/quest-log.tsx"
+        }
+      ]
+    },
+    {
       "name": "radial-context-menu",
       "type": "registry:ui",
       "dependencies": [

@@ -1,9 +1,23 @@
-import type { AuthenticatedPrincipal } from "@gonk/auth";
+import type { AuthContext } from "@gonk/auth";
 import {
-  shape,
-  type ToolContext,
-  type ToolRegistry,
-} from "@gonk/tool-registry";
+  ScopedKnowledgeAccessError,
+  type ScopedKnowledgeStore,
+} from "@gonk/knowledge/scoped";
+import type {
+  KnowledgeContainerRef,
+  KnowledgeHit,
+  KnowledgePage,
+} from "@gonk/knowledge/types";
+import {
+  canonicalResourceKey,
+  RetrievalEvidenceCoordinator,
+  type RetrievalEvidenceBudget,
+  type RetrievalHit,
+  type RetrievalEvidenceResult,
+  type RetrievalResourceRef,
+  type RetrievalSearchReceipt,
+} from "@gonk/retrieval";
+import { shape, type ToolRegistry } from "@gonk/tool-registry";
 import { InMemorySearchStore, tokenize } from "@mirk/store/search";
 
 import {
@@ -22,6 +36,8 @@ import { objectSchema, readHints } from "./domain-schemas.js";
 import { isRecord } from "./validators.js";
 
 const EVIDENCE_COLLECTION = "session-artifact-passages";
+const ARTIFACT_SOURCE_ID = "sigil.artifacts";
+const KNOWLEDGE_SOURCE_ID = "sigil.knowledge";
 const DEFAULT_RESULT_LIMIT = 5;
 const MAX_RESULT_LIMIT = 8;
 const MAX_PASSAGE_CHARS = 1_200;
@@ -83,8 +99,9 @@ export interface EvidenceLocator {
   endLine: number;
 }
 
-export interface EvidenceCitation {
+export interface ArtifactEvidenceCitation {
   citationId: string;
+  source: "artifact";
   artifactId: string;
   filename: string;
   mediaType: string;
@@ -92,6 +109,43 @@ export interface EvidenceCitation {
   locator: EvidenceLocator;
   score: number;
   matchedTerms: string[];
+}
+
+export interface KnowledgeEvidenceCitation {
+  citationId: string;
+  source: "knowledge";
+  pageId: string;
+  title: string;
+  container: KnowledgeContainerRef;
+  revision: number;
+  quote: string;
+  score: number;
+  matchedTerms: string[];
+}
+
+export type EvidenceCitation =
+  | ArtifactEvidenceCitation
+  | KnowledgeEvidenceCitation;
+
+export interface SigilEvidenceCandidate {
+  citation: EvidenceCitation;
+  hit: RetrievalHit;
+}
+
+export interface SigilRetrievalEvidenceCoordinator {
+  collect(input: {
+    auth: AuthContext;
+    question: string;
+    resultLimit: number;
+    candidates: readonly SigilEvidenceCandidate[];
+  }): Promise<RetrievalEvidenceResult>;
+}
+
+export interface KnowledgeEvidenceDiagnostic {
+  sourceId: typeof KNOWLEDGE_SOURCE_ID;
+  outcome: "unqueried";
+  reason: string;
+  activeContainer: KnowledgeContainerRef;
 }
 
 interface EvidencePassageMeta extends Record<string, unknown> {
@@ -115,12 +169,24 @@ export interface EvidenceSearchResult {
   question: string;
   citations: EvidenceCitation[];
   corpus: EvidenceCorpusSummary;
+  evidenceReceipt?: {
+    requestId: string;
+    sources: string[];
+    candidateCount: number;
+    visibleResourceKeys: string[];
+    selected: number;
+    dropped: number;
+    diagnostics?: KnowledgeEvidenceDiagnostic[];
+  };
   answerInstruction: string;
 }
 
 export function registerEvidenceTools(
   registry: ToolRegistry,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
+  retrievalEvidenceCoordinator: SigilRetrievalEvidenceCoordinator =
+    createSigilRetrievalEvidenceCoordinator(),
+  scopedKnowledgeStore?: ScopedKnowledgeStore,
 ): void {
   registry.register({
     name: "sigil-evidence-ask",
@@ -146,8 +212,10 @@ export function registerEvidenceTools(
       return {
         data: await searchArtifactEvidence({
           artifacts,
+          retrievalEvidenceCoordinator,
+          scopedKnowledgeStore,
           scope,
-          principal: ctx.auth?.principal,
+          auth: ctx.auth,
           question: input.question,
           limit: input.limit,
         }),
@@ -158,15 +226,20 @@ export function registerEvidenceTools(
 
 export async function searchArtifactEvidence(input: {
   artifacts: SessionArtifactStore;
+  retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator;
+  scopedKnowledgeStore?: ScopedKnowledgeStore;
   scope: ResourceScope;
-  principal?: AuthenticatedPrincipal;
+  auth?: AuthContext;
   question: string;
   limit?: number;
 }): Promise<EvidenceSearchResult> {
+  if (!input.auth) {
+    throw new Error("sigil-evidence-ask requires an authenticated tool context");
+  }
   const question = input.question.trim();
   const artifacts = await input.artifacts.listByScope(
     input.scope,
-    input.principal,
+    input.auth.principal,
   );
   const textualArtifacts = artifacts.filter(isTextualFile);
   const search = new InMemorySearchStore();
@@ -184,7 +257,7 @@ export async function searchArtifactEvidence(input: {
     const content = await input.artifacts.readContent(
       artifact.id,
       input.scope,
-      input.principal,
+      input.auth.principal,
     );
     const decoded = new TextDecoder("utf-8", { fatal: false }).decode(
       content.bytes,
@@ -230,9 +303,10 @@ export async function searchArtifactEvidence(input: {
     })
     .filter(({ matchedTerms }) => matchedTerms.length >= minimumTermMatches)
     .slice(0, resultLimit);
-  const citations = hits.map(
-    ({ hit, matchedTerms }, index): EvidenceCitation => ({
-      citationId: `c${index + 1}`,
+  const artifactCandidates = hits.map(({ hit, matchedTerms }) => ({
+    citation: {
+      citationId: "",
+      source: "artifact" as const,
       artifactId: hit.meta.artifactId,
       filename: hit.meta.filename,
       mediaType: hit.meta.mediaType,
@@ -240,8 +314,35 @@ export async function searchArtifactEvidence(input: {
       locator: hit.meta.locator,
       score: hit.score,
       matchedTerms,
-    }),
+    },
+    hit: retrievalHitForArtifact(hit, matchedTerms),
+  }));
+  const knowledge = await knowledgeCandidatesForScope({
+    scopedKnowledgeStore: input.scopedKnowledgeStore,
+    auth: input.auth,
+    scope: input.scope,
+    question,
+    limit: Math.max(resultLimit * 4, 20),
+    meaningfulTerms,
+  });
+  const coordinated =
+    await (input.retrievalEvidenceCoordinator ??
+      createSigilRetrievalEvidenceCoordinator()).collect({
+      candidates: [...artifactCandidates, ...knowledge.candidates],
+      auth: input.auth,
+      question,
+      resultLimit,
+    });
+  const citationByResourceKey = new Map(
+    [...artifactCandidates, ...knowledge.candidates].map((candidate) => [
+      canonicalResourceKey(candidate.hit.resource),
+      candidate.citation,
+    ]),
   );
+  const citations = coordinated.packets.flatMap((packet, index) => {
+    const citation = citationByResourceKey.get(packet.resourceKey);
+    return citation ? [{ ...citation, citationId: `c${index + 1}` }] : [];
+  });
   const corpus: EvidenceCorpusSummary = {
     artifactCount: artifacts.length,
     textualArtifactCount: textualArtifacts.length,
@@ -251,6 +352,21 @@ export async function searchArtifactEvidence(input: {
       processedTextualArtifactCount < textualArtifacts.length ||
       truncatedArtifactIds.length > 0,
   };
+  const evidenceReceipt = {
+    requestId: coordinated.receipt.requestId,
+    sources: coordinated.receipt.contributors.map(
+      (contributor) => contributor.sourceId,
+    ),
+    candidateCount: coordinated.receipt.candidateCount,
+    visibleResourceKeys: coordinated.receipt.search.visibleHits.map(
+      (hit) => hit.resourceKey,
+    ),
+    selected: coordinated.receipt.selected.length,
+    dropped: coordinated.receipt.dropped.length,
+    ...(knowledge.diagnostic
+      ? { diagnostics: [knowledge.diagnostic] }
+      : {}),
+  };
 
   if (citations.length === 0) {
     return {
@@ -258,8 +374,9 @@ export async function searchArtifactEvidence(input: {
       question,
       citations: [],
       corpus,
+      evidenceReceipt,
       answerInstruction:
-        "No supporting passage was found in the selected artifact scope. Say that the available artifacts do not answer the question; do not invent an answer, quote, locator, or citation.",
+        "No supporting passage was found in the selected artifact scope. Say that the available evidence does not answer the question; do not invent an answer, quote, locator, or citation.",
     };
   }
 
@@ -268,8 +385,244 @@ export async function searchArtifactEvidence(input: {
     question,
     citations,
     corpus,
+    evidenceReceipt,
     answerInstruction:
-      "Answer only from these passages. Cite claims with the returned citationId values and preserve each quote, artifactId, and locator exactly as supplied.",
+      "Answer only from these passages. Cite claims with the returned citationId values and preserve each quote, source identifier, and locator exactly as supplied.",
+  };
+}
+
+async function knowledgeCandidatesForScope(input: {
+  scopedKnowledgeStore: ScopedKnowledgeStore | undefined;
+  auth: AuthContext;
+  scope: ResourceScope;
+  question: string;
+  limit: number;
+  meaningfulTerms: readonly string[];
+}): Promise<{
+  candidates: SigilEvidenceCandidate[];
+  diagnostic?: KnowledgeEvidenceDiagnostic;
+}> {
+  if (!input.scopedKnowledgeStore) return { candidates: [] };
+  const activeContainer = knowledgeContainerForScope(input.scope);
+  if (!activeContainer) return { candidates: [] };
+  const principalId = input.auth.principal?.id;
+  if (!principalId) return { candidates: [] };
+  try {
+    const result = await input.scopedKnowledgeStore.query({
+      principal: { principalId },
+      activeContainer,
+      text: input.question,
+      limit: input.limit,
+    });
+    return {
+      candidates: result.results.map((hit) =>
+        evidenceCandidateForKnowledge(hit, input.meaningfulTerms),
+      ),
+    };
+  } catch (error) {
+    if (error instanceof ScopedKnowledgeAccessError) {
+      return {
+        candidates: [],
+        diagnostic: {
+          sourceId: KNOWLEDGE_SOURCE_ID,
+          outcome: "unqueried",
+          reason: "scoped knowledge read denied for active container",
+          activeContainer,
+        },
+      };
+    }
+    throw error;
+  }
+}
+
+function knowledgeContainerForScope(
+  scope: ResourceScope,
+): KnowledgeContainerRef | undefined {
+  return scope.tier === "project" || scope.tier === "workspace"
+    ? { tier: scope.tier, id: scope.id }
+    : undefined;
+}
+
+function evidenceCandidateForKnowledge(
+  hit: KnowledgeHit & { page: KnowledgePage & { container: KnowledgeContainerRef; revision: number } },
+  meaningfulTerms: readonly string[],
+): SigilEvidenceCandidate {
+  const matchedTerms = knowledgeMatchedTerms(hit.page, meaningfulTerms);
+  const quote = truncateQuote(hit.page.body);
+  return {
+    citation: {
+      citationId: "",
+      source: "knowledge",
+      pageId: hit.page.id,
+      title: hit.page.title,
+      container: hit.page.container,
+      revision: hit.page.revision,
+      quote,
+      score: hit.score,
+      matchedTerms,
+    },
+    hit: retrievalHit({
+      resource: {
+        sourceId: KNOWLEDGE_SOURCE_ID,
+        kind: "knowledge-page",
+        id: `${hit.page.container.tier}:${hit.page.container.id}/${hit.page.id}`,
+        revision: String(hit.page.revision),
+      },
+      sourceId: KNOWLEDGE_SOURCE_ID,
+      score: hit.score,
+      matchedTerms,
+    }),
+  };
+}
+
+function knowledgeMatchedTerms(
+  page: Pick<KnowledgePage, "title" | "body">,
+  meaningfulTerms: readonly string[],
+): string[] {
+  const pageTerms = new Set(tokenize(`${page.title} ${page.body}`));
+  return meaningfulTerms.filter((term) => pageTerms.has(term));
+}
+
+function truncateQuote(body: string): string {
+  const trimmed = body.trim();
+  if (trimmed.length <= MAX_PASSAGE_CHARS) return trimmed;
+  return `${trimmed.slice(0, MAX_PASSAGE_CHARS - 1).trimEnd()}…`;
+}
+
+export function createSigilRetrievalEvidenceCoordinator(): SigilRetrievalEvidenceCoordinator {
+  return {
+    collect: async (input) => {
+      const hits: RetrievalHit[] = [];
+      for (const candidate of input.candidates) {
+        if (await authorizeRetrievalHit(input.auth, candidate.hit)) {
+          hits.push(candidate.hit);
+        }
+      }
+      const coordinator = new RetrievalEvidenceCoordinator({
+        engine: {
+          search: async (request) => ({
+            hits,
+            receipt: retrievalSearchReceipt({
+              requestId: request.requestId,
+              hits,
+            }),
+          }),
+        },
+      });
+      return coordinator.collect({
+        requestId: crypto.randomUUID(),
+        auth: input.auth,
+        text: input.question,
+        mode: "lexical",
+        purpose: "user-search",
+        maxPackets: input.resultLimit,
+        candidateLimit: Math.max(input.resultLimit * 4, 20),
+        estimateTokens: estimateEvidenceTokens,
+      });
+    },
+  };
+}
+
+async function authorizeRetrievalHit(
+  auth: AuthContext,
+  hit: RetrievalHit,
+): Promise<boolean> {
+  const decision = await auth.authorize({
+    action: "retrieval.hit.read",
+    resource: {
+      kind: "retrieval-resource",
+      target: canonicalResourceKey(hit.resource),
+      scope: "resource",
+      metadata: {
+        sourceId: hit.resource.sourceId,
+        resourceKind: hit.resource.kind,
+        revision: hit.resource.revision,
+        audience: hit.audience,
+      },
+    },
+  });
+  return decision.outcome === "allow";
+}
+
+function retrievalHitForArtifact(
+  hit: { id: string; score: number; meta: EvidencePassageMeta },
+  matchedTerms: readonly string[],
+): RetrievalHit {
+  return retrievalHit({
+    resource: {
+      sourceId: ARTIFACT_SOURCE_ID,
+      kind: "artifact-passage",
+      id: hit.id,
+      revision: hit.meta.artifactId,
+      fragment: {
+        kind: "range",
+        id: hit.meta.artifactId,
+        start: hit.meta.locator.startOffset,
+        end: hit.meta.locator.endOffset,
+      },
+    },
+    sourceId: ARTIFACT_SOURCE_ID,
+    score: hit.score,
+    matchedTerms,
+  });
+}
+
+function retrievalHit(input: {
+  resource: RetrievalResourceRef;
+  sourceId: string;
+  score: number;
+  matchedTerms: readonly string[];
+}): RetrievalHit {
+  const score = Number.isFinite(input.score) ? input.score : 0;
+  return {
+    resource: input.resource,
+    audience: "restricted",
+    scores: {
+      lexical: {
+        algorithm: "bm25",
+        sourceId: input.sourceId,
+        value: score,
+      },
+      sourcePriority: 50,
+      final: score,
+    },
+    matchedTerms: input.matchedTerms,
+  };
+}
+
+function retrievalSearchReceipt(input: {
+  requestId: string;
+  hits: readonly RetrievalHit[];
+}): RetrievalSearchReceipt {
+  const sourceIds = [...new Set(input.hits.map((hit) => hit.resource.sourceId))];
+  return {
+    kind: "retrieval-search",
+    receiptVersion: 1,
+    requestId: input.requestId,
+    timestamp: new Date().toISOString(),
+    mode: "lexical",
+    purpose: "user-search",
+    outcome: "success",
+    sources: sourceIds.map((sourceId) => ({
+      sourceId,
+      mode: "native-index",
+    })),
+    visibleHits: input.hits.map((hit) => ({
+      resourceKey: canonicalResourceKey(hit.resource),
+      sourceId: hit.resource.sourceId,
+      scores: hit.scores,
+    })),
+    drops: [],
+  };
+}
+
+function estimateEvidenceTokens(hit: RetrievalHit): RetrievalEvidenceBudget {
+  return {
+    estimatedTokens: Math.max(
+      1,
+      Math.ceil(JSON.stringify(hit.resource).length / 4),
+    ),
+    estimateQuality: "fallback",
   };
 }
 

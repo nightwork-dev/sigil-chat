@@ -516,3 +516,126 @@ describe("MirkWorkItemsRepository", () => {
     expect(repairedIndex).toContain("S0.4 · Added elsewhere");
   });
 });
+
+// VQ.1 — the optional `verify:` block. The roadmap holds 180+ story files
+// authored before this field existed, so the read path has to treat it as
+// additive in every direction: absent, well-formed, and malformed all still
+// yield a loadable story.
+describe("MirkWorkItemsRepository — verify: block (VQ.1)", () => {
+  async function writeStoryWithFrontmatter(
+    directory: string,
+    id: string,
+    extraFrontmatter: string,
+  ): Promise<void> {
+    const source = await readFile(join(directory, "S0.3.md"), "utf8");
+    const patched = source.replace(
+      "id: S0.3",
+      `id: ${id}${extraFrontmatter ? `\n${extraFrontmatter}` : ""}`,
+    );
+    await writeFile(join(directory, `${id}.md`), patched, "utf8");
+  }
+
+  it("parses a well-formed block and leaves stories without one untouched", async () => {
+    const directory = await makeDirectory();
+    await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+
+    await writeStoryWithFrontmatter(
+      directory,
+      "VQ-OK",
+      [
+        "verify:",
+        "  url: /settings?section=models",
+        "  steps:",
+        "    - Open Settings and pick Models.",
+        "    - Toggle a discovered model off and reload.",
+      ].join("\n"),
+    );
+
+    const document = await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+
+    expect(
+      document.stories.find((story) => story.id === "VQ-OK")?.verify,
+    ).toEqual({
+      url: "/settings?section=models",
+      steps: [
+        "Open Settings and pick Models.",
+        "Toggle a discovered model off and reload.",
+      ],
+    });
+    // The pre-existing seed stories still load, still carry no block.
+    expect(document.stories.find((story) => story.id === "S0.3")?.verify).toBe(
+      undefined,
+    );
+    expect(document.stories.length).toBeGreaterThan(1);
+  });
+
+  it("keeps a story loadable when its block is malformed", async () => {
+    const directory = await makeDirectory();
+    await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+
+    // Steps as a bare string, and a numeric entry — both plausible hand-edits.
+    await writeStoryWithFrontmatter(
+      directory,
+      "VQ-BAD",
+      ["verify:", "  steps: not-a-list"].join("\n"),
+    );
+    await writeStoryWithFrontmatter(
+      directory,
+      "VQ-MIXED",
+      ["verify:", "  steps:", "    - 7", "    - Real step."].join("\n"),
+    );
+
+    const document = await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+
+    const malformed = document.stories.find((story) => story.id === "VQ-BAD");
+    expect(malformed).toBeDefined();
+    expect(malformed?.verify).toBe(undefined);
+
+    const mixed = document.stories.find((story) => story.id === "VQ-MIXED");
+    expect(mixed?.verify).toEqual({ steps: ["Real step."] });
+  });
+
+  it("round-trips the block through a structured rewrite", async () => {
+    const directory = await makeDirectory();
+    const repository = new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    });
+    const document = await repository.get();
+    const story = await seedStory("S0.3");
+    story.verify = { url: "/roadmap?story=S0.3", steps: ["Open the board."] };
+
+    await repository.upsertStory(story, document.revision);
+
+    const raw = await readFile(join(directory, "S0.3.md"), "utf8");
+    expect(raw).toContain("verify:");
+    expect(raw).toContain("url: /roadmap?story=S0.3");
+
+    const reopened = await new MirkWorkItemsRepository({
+      dir: directory,
+      now: () => NOW,
+      git: false,
+    }).get();
+    expect(reopened.stories.find((item) => item.id === "S0.3")?.verify).toEqual({
+      url: "/roadmap?story=S0.3",
+      steps: ["Open the board."],
+    });
+  });
+});

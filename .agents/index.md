@@ -225,6 +225,36 @@ gitignored; treat them as disposable local state, not fixtures.
 
 Verified against the actual code, not inherited by assumption:
 
+- **Every UI element carries four burdens of proof:** necessity, irreducible
+  interaction friction, compact/intuitive expression, and earned position and
+  visual weight relative to the user's objective on that surface. Before
+  styling or polish, ask what capability, state, navigation, or necessary copy
+  would be lost if the element were removed; whether fewer steps or a more
+  familiar interaction preserve it; and whether it is too prominent, too
+  early, or too large compared with the user's task. Delete, demote, move,
+  combine, or redesign when any answer is weak. Frequency changes placement,
+  never quality: low-frequency tasks use a compact invoked affordance,
+  progressive/contextual disclosure, or a separate configuration screen/panel
+  when they are distinct tasks. They must meet the same or higher intuitiveness
+  bar because users lack muscle memory. Permanent primary placement is for
+  continuously relevant state, serious risk prevention, or essential
+  discoverability. Every surface is an affordance unless it is explicitly copy.
+  It accepts
+  input, exposes state, enables navigation, or establishes manipulable
+  structure. A copy surface is deliberate and must justify its space; never let
+  explanation masquerade as interface. Tooling surfaces begin with zero
+  permanent explanatory-copy budget. Permanent text must be the control's
+  label, live state, a necessary warning, or an instruction without which the
+  current task cannot be completed. Settings are tooling, not documentation.
+  Treat rendered static text and badges as heavily suspect, like `useEffect`:
+  each needs a concrete justification. Badges must encode changing state,
+  selection, filtering, removal, or another real affordance; static taxonomy or
+  emphasis uses plain text or is deleted.
+  Put architecture and usage explanation in docs or contextual help; do not use
+  paragraphs to compensate for weak hierarchy or unclear controls. The deletion
+  test is mandatory: remove the sentence and attempt the task—if the task
+  remains clear and safe, the sentence does not belong on the surface. The
+  `ux-design-language` skill carries the full rule and checklist.
 - **Server functions wrapped in React Query with key factories.** See
   `apps/web/src/lib/agent-catalog.ts` (`agentCatalogKeys`),
   `agent-threads.ts` (`agentThreadKeys`), `review-document.ts`

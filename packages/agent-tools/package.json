@@ -11,6 +11,8 @@
   "dependencies": {
     "@gonk/auth": "catalog:",
     "@gonk/image-gen": "catalog:",
+    "@gonk/knowledge": "catalog:",
+    "@gonk/retrieval": "catalog:",
     "@gonk/skills": "catalog:",
     "@gonk/tool-registry": "catalog:",
     "@mirk/store": "catalog:",
@@ -31,6 +33,7 @@
   "exports": {
     "./approval": "./src/approval.ts",
     "./containers": "./src/containers.ts",
+    "./evidence": "./src/evidence.ts",
     "./files": "./src/files.ts",
     "./feature-request": "./src/feature-request.ts",
     "./registry": "./src/registry.ts",

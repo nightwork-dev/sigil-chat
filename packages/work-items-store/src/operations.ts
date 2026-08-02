@@ -26,6 +26,7 @@ import type {
   StoryComment,
   StoryFilter,
   StoryStatus,
+  StoryVerification,
   WorkItemsDocument,
   WorkItemsMutationResult,
   WorkSponsorshipDecision,
@@ -690,7 +691,43 @@ export function storyValidationIssues(value: unknown): string[] {
   if (!isNonEmptyString(value.updatedAt)) issues.push("updatedAt");
   if (!isOptionalString(value.decidedBy)) issues.push("decidedBy");
   if (!isOptionalString(value.decidedAt)) issues.push("decidedAt");
+  if (!isOptionalStoryVerification(value.verify)) issues.push("verify");
   return issues;
+}
+
+export function isOptionalStoryVerification(
+  value: unknown,
+): value is StoryVerification | undefined {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      isOptionalString(value.url) &&
+      Array.isArray(value.steps) &&
+      value.steps.every(isNonEmptyString))
+  );
+}
+
+/**
+ * Coerce whatever a story file's `verify:` key held into a usable block, or
+ * `undefined` (VQ.1).
+ *
+ * Read paths run this BEFORE {@link storyValidationIssues} so a hand-authored
+ * block that is malformed — steps as a bare string, a numeric entry, the key
+ * absent entirely — costs the story its verification target and nothing else.
+ * 180+ existing stories carry no block at all, and none of them may become
+ * unloadable because this field now exists.
+ */
+export function parseStoryVerification(
+  value: unknown,
+): StoryVerification | undefined {
+  if (!isRecord(value)) return undefined;
+  const steps = (Array.isArray(value.steps) ? value.steps : [])
+    .filter(isNonEmptyString)
+    .map((step) => step.trim())
+    .filter((step) => step.length > 0);
+  const url = isNonEmptyString(value.url) ? value.url.trim() : undefined;
+  if (url === undefined && steps.length === 0) return undefined;
+  return url === undefined ? { steps } : { url, steps };
 }
 
 export function isStoryComment(value: unknown): value is StoryComment {

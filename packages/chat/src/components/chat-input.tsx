@@ -10,7 +10,13 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { useFileUpload } from "@workspace/ui/hooks/use-file-upload"
 import { useClipboard } from "@workspace/ui/hooks/use-clipboard"
 import { isImageUrl } from "@workspace/ui/lib/image-url"
-import { FileIcon, PaperclipIcon, SendIcon, SquareIcon, XIcon } from "lucide-react"
+import {
+  FileIcon,
+  PaperclipIcon,
+  SendIcon,
+  SquareIcon,
+  XIcon,
+} from "lucide-react"
 
 /** Default `accept` for the attachment picker: images, PDFs, and the common
  *  document/data formats users paste into a chat (markdown, text, CSV/TSV,
@@ -39,6 +45,9 @@ const DEFAULT_ATTACHMENT_ACCEPT = [
   ".doc",
   ".docx",
 ].join(",")
+
+export const CHAT_INPUT_TEXTAREA_CLASS_NAME =
+  "min-h-11 max-h-32 overflow-y-auto resize-none border-0 bg-transparent px-3 pt-3 pb-1 text-base md:text-sm shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
 
 /** One attached file, from selection through upload to a served URL. */
 export interface ChatInputAttachment {
@@ -240,7 +249,7 @@ export function ChatInput({
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
-        className="min-h-11 resize-none border-0 bg-transparent px-3 pt-3 pb-1 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+        className={CHAT_INPUT_TEXTAREA_CLASS_NAME}
       />
 
       {/* Bottom region: one control row, left/right clusters. */}
@@ -265,7 +274,7 @@ export function ChatInput({
             </button>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
           {trailingControls}
           <button
             aria-label={isStreaming ? "Stop response" : "Send message"}
@@ -301,13 +310,15 @@ function AttachmentChip({
   onRemove?: (id: string) => void
 }) {
   const isImage =
-    attachment.mediaType.startsWith("image/") && attachment.status === "uploaded"
+    attachment.mediaType.startsWith("image/") &&
+    attachment.status === "uploaded"
 
   return (
     <div
       className={cn(
         "flex items-center gap-1.5 rounded-md border border-border bg-muted/40 py-1 pl-1.5 pr-1 text-xs",
-        attachment.status === "error" && "border-destructive/50 text-destructive",
+        attachment.status === "error" &&
+          "border-destructive/50 text-destructive",
       )}
     >
       {isImage && attachment.url ? (

@@ -54,6 +54,7 @@ position — MUST:
   core get this for free; hand-rolled pointer logic must replicate it.
 
 Beyond drags:
+
 - **No hover-only affordances.** Anything revealed on hover must also be
   reachable via `focus-within` AND visible by default on coarse pointers
   (Tailwind v4 `pointer-coarse:` variant). Hover-reveal actions that
@@ -86,12 +87,13 @@ this check BEFORE creating a new component file:
    new component** — extend the existing one, don't mint a sibling.
 3. It's genuinely a new component only when the **purpose OR the state model
    differs** — a 1-D display vs a 2-D input, an editor vs a read-only
-   indicator, a boolean *toggle* vs a boolean *indicator*. A shared render
+   indicator, a boolean _toggle_ vs a boolean _indicator_. A shared render
    substrate ("both use canvas", "both are boolean-ish") is NOT enough to
    merge. And the opposite error is real too: forcing genuinely-different state
    models into one union-typed API is the muddy-surface trap — don't.
 
 When it IS a variant, two shapes:
+
 - **Shared core** (a geometry/state module both import — `lib/rotary`,
   `useBoundedVector`) when the two keep deliberately distinct identities (a
   knob vs a slider is a real affordance choice). No copy-pasted math.
@@ -104,7 +106,7 @@ interaction or logic — the `viz/` "picture of the math" components each have a
 different draggable geometry and derivation — they stay **distinct components
 even when the state model rhymes**. Share a small helper if there's real
 overlap; don't force a variant surface over genuinely different behavior. The
-readout family collapses cleanly because the *only* difference is the skin; a
+readout family collapses cleanly because the _only_ difference is the skin; a
 family collapses badly when the differences are load-bearing.
 
 ## Component shape
@@ -124,8 +126,19 @@ const thingVariants = cva("base token classes", {
   defaultVariants: { variant: "default", size: "default" },
 })
 
-function Thing({ className, variant, size, ...props }: React.ComponentProps<"div"> & VariantProps<typeof thingVariants>) {
-  return <div data-slot="thing" className={cn(thingVariants({ variant, size, className }))} {...props} />
+function Thing({
+  className,
+  variant,
+  size,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof thingVariants>) {
+  return (
+    <div
+      data-slot="thing"
+      className={cn(thingVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
 }
 ```
 
@@ -182,7 +195,11 @@ polymorphism is the `render` prop, not `asChild`. Match it:
   import { mergeProps } from "@base-ui/react/merge-props"
   import { useRender } from "@base-ui/react/use-render"
 
-  function Thing({ className, render, ...props }: useRender.ComponentProps<"span"> & OwnProps) {
+  function Thing({
+    className,
+    render,
+    ...props
+  }: useRender.ComponentProps<"span"> & OwnProps) {
     return useRender({
       defaultTagName: "span",
       props: mergeProps<"span">({ className: cn("...", className) }, props),
@@ -260,12 +277,12 @@ This is the recipe used across many extraction passes. Follow it in order:
    this smell (three files independently defining "how do I format ±∞"),
    don't reproduce it.
 2. **Classify honestly: extract-as-is / extract-with-modification / skip.**
-   - *As-is*: no domain-specific type imports, or only `cn`/`cva`.
-   - *With modification*: imports one domain type for its shape, not its
+   - _As-is_: no domain-specific type imports, or only `cn`/`cva`.
+   - _With modification_: imports one domain type for its shape, not its
      behavior — a type-import swap is enough.
-   - *Skip*: the component's actual logic (a parser, a solve step, a
+   - _Skip_: the component's actual logic (a parser, a solve step, a
      schema) is the point, and there's no clean UI/logic seam. Don't force
-     an extraction here — port the *pattern* by re-deriving it, don't
+     an extraction here — port the _pattern_ by re-deriving it, don't
      copy-paste and half-strip it.
 3. **Check for redundancy before building.** Before porting, check whether
    this repo's existing components already cover the interaction — a
@@ -325,9 +342,19 @@ existing demo, but not where you wire a demo for new product work; see
 
 ## No-slop checklist
 
+- Every rendered element proves necessity, irreducible interaction friction,
+  compact/intuitive expression, and earned position/visual weight relative to
+  the user's objective.
+- Low-frequency tasks move behind compact labeled affordances without lowering
+  their quality bar; infrequent use raises the need for familiar conventions
+  and low relearning cost.
+- Treat rendered static text and badges like `useEffect`: each requires a
+  concrete justification in review.
 - No repeated `<h1>`/description pair when the shell/breadcrumb already
   says what's on screen.
-- No generic badges or eyebrow text that don't carry state.
+- Badges encode changing state, selection, filtering, removal, or another real
+  affordance. Static taxonomy/emphasis is plain text or deleted.
+- No generic eyebrow or explanatory text that does not enable the task.
 - CVA variants only for choices a real caller makes — not speculative ones.
 - Use design tokens (`bg-card`, `text-muted-foreground`, `border-border`,
   `text-destructive`) over raw colors; raw colors are acceptable only where

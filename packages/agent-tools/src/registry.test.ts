@@ -37,6 +37,21 @@ const expectedWorkItemToolNames = [
 ]
 
 describe("Sigil agent tool registry", () => {
+  it("projects every application tool with an object parameter schema", () => {
+    const registry = createSigilAgentToolRegistry({
+      ...hostDependencies,
+      workItems: new MemoryWorkItemsRepository(),
+      specs: new MemorySpecsRepository(),
+    })
+
+    for (const tool of registry.list()) {
+      expect(
+        tool.inputJsonSchema,
+        `${tool.name} must expose object parameters`,
+      ).toMatchObject({ type: "object" })
+    }
+  })
+
   it("preserves current work-item tool names, schemas, visibility, and approval tiers", () => {
     const registry = createSigilAgentToolRegistry({
       ...hostDependencies,

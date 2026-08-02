@@ -446,7 +446,11 @@ function Panel({
       </header>
       <div
         data-slot="floating-dock-content"
-        className="min-h-0 overflow-y-auto overscroll-contain"
+        // A flex column, not a plain block scroller: a child that wants to
+        // fill the panel and pin its own footer (a chat surface's composer,
+        // any list-over-input layout) declares flex-1 and gets real height.
+        // Ordinary flow children still stack and scroll exactly as before.
+        className="flex min-h-0 flex-col overflow-y-auto overscroll-contain"
       >
         {children}
       </div>

@@ -6,15 +6,17 @@ catalog:
   "@gonk/auth": 0.5.1
   "@gonk/comms": 0.5.0
   "@gonk/context": 0.5.1
-  "@gonk/eve-host": 0.9.6
+  "@gonk/eve-host": 0.9.7
   "@gonk/image-gen": 0.6.0
+  "@gonk/knowledge": 0.6.0
   "@gonk/memory": 0.7.1
   "@gonk/persona": 0.7.0
+  "@gonk/retrieval": 0.6.0
   "@gonk/scope": 0.5.1
   "@gonk/skills": 0.5.1
   "@gonk/store": 0.5.1
   "@gonk/tool-registry": 0.5.1
-  "@mirk/artifact": 0.1.0
+  "@mirk/artifact": 0.1.1
   "@mirk/fixtures": 0.2.0
   "@mirk/store": 0.8.1
   "@mirk/store-markdown": 0.1.0

@@ -14,6 +14,7 @@ import {
 } from "@gonk/eve-host/fabric"
 import type { ToolContext } from "@gonk/tool-registry"
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
+import { createSigilRetrievalEvidenceCoordinator } from "@workspace/agent-tools/evidence"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
 import {
   createFileSessionArtifactStore,
@@ -35,6 +36,10 @@ import { MirkEveSessionOwnerStore } from "./eve-session-owners"
 import { personalScopeId } from "./personal-scope"
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import { createScopeGrantPolicy } from "./scope-authorization"
+import {
+  createSigilScopedKnowledgeStore,
+  createSigilScopedKnowledgeTools,
+} from "./scoped-knowledge"
 import { resolvePersonaVoice } from "./memory"
 import {
   MirkUsageLedgerRepository,
@@ -71,7 +76,20 @@ export const usageLedgerRepository = new MirkUsageLedgerRepository({
   ),
 })
 
+export const retrievalEvidenceCoordinator =
+  createSigilRetrievalEvidenceCoordinator()
+
 export const projectWorkspaceRegistries = getProjectWorkspaceRegistries()
+export const scopedKnowledgeStore = createSigilScopedKnowledgeStore({
+  registries: projectWorkspaceRegistries,
+  scanWrites: (text) =>
+    /<script\b|javascript:|data:text\/html/i.test(text)
+      ? {
+          allowed: false,
+          reason: "shared knowledge text failed the application safety scan",
+        }
+      : { allowed: true },
+})
 export const scopeGrantPolicy = createScopeGrantPolicy({
   registries: projectWorkspaceRegistries,
 })
@@ -100,6 +118,9 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   containers: projectWorkspaceRegistries,
   graph: graphRepository,
   reviews: reviewRepository,
+  retrievalEvidenceCoordinator,
+  scopedKnowledgeStore,
+  scopedKnowledgeTools: createSigilScopedKnowledgeTools(scopedKnowledgeStore),
   skills: createRequestBoundSkillRegistry(
     readDataEnvironment(process.env).skillsDir,
   ),

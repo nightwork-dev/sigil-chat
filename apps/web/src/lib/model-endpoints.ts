@@ -18,6 +18,8 @@ import {
 } from "@tanstack/react-query"
 import { createServerFn } from "@tanstack/react-start"
 
+import { isModelEnabledForNewSessions } from "./model-enablement"
+
 export interface ModelEndpointCredentialStatus {
   /** Environment variable NAME the credential is read from, when there is one. */
   envName?: string
@@ -276,6 +278,42 @@ export function formatRelativeTime(iso: string): string {
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.round(minutes / 60)
   return `${hours}h ago`
+}
+
+/**
+ * The inventory narrowed to what may actually be chosen, provider grouping
+ * preserved and empty providers dropped.
+ *
+ * One function for both selection surfaces (Settings → Models' new-chat
+ * picker and MDL.5's composer control) so they cannot drift on what "offered"
+ * means. Offering an unselectable model would produce a control that appears
+ * to work and a server that refuses — the server applies the same rule
+ * regardless of what was listed.
+ */
+export function selectableModelProviders(
+  providers: readonly ModelProviderRecord[],
+  enabledIds: readonly string[],
+): ModelProviderRecord[] {
+  return providers
+    .map((provider) => ({
+      ...provider,
+      models: provider.models.filter((model) =>
+        isModelEnabledForNewSessions(model, enabledIds),
+      ),
+    }))
+    .filter((provider) => provider.models.length > 0)
+}
+
+/** The inventory row for a preset id, across every provider. */
+export function findModelRecord(
+  providers: readonly ModelProviderRecord[],
+  presetId: string,
+): ModelEndpointRecord | undefined {
+  for (const provider of providers) {
+    const found = provider.models.find((model) => model.id === presetId)
+    if (found) return found
+  }
+  return undefined
 }
 
 /** A model's context window as a row-width label. Zero means undeclared. */

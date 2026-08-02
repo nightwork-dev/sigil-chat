@@ -192,6 +192,7 @@ function ActiveAgentSession({
   const persistence = useRef(
     new AgentSessionPersistenceCoordinator(thread.revision),
   )
+  persistence.current.observeRevision(thread.revision)
   const [persistenceError, setPersistenceError] = useState<Error | null>(null)
   const [participantAdapters, setParticipantAdapters] = useState<
     readonly AgentParticipantSessionAdapter[]

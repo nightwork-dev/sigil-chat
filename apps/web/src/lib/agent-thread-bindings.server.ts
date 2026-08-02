@@ -35,6 +35,7 @@ export interface ThreadBindingRepository extends Pick<
   | "getDefaultPersonaId"
   | "list"
   | "resolveByRouteParam"
+  | "setExecutionModel"
 > {}
 
 export interface ThreadBindingDependencies {
@@ -361,6 +362,46 @@ export function createThreadBindingService(
       )
       if (!thread) throw new Error(`Agent thread ${threadId} was not found.`)
       return bindLegacyThread(principalId, thread)
+    },
+
+    /**
+     * MDL.5 — change the model a LIVE thread runs, mid-conversation.
+     *
+     * Routes through the identical `resolveModelPreset` the create path uses,
+     * so the allow-list decision is made in exactly one place: a model an
+     * owner has not enabled is refused here the same way, by the same
+     * function, with the same single rejection path. Naming the id directly
+     * gains a caller nothing the create path would not already refuse.
+     *
+     * `bindLegacyThread` first, so a pre-binding thread acquires its binding
+     * (with its scopes authorized) before the model is swapped on it.
+     */
+    rebindModel(
+      principalId: string,
+      threadId: string,
+      presetId: string | undefined,
+      expectedRevision?: number,
+    ): AgentThread {
+      const thread = dependencies.repository.resolveByRouteParam(
+        principalId,
+        threadId,
+      )
+      if (!thread) throw new Error(`Agent thread ${threadId} was not found.`)
+      const bound = bindLegacyThread(principalId, thread)
+      const trimmed = presetId?.trim()
+      const model = trimmed
+        ? dependencies.resolveModelPreset?.(trimmed)
+        : undefined
+      if (trimmed && !model) throw new Error("EVE_MODEL_PRESET_NOT_SELECTABLE")
+      return dependencies.repository.setExecutionModel(
+        principalId,
+        bound.id,
+        model,
+        // Binding a legacy thread just consumed a revision, so the client's
+        // expectation is legitimately stale in exactly that case — the same
+        // reconciliation `fork` performs, for the same reason.
+        thread.executionBinding ? expectedRevision : bound.revision,
+      )
     },
 
     fork(principalId: string, input: ForkAgentThreadInput): AgentThread {
