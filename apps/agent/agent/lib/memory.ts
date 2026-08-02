@@ -2,8 +2,13 @@ import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import {
   StoreBackedMemoryRecordStore,
+  type EvidenceRef,
+  type MemoryAdmissionAuthority,
+  type MemoryAdmissionDecision,
+  type MemoryAdmissionRequest,
   type MemoryRecord,
   type MemoryRecordDraft,
+  type TrustedTurnEnvelope,
 } from "@gonk/memory"
 import {
   EveMemoryHost,
@@ -34,6 +39,79 @@ const personaRegistry = new PersonaRegistry(
 )
 const memoryRecordStore = new StoreBackedMemoryRecordStore({ scopeEnv })
 
+export const sigilMemoryAdmissionAuthority: MemoryAdmissionAuthority = {
+  authorityId: "sigil-chat-memory-admission",
+  authorityRevision: "v1",
+  decide(envelope, request) {
+    const refusal = refuseUnauthenticatedMemoryAdmission(envelope, request)
+    if (refusal) return refusal
+
+    switch (request.command.kind) {
+      case "propose": {
+        const draftRefusal = refuseDraftOutsidePrincipal(
+          envelope,
+          request,
+          request.command.draft,
+        )
+        if (draftRefusal) return draftRefusal
+        return {
+          outcome: {
+            kind: "admit",
+            status: admittedDraftStatus(request),
+            reason:
+              request.command.origin.source === "imported"
+                ? "migration-import"
+                : request.policyAction === "explicit-remember"
+                  ? "explicit-remember"
+                  : "review",
+          },
+          decidedAt: Date.now(),
+        }
+      }
+      case "correct": {
+        const draftRefusal = refuseDraftOutsidePrincipal(
+          envelope,
+          request,
+          request.command.replacement,
+        )
+        if (draftRefusal) return draftRefusal
+        return {
+          outcome: {
+            kind: "admit",
+            status: "candidate",
+            reason: "explicit-correct",
+          },
+          decidedAt: Date.now(),
+        }
+      }
+      case "archive":
+        return {
+          outcome: {
+            kind: "admit",
+            status: "archived",
+            reason: "explicit-forget",
+          },
+          decidedAt: Date.now(),
+        }
+      case "accept":
+        return {
+          outcome: { kind: "admit", status: "accepted", reason: "review" },
+          decidedAt: Date.now(),
+        }
+      case "reject":
+        return {
+          outcome: { kind: "admit", status: "rejected", reason: "review" },
+          decidedAt: Date.now(),
+        }
+      case "supersede":
+        return {
+          outcome: { kind: "admit", status: "superseded", reason: "review" },
+          decidedAt: Date.now(),
+        }
+    }
+  },
+}
+
 const SOURCE_SCOPE_EVIDENCE_PREFIX = "sigil-chat:source-scope:"
 const SOURCE_RESOURCE_EVIDENCE_PREFIX = "sigil-chat:source-resource:"
 const AUDIENCE_PERSONAL_EVIDENCE_PREFIX = "sigil-chat:audience-personal:"
@@ -57,6 +135,10 @@ export type ScopedMemoryAudienceLabel =
 export interface ScopedMemoryLabels {
   readonly sources: readonly ScopedMemorySourceLabel[]
   readonly audience: ScopedMemoryAudienceLabel
+}
+
+export type ScopedMemoryRecordDraft = MemoryRecordDraft & {
+  readonly evidence: readonly EvidenceRef[]
 }
 
 export interface ScopedMemoryRecordProjection {
@@ -111,6 +193,7 @@ export function personaHost(
   if (!record) throw new Error(`No such persona: ${personaId}`)
   const host = new EveMemoryHost({
     store: memoryRecordStore,
+    admissionAuthority: sigilMemoryAdmissionAuthority,
     persona: {
       record,
       authoredBaseId: `${record.id}-v1`,
@@ -132,6 +215,66 @@ export function personaHost(
   })
   hosts.set(personaId, host)
   return host
+}
+
+function refuseUnauthenticatedMemoryAdmission(
+  envelope: TrustedTurnEnvelope,
+  _request: MemoryAdmissionRequest,
+): MemoryAdmissionDecision | undefined {
+  if (envelope.binding.kind !== "persona") {
+    return refuseMemoryAdmission("unsupported-memory-owner")
+  }
+  const principalId = envelope.principalId?.trim()
+  if (!principalId || !envelope.presentPrincipalIds.includes(principalId)) {
+    return refuseMemoryAdmission("principal-not-present")
+  }
+  return undefined
+}
+
+function refuseDraftOutsidePrincipal(
+  envelope: TrustedTurnEnvelope,
+  _request: MemoryAdmissionRequest,
+  draft: MemoryRecordDraft,
+): MemoryAdmissionDecision | undefined {
+  const principalId = envelope.principalId
+  if (!principalId) return refuseMemoryAdmission("principal-not-present")
+  if (
+    draft.author &&
+    draft.author.kind === "principal" &&
+    draft.author.id !== principalId
+  ) {
+    return refuseMemoryAdmission("author-principal-mismatch")
+  }
+  if (
+    draft.subject.kind === "principal" &&
+    draft.subject.id !== principalId
+  ) {
+    return refuseMemoryAdmission("subject-principal-mismatch")
+  }
+  return undefined
+}
+
+function admittedDraftStatus(
+  request: MemoryAdmissionRequest,
+): "candidate" | "accepted" {
+  const command = request.command
+  if (command.kind !== "propose") return "candidate"
+  if (
+    command.origin.modelInvolved ||
+    command.origin.source === "inferred" ||
+    command.origin.source === "perceived" ||
+    command.origin.source === "consolidated"
+  ) {
+    return "candidate"
+  }
+  return request.policyAction === "explicit-remember" ? "accepted" : "candidate"
+}
+
+function refuseMemoryAdmission(code: string): MemoryAdmissionDecision {
+  return {
+    outcome: { kind: "refuse", code },
+    decidedAt: Date.now(),
+  }
 }
 
 export function listPersonas() {
@@ -207,7 +350,7 @@ export function memoryDraft(
     readonly sources?: readonly ScopedMemorySourceLabel[]
     readonly audience?: ScopedMemoryAudienceLabel
   },
-): MemoryRecordDraft {
+): ScopedMemoryRecordDraft {
   const audience = labels?.audience ?? {
     kind: "personal",
     principalId,
@@ -307,7 +450,7 @@ export function scopedMemoryLabelsFromRecord(
 
 function sourceLabelsToEvidence(
   sources: readonly ScopedMemorySourceLabel[],
-): MemoryRecordDraft["evidence"] {
+): EvidenceRef[] {
   return sources.map((source) =>
     source.resourceKey
       ? {
@@ -323,7 +466,7 @@ function sourceLabelsToEvidence(
 
 function audienceLabelToEvidence(
   audience: ScopedMemoryAudienceLabel,
-): MemoryRecordDraft["evidence"][number] {
+): EvidenceRef {
   if (audience.kind === "personal") {
     return {
       kind: "record",

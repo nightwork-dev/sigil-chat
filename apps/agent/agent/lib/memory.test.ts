@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest"
-import { InMemoryMemoryRecordStore, type MemoryRecord } from "@gonk/memory"
+import {
+  InMemoryMemoryRecordStore,
+  type MemoryReceipt,
+  type MemoryRecord,
+} from "@gonk/memory"
 import { EveMemoryHost } from "@gonk/eve-host/guard"
 import {
   memoryDraft,
   memoryLabelsForSession,
   memoryTurn,
   scopedMemoryLabelsFromRecord,
+  sigilMemoryAdmissionAuthority,
   sigilMemoryHost,
 } from "./memory"
 
@@ -127,6 +132,51 @@ describe("Sigil scoped memory labels", () => {
 })
 
 describe("Sigil memory host verification fixtures", () => {
+  it("requires the product admission authority at the Eve host boundary", () => {
+    const { store, hostOptions } = memoryFixture()
+
+    expect(
+      () =>
+        new EveMemoryHost({
+          ...hostOptions,
+          store,
+          admissionAuthority: undefined as never,
+        }),
+    ).toThrow("explicit memory admission authority")
+  })
+
+  it("refuses product memory writes when the authenticated principal is absent", () => {
+    const { host, turn } = memoryFixture()
+
+    const receipt = host.remember(
+      { ...turn("session-1", "user-1"), presentPrincipalIds: [] },
+      memoryDraft("sigil-chat-eve", "user-1", "Do not admit this."),
+    )
+
+    expect(receipt.outcome).toEqual({
+      kind: "refused",
+      code: "principal-not-present",
+    })
+  })
+
+  it("refuses product memory writes for another principal's relationship", () => {
+    const { host, turn } = memoryFixture()
+
+    const receipt = host.remember(
+      turn("session-1", "user-1"),
+      memoryDraft(
+        "sigil-chat-eve",
+        "user-2",
+        "User two's relationship memory is not user one's write target.",
+      ),
+    )
+
+    expect(receipt.outcome).toEqual({
+      kind: "refused",
+      code: "author-principal-mismatch",
+    })
+  })
+
   it("suppresses automatic recall for empty and nonmatching latest-turn queries", () => {
     const { host, turn } = memoryFixture()
 
@@ -140,7 +190,8 @@ describe("Sigil memory host verification fixtures", () => {
       "and the or to",
     )
 
-    expect(write.to).toBe("accepted")
+    expect(write.outcome).toEqual({ kind: "committed" })
+    expect(write.affected[0]?.to).toBe("accepted")
     expect(emptyDelivery.message).toBeUndefined()
     expect(emptyDelivery.selectedRecordIds).toEqual([])
     expect(emptyDelivery.receipt.query.normalized).toBe("")
@@ -197,7 +248,8 @@ describe("Sigil memory host verification fixtures", () => {
       "vermilion launch",
     )
 
-    expect(write.to).toBe("accepted")
+    expect(write.outcome).toEqual({ kind: "committed" })
+    expect(write.affected[0]?.to).toBe("accepted")
     expect(otherPrincipalDelivery.message).toBeUndefined()
     expect(otherPrincipalDelivery.selectedRecordIds).toEqual([])
     expect(otherPrincipalDelivery.receipt.sourceReceipt.recordIdsConsidered).toEqual(
@@ -243,7 +295,7 @@ describe("Sigil memory host verification fixtures", () => {
   it("preserves attributable episode provenance when the app supplies episode evidence", () => {
     const { host, store, turn } = memoryFixture()
 
-    const write = host.remember(turn("session-1", "user-1"), {
+    const citedDraft = {
       ...memoryDraft(
         "sigil-chat-eve",
         "user-1",
@@ -253,8 +305,9 @@ describe("Sigil memory host verification fixtures", () => {
         { kind: "tool", id: "sigil-memory" },
         { kind: "episode", id: "eve-session-1:turn-7" },
       ],
-    })
-    const record = store.get(write.recordId)
+    }
+    const write = host.remember(turn("session-1", "user-1"), citedDraft)
+    const record = store.get(committedRecordId(write))
 
     expect(record?.provenance.author).toEqual({
       kind: "principal",
@@ -307,7 +360,8 @@ function record(
 ): MemoryRecord {
   return {
     id: "memory-1",
-    owner: { personaId: "agent-a" },
+    owner: { kind: "persona", personaId: "agent-a" },
+    revision: 1,
     scope: { tier: "persona", id: "agent-a" },
     kind: "preference",
     subject: { kind: "principal", id: "user-1" },
@@ -320,6 +374,7 @@ function record(
       },
       disclosure: { kind: "same-as-recall" },
     },
+    inspection: "none",
     content: "Remember this",
     provenance: {
       source: "tool",
@@ -330,6 +385,7 @@ function record(
     lifecycle: {
       status: "accepted",
       supersedes: [],
+      admissionReceiptId: "test-receipt",
     },
     createdAt: 1,
     updatedAt: 1,
@@ -338,8 +394,9 @@ function record(
 
 function memoryFixture() {
   const store = new InMemoryMemoryRecordStore()
-  const host = new EveMemoryHost({
+  const hostOptions: ConstructorParameters<typeof EveMemoryHost>[0] = {
     store,
+    admissionAuthority: sigilMemoryAdmissionAuthority,
     persona: {
       record: {
         id: "sigil-chat-eve",
@@ -374,12 +431,21 @@ function memoryFixture() {
         return () => next++
       })(),
     },
-  })
+  }
+  const host = new EveMemoryHost(hostOptions)
 
   return {
     store,
     host,
+    hostOptions,
     turn: (eveSessionId: string, principalId: string) =>
       memoryTurn(eveSessionId, principalId),
   }
+}
+
+function committedRecordId(receipt: MemoryReceipt): string {
+  expect(receipt.outcome).toEqual({ kind: "committed" })
+  const recordId = receipt.affected[0]?.recordId
+  expect(recordId).toBeTruthy()
+  return recordId
 }
