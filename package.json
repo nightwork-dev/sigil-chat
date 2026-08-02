@@ -39,9 +39,6 @@
       "esbuild",
       "eve",
       "unrs-resolver"
-    ],
-    "overrides": {
-      "@zigil/agent": "link:/Users/dr/Dev/templates/worktrees/sigil-design-dx10-tier1/packages/agent"
-    }
+    ]
   }
 }
