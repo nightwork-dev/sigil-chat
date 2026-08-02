@@ -15,6 +15,7 @@
     "registry:item": "node scripts/emit-registry-item.mjs",
     "test": "vitest run",
     "test:registry-smoke": "node scripts/registry-smoke.mjs",
+    "check:import-closure": "node scripts/check-import-closure.mjs",
     "prepack": "pnpm stage",
     "postpack": "node scripts/clean-overlay.mjs",
     "typecheck": "tsc --noEmit"
