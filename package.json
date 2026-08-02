@@ -39,9 +39,6 @@
       "esbuild",
       "eve",
       "unrs-resolver"
-    ],
-    "overrides": {
-      "eve": "http://localhost:4873/eve/-/eve-0.27.13-sigil.1.tgz"
-    }
+    ]
   }
 }
