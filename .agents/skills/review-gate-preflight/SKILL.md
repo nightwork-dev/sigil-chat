@@ -36,8 +36,10 @@ Viewport ~375px iPhone, hard-refreshed, against the mobile preview:
 
 1. Implementing lane finishes → runs or dispatches the preflight.
 2. Preflight failures → fix before the owner ever sees the story.
-3. Preflight passes → THEN move the story to `verify` and notify the owner,
-   stating "preflight passed" in the story comment.
+3. Preflight passes → THEN move the story to `verify`, author its
+   `verify` block (url + steps — the owner-verification-queue skill carries
+   the format) in the same edit, and notify the owner, stating "preflight
+   passed" in the story comment.
 4. The owner flags something new anyway → it joins this checklist the same
    day, with the story reference.
 
