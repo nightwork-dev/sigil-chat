@@ -503,6 +503,52 @@ describe("AppAgentSessions persistence call site", () => {
     expect(harness.eveSendCallCount).toBe(2)
   })
 
+  it("rejects a send while a tool-input approval is pending, then allows it once the approval is answered", async () => {
+    repository.create(TEST_USER_ID, { title: "Fixed title" })
+    await renderSessions()
+    stagePendingToolInputRequests(primaryMockSession(), ["request-1"])
+
+    await act(async () => {
+      const result = await harness.session?.send({ message: "Blocked" })
+      expect(result).toMatchObject({
+        status: "failed",
+        error: {
+          code: "pending-tool-input-approval",
+          message:
+            "Respond to the pending tool approval(s) before sending a new message.",
+        },
+      })
+    })
+
+    expect(harness.eveSendCallCount).toBe(0)
+
+    ;(primaryMockSession() as { data: AgentSessionData }).data = {
+      messages: [
+        {
+          id: "message:answered:request-1",
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-call",
+              id: "tool:request-1",
+              name: "sigil-test-tool",
+              state: "approval-responded",
+              inputRequest: { requestId: "request-1", prompt: "Approve request-1?" },
+              inputResponse: { optionId: "allow", requestId: "request-1" },
+            },
+          ],
+        } as AgentMessage,
+      ],
+    }
+
+    await act(async () => {
+      const result = await harness.session?.send({ message: "Allowed" })
+      expect(result).toMatchObject({ status: "succeeded" })
+    })
+
+    expect(harness.eveSendCallCount).toBe(1)
+  })
+
   it("rejects an overlapping tool-input continuation before it reaches Eve, then allows a subsequent continuation once the turn clears", async () => {
     repository.create(TEST_USER_ID, { title: "Fixed title" })
     await renderSessions()
