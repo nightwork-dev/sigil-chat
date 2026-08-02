@@ -16,8 +16,8 @@ catalogs:
       specifier: 0.5.1
       version: 0.5.1
     '@gonk/eve-host':
-      specifier: 0.9.7
-      version: 0.9.7
+      specifier: 0.9.9
+      version: 0.9.9
     '@gonk/image-gen':
       specifier: 0.6.0
       version: 0.6.0
@@ -25,8 +25,8 @@ catalogs:
       specifier: 0.6.0
       version: 0.6.0
     '@gonk/memory':
-      specifier: 0.7.1
-      version: 0.7.1
+      specifier: 0.7.2
+      version: 0.7.2
     '@gonk/persona':
       specifier: 0.7.0
       version: 0.7.0
@@ -103,7 +103,7 @@ importers:
         version: 0.5.1
       '@gonk/eve-host':
         specifier: 'catalog:'
-        version: 0.9.7(better-sqlite3@12.10.0)(eve@0.27.5(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(sqlite-vec@0.1.9)
+        version: 0.9.9(better-sqlite3@12.10.0)(eve@0.27.5(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(sqlite-vec@0.1.9)
       '@gonk/image-gen':
         specifier: 'catalog:'
         version: 0.6.0
@@ -112,7 +112,7 @@ importers:
         version: 0.6.0
       '@gonk/memory':
         specifier: 'catalog:'
-        version: 0.7.1
+        version: 0.7.2
       '@gonk/persona':
         specifier: 'catalog:'
         version: 0.7.0
@@ -203,7 +203,7 @@ importers:
         version: 0.5.0(sqlite-vec@0.1.9)
       '@gonk/memory':
         specifier: 'catalog:'
-        version: 0.7.1
+        version: 0.7.2
       '@gonk/persona':
         specifier: 'catalog:'
         version: 0.7.0
@@ -1493,8 +1493,8 @@ packages:
   '@gonk/embedding@0.5.0':
     resolution: {integrity: sha512-LCjzu8TeWLwcSpWdd8qr9A6TpszwTJufQ5yUBaqc50giZEfkrUNzB+xlA34cwBwAQJLuntLVs6CDfno4GmIJZA==}
 
-  '@gonk/eve-host@0.9.7':
-    resolution: {integrity: sha512-SnmvQuSjnQVUSxvSuzw94UyvBQlXzB1OAbpPiAZPaP+UL11QXmC4QCwSkSzUEAqWznsPRmVbTmOQKvU2QmhU0g==}
+  '@gonk/eve-host@0.9.9':
+    resolution: {integrity: sha512-EldlyXxpBX/7SaHHBlNLjnz0V9/WLIMH6yraBGdsCIMcRNDxhurmJcjePUsAKKq2Es9CJMJlpJ+GDBjebgzEbA==}
     peerDependencies:
       eve: '*'
 
@@ -1525,6 +1525,9 @@ packages:
 
   '@gonk/memory@0.7.1':
     resolution: {integrity: sha512-og5TAuB236O1Njdjaq9BMWU390c9R4MZU4Q5/pgNNhcmJRfZipYqcNLW+CSyYbA3y7y7CBX310YWptgq6wTmLA==}
+
+  '@gonk/memory@0.7.2':
+    resolution: {integrity: sha512-scRhYWh1PnQz/t73vWyNMtgXN0rVcVVy8OYHKUD8XYlIU3ziCXoa1FZtV+UlZ2Lm3f9AKveZhMTed2LEHFjZqA==}
 
   '@gonk/persona@0.5.0':
     resolution: {integrity: sha512-/OipEUvk+rNB0RwE1sm2X3cjlId5RYzZGv0OozZ8kjltzaO+7UjBMAu5d9r1SCratNQ9uhiqudPudO5Rn4SvkQ==}
@@ -7493,12 +7496,12 @@ snapshots:
     dependencies:
       '@gonk/scope': 0.3.1
 
-  '@gonk/eve-host@0.9.7(better-sqlite3@12.10.0)(eve@0.27.5(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(sqlite-vec@0.1.9)':
+  '@gonk/eve-host@0.9.9(better-sqlite3@12.10.0)(eve@0.27.5(ai@7.0.31(zod@4.4.3))(better-sqlite3@12.10.0)(dotenv@17.4.2)(jiti@2.7.0)(just-bash@3.1.0)(microsandbox@0.6.6)(rollup@4.62.2)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0)))(sqlite-vec@0.1.9)':
     dependencies:
       '@gonk/auth': 0.5.1
       '@gonk/fabric': 0.3.7(@gonk/scope@0.5.1)(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/jobs': 1.2.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@gonk/memory': 0.7.1
+      '@gonk/memory': 0.7.2
       '@gonk/persona': 0.7.0
       '@gonk/scope': 0.5.1
       '@gonk/store': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -7576,6 +7579,17 @@ snapshots:
       sqlite-vec: 0.1.9
 
   '@gonk/memory@0.7.1':
+    dependencies:
+      '@gonk/embedding': 0.5.0
+      '@gonk/scope': 0.5.1
+      '@gonk/store': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@mirk/store': 0.8.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@types/better-sqlite3': 7.6.13
+      better-sqlite3: 12.10.0
+    optionalDependencies:
+      sqlite-vec: 0.1.9
+
+  '@gonk/memory@0.7.2':
     dependencies:
       '@gonk/embedding': 0.5.0
       '@gonk/scope': 0.5.1
