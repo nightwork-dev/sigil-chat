@@ -903,6 +903,159 @@ export const expectedRegistryToolContracts: RegistryToolContract[] = [
     },
   },
   {
+    name: "knowledge_write",
+    description:
+      "Author or revise a durable knowledge page: prose with a category, tags, and [[wiki-links]]. Durable and provenance-tracked — corrected by re-writing the same id (which supersedes the prior version), not aged out like memory. Use for what is true / how things are, not what happened.",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id", "title", "body", "category"],
+      properties: [
+        "id",
+        "title",
+        "body",
+        "category",
+        "tags",
+        "source",
+        "visibility",
+        "confidence",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+    },
+  },
+  {
+    name: "knowledge_query",
+    description:
+      "Knowledge-specific keyword search; for a broad cross-substrate 'what do I know' pull, prefer recall_read. Query durable knowledge by keyword (FTS5 over title + body) and/or category, tags, or backlink. Returns raw matches across the resolvable visibility tiers (private/personal/team) — you synthesize. No embeddings: keyword precision, not semantic fuzz.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [
+        "text",
+        "category",
+        "tags",
+        "linksTo",
+        "visibility",
+        "includeSuperseded",
+        "limit",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      idempotent: true,
+    },
+  },
+  {
+    name: "knowledge_get",
+    description:
+      "Fetch a single knowledge page by its slug. Searches the narrowest resolvable visibility tier first unless one is named.",
+    visibility: "on-demand",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id", "visibility"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      idempotent: true,
+    },
+  },
+  {
+    name: "knowledge_links",
+    description:
+      "List the knowledge pages that link *to* the given slug (inbound backlinks) — the [[wiki-link]] graph over durable pages.",
+    visibility: "on-demand",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id", "visibility"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      idempotent: true,
+    },
+  },
+  {
+    name: "triple_assert",
+    description:
+      "Record a Subject-Predicate-Object fact in the temporal knowledge graph. Set invalidatesPriors=true to supersede earlier triples that share this (subject, predicate).",
+    visibility: "always",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["subject", "predicate", "object"],
+      properties: [
+        "subject",
+        "predicate",
+        "object",
+        "source",
+        "confidence",
+        "invalidatesPriors",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: false,
+      idempotent: false,
+    },
+  },
+  {
+    name: "triple_query",
+    description:
+      "Query the temporal knowledge graph. Filters by any combination of subject/predicate/object; returns currently-valid triples by default. Pass checkFreshness=true to grep anchor-bearing triples against their live repo and flag ones whose cited symbol has moved.",
+    visibility: "always",
+    approval: "read",
+    schema: {
+      type: "object",
+      required: [],
+      properties: [
+        "subject",
+        "predicate",
+        "object",
+        "asOf",
+        "includeInvalidated",
+        "checkFreshness",
+      ],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: true,
+      idempotent: true,
+    },
+  },
+  {
+    name: "triple_invalidate",
+    description:
+      "Mark a triple as no longer valid (sets valid_until = now). Idempotent — invalidating an already-invalidated triple is a no-op.",
+    visibility: "on-demand",
+    approval: "write",
+    schema: {
+      type: "object",
+      required: ["id"],
+      properties: ["id"],
+      additionalProperties: false,
+    },
+    mcpAnnotations: {
+      readOnly: false,
+      destructive: true,
+      idempotent: true,
+    },
+  },
+  {
     name: "sigil-skill-list",
     description:
       "List the managed skills visible at a scope, including their stable revisions and lifecycle metadata.",

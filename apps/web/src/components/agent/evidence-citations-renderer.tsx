@@ -14,14 +14,24 @@ interface EvidenceLocator {
 }
 export interface EvidenceCitation {
   citationId: string
+  source?: "artifact"
   artifactId: string
   filename: string
   quote: string
   locator: EvidenceLocator
 }
+export interface KnowledgeEvidenceCitation {
+  citationId: string
+  source: "knowledge"
+  knowledgeId: string
+  title: string
+  category: string
+  visibility: string
+  quote: string
+}
 export interface EvidenceSearchResult {
   grounding: "grounded" | "no-evidence"
-  citations: EvidenceCitation[]
+  citations: Array<EvidenceCitation | KnowledgeEvidenceCitation>
 }
 
 /**
@@ -79,10 +89,14 @@ export function EvidenceCitations({
               </span>
               <FileTextIcon className="size-3 shrink-0" />
               <span className="min-w-0 truncate font-medium text-foreground/80">
-                {citation.filename}
+                {citation.source === "knowledge"
+                  ? citation.title
+                  : citation.filename}
               </span>
               <span className="shrink-0 text-muted-foreground/70">
-                lines {citation.locator.startLine}–{citation.locator.endLine}
+                {citation.source === "knowledge"
+                  ? `${citation.visibility} knowledge`
+                  : `lines ${citation.locator.startLine}–${citation.locator.endLine}`}
               </span>
             </div>
             <blockquote className="border-l-2 border-primary/30 pl-2.5 text-xs leading-relaxed text-foreground/85 [overflow-wrap:anywhere]">

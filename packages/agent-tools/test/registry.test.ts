@@ -46,6 +46,7 @@ afterEach(async () => {
 async function makeRegistry(
   artifacts?: SessionArtifactStore,
   skillRegistry?: WritableManagedSkillRegistry,
+  knowledge?: Parameters<typeof createSigilAgentToolRegistry>[0]["knowledge"],
 ) {
   const directory = await mkdtemp(join(tmpdir(), "sigil-chat-gonk-"));
   temporaryDirectories.push(directory);
@@ -79,6 +80,7 @@ async function makeRegistry(
             rootKinds: ["agents", ".agents", ".gonk"],
           },
         }),
+      knowledge,
       workItems: workItemsRepository,
       specs: new MemorySpecsRepository(),
     }),
@@ -103,6 +105,41 @@ function humanAuth(principalId: string, scope: string): AuthContext {
       scopes: [scope],
     },
     authorize: () => ({ outcome: "allow", reason: "test policy" }),
+  };
+}
+
+function humanAuthDenyingKnowledge(
+  principalId: string,
+  scope: string,
+): AuthContext {
+  const auth = humanAuth(principalId, scope);
+  return {
+    ...auth,
+    authorize: (request) => {
+      const metadata = request.resource.metadata as
+        | { sourceId?: string; visibility?: string }
+        | undefined;
+      if (
+        request.action === "retrieval.source.discover" &&
+        metadata?.sourceId === "gonk.knowledge" &&
+        metadata.visibility === "team"
+      ) {
+        return {
+          outcome: "deny",
+          reason: "test policy denies team knowledge source discovery",
+        };
+      }
+      if (
+        request.action === "retrieval.hit.read" &&
+        metadata?.sourceId === "gonk.knowledge"
+      ) {
+        return {
+          outcome: "deny",
+          reason: "test policy denies knowledge retrieval",
+        };
+      }
+      return { outcome: "allow", reason: "test policy" };
+    },
   };
 }
 
@@ -776,6 +813,7 @@ describe("Sigil Chat Gonk registry", () => {
     });
     const { registry } = await makeRegistry(artifacts);
     const context = makeBaseContext({
+      auth: humanAuth("owner-1", "session:evidence-room-demo"),
       host: { resourceScope: "session:evidence-room-demo" },
     });
 
@@ -793,6 +831,7 @@ describe("Sigil Chat Gonk registry", () => {
         citations: [
           {
             citationId: "c1",
+            source: "artifact",
             artifactId: stored.id,
             filename: "cerebras-knowledge-base.md",
             quote: expect.stringContaining("biggest stated accuracy win"),
@@ -836,6 +875,7 @@ describe("Sigil Chat Gonk registry", () => {
         "sigil-evidence-ask",
         { question: "biggest accuracy win" },
         makeBaseContext({
+          auth: humanAuth("owner-1", "session:another-session"),
           host: { resourceScope: "session:another-session" },
         }),
       ),
@@ -844,6 +884,203 @@ describe("Sigil Chat Gonk registry", () => {
       ok: true,
       data: { grounding: "no-evidence", citations: [] },
     });
+  });
+
+  it("requires authenticated evidence retrieval", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-evidence-auth-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    await artifacts.putFile({
+      bytes: new TextEncoder().encode("A private note about Slack evidence."),
+      filename: "private-note.md",
+      mediaType: "text/markdown",
+      scope: "session:evidence-room-demo",
+    });
+    const { registry } = await makeRegistry(artifacts);
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "What evidence exists about Slack?" },
+        makeBaseContext({
+          host: { resourceScope: "session:evidence-room-demo" },
+        }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: expect.stringContaining("requires an authenticated"),
+    });
+  });
+
+  it("treats durable knowledge pages as a first-class evidence corpus", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-evidence-knowledge-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    await artifacts.putFile({
+      bytes: new TextEncoder().encode(
+        "Artifact evidence says Slack thread normalization improved the answer.",
+      ),
+      filename: "artifact-note.md",
+      mediaType: "text/markdown",
+      scope: "session:evidence-room-demo",
+    });
+    const queriedVisibilities: string[] = [];
+    const knowledge = {
+      query: vi.fn((query: { visibility?: string }) => {
+        queriedVisibilities.push(query.visibility ?? "all");
+        return query.visibility === "team"
+          ? [
+              {
+                page: {
+                  id: "slack-thread-normalization",
+                  title: "Slack Thread Normalization",
+                  body: "Durable knowledge says Slack thread normalization preserves references before synthesis.",
+                  category: "pattern",
+                  tags: ["slack", "normalization"],
+                  links: [],
+                  source: "test",
+                  visibility: "team",
+                  confidence: 1,
+                  superseded: false,
+                  created_at: 1,
+                  updated_at: 2,
+                },
+                score: 10,
+              },
+            ]
+          : [];
+      }),
+    } as Parameters<typeof createSigilAgentToolRegistry>[0]["knowledge"];
+    const { registry } = await makeRegistry(artifacts, undefined, knowledge);
+
+    const grounded = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "How does Slack thread normalization preserve references?" },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "session:evidence-room-demo"),
+          host: { resourceScope: "session:evidence-room-demo" },
+        }),
+      ),
+    );
+
+    expect(grounded).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "grounded",
+        citations: expect.arrayContaining([
+          expect.objectContaining({
+            source: "artifact",
+            filename: "artifact-note.md",
+          }),
+          expect.objectContaining({
+            source: "knowledge",
+            knowledgeId: "slack-thread-normalization",
+            visibility: "team",
+          }),
+        ]),
+        evidenceReceipt: {
+          sources: expect.arrayContaining(["sigil.artifacts", "gonk.knowledge"]),
+        },
+      },
+    });
+    expect(queriedVisibilities).toEqual(["private", "personal", "team"]);
+  });
+
+  it("does not rank or receipt knowledge hits denied by retrieval authorization", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-evidence-deny-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    await artifacts.putFile({
+      bytes: new TextEncoder().encode(
+        "Artifact evidence says Slack thread normalization improved the answer.",
+      ),
+      filename: "artifact-note.md",
+      mediaType: "text/markdown",
+      scope: "session:evidence-room-demo",
+    });
+    const queriedVisibilities: string[] = [];
+    const knowledge = {
+      query: vi.fn((query: { visibility?: string }) => {
+        queriedVisibilities.push(query.visibility ?? "all");
+        return query.visibility === "team"
+          ? [
+              {
+                page: {
+                  id: "denied-slack-thread-normalization",
+                  title: "Denied Slack Thread Normalization",
+                  body: "Denied durable knowledge says Slack thread normalization preserves hidden references.",
+                  category: "pattern",
+                  tags: ["slack", "normalization"],
+                  links: [],
+                  source: "test",
+                  visibility: "team",
+                  confidence: 1,
+                  superseded: false,
+                  created_at: 1,
+                  updated_at: 2,
+                },
+                score: 100,
+              },
+            ]
+          : [];
+      }),
+    } as Parameters<typeof createSigilAgentToolRegistry>[0]["knowledge"];
+    const { registry } = await makeRegistry(artifacts, undefined, knowledge);
+
+    const grounded = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "How does Slack thread normalization preserve references?" },
+        makeBaseContext({
+          auth: humanAuthDenyingKnowledge(
+            "owner-1",
+            "session:evidence-room-demo",
+          ),
+          host: { resourceScope: "session:evidence-room-demo" },
+        }),
+      ),
+    );
+
+    expect(grounded).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "grounded",
+        citations: [
+          expect.objectContaining({
+            source: "artifact",
+            filename: "artifact-note.md",
+          }),
+        ],
+        evidenceReceipt: {
+          sources: ["sigil.artifacts"],
+          candidateCount: 1,
+          visibleResourceKeys: [
+            expect.stringContaining("sigil.artifacts"),
+          ],
+        },
+      },
+    });
+    if (grounded.ok) {
+      const data = grounded.data as {
+        citations: Array<{ source: string }>;
+        evidenceReceipt: {
+          visibleResourceKeys: string[];
+          sources: string[];
+        };
+      };
+      expect(data.citations.map((citation) => citation.source)).not.toContain(
+        "knowledge",
+      );
+      expect(data.evidenceReceipt.sources).not.toContain("gonk.knowledge");
+      expect(data.evidenceReceipt.visibleResourceKeys.join("\n")).not.toContain(
+        "denied-slack-thread-normalization",
+      );
+    }
+    expect(queriedVisibilities).toEqual(["private", "personal"]);
   });
 
   it("reads and mutates stories through the domain-outcome path", async () => {
