@@ -50,27 +50,10 @@ describe("native Gonk tool context", () => {
       authorizeGonkRequest(
         {
           request: {
-            action: "retrieval.source.discover",
-            resource: {
-              kind: "retrieval-source",
-              target: "gonk.knowledge:team",
-            },
-          },
-          principal,
-          resourceScope: "project:sigil-chat",
-          personaId: undefined,
-        },
-        () => allowed,
-      ).outcome,
-    ).toBe("allow")
-    expect(
-      authorizeGonkRequest(
-        {
-          request: {
             action: "retrieval.hit.read",
             resource: {
               kind: "retrieval-resource",
-              target: "gonk.knowledge:knowledge-page:thread-notes",
+              target: "sigil.artifacts:artifact-passage:thread-notes",
             },
           },
           principal,
@@ -86,27 +69,10 @@ describe("native Gonk tool context", () => {
       authorizeGonkRequest(
         {
           request: {
-            action: "retrieval.source.discover",
-            resource: {
-              kind: "retrieval-source",
-              target: "gonk.knowledge:team",
-            },
-          },
-          principal,
-          resourceScope: "project:sigil-chat",
-          personaId: undefined,
-        },
-        () => allowed,
-      ).outcome,
-    ).toBe("deny")
-    expect(
-      authorizeGonkRequest(
-        {
-          request: {
             action: "retrieval.hit.read",
             resource: {
               kind: "retrieval-resource",
-              target: "gonk.knowledge:knowledge-page:thread-notes",
+              target: "sigil.artifacts:artifact-passage:thread-notes",
             },
           },
           principal,
@@ -153,7 +119,7 @@ describe("native Gonk tool context", () => {
     ).toBe("not-applicable")
   })
 
-  it("binds Gonk knowledge and triples substrates into tool host context", async () => {
+  it("binds the retrieval evidence coordinator into tool host context", async () => {
     const context = await makeGonkToolContext({
       dynamic: dynamicContext({
         sigilResourceScope: "project:sigil-chat",
@@ -167,19 +133,12 @@ describe("native Gonk tool context", () => {
 
     expect(context.host).toMatchObject({
       resourceScope: "project:sigil-chat",
-      knowledge: expect.objectContaining({
-        query: expect.any(Function),
-        write: expect.any(Function),
-      }),
       retrievalEvidenceCoordinator: expect.objectContaining({
         collect: expect.any(Function),
       }),
-      triples: expect.objectContaining({
-        assert: expect.any(Function),
-        query: expect.any(Function),
-        invalidate: expect.any(Function),
-      }),
     })
+    expect(context.host).not.toHaveProperty("knowledge")
+    expect(context.host).not.toHaveProperty("triples")
   })
 
   it("projects the immutable Eve binding into an exact Fabric execution seam", () => {

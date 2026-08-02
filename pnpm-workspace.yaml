@@ -8,9 +8,7 @@ catalog:
   "@gonk/context": 0.5.1
   "@gonk/eve-host": 0.9.7
   "@gonk/image-gen": 0.6.0
-  "@gonk/knowledge": 0.5.1
   "@gonk/memory": 0.7.1
-  "@gonk/memory-tools": 0.5.1
   "@gonk/persona": 0.7.0
   "@gonk/retrieval": 0.6.0
   "@gonk/scope": 0.5.1

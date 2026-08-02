@@ -174,8 +174,6 @@ function groupForApplicationTool(name: string): string {
   if (name.startsWith("sigil-review-")) return "review"
   if (name.startsWith("sigil-story-")) return "roadmap"
   if (name.startsWith("sigil-skill-")) return "skills"
-  if (name.startsWith("knowledge_") || name.startsWith("triple_"))
-    return "agent-memory"
   if (name.startsWith("sigil-blackboard-")) return "planning"
   if (
     name === "image_generate" ||
@@ -203,8 +201,6 @@ function scopeForApplicationTool(name: string): string {
   if (name.startsWith("sigil-review-")) return "Review document"
   if (name.startsWith("sigil-story-")) return "Shared roadmap"
   if (name.startsWith("sigil-skill-")) return "Global to session"
-  if (name.startsWith("knowledge_") || name.startsWith("triple_"))
-    return "Authorized knowledge scope"
   if (name.startsWith("sigil-blackboard-")) return "Current session"
   if (
     name === "image_generate" ||

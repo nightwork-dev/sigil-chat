@@ -21,15 +21,9 @@ catalogs:
     '@gonk/image-gen':
       specifier: 0.6.0
       version: 0.6.0
-    '@gonk/knowledge':
-      specifier: 0.5.1
-      version: 0.5.1
     '@gonk/memory':
       specifier: 0.7.1
       version: 0.7.1
-    '@gonk/memory-tools':
-      specifier: 0.5.1
-      version: 0.5.1
     '@gonk/persona':
       specifier: 0.7.0
       version: 0.7.0
@@ -110,15 +104,9 @@ importers:
       '@gonk/image-gen':
         specifier: 'catalog:'
         version: 0.6.0
-      '@gonk/knowledge':
-        specifier: 'catalog:'
-        version: 0.5.1
       '@gonk/memory':
         specifier: 'catalog:'
         version: 0.7.1
-      '@gonk/memory-tools':
-        specifier: 'catalog:'
-        version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/persona':
         specifier: 'catalog:'
         version: 0.7.0
@@ -383,12 +371,6 @@ importers:
       '@gonk/image-gen':
         specifier: 'catalog:'
         version: 0.6.0
-      '@gonk/knowledge':
-        specifier: 'catalog:'
-        version: 0.5.1
-      '@gonk/memory-tools':
-        specifier: 'catalog:'
-        version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/retrieval':
         specifier: 'catalog:'
         version: 0.6.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -1510,9 +1492,6 @@ packages:
   '@gonk/extension-spec@0.3.1':
     resolution: {integrity: sha512-qqIUGQZtXx4HYxJms+a4R3oLK2crYpmTDgCJTiFoTbZPIH+p3niml2CN0SUummzZ7s5bHt5IPNy1xgec8wdMRg==}
 
-  '@gonk/extension-spec@0.5.1':
-    resolution: {integrity: sha512-2MU80XDM2sx2EKhB4VPS8+mixonoVTqXQTIHBt2rF3HekvLR7CwkYCo+iLWuX7z+f+vylGNgvIhljV82uMC3Ow==}
-
   '@gonk/fabric@0.3.7':
     resolution: {integrity: sha512-zjMD+s60HURL5dpTK1lX0R+kdJGnTs1UK8frBXi/JtRF/VkdmuWqgQjvyqQy0qf04+2wt1h4SFRuGCtu3/oSwA==}
     hasBin: true
@@ -1528,15 +1507,6 @@ packages:
 
   '@gonk/jobs@1.2.0':
     resolution: {integrity: sha512-E6lYL5DV27Uf3HzeZwYD4tO+nQS0wRjpLdBs1c3OZDo5+43ykPmPd2NEEAZYWX40BanMTkFiE/HE1QI4WUKJkQ==}
-
-  '@gonk/knowledge@0.5.1':
-    resolution: {integrity: sha512-HosHho0TN3dgdd0amPBUOppjXvnE4oopmLNNufY89m1j2k1mqn+/gAdYHWQe33nGN2oGGtIWvJa9T4Ob2HrrTQ==}
-
-  '@gonk/memory-tools@0.5.1':
-    resolution: {integrity: sha512-DyMrC6HIM5P9ttFDT5UGlzZ922ExilTGONhvlpdwljSd+Ggv2RD8aiKoRgtUCESmatNvIpfxNHAuOCYGN7UO1w==}
-
-  '@gonk/memory@0.7.0':
-    resolution: {integrity: sha512-f2ZPxWBA9zAmoquQSAPh5YvUMiM89QxM3/3849bjWDFJ0XlrsHtb2TGM4W6OtB4ICDbrd5oKx2zlqpRq5aJgVQ==}
 
   '@gonk/memory@0.7.1':
     resolution: {integrity: sha512-og5TAuB236O1Njdjaq9BMWU390c9R4MZU4Q5/pgNNhcmJRfZipYqcNLW+CSyYbA3y7y7CBX310YWptgq6wTmLA==}
@@ -1566,9 +1536,6 @@ packages:
 
   '@gonk/skill-creator@0.5.0':
     resolution: {integrity: sha512-7Cy8mkGgsCmQw28rtfMWbQBW3Se8gYjs2ipKrtcFewiUe5cRjg+1HYWFr3dziHWAisZ3NqKLjTAyTV2iIWj02A==}
-
-  '@gonk/skill-creator@0.5.1':
-    resolution: {integrity: sha512-w/sKhr38gA9bC1ia5FAExhZD/GJMFlXinMh7cOxK8VDcoE7mxPDnAIoEDOR6o9oDRD5fwawOJZ0E8QbOWCckcQ==}
 
   '@gonk/skills@0.3.1':
     resolution: {integrity: sha512-bMP1EA/lm97i/aWtLG/1wUBPamaFNqPpmeoduOpECANHgt450CtdSJC/lnBKtfBdge0lgcdWRlrGRbx4ErchTw==}
@@ -7534,11 +7501,6 @@ snapshots:
       '@gonk/scope': 0.3.1
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
 
-  '@gonk/extension-spec@0.5.1':
-    dependencies:
-      '@gonk/scope': 0.5.1
-      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
-
   '@gonk/fabric@0.3.7(@gonk/scope@0.5.1)(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
     dependencies:
       '@gonk/jobs': 1.2.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -7579,42 +7541,6 @@ snapshots:
     transitivePeerDependencies:
       - better-sqlite3
       - sqlite-vec
-
-  '@gonk/knowledge@0.5.1':
-    dependencies:
-      '@gonk/autotune': 0.5.0
-      '@gonk/extension-spec': 0.5.1
-      '@gonk/memory': 0.7.0
-      '@gonk/scope': 0.5.1
-      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
-      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@types/better-sqlite3': 7.6.13
-      better-sqlite3: 12.10.0
-    optionalDependencies:
-      sqlite-vec: 0.1.9
-
-  '@gonk/memory-tools@0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
-    dependencies:
-      '@gonk/extension-spec': 0.5.1
-      '@gonk/memory': 0.7.0
-      '@gonk/scope': 0.5.1
-      '@gonk/skill-creator': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@gonk/skills': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
-    transitivePeerDependencies:
-      - better-sqlite3
-      - sqlite-vec
-
-  '@gonk/memory@0.7.0':
-    dependencies:
-      '@gonk/embedding': 0.5.0
-      '@gonk/scope': 0.5.1
-      '@gonk/store': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@mirk/store': 0.6.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@types/better-sqlite3': 7.6.13
-      better-sqlite3: 12.10.0
-    optionalDependencies:
-      sqlite-vec: 0.1.9
 
   '@gonk/memory@0.7.1':
     dependencies:
@@ -7680,19 +7606,6 @@ snapshots:
       '@gonk/tool-registry': 0.3.1(@gonk/scope@0.3.1)
       yaml: 2.9.0
     transitivePeerDependencies:
-      - sqlite-vec
-
-  '@gonk/skill-creator@0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
-    dependencies:
-      '@gonk/auth': 0.5.1
-      '@gonk/extension-spec': 0.5.1
-      '@gonk/persona': 0.7.0
-      '@gonk/scope': 0.5.1
-      '@gonk/skills': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
-      '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
-      yaml: 2.9.0
-    transitivePeerDependencies:
-      - better-sqlite3
       - sqlite-vec
 
   '@gonk/skills@0.3.1(sqlite-vec@0.1.9)':

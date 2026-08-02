@@ -1,10 +1,5 @@
 import type { AuthContext } from "@gonk/auth";
 import {
-  KNOWLEDGE_VISIBILITIES,
-  type KnowledgeVisibility,
-} from "@gonk/knowledge";
-import type { KnowledgeStore } from "@gonk/knowledge/store";
-import {
   canonicalResourceKey,
   RetrievalEvidenceCoordinator,
   type RetrievalEvidenceBudget,
@@ -33,7 +28,6 @@ import { isRecord } from "./validators.js";
 
 const EVIDENCE_COLLECTION = "session-artifact-passages";
 const ARTIFACT_SOURCE_ID = "sigil.artifacts";
-const KNOWLEDGE_SOURCE_ID = "gonk.knowledge";
 const DEFAULT_RESULT_LIMIT = 5;
 const MAX_RESULT_LIMIT = 8;
 const MAX_PASSAGE_CHARS = 1_200;
@@ -107,30 +101,8 @@ export interface EvidenceCitation {
   matchedTerms: string[];
 }
 
-export interface KnowledgeEvidenceLocator {
-  type: "knowledge-page";
-  section: "body";
-}
-
-export interface KnowledgeEvidenceCitation {
-  citationId: string;
-  source: "knowledge";
-  knowledgeId: string;
-  title: string;
-  category: string;
-  visibility: string;
-  quote: string;
-  locator: KnowledgeEvidenceLocator;
-  score: number;
-  matchedTerms: string[];
-}
-
-export type EvidenceSearchCitation =
-  | EvidenceCitation
-  | KnowledgeEvidenceCitation;
-
 export interface SigilEvidenceCandidate {
-  citation: EvidenceSearchCitation;
+  citation: EvidenceCitation;
   hit: RetrievalHit;
 }
 
@@ -162,7 +134,7 @@ interface EvidenceCorpusSummary {
 export interface EvidenceSearchResult {
   grounding: "grounded" | "no-evidence";
   question: string;
-  citations: EvidenceSearchCitation[];
+  citations: EvidenceCitation[];
   corpus: EvidenceCorpusSummary;
   evidenceReceipt?: {
     requestId: string;
@@ -178,7 +150,6 @@ export interface EvidenceSearchResult {
 export function registerEvidenceTools(
   registry: ToolRegistry,
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
-  knowledge?: KnowledgeStore,
   retrievalEvidenceCoordinator: SigilRetrievalEvidenceCoordinator =
     createSigilRetrievalEvidenceCoordinator(),
 ): void {
@@ -206,7 +177,6 @@ export function registerEvidenceTools(
       return {
         data: await searchArtifactEvidence({
           artifacts,
-          knowledge,
           retrievalEvidenceCoordinator,
           scope,
           auth: ctx.auth,
@@ -220,7 +190,6 @@ export function registerEvidenceTools(
 
 export async function searchArtifactEvidence(input: {
   artifacts: SessionArtifactStore;
-  knowledge?: KnowledgeStore;
   retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator;
   scope: ResourceScope;
   auth?: AuthContext;
@@ -311,23 +280,16 @@ export async function searchArtifactEvidence(input: {
     },
     hit: retrievalHitForArtifact(hit, matchedTerms),
   }));
-  const knowledgeCandidates = await searchKnowledgeEvidence({
-    knowledge: input.knowledge,
-    auth: input.auth,
-    question,
-    meaningfulTerms,
-    limit: Math.max(resultLimit * 4, 20),
-  });
   const coordinated =
     await (input.retrievalEvidenceCoordinator ??
       createSigilRetrievalEvidenceCoordinator()).collect({
-      candidates: [...artifactCandidates, ...knowledgeCandidates],
+      candidates: artifactCandidates,
       auth: input.auth,
       question,
       resultLimit,
     });
   const citationByResourceKey = new Map(
-    [...artifactCandidates, ...knowledgeCandidates].map((candidate) => [
+    artifactCandidates.map((candidate) => [
       canonicalResourceKey(candidate.hit.resource),
       candidate.citation,
     ]),
@@ -366,7 +328,7 @@ export async function searchArtifactEvidence(input: {
       corpus,
       evidenceReceipt,
       answerInstruction:
-        "No supporting passage was found in the selected artifact scope or durable knowledge corpus. Say that the available evidence does not answer the question; do not invent an answer, quote, locator, or citation.",
+        "No supporting passage was found in the selected artifact scope. Say that the available evidence does not answer the question; do not invent an answer, quote, locator, or citation.",
     };
   }
 
@@ -379,90 +341,6 @@ export async function searchArtifactEvidence(input: {
     answerInstruction:
       "Answer only from these passages. Cite claims with the returned citationId values and preserve each quote, source identifier, and locator exactly as supplied.",
   };
-}
-
-async function searchKnowledgeEvidence(input: {
-  knowledge: KnowledgeStore | undefined;
-  auth: AuthContext;
-  question: string;
-  meaningfulTerms: readonly string[];
-  limit: number;
-}): Promise<Array<{
-  citation: KnowledgeEvidenceCitation;
-  hit: RetrievalHit;
-}>> {
-  if (!input.knowledge || input.meaningfulTerms.length === 0) return [];
-  const hits = [];
-  for (const visibility of KNOWLEDGE_VISIBILITIES) {
-    if (!(await authorizeKnowledgeVisibility(input.auth, visibility))) {
-      continue;
-    }
-    hits.push(
-      ...input.knowledge.query({
-        text: input.question,
-        limit: input.limit,
-        visibility,
-      }),
-    );
-  }
-  return hits.flatMap((hit) => {
-    const searchable = [
-      hit.page.title,
-      hit.page.body,
-      hit.page.category,
-      hit.page.tags.join(" "),
-    ].join(" ");
-    const pageTerms = new Set(tokenize(searchable));
-    const matchedTerms = input.meaningfulTerms.filter((term) =>
-      pageTerms.has(term),
-    );
-    if (matchedTerms.length < Math.min(2, input.meaningfulTerms.length)) {
-      return [];
-    }
-    const quote = quoteKnowledgePage(hit.page.body, matchedTerms);
-    const citation: KnowledgeEvidenceCitation = {
-      citationId: "",
-      source: "knowledge",
-      knowledgeId: hit.page.id,
-      title: hit.page.title,
-      category: hit.page.category,
-      visibility: hit.page.visibility,
-      quote,
-      locator: { type: "knowledge-page", section: "body" },
-      score: hit.score,
-      matchedTerms,
-    };
-    return [
-      {
-        citation,
-        hit: retrievalHitForKnowledge({
-          id: hit.page.id,
-          revision: String(hit.page.updated_at),
-          score: hit.score,
-          matchedTerms,
-        }),
-      },
-    ];
-  });
-}
-
-async function authorizeKnowledgeVisibility(
-  auth: AuthContext,
-  visibility: KnowledgeVisibility,
-): Promise<boolean> {
-  const decision = await auth.authorize({
-    action: "retrieval.source.discover",
-    resource: {
-      kind: "retrieval-source",
-      target: `${KNOWLEDGE_SOURCE_ID}:${visibility}`,
-      scope: "resource",
-      metadata: {
-        sourceId: KNOWLEDGE_SOURCE_ID,
-        visibility,
-      },
-    },
-  });
-  return decision.outcome === "allow";
 }
 
 export function createSigilRetrievalEvidenceCoordinator(): SigilRetrievalEvidenceCoordinator {
@@ -543,26 +421,6 @@ function retrievalHitForArtifact(
   });
 }
 
-function retrievalHitForKnowledge(input: {
-  id: string;
-  revision: string;
-  score: number;
-  matchedTerms: readonly string[];
-}): RetrievalHit {
-  return retrievalHit({
-    resource: {
-      sourceId: KNOWLEDGE_SOURCE_ID,
-      kind: "knowledge-page",
-      id: input.id,
-      revision: input.revision,
-      fragment: { kind: "section", id: "body" },
-    },
-    sourceId: KNOWLEDGE_SOURCE_ID,
-    score: input.score,
-    matchedTerms: input.matchedTerms,
-  });
-}
-
 function retrievalHit(input: {
   resource: RetrievalResourceRef;
   sourceId: string;
@@ -575,11 +433,11 @@ function retrievalHit(input: {
     audience: "restricted",
     scores: {
       lexical: {
-        algorithm: input.sourceId === KNOWLEDGE_SOURCE_ID ? "native" : "bm25",
+        algorithm: "bm25",
         sourceId: input.sourceId,
         value: score,
       },
-      sourcePriority: input.sourceId === KNOWLEDGE_SOURCE_ID ? 60 : 50,
+      sourcePriority: 50,
       final: score,
     },
     matchedTerms: input.matchedTerms,
@@ -620,22 +478,6 @@ function estimateEvidenceTokens(hit: RetrievalHit): RetrievalEvidenceBudget {
     ),
     estimateQuality: "fallback",
   };
-}
-
-function quoteKnowledgePage(
-  body: string,
-  matchedTerms: readonly string[],
-): string {
-  const trimmed = body.trim();
-  if (trimmed.length <= MAX_PASSAGE_CHARS) return trimmed;
-  const lower = trimmed.toLowerCase();
-  const firstMatch = matchedTerms
-    .map((term) => lower.indexOf(term.toLowerCase()))
-    .filter((index) => index >= 0)
-    .sort((a, b) => a - b)[0];
-  const center = firstMatch ?? 0;
-  const start = Math.max(0, center - Math.floor(MAX_PASSAGE_CHARS / 3));
-  return trimmed.slice(start, start + MAX_PASSAGE_CHARS).trim();
 }
 
 function passagesForArtifact(

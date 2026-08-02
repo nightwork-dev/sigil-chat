@@ -17,12 +17,10 @@ import type { DynamicResolveContext } from "eve/tools"
 
 import {
   eveSessionOwnerStore,
-  knowledgeStore,
   projectWorkspaceRegistries,
   retrievalEvidenceCoordinator,
   scopeGrantPolicy,
   threadScopeOwners,
-  triplesLayer,
 } from "./application-services"
 import type { EveSessionBinding } from "./eve-session-owners"
 import { personalScopeId } from "./personal-scope"
@@ -75,9 +73,7 @@ export async function makeGonkToolContext(
         current.attributes.sigilExecutionBinding,
       )?.applicationThreadId,
       personaId: stringAttribute(current.attributes.sigilPersonaId),
-      knowledge: knowledgeStore,
       retrievalEvidenceCoordinator,
-      triples: triplesLayer,
       ...(fabric ? { fabric } : {}),
     },
     log: silentLogger,
@@ -197,20 +193,6 @@ export function authorizeGonkRequest(
     }
     return allow(
       "The authenticated Sigil principal may read retrieval evidence in this scope",
-    )
-  }
-  if (input.request.action === "retrieval.source.discover") {
-    if (
-      !input.resourceScope ||
-      !canAccess(input.principal.id, input.resourceScope, input.personaId)
-    ) {
-      return deny("The active Sigil resource scope is no longer authorized")
-    }
-    if (input.request.resource.kind !== "retrieval-source") {
-      return deny("Retrieval source discovery requires a retrieval source")
-    }
-    return allow(
-      "The authenticated Sigil principal may discover retrieval sources in this scope",
     )
   }
   if (

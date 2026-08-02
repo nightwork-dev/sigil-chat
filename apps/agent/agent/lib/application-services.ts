@@ -1,9 +1,6 @@
-import { join } from "node:path"
 import { createScope } from "@gonk/scope"
 import { createStoreProvider } from "@gonk/store"
 import { mirkBackendFactory } from "@gonk/store/sqlite"
-import { KnowledgeStore } from "@gonk/knowledge/store"
-import { TriplesLayer } from "@gonk/memory"
 import {
   IMAGE_GENERATE_CAPABILITY,
   createImageGenerateCapability,
@@ -46,8 +43,6 @@ import {
   type UsageLedgerRecord,
 } from "./usage-ledger"
 
-const dataEnvironment = readDataEnvironment(process.env)
-
 // `createScope({ cwd })` alone walks from `cwd` for a root marker
 // (`.gonk`/`.claude`/`.agents`/`agents`/`.git`) and, finding none, falls back
 // to the real user home for the project tier (@gonk/scope's
@@ -60,21 +55,12 @@ const dataEnvironment = readDataEnvironment(process.env)
 // resolves it, by walking for `fixtures/application/sigil-chat.yaml` or a
 // `package.json` named `sigil-chat` — pins the project tier to a directory
 // that is always real for this repo (the worktree root, or the smoke
-// script's copied fixture tree), so the project store never silently escapes
-// into the operator's home.
-//
-// KB.1's durable knowledge tools use Gonk's private/personal/team visibility
-// tiers, while Sigil Chat gates invocation through the active
-// project/workspace resource scope in the Eve tool context. Bind every
-// non-project knowledge home to SIGIL_DATA_DIR's identity subtree so the
-// application-owned corpus stays inside the same disposable app data boundary.
-const scopeEnvironment = {
+// script's copied fixture tree), so the store never silently escapes into
+// the operator's home.
+const usageScope = createScope({
   cwd: process.cwd(),
-  homeRoot: dataEnvironment.identityDir,
-  personaHome: join(dataEnvironment.identityDir, "knowledge", "private"),
   projectRoot: resolveSigilProjectRoot(process.cwd()),
-}
-const usageScope = createScope(scopeEnvironment)
+})
 const usageStore = createStoreProvider(usageScope, {
   backendFactory: mirkBackendFactory(usageScope),
 })
@@ -86,15 +72,8 @@ export const usageLedgerRepository = new MirkUsageLedgerRepository({
   ),
 })
 
-export const knowledgeStore = new KnowledgeStore({
-  scopeEnv: scopeEnvironment,
-  teamHome: join(dataEnvironment.identityDir, "knowledge", "team"),
-})
 export const retrievalEvidenceCoordinator =
   createSigilRetrievalEvidenceCoordinator()
-export const triplesLayer = new TriplesLayer({
-  dbPath: join(dataEnvironment.identityDir, "triples", "triples.db"),
-})
 
 export const projectWorkspaceRegistries = getProjectWorkspaceRegistries()
 export const scopeGrantPolicy = createScopeGrantPolicy({
@@ -125,10 +104,9 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   containers: projectWorkspaceRegistries,
   graph: graphRepository,
   reviews: reviewRepository,
-  knowledge: knowledgeStore,
   retrievalEvidenceCoordinator,
   skills: createRequestBoundSkillRegistry(
-    dataEnvironment.skillsDir,
+    readDataEnvironment(process.env).skillsDir,
   ),
   sessions: {
     listOwned: (principalId) => threadScopeOwners.listOwned(principalId),
