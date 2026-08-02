@@ -337,7 +337,10 @@ describe("AppAgentSessions persistence call site", () => {
     repository.saveSnapshot(
       TEST_USER_ID,
       thread.id,
-      finalSnapshot,
+      {
+        events: [...finalSnapshot.events],
+        session: finalSnapshot.session,
+      },
       thread.revision,
     )
 

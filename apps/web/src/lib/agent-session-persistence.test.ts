@@ -65,6 +65,37 @@ describe("AgentSessionRevisionChain", () => {
     ).rejects.toThrow("revision conflict")
     expect(chain.current()).toBe(9)
   })
+
+  it("adopts a newer authoritative revision observed between mutations", async () => {
+    const chain = new AgentSessionRevisionChain(4)
+    const expected: number[] = []
+
+    chain.observe(6)
+    await chain.apply((expectedRevision) => {
+      expected.push(expectedRevision)
+      return Promise.resolve({ revision: 7 })
+    })
+
+    expect(expected).toEqual([6])
+    expect(chain.current()).toBe(7)
+  })
+
+  it("does not regress when a newer revision is observed during a write", async () => {
+    const chain = new AgentSessionRevisionChain(4)
+    let finish!: (value: { revision: number }) => void
+    const pending = chain.apply(
+      () =>
+        new Promise<{ revision: number }>((resolve) => {
+          finish = resolve
+        }),
+    )
+
+    chain.observe(6)
+    finish({ revision: 5 })
+    await pending
+
+    expect(chain.current()).toBe(6)
+  })
 })
 
 describe("AgentSessionPersistenceCoordinator", () => {

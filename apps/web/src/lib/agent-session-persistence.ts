@@ -25,11 +25,15 @@ export class AgentSessionRevisionChain {
     return this.revision
   }
 
+  observe(revision: number): void {
+    if (revision > this.revision) this.revision = revision
+  }
+
   async apply<T extends { revision: number }>(
     mutation: (expectedRevision: number) => Promise<T>,
   ): Promise<T> {
     const result = await mutation(this.revision)
-    this.revision = result.revision
+    this.observe(result.revision)
     return result
   }
 }
@@ -50,6 +54,10 @@ export class AgentSessionPersistenceCoordinator {
 
   afterPersisted<T>(action: () => Promise<T>): Promise<T> {
     return this.queue.afterPersisted(action)
+  }
+
+  observeRevision(revision: number): void {
+    this.revisions.observe(revision)
   }
 
   currentRevision(): number {
