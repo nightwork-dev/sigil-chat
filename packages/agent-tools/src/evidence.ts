@@ -141,6 +141,13 @@ export interface SigilRetrievalEvidenceCoordinator {
   }): Promise<RetrievalEvidenceResult>;
 }
 
+export interface KnowledgeEvidenceDiagnostic {
+  sourceId: typeof KNOWLEDGE_SOURCE_ID;
+  outcome: "unqueried";
+  reason: string;
+  activeContainer: KnowledgeContainerRef;
+}
+
 interface EvidencePassageMeta extends Record<string, unknown> {
   artifactId: string;
   filename: string;
@@ -169,6 +176,7 @@ export interface EvidenceSearchResult {
     visibleResourceKeys: string[];
     selected: number;
     dropped: number;
+    diagnostics?: KnowledgeEvidenceDiagnostic[];
   };
   answerInstruction: string;
 }
@@ -309,7 +317,7 @@ export async function searchArtifactEvidence(input: {
     },
     hit: retrievalHitForArtifact(hit, matchedTerms),
   }));
-  const knowledgeCandidates = await knowledgeCandidatesForScope({
+  const knowledge = await knowledgeCandidatesForScope({
     scopedKnowledgeStore: input.scopedKnowledgeStore,
     auth: input.auth,
     scope: input.scope,
@@ -320,13 +328,13 @@ export async function searchArtifactEvidence(input: {
   const coordinated =
     await (input.retrievalEvidenceCoordinator ??
       createSigilRetrievalEvidenceCoordinator()).collect({
-      candidates: [...artifactCandidates, ...knowledgeCandidates],
+      candidates: [...artifactCandidates, ...knowledge.candidates],
       auth: input.auth,
       question,
       resultLimit,
     });
   const citationByResourceKey = new Map(
-    [...artifactCandidates, ...knowledgeCandidates].map((candidate) => [
+    [...artifactCandidates, ...knowledge.candidates].map((candidate) => [
       canonicalResourceKey(candidate.hit.resource),
       candidate.citation,
     ]),
@@ -355,6 +363,9 @@ export async function searchArtifactEvidence(input: {
     ),
     selected: coordinated.receipt.selected.length,
     dropped: coordinated.receipt.dropped.length,
+    ...(knowledge.diagnostic
+      ? { diagnostics: [knowledge.diagnostic] }
+      : {}),
   };
 
   if (citations.length === 0) {
@@ -387,12 +398,15 @@ async function knowledgeCandidatesForScope(input: {
   question: string;
   limit: number;
   meaningfulTerms: readonly string[];
-}): Promise<SigilEvidenceCandidate[]> {
-  if (!input.scopedKnowledgeStore) return [];
+}): Promise<{
+  candidates: SigilEvidenceCandidate[];
+  diagnostic?: KnowledgeEvidenceDiagnostic;
+}> {
+  if (!input.scopedKnowledgeStore) return { candidates: [] };
   const activeContainer = knowledgeContainerForScope(input.scope);
-  if (!activeContainer) return [];
+  if (!activeContainer) return { candidates: [] };
   const principalId = input.auth.principal?.id;
-  if (!principalId) return [];
+  if (!principalId) return { candidates: [] };
   try {
     const result = await input.scopedKnowledgeStore.query({
       principal: { principalId },
@@ -400,11 +414,23 @@ async function knowledgeCandidatesForScope(input: {
       text: input.question,
       limit: input.limit,
     });
-    return result.results.map((hit) =>
-      evidenceCandidateForKnowledge(hit, input.meaningfulTerms),
-    );
+    return {
+      candidates: result.results.map((hit) =>
+        evidenceCandidateForKnowledge(hit, input.meaningfulTerms),
+      ),
+    };
   } catch (error) {
-    if (error instanceof ScopedKnowledgeAccessError) return [];
+    if (error instanceof ScopedKnowledgeAccessError) {
+      return {
+        candidates: [],
+        diagnostic: {
+          sourceId: KNOWLEDGE_SOURCE_ID,
+          outcome: "unqueried",
+          reason: "scoped knowledge read denied for active container",
+          activeContainer,
+        },
+      };
+    }
     throw error;
   }
 }
