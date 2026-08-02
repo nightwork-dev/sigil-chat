@@ -99,7 +99,7 @@ export function projectProviders(payload: unknown): ModelProviderRecord[] {
   if (typeof payload !== "object" || payload === null) return []
   const providers = (payload as { providers?: unknown }).providers
   if (!Array.isArray(providers)) return []
-  return providers.flatMap((candidate) => {
+  const projected = providers.flatMap((candidate) => {
     if (typeof candidate !== "object" || candidate === null) return []
     const entry = candidate as Record<string, unknown>
     const id = text(entry.id)
@@ -134,6 +134,54 @@ export function projectProviders(payload: unknown): ModelProviderRecord[] {
       },
     ]
   })
+  return coalesceProviderRecords(projected)
+}
+
+/**
+ * The runtime keeps the deployment fallback as a synthetic provider so it can
+ * exist without an authored `agent.providers` entry. Operator UI should not
+ * turn that storage distinction into two identical endpoint blocks. When the
+ * transport identity is the same, show one provider with the fallback first.
+ */
+function coalesceProviderRecords(
+  providers: readonly ModelProviderRecord[],
+): ModelProviderRecord[] {
+  const result: ModelProviderRecord[] = []
+  const indexByEndpoint = new Map<string, number>()
+
+  for (const provider of providers) {
+    const endpointKey = JSON.stringify([
+      provider.label,
+      provider.kind,
+      provider.baseUrl ?? "",
+      provider.credential.envName ?? "",
+      provider.credential.required,
+    ])
+    const existingIndex = indexByEndpoint.get(endpointKey)
+    if (existingIndex === undefined) {
+      indexByEndpoint.set(endpointKey, result.length)
+      result.push(provider)
+      continue
+    }
+
+    const existing = result[existingIndex]!
+    result[existingIndex] = {
+      ...existing,
+      enabled: existing.enabled || provider.enabled,
+      credential: {
+        ...existing.credential,
+        present: existing.credential.present || provider.credential.present,
+      },
+      models: [...existing.models, ...provider.models],
+      ...(existing.catalog
+        ? { catalog: existing.catalog }
+        : provider.catalog
+          ? { catalog: provider.catalog }
+          : {}),
+    }
+  }
+
+  return result
 }
 
 function projectModel(candidate: unknown): ModelEndpointRecord[] {

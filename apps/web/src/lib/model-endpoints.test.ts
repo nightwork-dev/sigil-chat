@@ -120,6 +120,60 @@ describe("provider projection", () => {
     expect(JSON.stringify(providers)).not.toContain("sk-live-secret")
   })
 
+  it("shows the deployment fallback with its authored provider when they share one endpoint", () => {
+    const providers = projectProviders({
+      providers: [
+        {
+          id: "deployment",
+          label: "Codex subscription",
+          kind: "codex",
+          enabled: true,
+          credential: { required: true, present: true },
+          models: [
+            {
+              id: "deployment-default",
+              model: "gpt-5.6-terra",
+              enabled: true,
+              isDeploymentDefault: true,
+            },
+          ],
+        },
+        {
+          id: "codex",
+          label: "Codex subscription",
+          kind: "codex",
+          enabled: true,
+          credential: { required: true, present: true },
+          models: [
+            {
+              id: "codex/luna",
+              model: "gpt-5.6-luna",
+              enabled: true,
+              isDeploymentDefault: false,
+            },
+            {
+              id: "codex/sol",
+              model: "gpt-5.6-sol",
+              enabled: true,
+              isDeploymentDefault: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(providers).toHaveLength(1)
+    expect(providers[0]).toMatchObject({
+      id: "deployment",
+      label: "Codex subscription",
+    })
+    expect(providers[0]?.models.map((model) => model.id)).toEqual([
+      "deployment-default",
+      "codex/luna",
+      "codex/sol",
+    ])
+  })
+
   it("projects a reasoning declaration through, and drops a malformed one (MDL.4)", () => {
     const withReasoning = projectProviders({
       providers: [

@@ -47,7 +47,7 @@ const DEFAULT_ATTACHMENT_ACCEPT = [
 ].join(",")
 
 export const CHAT_INPUT_TEXTAREA_CLASS_NAME =
-  "min-h-11 resize-none border-0 bg-transparent px-3 pt-3 pb-1 text-base md:text-sm shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+  "min-h-11 max-h-32 overflow-y-auto resize-none border-0 bg-transparent px-3 pt-3 pb-1 text-base md:text-sm shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
 
 /** One attached file, from selection through upload to a served URL. */
 export interface ChatInputAttachment {
@@ -274,7 +274,7 @@ export function ChatInput({
             </button>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
           {trailingControls}
           <button
             aria-label={isStreaming ? "Stop response" : "Send message"}

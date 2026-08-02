@@ -18,26 +18,19 @@
 // trigger and puts the reason in the popover, rather than showing a selection
 // that never took.
 
-import { useState } from "react"
-import { ChevronDownIcon } from "lucide-react"
-
 import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover"
-import { SectionHeader } from "@workspace/ui/components/section-header"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
-import { Separator } from "@workspace/ui/components/separator"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { ToneChip } from "@workspace/ui/components/tone-chip"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -51,10 +44,9 @@ import {
 import { useEnabledModelIds } from "@/lib/model-enablement"
 import {
   findModelRecord,
-  formatContextWindow,
   selectableModelProviders,
   useModelEndpoints,
-  type ModelEndpointRecord,
+  type ModelProviderRecord,
 } from "@/lib/model-endpoints"
 
 /**
@@ -81,7 +73,6 @@ export function ComposerModelControl({
   className?: string
   thread?: AgentThread
 }) {
-  const [open, setOpen] = useState(false)
   const catalog = useAgentRuntimeCatalog()
   const endpoints = useModelEndpoints()
   const enablement = useEnabledModelIds()
@@ -98,6 +89,13 @@ export function ComposerModelControl({
   )
   const label = formatBoundModelLabel(thread, catalog.data?.agent.model)
   const pending = setModel.isPending || setRequestOptions.isPending
+  const triggerLabel = record?.label ?? label
+  const reasoning = record?.reasoning
+  const declaresFastMode = record?.fastMode === true
+  const hasTuning = Boolean(reasoning || declaresFastMode)
+  const reasoningLevel =
+    thread?.requestOptions?.reasoningLevel ?? reasoning?.default
+  const fastMode = thread?.requestOptions?.fastMode === true
 
   // A rebind that lost a revision race is the ordinary concurrent-edit case,
   // not a model problem — but the user still has to be told the model did not
@@ -108,7 +106,9 @@ export function ComposerModelControl({
     if (!thread || presetId === boundPresetId) return
     setModel.mutate({
       id: thread.id,
-      ...(presetId === DEPLOYMENT_DEFAULT_PRESET_ID ? {} : { modelPresetId: presetId }),
+      ...(presetId === DEPLOYMENT_DEFAULT_PRESET_ID
+        ? {}
+        : { modelPresetId: presetId }),
       expectedRevision: thread.revision,
     })
   }
@@ -123,199 +123,160 @@ export function ComposerModelControl({
   }
 
   return (
-    <Popover onOpenChange={setOpen} open={open}>
-      <PopoverTrigger
+    <DropdownMenu>
+      <DropdownMenuTrigger
         render={
           <ToneChip
             aria-label={`Model: ${label}`}
-            className={cn("min-w-0 font-mono", className)}
+            className={cn(
+              "min-w-0 max-w-48 shrink font-mono max-sm:max-w-28",
+              className,
+            )}
             title="Model, reasoning level, and fast mode"
             tone={error ? "destructive" : "muted"}
           />
         }
       >
-        <span className="truncate">{label}</span>
-        <ChevronDownIcon />
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 gap-3 p-3" side="top">
-        <div className="flex flex-col gap-1.5">
-          <SectionHeader>Model</SectionHeader>
-          {endpoints.isPending || enablement.isPending ? (
-            <p className="text-muted-foreground">Loading models…</p>
-          ) : endpoints.isError ? (
-            <p className="text-destructive">
-              The agent runtime did not answer, so the model list is
-              unavailable. The conversation keeps the model it is bound to.
-            </p>
-          ) : selectable.length === 0 ? (
-            <p className="text-muted-foreground">
-              No models are available to choose. An owner enables them in
-              Settings → Models.
-            </p>
-          ) : (
-            <>
-              <Select
-                disabled={pending || !thread}
-                onValueChange={(value) => {
-                  if (value) handleModelChange(value)
-                }}
-                value={boundPresetId}
-              >
-                <SelectTrigger className="w-full font-mono" size="sm">
-                  <SelectValue placeholder={label} />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectable.map((provider) => (
-                    <SelectGroupedModels
-                      key={provider.id}
-                      label={provider.label}
-                      models={provider.models}
-                    />
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* The bound model can legitimately be absent from the list:
-                  an owner may disable a model a conversation is already
-                  running. Saying so beats a select that silently shows a
-                  value with no matching option. */}
-              {!selectable.some((provider) =>
-                provider.models.some((model) => model.id === boundPresetId),
-              ) ? (
-                <p className="text-muted-foreground">
-                  This conversation runs{" "}
-                  <span className="font-mono">{boundPresetId}</span>, which is
-                  no longer offered for new selections. It keeps running until
-                  you choose another.
-                </p>
-              ) : null}
-              <p className="text-muted-foreground">
-                Applies from your next message. Changing provider starts a new
-                prompt cache for this conversation.
-              </p>
-            </>
-          )}
-          {error ? (
-            <p className="text-destructive">
-              {error instanceof Error
-                ? error.message
-                : "That change was refused."}
-            </p>
-          ) : null}
-        </div>
-
-        <Separator />
-
-        <div className="flex flex-col gap-1.5">
-          <SectionHeader>Tuning</SectionHeader>
-          <ModelTuning
-            disabled={pending || !thread}
-            onChange={handleRequestOptions}
-            record={record}
-            requestOptions={thread?.requestOptions}
+        <span className="truncate">{triggerLabel}</span>
+        {reasoningLevel ? (
+          <span className="text-muted-foreground">
+            {titleCase(reasoningLevel)}
+          </span>
+        ) : null}
+        {fastMode ? <span className="text-muted-foreground">Fast</span> : null}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56" side="top">
+        {hasTuning ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger disabled={pending || !thread}>
+              <span>Model</span>
+              <DropdownMenuShortcut className="max-w-32 truncate">
+                {triggerLabel}
+              </DropdownMenuShortcut>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="max-h-[min(24rem,calc(100vh-2rem))] min-w-64 overflow-y-auto">
+              <ModelMenuItems
+                boundPresetId={boundPresetId}
+                error={endpoints.isError}
+                loading={endpoints.isPending || enablement.isPending}
+                onChange={handleModelChange}
+                providers={selectable}
+              />
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : (
+          <ModelMenuItems
+            boundPresetId={boundPresetId}
+            error={endpoints.isError}
+            loading={endpoints.isPending || enablement.isPending}
+            onChange={handleModelChange}
+            providers={selectable}
           />
-        </div>
-      </PopoverContent>
-    </Popover>
+        )}
+        {reasoning ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger disabled={pending || !thread}>
+              <span>Effort</span>
+              <DropdownMenuShortcut>
+                {titleCase(reasoningLevel ?? reasoning.default)}
+              </DropdownMenuShortcut>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                onValueChange={(value) =>
+                  handleRequestOptions({ reasoningLevel: value })
+                }
+                value={reasoningLevel ?? reasoning.default}
+              >
+                {reasoning.levels.map((level) => (
+                  <DropdownMenuRadioItem key={level} value={level}>
+                    {titleCase(level)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : null}
+        {declaresFastMode ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger disabled={pending || !thread}>
+              <span>Speed</span>
+              <DropdownMenuShortcut>
+                {fastMode ? "Fast" : "Standard"}
+              </DropdownMenuShortcut>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                onValueChange={(value) =>
+                  handleRequestOptions({ fastMode: value === "fast" })
+                }
+                value={fastMode ? "fast" : "standard"}
+              >
+                <DropdownMenuRadioItem value="standard">
+                  Standard
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="fast">Fast</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : null}
+        {error ? (
+          <DropdownMenuLabel className="max-w-64 text-destructive">
+            {error instanceof Error
+              ? error.message
+              : "That change was refused."}
+          </DropdownMenuLabel>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
-function SelectGroupedModels({
-  label,
-  models,
-}: {
-  label: string
-  models: readonly ModelEndpointRecord[]
-}) {
-  return (
-    <SelectGroup>
-      <SelectLabel>{label}</SelectLabel>
-      {models.map((model) => (
-        <SelectItem key={model.id} value={model.id}>
-          <span className="font-mono">{model.model}</span>
-        </SelectItem>
-      ))}
-    </SelectGroup>
-  )
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
-/**
- * MDL.4's reasoning level and fast mode, for the model that is actually
- * bound.
- *
- * Declared capability still governs which CONTROLS exist (MDL.4 AC2/AC3) —
- * this never invents a control the fixture did not declare. What changed in
- * MDL.5 is the empty case: a model declaring neither now says so, because
- * rendering nothing inside an opened popover reads as a broken surface rather
- * than as an honest absence.
- */
-function ModelTuning({
-  disabled,
+function ModelMenuItems({
+  boundPresetId,
+  error,
+  loading,
   onChange,
-  record,
-  requestOptions,
+  providers,
 }: {
-  disabled: boolean
-  onChange: (next: AgentThreadRequestOptions) => void
-  record: ModelEndpointRecord | undefined
-  requestOptions: AgentThreadRequestOptions | undefined
+  boundPresetId: string
+  error: boolean
+  loading: boolean
+  onChange: (presetId: string) => void
+  providers: readonly ModelProviderRecord[]
 }) {
-  if (!record) {
+  if (loading) return <DropdownMenuLabel>Loading models…</DropdownMenuLabel>
+  if (error) {
     return (
-      <p className="text-muted-foreground">
-        This model is not in the current inventory, so its tunable settings are
-        unknown.
-      </p>
+      <DropdownMenuLabel className="text-destructive">
+        Model list unavailable
+      </DropdownMenuLabel>
     )
   }
-  if (!record.reasoning && !record.fastMode) {
-    return (
-      <p className="text-muted-foreground">
-        {record.model} declares no reasoning levels or fast mode
-        {record.contextWindowTokens > 0
-          ? ` — ${formatContextWindow(record.contextWindowTokens)}.`
-          : "."}
-      </p>
-    )
+  if (providers.length === 0) {
+    return <DropdownMenuLabel>No models enabled in Settings</DropdownMenuLabel>
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {record.reasoning ? (
-        <Select
-          disabled={disabled}
-          onValueChange={(value) => {
-            if (value) onChange({ reasoningLevel: value })
-          }}
-          value={requestOptions?.reasoningLevel ?? record.reasoning.default}
-        >
-          <ToneChip
-            aria-label="Reasoning level"
-            render={<SelectTrigger size="sm" />}
-            title="Reasoning level"
-          >
-            <SelectValue />
-          </ToneChip>
-          <SelectContent align="start">
-            {record.reasoning.levels.map((level) => (
-              <SelectItem key={level} value={level}>
-                {level}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : null}
-      {record.fastMode ? (
-        <ToneChip
-          aria-label="Fast mode"
-          aria-pressed={requestOptions?.fastMode === true}
-          disabled={disabled}
-          onClick={() => onChange({ fastMode: !requestOptions?.fastMode })}
-          title="Fast mode"
-          tone={requestOptions?.fastMode === true ? "info" : "muted"}
-        >
-          Fast
-        </ToneChip>
-      ) : null}
-    </div>
+    <DropdownMenuRadioGroup onValueChange={onChange} value={boundPresetId}>
+      {providers.map((provider) => (
+        <div key={provider.id}>
+          <DropdownMenuLabel>{provider.label}</DropdownMenuLabel>
+          {provider.models.map((model) => (
+            <DropdownMenuRadioItem
+              className="font-mono"
+              key={model.id}
+              value={model.id}
+            >
+              {model.model}
+            </DropdownMenuRadioItem>
+          ))}
+        </div>
+      ))}
+    </DropdownMenuRadioGroup>
   )
 }

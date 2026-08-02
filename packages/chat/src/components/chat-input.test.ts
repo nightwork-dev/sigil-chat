@@ -10,4 +10,11 @@ describe("ChatInput textarea sizing", () => {
     expect(classes).toContain("md:text-sm")
     expect(classes).not.toContain("text-sm")
   })
+
+  it("bounds long drafts and scrolls them inside the composer", () => {
+    const classes = CHAT_INPUT_TEXTAREA_CLASS_NAME.split(/\s+/)
+
+    expect(classes).toContain("max-h-32")
+    expect(classes).toContain("overflow-y-auto")
+  })
 })

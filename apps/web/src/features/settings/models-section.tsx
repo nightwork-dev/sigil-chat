@@ -25,7 +25,14 @@ import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { CodeBlock } from "@workspace/ui/components/code-block"
-import { FieldDescription, FieldError } from "@workspace/ui/components/field"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@workspace/ui/components/dialog"
+import { FieldError } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
@@ -55,6 +62,7 @@ import {
   type ModelProviderRecord,
 } from "@/lib/model-endpoints"
 import {
+  MAX_MODEL_ENABLEMENT_IDS_PER_REQUEST,
   isModelEnabledForNewSessions,
   isModelEnablementLocked,
   useEnabledModelIds,
@@ -166,14 +174,6 @@ export function ModelsSection({ userId }: { userId: string }) {
                   : "That change was refused."}
               </FieldError>
             ) : null}
-            <FieldDescription>
-              Providers come from{" "}
-              <code className="font-mono">agent.providers</code> in the
-              application fixture; a model becomes available to new chats only
-              when you turn it on here, and stays unavailable until you do.
-              Credentials stay in the agent runtime&apos;s environment — this
-              page can see whether a variable is set, never what it contains.
-            </FieldDescription>
           </>
         </SettingsAsyncState>
       </SettingsSection>
@@ -237,10 +237,6 @@ function NewChatModelPicker({
           </SelectContent>
         </Select>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Bound when a chat is created and fixed for that conversation, so chats
-        already open keep the model they began with.
-      </p>
     </div>
   )
 }
@@ -264,6 +260,9 @@ function ProviderBlock({
   const allOn =
     toggleable.length > 0 &&
     toggleable.every((model) => enabledIds.includes(model.id))
+  const canBulkToggle =
+    toggleable.length > 0 &&
+    toggleable.length <= MAX_MODEL_ENABLEMENT_IDS_PER_REQUEST
   const availableCount = provider.models.filter((model) =>
     isModelEnabledForNewSessions(model, enabledIds),
   ).length
@@ -271,54 +270,164 @@ function ProviderBlock({
   return (
     <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <div className="flex flex-wrap items-baseline gap-x-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-xs font-medium text-foreground">
               {provider.label}
             </span>
             <span className="font-mono text-xs text-muted-foreground">
               {provider.kind}
             </span>
+            <span className="text-xs text-muted-foreground">
+              {availableCount}/{provider.models.length} enabled
+            </span>
           </div>
-          {provider.baseUrl ? (
-            <p className="truncate font-mono text-xs text-muted-foreground">
-              {provider.baseUrl}
-            </p>
-          ) : null}
-          <CredentialLine credential={provider.credential} />
-          <CatalogLine catalog={provider.catalog} />
-          <p className="text-xs text-muted-foreground">
-            {availableCount} of {provider.models.length} available to new chats
-          </p>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            {provider.baseUrl ? (
+              <span
+                className="max-w-full truncate font-mono"
+                title={provider.baseUrl}
+              >
+                {provider.baseUrl}
+              </span>
+            ) : null}
+            <CredentialLine credential={provider.credential} />
+            {provider.credential.required &&
+            !provider.credential.present ? null : (
+              <CatalogLine catalog={provider.catalog} />
+            )}
+          </div>
         </div>
-        <Switch
-          size="sm"
-          className="mt-0.5 shrink-0"
-          aria-label={`Make every ${provider.label} model available to new chats`}
-          checked={toggleable.length === 0 ? availableCount > 0 : allOn}
-          disabled={pending || toggleable.length === 0}
-          onCheckedChange={(next) =>
-            onChange(
-              toggleable.map((model) => model.id),
-              next,
-            )
-          }
-        />
+        {canBulkToggle ? (
+          <Switch
+            size="sm"
+            className="mt-0.5 shrink-0"
+            aria-label={`Make every ${provider.label} model available to new chats`}
+            checked={allOn}
+            disabled={pending}
+            onCheckedChange={(next) =>
+              onChange(
+                toggleable.map((model) => model.id),
+                next,
+              )
+            }
+          />
+        ) : null}
       </div>
 
-      {/* Model rows. Fetched catalog models append here, disabled like any
-          other until an owner turns them on. */}
-      <div className="flex flex-col gap-1 border-l border-border pl-3">
-        {provider.models.map((model: ModelEndpointRecord) => (
-          <ModelRow
-            key={model.id}
-            model={model}
-            enabledIds={enabledIds}
-            pending={pending}
-            onChange={(enabled) => onChange([model.id], enabled)}
-          />
-        ))}
-      </div>
+      <ProviderModels
+        provider={provider}
+        enabledIds={enabledIds}
+        pending={pending}
+        onChange={onChange}
+      />
+    </div>
+  )
+}
+
+function ProviderModels({
+  provider,
+  enabledIds,
+  pending,
+  onChange,
+}: {
+  provider: ModelProviderRecord
+  enabledIds: readonly string[]
+  pending: boolean
+  onChange: (presetIds: string[], enabled: boolean) => void
+}) {
+  const authored = provider.models.filter((model) => !model.discovered)
+  const discovered = provider.models.filter((model) => model.discovered)
+  const enabledDiscovered = discovered.filter((model) =>
+    isModelEnabledForNewSessions(model, enabledIds),
+  )
+  const otherDiscovered = discovered.filter(
+    (model) => !isModelEnabledForNewSessions(model, enabledIds),
+  )
+
+  return (
+    <div className="flex flex-col gap-1 border-l border-border pl-3">
+      {[...authored, ...enabledDiscovered].map((model: ModelEndpointRecord) => (
+        <ModelRow
+          key={model.id}
+          model={model}
+          enabledIds={enabledIds}
+          pending={pending}
+          onChange={(enabled) => onChange([model.id], enabled)}
+        />
+      ))}
+      {otherDiscovered.length > 0 ? (
+        <DiscoveredModelSearch
+          models={otherDiscovered}
+          enabledIds={enabledIds}
+          pending={pending}
+          onChange={onChange}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+const MAX_DISCOVERED_MODEL_RESULTS = 12
+
+function DiscoveredModelSearch({
+  models,
+  enabledIds,
+  pending,
+  onChange,
+}: {
+  models: readonly ModelEndpointRecord[]
+  enabledIds: readonly string[]
+  pending: boolean
+  onChange: (presetIds: string[], enabled: boolean) => void
+}) {
+  const [query, setQuery] = useState("")
+  const normalizedQuery = query.trim().toLowerCase()
+  const filtered =
+    normalizedQuery.length === 0
+      ? []
+      : models.filter((model) =>
+          `${model.label} ${model.model}`
+            .toLowerCase()
+            .includes(normalizedQuery),
+        )
+  const visible = filtered.slice(0, MAX_DISCOVERED_MODEL_RESULTS)
+
+  return (
+    <div className="flex flex-col gap-1.5 pt-1">
+      <Input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={`Find among ${models.length} discovered models`}
+        aria-label="Find a discovered model to enable"
+        className="h-8 font-mono text-xs"
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {normalizedQuery ? (
+        <div className="flex flex-col gap-1">
+          {visible.map((model) => (
+            <ModelRow
+              key={model.id}
+              model={model}
+              enabledIds={enabledIds}
+              pending={pending}
+              onChange={(enabled) => onChange([model.id], enabled)}
+            />
+          ))}
+          {filtered.length === 0 ? (
+            <p className="py-2 text-xs text-muted-foreground">
+              No models match.
+            </p>
+          ) : null}
+          {filtered.length > visible.length ? (
+            <p className="py-1 text-xs text-muted-foreground">
+              {filtered.length - visible.length} more matches — keep typing to
+              narrow the list.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -337,45 +446,30 @@ function ModelRow({
   const locked = isModelEnablementLocked(model) || !model.enabled
 
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-mono text-xs text-foreground">
-            {model.model}
+    <div className="grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span
+          className="truncate font-mono text-xs text-foreground"
+          title={model.model}
+        >
+          {model.model}
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {formatContextWindow(model.contextWindowTokens)}
+        </span>
+        {model.isDeploymentDefault ? (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            Fallback
           </span>
-          <span className="text-xs text-muted-foreground">
-            {formatContextWindow(model.contextWindowTokens)}
+        ) : !model.enabled ? (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            Fixture-disabled
           </span>
-          {model.discovered ? (
-            <span
-              className="rounded-sm border border-border px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
-              title="Not in the application fixture — found by a live catalog check of this provider."
-            >
-              Discovered
-            </span>
-          ) : null}
-        </div>
-        {locked ? (
-          <p className="text-xs text-muted-foreground">
-            {model.isDeploymentDefault
-              ? // Post-binding this means something narrower than it used to:
-                // sessions carry their own model, so the fixture default is
-                // what a session falls back to when it has none — which is why
-                // it cannot be switched off from here.
-                "Always available: chats with no model of their own run this one."
-              : "Turned off in the application fixture."}
-          </p>
-        ) : model.discovered ? (
-          <p className="text-xs text-muted-foreground">
-            Not yet in the application fixture — turning this on is enough to
-            use it, but it will offer again after every restart until it is
-            authored there too.
-          </p>
         ) : null}
       </div>
       <Switch
         size="sm"
-        className="mt-0.5 shrink-0"
+        className="shrink-0"
         aria-label={`Make ${model.model} available to new chats`}
         checked={isModelEnabledForNewSessions(model, enabledIds)}
         disabled={pending || locked}
@@ -391,30 +485,28 @@ function CredentialLine({
   credential: ModelEndpointCredentialStatus
 }) {
   if (!credential.required && !credential.envName) {
-    return (
-      <p className="text-xs text-muted-foreground">No credential required.</p>
-    )
+    return <span className="text-muted-foreground">No credential required</span>
   }
   if (!credential.envName) {
     // Codex reads the local `codex login` session rather than a variable, so
     // there is no name to print — only whether that login is usable.
     return credential.present ? (
-      <p className="text-xs text-muted-foreground">Signed in locally.</p>
+      <span className="text-muted-foreground">Signed in locally</span>
     ) : (
-      <p className="text-xs text-destructive">
+      <span className="text-destructive">
         No local sign-in. Run <code className="font-mono">codex login</code>{" "}
         where the agent runs.
-      </p>
+      </span>
     )
   }
   return credential.present ? (
-    <p className="text-xs text-muted-foreground">
-      <span className="font-mono">{credential.envName}</span> is set.
-    </p>
+    <span className="text-muted-foreground">
+      <span className="font-mono">{credential.envName}</span> set
+    </span>
   ) : (
-    <p className="text-xs text-destructive">
-      <span className="font-mono">{credential.envName}</span> is not set.
-    </p>
+    <span className="text-destructive">
+      <span className="font-mono">{credential.envName}</span> not set
+    </span>
   )
 }
 
@@ -429,15 +521,15 @@ function CatalogLine({ catalog }: { catalog?: ModelCatalogStatus }) {
   if (!catalog) return null
   if (catalog.error) {
     return (
-      <p className="text-xs text-destructive">
+      <span className="text-destructive">
         Catalog check failed: {catalog.error}
-      </p>
+      </span>
     )
   }
   return (
-    <p className="text-xs text-muted-foreground">
-      Catalog checked {formatRelativeTime(catalog.checkedAt)}.
-    </p>
+    <span className="text-muted-foreground">
+      Checked {formatRelativeTime(catalog.checkedAt)}
+    </span>
   )
 }
 
@@ -459,137 +551,125 @@ function AddEndpointSection() {
   }
 
   return (
-    <SettingsSection>
-      <div className="flex flex-col gap-1">
-        <SectionHeader>Add a provider</SectionHeader>
-        <p className="text-xs text-muted-foreground">
-          Ollama, LM Studio, vLLM, and llama.cpp all speak the same
-          OpenAI-compatible HTTP API. Probe one to confirm the agent runtime can
-          reach it and to see what it serves, then add the generated rows to the
-          application fixture.
-        </p>
-      </div>
+    <div>
+      <Dialog>
+        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          Add provider
+        </DialogTrigger>
+        <DialogContent className="max-h-[min(90vh,48rem)] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add provider</DialogTitle>
+          </DialogHeader>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <Label htmlFor="endpoint-base-url" className="text-xs">
-            Base URL
-          </Label>
-          <Input
-            id="endpoint-base-url"
-            value={baseUrl}
-            onChange={(event) => setBaseUrl(event.target.value)}
-            placeholder="http://127.0.0.1:1234/v1"
-            className="font-mono text-xs"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <Label htmlFor="endpoint-api-key-env" className="text-xs">
-            Credential variable for the generated rows (optional)
-          </Label>
-          <Input
-            id="endpoint-api-key-env"
-            value={apiKeyEnv}
-            onChange={(event) => setApiKeyEnv(event.target.value)}
-            placeholder="SIGIL_MODEL_LOCAL_API_KEY"
-            className="font-mono text-xs"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Name the environment variable the agent runtime reads the key from, not
-        the key. Local servers usually need none. The probe itself runs
-        unauthenticated against a new address — a credential is only ever sent
-        to an origin already listed in the fixture.
-      </p>
-
-      <div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={!canProbe}
-          onClick={handleProbe}
-        >
-          {probe.isPending ? "Probing…" : "Probe endpoint"}
-        </Button>
-      </div>
-
-      {probe.isError ? (
-        <p className="text-xs text-destructive">
-          {probe.error instanceof Error
-            ? probe.error.message
-            : "The probe could not be run."}
-        </p>
-      ) : null}
-
-      {result ? (
-        <div className="flex flex-col gap-2 border-t border-border pt-3">
-          {result.reachable ? (
-            <p className="text-xs text-muted-foreground">
-              Reachable — serving {result.models.length}{" "}
-              {result.models.length === 1 ? "model" : "models"}.
-            </p>
-          ) : (
-            <p className="text-xs text-destructive">
-              Unreachable.{result.error ? ` ${result.error}` : ""}
-            </p>
-          )}
-
-          {result.credential.envName ? (
-            <p className="text-xs text-muted-foreground">
-              This origin is already configured, so the probe used{" "}
-              <span className="font-mono">{result.credential.envName}</span>,
-              which {result.credential.present ? "is set" : "is not set"}.
-            </p>
-          ) : null}
-
-          {result.models.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {result.models.map((servedModel) => (
-                <Button
-                  key={servedModel}
-                  type="button"
-                  size="sm"
-                  variant={servedModel === model ? "secondary" : "ghost"}
-                  className="h-auto py-1 font-mono text-xs"
-                  onClick={() => setModel(servedModel)}
-                >
-                  {servedModel}
-                </Button>
-              ))}
-            </div>
-          ) : null}
-
-          {result.reachable && model ? (
-            <div className="flex flex-col gap-1.5">
-              <p className="text-xs text-muted-foreground">
-                Add this provider under{" "}
-                <code className="font-mono">agent.providers</code> in{" "}
-                <code className="font-mono">
-                  fixtures/application/sigil-chat.yaml
-                </code>
-                , then restart the agent runtime.
-              </p>
-              <CodeBlock
-                language="yaml"
-                code={providerFixtureSnippet({
-                  id: suggestProviderId(baseUrl.trim(), model),
-                  label: model,
-                  model,
-                  modelId: "default",
-                  baseUrl: baseUrl.trim(),
-                  ...(apiKeyEnv.trim() ? { apiKeyEnv: apiKeyEnv.trim() } : {}),
-                })}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Label htmlFor="endpoint-base-url" className="text-xs">
+                Base URL
+              </Label>
+              <Input
+                id="endpoint-base-url"
+                value={baseUrl}
+                onChange={(event) => setBaseUrl(event.target.value)}
+                placeholder="http://127.0.0.1:1234/v1"
+                className="font-mono text-xs"
+                autoComplete="off"
+                spellCheck={false}
               />
             </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Label htmlFor="endpoint-api-key-env" className="text-xs">
+                Credential environment (optional)
+              </Label>
+              <Input
+                id="endpoint-api-key-env"
+                value={apiKeyEnv}
+                onChange={(event) => setApiKeyEnv(event.target.value)}
+                placeholder="SIGIL_MODEL_LOCAL_API_KEY"
+                className="font-mono text-xs"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canProbe}
+              onClick={handleProbe}
+            >
+              {probe.isPending ? "Probing…" : "Probe"}
+            </Button>
+          </div>
+
+          {probe.isError ? (
+            <p className="text-xs text-destructive">
+              {probe.error instanceof Error
+                ? probe.error.message
+                : "The probe could not be run."}
+            </p>
           ) : null}
-        </div>
-      ) : null}
-    </SettingsSection>
+
+          {result ? (
+            <div className="flex flex-col gap-2 border-t border-border pt-3">
+              {result.reachable ? (
+                <p className="text-xs text-muted-foreground">
+                  Reachable · {result.models.length}{" "}
+                  {result.models.length === 1 ? "model" : "models"}
+                </p>
+              ) : (
+                <p className="text-xs text-destructive">
+                  Unreachable{result.error ? ` · ${result.error}` : ""}
+                </p>
+              )}
+
+              {result.credential.envName ? (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-mono">{result.credential.envName}</span>
+                  {result.credential.present ? " set" : " not set"}
+                </p>
+              ) : null}
+
+              {result.models.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.models.map((servedModel) => (
+                    <Button
+                      key={servedModel}
+                      type="button"
+                      size="sm"
+                      variant={servedModel === model ? "secondary" : "ghost"}
+                      className="h-auto py-1 font-mono text-xs"
+                      onClick={() => setModel(servedModel)}
+                    >
+                      {servedModel}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+
+              {result.reachable && model ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Fixture entry</Label>
+                  <CodeBlock
+                    language="yaml"
+                    code={providerFixtureSnippet({
+                      id: suggestProviderId(baseUrl.trim(), model),
+                      label: model,
+                      model,
+                      modelId: "default",
+                      baseUrl: baseUrl.trim(),
+                      ...(apiKeyEnv.trim()
+                        ? { apiKeyEnv: apiKeyEnv.trim() }
+                        : {}),
+                    })}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

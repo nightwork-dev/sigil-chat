@@ -132,7 +132,7 @@ export interface SetModelEnabledRequest {
   enabled: boolean
 }
 
-const MAX_IDS_PER_REQUEST = 64
+export const MAX_MODEL_ENABLEMENT_IDS_PER_REQUEST = 64
 
 /**
  * The enabled set, readable by ANY signed-in principal.
@@ -170,10 +170,10 @@ export function parseSetModelEnabledRequest(
   if (
     !Array.isArray(entry.presetIds) ||
     entry.presetIds.length === 0 ||
-    entry.presetIds.length > MAX_IDS_PER_REQUEST
+    entry.presetIds.length > MAX_MODEL_ENABLEMENT_IDS_PER_REQUEST
   ) {
     throw new ModelEnablementRefusedError(
-      `Name between 1 and ${MAX_IDS_PER_REQUEST} model ids.`,
+      `Name between 1 and ${MAX_MODEL_ENABLEMENT_IDS_PER_REQUEST} model ids.`,
     )
   }
   const presetIds = entry.presetIds.map((id) => {
