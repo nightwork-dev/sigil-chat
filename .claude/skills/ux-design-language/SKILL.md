@@ -15,6 +15,49 @@ showcase pages, admin panels, config editors) because there's no marketing
 narrative to hide behind. If a badge doesn't mean anything, there's nothing
 else on the page to distract from that.
 
+## The four burdens of proof
+
+Every element in a UI must prove:
+
+1. **Necessity** — what capability, state, navigation, or necessary copy would
+   be lost if it disappeared?
+2. **Irreducible friction** — why can the clicks, typing, decisions, travel,
+   waiting, or cognitive load required to use it not be reduced?
+3. **Compact and intuitive expression** — why can the same capability not use
+   fewer surfaces, steps, words, or space, or a more familiar interaction?
+4. **Objective-relative position** — why does it earn this location, order,
+   size, and visual weight compared with everything else the user needs to
+   achieve their objective on this surface?
+
+Run these before color, spacing, component choice, or polish. An element can be
+useful in isolation and still be wrong because it is too prominent, too early,
+too large, or too costly relative to the user's task.
+
+- If necessity is weak: delete it.
+- If friction can fall: shorten, default, automate, autocomplete, or remove a
+  step.
+- If expression can compress: combine or redesign it.
+- If position is unearned: demote, move, resize, or reveal it contextually.
+
+Frequency changes placement, never quality. A low-frequency task uses one of
+three homes:
+
+1. a compact, clearly labeled affordance that reveals it on invocation;
+2. progressive or contextual disclosure at the moment it becomes relevant; or
+3. a separate configuration screen or panel when it is a distinct task.
+
+It does not remain permanently expanded because that was easiest to implement.
+It still carries the full interaction-quality burden; because users cannot rely
+on muscle memory, an infrequent task often needs more familiar conventions,
+clearer state, and lower relearning cost. Persistent primary placement is
+reserved for continuously relevant state, serious risk prevention, or
+essential discoverability.
+
+Compact does not mean cramped or cryptic. It means no element, step, or word
+stands between the user and the task without earning that cost. Intuitive means
+the affordance carries its own operation through convention, placement, state,
+and feedback rather than explanation.
+
 ## The one question
 
 For every visual element you're about to add, ask: **what does this
@@ -32,9 +75,32 @@ communicate, and does it communicate exactly one thing?**
 If you can't answer "what does this communicate" in one sentence, don't add
 it.
 
+## Every surface is an affordance unless it is explicitly copy
+
+A surface must accept input, expose state, enable navigation, or establish
+manipulable structure. If its purpose is prose, classify it as a deliberate
+copy surface and make it justify the space it occupies. Explanation is not a
+neutral filler state and must never masquerade as interface.
+
+- Treat every rendered static string and every badge with the same suspicion as
+  `useEffect`: allowed, but only with a concrete justification that survives
+  review. "Helpful," "clearer," "looks finished," and "adds hierarchy" are not
+  sufficient.
+- A bordered panel that only explains nearby controls is a copy surface, not a
+  tool. Delete it, move the material to documentation or contextual help, or
+  turn the panel into an actual control/state surface.
+- A row implies inspection, selection, navigation, or manipulation. If none is
+  possible, the row-shaped treatment is a false affordance.
+- A chip implies state, filtering, selection, or removal. Static taxonomy text
+  should not borrow the shape of a control.
+- A badge must encode changing state, selection, filtering, removal, or another
+  real affordance. Static taxonomy or emphasis should be plain text or deleted.
+- Empty space is preferable to a surface invented to hold explanation.
+
 ## Concrete checks, in order
 
 ### Color
+
 - Each token means one thing across the whole app: `text-destructive` is
   always error/danger, `text-primary` is always the active/selected/on
   state, chart-* tokens are always the same data series. Don't introduce a
@@ -52,6 +118,7 @@ it.
   components.
 
 ### Shadow and elevation
+
 - No box-shadow on every surface by default (logo, background, card, icon).
   A shadow says "this is above the surface, closer to the viewer, probably
   interactive or floating." If everything has one, nothing does.
@@ -59,6 +126,7 @@ it.
   items, actively-focused cards in a stack.
 
 ### Content hierarchy — the over-labeling trap
+
 - Don't stack eyebrow + title + description + a paragraph when the title
   alone already carries the message. Every additional line is something the
   reader has to decide is worth reading.
@@ -71,6 +139,7 @@ it.
   either make it dynamic or delete it and use plain text.
 
 ### Layout rhythm
+
 - Avoid reflexive uniform 3-or-4-column grids when the content itself has
   unequal weight. A dashboard where every card is identically sized implies
   every card is equally important — is that true?
@@ -79,6 +148,7 @@ it.
   interest alone.
 
 ### Containers and nesting
+
 - A card is one elevation level. Don't nest bordered or tinted sub-cards
   inside a card — a card of cards reads as noise, and if every group is a
   card, "card" stops meaning "distinct surface." Inside a card, separate
@@ -87,19 +157,35 @@ it.
 - One tint level, too. A tinted callout inside a tinted card inside a tinted
   section is three claims of "this is special" that cancel out.
 
-### Annotation register — read every visit, or once?
-- Match explanatory text to how often the surface is read. **Deliberative
-  surfaces are read once** (settings, forms, onboarding, config editors) —
-  annotate each control; help text earns its place. **Glanceable surfaces
-  are read constantly** (dashboards, monitors, live views, status boards) —
-  labels and values only. An operator scanning queue health every few
-  seconds does not re-read "Attention combines depth growth, worker
-  shortfall, oldest-job age, and retry pressure" each time — move that to a
-  tooltip or an info affordance, never always-on prose.
-- The test: *will the user read this sentence on every visit, or once?* If
-  every visit, it isn't annotation, it's clutter — demote it.
+### Permanent-copy budget — tooling is not documentation
+
+- Tooling surfaces start with a permanent explanatory-copy budget of
+  **zero**. A sentence earns permanent space only when it is:
+  1. the control's actual label;
+  2. live state or a value the user must inspect;
+  3. a warning needed to prevent an imminent, consequential mistake; or
+  4. an instruction without which the current task cannot be completed.
+- Settings and forms are still tooling. Do not annotate every control merely
+  because a user may visit the page infrequently. A clear label, familiar
+  control, useful placeholder, grouping, and immediate validation should carry
+  the interaction.
+- Architecture, ownership, persistence semantics, implementation details, and
+  "what this screen does" prose belong in documentation, contextual help, or a
+  tooltip—not permanently between controls.
+- Do not use prose to compensate for weak hierarchy or an unfamiliar control.
+  Repair the hierarchy or control. If a control needs a paragraph to explain
+  how to operate it, the control is unfinished.
+- Explanatory copy that appears only after a relevant action, error, dangerous
+  choice, or empty state is contextual rather than permanent and may earn its
+  place. Keep it specific to the moment.
+- Use professional creative tools such as Blender as the density reference:
+  labels, values, menus, affordances, and live status dominate; tutorial prose
+  does not occupy the working surface.
+- Review every permanent sentence with the deletion test: remove it and attempt
+  the task. If the task remains clear and safe, delete the sentence.
 
 ### Horizontal space and duplication
+
 - Fill horizontal space with **different information, or whitespace** —
   never a second rendering of data already on the page. A summary/detail
   split is fine; a sidebar that re-plots the numbers the table already shows
@@ -110,6 +196,7 @@ it.
   to duplicate.
 
 ### Gradients and motion
+
 - Tone down extreme gradients unless the product's brand deliberately owns
   that visual language (check `themes.css` — none of this template's seven
   themes lean on heavy gradients as their identity).
@@ -119,6 +206,7 @@ it.
   purely decorative (a shimmer with no state behind it) is noise.
 
 ### Typography register
+
 - Body copy has a sensible minimum size for its script (≥14px English body
   text as a floor; smaller is acceptable only for genuinely secondary
   metadata like timestamps or the 9–11px mono readouts used throughout this
@@ -149,6 +237,13 @@ attention. Every element competes for that job:
 
 ## Before-you-ship checklist
 
+- [ ] Every element proved necessity.
+- [ ] Every interaction's friction is irreducible or deliberately constrained.
+- [ ] No more compact and intuitive expression preserves the same capability.
+- [ ] Every element earns its location, order, size, and visual weight relative
+      to the user's objective.
+- [ ] Low-frequency tasks are invoked contextually without lowering their
+      interaction-quality or intuitiveness bar.
 - [ ] Every color on this screen means the same thing everywhere else it
       appears in the app.
 - [ ] Every badge/pill/indicator displays a value that can actually change.
@@ -159,8 +254,14 @@ attention. Every element competes for that job:
 - [ ] Motion, where present, ties to a real state change.
 - [ ] No card nested inside a card (one elevation level); sub-groups use
       dividers/rows/`FieldGroup`. One tint level.
-- [ ] Annotation density matches the surface — help text on read-once
-      surfaces (settings/forms), labels-only on glanceable ones (dashboards).
+- [ ] Every permanent sentence passes the tooling-copy test: label, live state,
+      necessary warning, or indispensable instruction.
+- [ ] Every surface is an actual affordance or an explicitly justified copy
+      surface; no explanation masquerades as interface.
+- [ ] Every static string and badge has a reviewable justification; badges
+      encode real state or affordance rather than decorative taxonomy.
+- [ ] No prose compensates for a weak hierarchy, ambiguous affordance, or
+      unfamiliar interaction; the control itself was repaired.
 - [ ] No datum rendered twice to fill space; every panel shows something the
       others don't.
 
