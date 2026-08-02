@@ -771,6 +771,14 @@ async function postSession(
       reset: async () => {
         throw new Error("reset should not be called")
       },
+      // Added by eve 0.29.x: manual session context clearing and compaction
+      // reach custom channel routes too. Same policy: throw, don't mask.
+      clear: async () => {
+        throw new Error("clear should not be called")
+      },
+      compact: async () => {
+        throw new Error("compact should not be called")
+      },
       resolveActiveSession: async () => {
         throw new Error("resolveActiveSession should not be called")
       },

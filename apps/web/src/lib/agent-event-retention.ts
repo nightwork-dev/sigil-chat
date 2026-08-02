@@ -1,4 +1,5 @@
 import type { BuildEveForkSeedInput } from "@zigil/agent/eve/client"
+import type { MessageStreamEventMeta } from "eve/client"
 import {
   AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
   isAgentContextCompileReceiptEvent,
@@ -8,6 +9,18 @@ import {
 export type AgentRuntimeStreamEvent = BuildEveForkSeedInput["events"][number]
 export type AgentSessionTimelineEvent =
   AgentRuntimeStreamEvent | AgentContextCompileReceiptEvent
+
+// eve 0.29 unwraps a subagent's child stream events before they're stamped
+// with `meta` (id/at): the parent workflow forwards them live, ahead of the
+// durable-write seam that assigns identity. Sanitizing/replaying a subagent
+// transcript therefore has to accept the unstamped shape too, alongside the
+// always-stamped top-level events this module otherwise handles.
+type SubagentChildStreamEvent = Extract<
+  AgentRuntimeStreamEvent,
+  { type: "subagent.event" }
+>["data"]["event"]
+
+type SanitizableAgentEvent = AgentSessionTimelineEvent | SubagentChildStreamEvent
 
 type AssistantFinishReason = Extract<
   AgentRuntimeStreamEvent,
@@ -26,8 +39,15 @@ export interface AgentEventCompactionReceipt {
   compactedAt: string
 }
 
+// `id` is optional here even though eve 0.29 stamps every top-level event
+// with one: snapshots persisted before this migration, and every subagent
+// child event (forwarded before eve's stamping seam runs — see
+// `SubagentChildStreamEvent` above), can still lack it. Replay synthesizes a
+// placeholder id for those so the reconstructed event still satisfies eve's
+// `MessageStreamEvent` contract; eve documents the same non-dedupable
+// pre-upgrade gap for its own stream rewinds.
 interface PersistedEventMeta {
-  meta?: { at: string }
+  meta?: { at: string; id?: string }
 }
 
 type LiveActionRequest = Extract<
@@ -283,6 +303,10 @@ export type PersistedAgentEvent = PersistedEventMeta &
       }
     | { type: "session.completed" }
     | {
+        type: "context.cleared"
+        data: { sequence: number; sessionId: string; turnId: string }
+      }
+    | {
         type: "compaction.requested"
         data: {
           modelId: string
@@ -354,16 +378,16 @@ export function sanitizeAndBoundAgentEvents(
 export function agentEventsForReplay(
   events: readonly PersistedAgentEvent[],
 ): AgentRuntimeStreamEvent[] {
-  return events.flatMap((event) => {
-    const replay = replayAgentEvent(event)
+  return events.flatMap((event, sourceIndex) => {
+    const replay = replayAgentEvent(event, sourceIndex)
     return replay ? [replay] : []
   })
 }
 
 function sanitizeAgentEvent(
-  event: AgentSessionTimelineEvent,
+  event: SanitizableAgentEvent,
 ): PersistedAgentEvent | null {
-  const meta = event.meta ? { meta: { at: event.meta.at } } : {}
+  const meta = sourceEventMeta(event)
   if (isAgentContextCompileReceiptEvent(event)) {
     return retainedEvent({
       type: AGENT_CONTEXT_COMPILE_RECEIPT_EVENT,
@@ -374,7 +398,7 @@ function sanitizeAgentEvent(
         receipt: event.data.receipt,
         ...(event.data.turnId ? { turnId: event.data.turnId } : {}),
       },
-      ...meta,
+      meta,
     })
   }
   switch (event.type) {
@@ -386,7 +410,7 @@ function sanitizeAgentEvent(
           sequence: event.data.sequence,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "message.completed":
       return retainedEvent({
@@ -398,7 +422,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "actions.requested":
       return retainedEvent({
@@ -409,7 +433,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "input.requested":
       return retainedEvent({
@@ -420,7 +444,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "action.result":
       return retainedEvent({
@@ -440,7 +464,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "authorization.completed":
       return retainedEvent({
@@ -453,7 +477,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "subagent.called":
       return retainedEvent({
@@ -468,7 +492,7 @@ function sanitizeAgentEvent(
           turnId: event.data.turnId,
           workflowId: event.data.workflowId,
         },
-        ...meta,
+        meta,
       })
     case "subagent.event": {
       const child = sanitizeAgentEvent(event.data.event)
@@ -480,7 +504,7 @@ function sanitizeAgentEvent(
           event: child,
           subagentName: event.data.subagentName,
         },
-        ...meta,
+        meta,
       })
     }
     case "subagent.completed":
@@ -491,7 +515,7 @@ function sanitizeAgentEvent(
           output: boundPayload(event.data.output),
           subagentName: event.data.subagentName,
         },
-        ...meta,
+        meta,
       })
     case "step.completed":
       return retainedEvent({
@@ -502,7 +526,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "step.failed":
       return retainedEvent({
@@ -514,7 +538,7 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "turn.failed":
       return retainedEvent({
@@ -525,7 +549,7 @@ function sanitizeAgentEvent(
           sequence: event.data.sequence,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "session.failed":
       return retainedEvent({
@@ -535,7 +559,7 @@ function sanitizeAgentEvent(
           message: event.data.message,
           sessionId: event.data.sessionId,
         },
-        ...meta,
+        meta,
       })
     case "session.started":
       return retainedEvent({
@@ -545,7 +569,7 @@ function sanitizeAgentEvent(
             ? { invocation: structuredClone(event.data.invocation) }
             : {}),
         },
-        ...meta,
+        meta,
       })
     case "turn.started":
     case "turn.completed":
@@ -556,7 +580,7 @@ function sanitizeAgentEvent(
           sequence: event.data.sequence,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "step.started":
       return retainedEvent({
@@ -566,10 +590,20 @@ function sanitizeAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "session.completed":
-      return retainedEvent({ type: event.type, ...meta })
+      return retainedEvent({ type: event.type, meta })
+    case "context.cleared":
+      return retainedEvent({
+        type: event.type,
+        data: {
+          sequence: event.data.sequence,
+          sessionId: event.data.sessionId,
+          turnId: event.data.turnId,
+        },
+        meta,
+      })
     case "compaction.requested":
       return retainedEvent({
         type: event.type,
@@ -580,7 +614,7 @@ function sanitizeAgentEvent(
           turnId: event.data.turnId,
           usageInputTokens: event.data.usageInputTokens,
         },
-        ...meta,
+        meta,
       })
     case "compaction.completed":
       return retainedEvent({
@@ -591,7 +625,7 @@ function sanitizeAgentEvent(
           sessionId: event.data.sessionId,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "subagent.started":
       return retainedEvent({
@@ -600,7 +634,7 @@ function sanitizeAgentEvent(
           callId: event.data.callId,
           subagentName: event.data.subagentName,
         },
-        ...meta,
+        meta,
       })
     case "message.appended":
     case "reasoning.appended":
@@ -614,20 +648,30 @@ function sanitizeAgentEvent(
 
 function replayAgentEvent(
   event: PersistedAgentEvent,
+  sourceIndex: number,
 ): AgentRuntimeStreamEvent | null {
-  const meta = event.meta ? { meta: { at: event.meta.at } } : {}
+  // eve 0.29 requires every stamped event to carry `meta.id`. A persisted
+  // event can lack one — pre-migration snapshots, or a subagent child event
+  // eve never stamped in the first place (see `SubagentChildStreamEvent`) —
+  // so replay synthesizes a placeholder. It is not meaningful for
+  // deduplication, matching the gap eve itself documents for rewinding a
+  // session that started before stream version 20.
+  const meta: MessageStreamEventMeta = {
+    at: event.meta?.at ?? new Date(0).toISOString(),
+    id: event.meta?.id ?? `unstamped-${sourceIndex}`,
+  }
   if (event.type === AGENT_CONTEXT_COMPILE_RECEIPT_EVENT) return null
   switch (event.type) {
     case "session.started":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "turn.started":
     case "turn.completed":
     case "turn.cancelled":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "message.received":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "message.completed":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "actions.requested":
       return rawEvent({
         type: event.type,
@@ -637,7 +681,7 @@ function replayAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "input.requested":
       return rawEvent({
@@ -651,7 +695,7 @@ function replayAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "action.result":
       return rawEvent({
@@ -664,7 +708,7 @@ function replayAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "authorization.completed":
       return rawEvent({
@@ -676,23 +720,27 @@ function replayAgentEvent(
           stepIndex: event.data.stepIndex,
           turnId: event.data.turnId,
         },
-        ...meta,
+        meta,
       })
     case "subagent.called":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "subagent.started":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "subagent.event": {
-      const child = replayAgentEvent(event.data.event)
+      const child = replayAgentEvent(event.data.event, sourceIndex)
       if (!child) return null
+      // eve forwards a subagent's child events unstamped (see
+      // `SubagentChildStreamEvent`): strip the meta this function just
+      // synthesized for the recursive call before nesting it back in.
+      const { meta: _childMeta, ...unstamped } = child
       return rawEvent({
         type: event.type,
         data: {
           callId: event.data.callId,
-          event: child,
+          event: unstamped as SubagentChildStreamEvent,
           subagentName: event.data.subagentName,
         },
-        ...meta,
+        meta,
       })
     }
     case "subagent.completed":
@@ -703,30 +751,32 @@ function replayAgentEvent(
           output: event.data.output as never,
           subagentName: event.data.subagentName,
         },
-        ...meta,
+        meta,
       })
     case "step.started":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "step.completed":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "step.failed": {
       const { redacted: _redacted, ...data } = event.data
-      return rawEvent({ type: event.type, data, ...meta })
+      return rawEvent({ type: event.type, data, meta })
     }
     case "turn.failed": {
       const { redacted: _redacted, ...data } = event.data
-      return rawEvent({ type: event.type, data, ...meta })
+      return rawEvent({ type: event.type, data, meta })
     }
     case "session.failed": {
       const { redacted: _redacted, ...data } = event.data
-      return rawEvent({ type: event.type, data, ...meta })
+      return rawEvent({ type: event.type, data, meta })
     }
     case "session.completed":
-      return rawEvent({ type: event.type, ...meta })
+      return rawEvent({ type: event.type, meta })
+    case "context.cleared":
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "compaction.requested":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
     case "compaction.completed":
-      return rawEvent({ type: event.type, data: event.data, ...meta })
+      return rawEvent({ type: event.type, data: event.data, meta })
   }
 }
 
@@ -863,6 +913,22 @@ function rawEvent(value: AgentRuntimeStreamEvent): AgentRuntimeStreamEvent {
 
 function serializedBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength
+}
+
+// Extracted to its own function (rather than inlined per call site) so
+// TypeScript narrows `event.meta` against one concrete return type instead
+// of re-deriving it inline against whichever `PersistedAgentEvent` union
+// member the caller happens to be constructing.
+function sourceEventMeta(
+  event: SanitizableAgentEvent,
+): { at: string; id?: string } | undefined {
+  if (!("meta" in event) || !event.meta) return undefined
+  const at: string = event.meta.at
+  const id: string | undefined =
+    "id" in event.meta && typeof event.meta.id === "string"
+      ? event.meta.id
+      : undefined
+  return { at, id }
 }
 
 function eventStreamIndex(
