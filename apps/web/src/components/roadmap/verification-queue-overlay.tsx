@@ -37,6 +37,9 @@ import {
   type VerificationQueueEntry,
 } from "@/lib/verification-queue"
 
+export const VERIFICATION_FEEDBACK_TEXTAREA_CLASS_NAME =
+  "min-h-16 text-base md:text-sm"
+
 /** A story passed in this browser session, held only to keep its row visible. */
 interface PassedStory {
   id: string
@@ -222,7 +225,7 @@ function QueueEntry({
               <Textarea
                 aria-label={`Feedback on ${entry.story.id}`}
                 autoFocus
-                className="min-h-16 text-sm"
+                className={VERIFICATION_FEEDBACK_TEXTAREA_CLASS_NAME}
                 onChange={(event) => setFeedback(event.target.value)}
                 placeholder="What went wrong, or what to change…"
                 value={draft}
