@@ -183,6 +183,11 @@ export function checkImportClosure({ filesRoot, designRoot }) {
         continue;
       }
 
+      // Sound while the Design scaffold ships all of packages/ui/src to every
+      // profile (verified 2026-08-02: template.sigil.json carries no
+      // packages/ui/src exclude and no features closure exists). If Design
+      // ever splits base-template UI into a features closure, this existsSync
+      // must consult that closure instead of the raw source tree.
       const baseTemplateMatch = candidates.find((rel) =>
         existsSync(join(designRoot, "packages/ui", rel)),
       );
