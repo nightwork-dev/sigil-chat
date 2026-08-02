@@ -17,12 +17,14 @@ import { MessageReadAloud } from "@/components/agent/message-read-aloud"
 
 export function AgentTranscriptMessage({
   canRespond,
+  canRespondToInputRequest,
   isStreaming,
   message,
   onAlwaysAllow,
   onInputResponses,
 }: {
   canRespond: boolean
+  canRespondToInputRequest?: (requestId: string) => boolean
   isStreaming: boolean
   message: AgentMessage
   onAlwaysAllow?: () => void
@@ -100,6 +102,7 @@ export function AgentTranscriptMessage({
           {otherParts.map((part, index) => (
             <AgentPart
               canRespond={canRespond}
+              canRespondToInputRequest={canRespondToInputRequest}
               key={
                 part.type === "tool-call" ? part.id : `${part.type}:${index}`
               }
@@ -126,11 +129,13 @@ export function AgentTranscriptMessage({
 
 function AgentPart({
   canRespond,
+  canRespondToInputRequest,
   onAlwaysAllow,
   onInputResponses,
   part,
 }: {
   canRespond: boolean
+  canRespondToInputRequest?: (requestId: string) => boolean
   onAlwaysAllow?: () => void
   onInputResponses: (
     responses: readonly AgentToolInputResponse[],
@@ -141,6 +146,7 @@ function AgentPart({
     return (
       <ToolCallSlot
         canRespond={canRespond}
+        canRespondToInputRequest={canRespondToInputRequest}
         onAlwaysAllow={onAlwaysAllow}
         onInputResponses={onInputResponses}
         part={part}

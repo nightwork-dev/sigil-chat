@@ -21,6 +21,7 @@ import type {
 export interface ToolRendererProps {
   readonly part: AgentToolCallPart
   readonly canRespond: boolean
+  readonly canRespondToInputRequest?: (requestId: string) => boolean
   readonly onInputResponses: (
     responses: readonly AgentToolInputResponse[],
   ) => void | Promise<void>

@@ -9,7 +9,10 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 
-import type { AgentToolCallPart, AgentToolInputResponse } from "@zigil/agent/contracts"
+import type {
+  AgentToolCallPart,
+  AgentToolInputResponse,
+} from "@zigil/agent/contracts"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import {
@@ -23,11 +26,13 @@ import { JsonValue } from "@workspace/ui/components/blocks/json-value"
 
 export function ToolCall({
   canRespond,
+  canRespondToInputRequest,
   onAlwaysAllow,
   onInputResponses,
   part,
 }: {
   canRespond: boolean
+  canRespondToInputRequest?: (requestId: string) => boolean
   onAlwaysAllow?: () => void
   onInputResponses: (
     responses: readonly AgentToolInputResponse[],
@@ -52,8 +57,11 @@ export function ToolCall({
   const denyOption = isBinaryApproval
     ? options?.find((option) => option.style === "danger")
     : undefined
+  const canRespondToRequest = inputRequest
+    ? canRespond && (canRespondToInputRequest?.(inputRequest.requestId) ?? true)
+    : canRespond
   const respond = (optionId: string) => {
-    if (!inputRequest) return
+    if (!inputRequest || !canRespondToRequest) return
     void onInputResponses([{ optionId, requestId: inputRequest.requestId }])
   }
 
@@ -89,7 +97,7 @@ export function ToolCall({
                 <div className="flex flex-wrap gap-2">
                   <Button
                     className="max-sm:min-h-11"
-                    disabled={!canRespond}
+                    disabled={!canRespondToRequest}
                     onClick={() => respond(approveOption.id)}
                     size="sm"
                   >
@@ -98,7 +106,7 @@ export function ToolCall({
                   {onAlwaysAllow ? (
                     <Button
                       className="max-sm:min-h-11"
-                      disabled={!canRespond}
+                      disabled={!canRespondToRequest}
                       onClick={() => {
                         onAlwaysAllow()
                         respond(approveOption.id)
@@ -112,7 +120,7 @@ export function ToolCall({
                   {denyOption ? (
                     <Button
                       className="max-sm:min-h-11"
-                      disabled={!canRespond}
+                      disabled={!canRespondToRequest}
                       onClick={() => respond(denyOption.id)}
                       size="sm"
                       variant="ghost"
@@ -126,16 +134,9 @@ export function ToolCall({
                   {inputRequest.options?.map((option) => (
                     <Button
                       className="max-sm:min-h-11"
-                      disabled={!canRespond}
+                      disabled={!canRespondToRequest}
                       key={option.id}
-                      onClick={() =>
-                        void onInputResponses([
-                          {
-                            optionId: option.id,
-                            requestId: inputRequest.requestId,
-                          },
-                        ])
-                      }
+                      onClick={() => respond(option.id)}
                       size="sm"
                       variant={
                         option.style === "danger" ? "destructive" : "default"

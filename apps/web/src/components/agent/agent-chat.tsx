@@ -1,5 +1,7 @@
 import {
   useCallback,
+  useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
@@ -9,6 +11,7 @@ import { AlertTriangleIcon, WrenchIcon } from "lucide-react"
 import {
   isAgentSessionBusy,
   type AgentRuntimeSession,
+  type AgentToolInputResponse,
 } from "@zigil/agent/contracts"
 import {
   getContextDraftScope,
@@ -67,6 +70,11 @@ import {
 } from "@/lib/agent-session-scope"
 import type { ToolApprovalMode } from "@/lib/agent-tool-approval"
 import { isAtWordBoundary } from "@/lib/mention-trigger"
+import {
+  buildToolInputResponseBatch,
+  collectPendingToolInputRequests,
+  toolInputBatchKey,
+} from "@/lib/agent-tool-input-batch"
 
 export interface AgentChatProps {
   session?: AgentRuntimeSession
@@ -104,6 +112,62 @@ export function AgentChat({
   const threadControls = useAgentThreadControls()
   const [input, setInput] = useState("")
   const busy = isAgentSessionBusy(session)
+  const pendingToolInputRequests = useMemo(
+    () => collectPendingToolInputRequests(session.data.messages),
+    [session.data.messages],
+  )
+  const pendingToolInputBatchKey = useMemo(
+    () => toolInputBatchKey(pendingToolInputRequests),
+    [pendingToolInputRequests],
+  )
+  const pendingToolInputRequestIds = useMemo(
+    () => new Set(pendingToolInputRequests.map((request) => request.requestId)),
+    [pendingToolInputRequests],
+  )
+  const [toolInputBatchState, setToolInputBatchState] = useState<{
+    batchKey: string
+    queuedRequestIds: readonly string[]
+    submittedRequestIds: readonly string[]
+  }>({ batchKey: "", queuedRequestIds: [], submittedRequestIds: [] })
+  const toolInputDraftResponses = useRef<readonly AgentToolInputResponse[]>([])
+  const toolInputSubmittedRequestIds = useRef(new Set<string>())
+  const toolInputBatchKeyRef = useRef("")
+  const activeQueuedToolInputRequestIds = useMemo(
+    () =>
+      new Set(
+        toolInputBatchState.batchKey === pendingToolInputBatchKey
+          ? toolInputBatchState.queuedRequestIds
+          : [],
+      ),
+    [pendingToolInputBatchKey, toolInputBatchState],
+  )
+  const activeSubmittedToolInputRequestIds = useMemo(
+    () =>
+      new Set(
+        toolInputBatchState.batchKey === pendingToolInputBatchKey
+          ? toolInputBatchState.submittedRequestIds
+          : [],
+      ),
+    [pendingToolInputBatchKey, toolInputBatchState],
+  )
+  const canRespondToToolInput =
+    Boolean(session.capabilities.toolInput) &&
+    typeof session.respondToToolInput === "function"
+  const canRespondToInputRequest = useCallback(
+    (requestId: string) =>
+      canRespondToToolInput &&
+      !busy &&
+      pendingToolInputRequestIds.has(requestId) &&
+      !activeQueuedToolInputRequestIds.has(requestId) &&
+      !activeSubmittedToolInputRequestIds.has(requestId),
+    [
+      activeQueuedToolInputRequestIds,
+      activeSubmittedToolInputRequestIds,
+      busy,
+      canRespondToToolInput,
+      pendingToolInputRequestIds,
+    ],
+  )
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   const blackboardContainers = useActiveThreadContainers()
 
@@ -247,6 +311,74 @@ export function AgentChat({
     [submit],
   )
 
+  const handleToolInputResponses = useCallback(
+    async (inputResponses: readonly AgentToolInputResponse[]) => {
+      if (!canRespondToToolInput || busy || !session.respondToToolInput) return
+      if (toolInputBatchKeyRef.current !== pendingToolInputBatchKey) {
+        toolInputBatchKeyRef.current = pendingToolInputBatchKey
+        toolInputDraftResponses.current = []
+        toolInputSubmittedRequestIds.current = new Set()
+      }
+
+      const update = buildToolInputResponseBatch({
+        incomingResponses: inputResponses,
+        pendingRequests: pendingToolInputRequests,
+        queuedResponses: toolInputDraftResponses.current,
+        submittedRequestIds: [...toolInputSubmittedRequestIds.current],
+      })
+      if (update.acceptedRequestIds.length === 0 && !update.batchResponses) {
+        return
+      }
+
+      toolInputDraftResponses.current = update.queuedResponses
+      if (!update.batchResponses) {
+        setToolInputBatchState({
+          batchKey: pendingToolInputBatchKey,
+          queuedRequestIds: update.queuedResponses.map(
+            (response) => response.requestId,
+          ),
+          submittedRequestIds: [...toolInputSubmittedRequestIds.current],
+        })
+        return
+      }
+
+      const submittedRequestIds = update.batchResponses.map(
+        (response) => response.requestId,
+      )
+      toolInputDraftResponses.current = []
+      toolInputSubmittedRequestIds.current = new Set([
+        ...toolInputSubmittedRequestIds.current,
+        ...submittedRequestIds,
+      ])
+      setToolInputBatchState({
+        batchKey: pendingToolInputBatchKey,
+        queuedRequestIds: [],
+        submittedRequestIds: [...toolInputSubmittedRequestIds.current],
+      })
+
+      const result = await session.respondToToolInput(update.batchResponses)
+      if (result.status !== "succeeded") {
+        toolInputSubmittedRequestIds.current = new Set(
+          [...toolInputSubmittedRequestIds.current].filter(
+            (requestId) => !submittedRequestIds.includes(requestId),
+          ),
+        )
+        setToolInputBatchState({
+          batchKey: pendingToolInputBatchKey,
+          queuedRequestIds: [],
+          submittedRequestIds: [...toolInputSubmittedRequestIds.current],
+        })
+      }
+    },
+    [
+      busy,
+      canRespondToToolInput,
+      pendingToolInputBatchKey,
+      pendingToolInputRequests,
+      session,
+    ],
+  )
+
   return (
     <div
       className={cn(
@@ -297,14 +429,13 @@ export function AgentChat({
             }
             key={message.id}
             message={message}
+            canRespondToInputRequest={canRespondToInputRequest}
             onAlwaysAllow={
               onApprovalModeChange
                 ? () => onApprovalModeChange("always")
                 : undefined
             }
-            onInputResponses={async (inputResponses) => {
-              await session.respondToToolInput?.(inputResponses)
-            }}
+            onInputResponses={handleToolInputResponses}
           />
         ))}
       </ChatList>

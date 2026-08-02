@@ -29,6 +29,7 @@ import type {
   AgentRuntimeSession,
   AgentSendInput,
   AgentThreadControls,
+  AgentTurnResult,
 } from "@zigil/agent/contracts"
 import {
   Alert,
@@ -354,20 +355,30 @@ function ActiveAgentSession({
     thread,
   })
   const turnActive = useRef(false)
+  const runExclusiveTurn = useCallback(
+    async (run: () => Promise<AgentTurnResult>): Promise<AgentTurnResult> => {
+      if (turnActive.current) {
+        return {
+          status: "failed",
+          error: {
+            message: "The agent session is already processing a turn.",
+          },
+        }
+      }
+      turnActive.current = true
+      try {
+        return await run()
+      } finally {
+        turnActive.current = false
+      }
+    },
+    [],
+  )
   const session = useMemo<AgentRuntimeSession>(
     () => ({
       ...eveSession,
-      send: async (input) => {
-        if (turnActive.current) {
-          return {
-            status: "failed",
-            error: {
-              message: "The agent session is already processing a turn.",
-            },
-          }
-        }
-        turnActive.current = true
-        try {
+      send: (input) =>
+        runExclusiveTurn(async () => {
           const resourceScope = input.headers?.[AGENT_SCOPE_HEADER]
           const [scopeProof, sessionBindingProof] = await Promise.all([
             resourceScope
@@ -390,15 +401,27 @@ function ActiveAgentSession({
           })
           if (result.status === "succeeded") await handleSendSuccess(input)
           return result
-        } finally {
-          turnActive.current = false
-        }
-      },
+        }),
+      respondToToolInput: eveSession.respondToToolInput
+        ? (responses) =>
+            runExclusiveTurn(() => {
+              if (responses.length === 0) {
+                return Promise.resolve({
+                  status: "failed",
+                  error: {
+                    message: "No tool input responses were provided.",
+                  },
+                })
+              }
+              return eveSession.respondToToolInput!(responses)
+            })
+        : undefined,
     }),
     [
       eveSession,
       handleSendSuccess,
       principalId,
+      runExclusiveTurn,
       thread.forkSeed,
       thread.id,
       thread.personaId,

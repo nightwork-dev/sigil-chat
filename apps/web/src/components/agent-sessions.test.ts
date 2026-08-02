@@ -8,6 +8,7 @@ import type { UseEveRuntimeSessionOptions } from "@zigil/agent/react/eve"
 import { useAgentRuntimeSession } from "@zigil/agent/react"
 import type {
   AgentRuntimeSession,
+  AgentToolInputResponse,
   AgentTurnResult,
 } from "@zigil/agent/contracts"
 
@@ -44,9 +45,11 @@ type MockEveSession = AgentRuntimeSession & {
   cancelTurnIds: Array<string | undefined>
   callbacks: EveCallbacks
   pendingSend: Promise<AgentTurnResult> | null
+  pendingToolInput: Promise<AgentTurnResult> | null
   primary: boolean
   sent: Array<{ headers?: Record<string, string>; message?: unknown }>
   sendResult: AgentTurnResult | null
+  toolInputResponses: readonly AgentToolInputResponse[][]
 }
 
 const harness = vi.hoisted(() => ({
@@ -73,7 +76,9 @@ const harness = vi.hoisted(() => ({
   // resolving immediately — lets a test hold a turn "in flight" to drive the
   // overlapping-send guard.
   pendingSend: null as Promise<AgentTurnResult> | null,
+  pendingToolInput: null as Promise<AgentTurnResult> | null,
   eveSendCallCount: 0,
+  eveToolInputCallCount: 0,
   lastEveSendInput: null as { headers?: Record<string, string> } | null,
 }))
 
@@ -108,13 +113,21 @@ function createMockEveSession(sessionId: string): MockEveSession {
   return {
     callbacks: {},
     cancelTurnIds: [],
-    capabilities: { reset: true, stop: true, streaming: true, cancel: true },
+    capabilities: {
+      reset: true,
+      stop: true,
+      streaming: true,
+      cancel: true,
+      toolInput: true,
+    },
     data: { messages: [] },
     pendingSend: null,
+    pendingToolInput: null,
     primary: false,
     sendResult: null,
     sent: [],
     status: "idle",
+    toolInputResponses: [],
     send(input: { headers?: Record<string, string>; message?: unknown }) {
       this.sent.push(input)
       if (this.primary) {
@@ -141,6 +154,21 @@ function createMockEveSession(sessionId: string): MockEveSession {
     cancel(options?: { turnId?: string }) {
       this.cancelTurnIds.push(options?.turnId)
       return Promise.resolve({ outcome: "accepted" })
+    },
+    respondToToolInput(responses: readonly AgentToolInputResponse[]) {
+      this.toolInputResponses = [...this.toolInputResponses, [...responses]]
+      if (this.primary) {
+        harness.eveToolInputCallCount += 1
+      }
+      this.activeTurnId = `${sessionId}-tool-input-${this.toolInputResponses.length}`
+      const pending = this.pendingToolInput ?? harness.pendingToolInput
+      if (pending) {
+        return pending.finally(() => {
+          delete this.activeTurnId
+        })
+      }
+      delete this.activeTurnId
+      return Promise.resolve({ status: "succeeded" })
     },
     reset: vi.fn(),
     stop: vi.fn(),
@@ -279,7 +307,9 @@ beforeEach(() => {
   harness.expectedRevisions = []
   harness.sendResult = null
   harness.pendingSend = null
+  harness.pendingToolInput = null
   harness.eveSendCallCount = 0
+  harness.eveToolInputCallCount = 0
   harness.lastEveSendInput = null
   container = document.createElement("div")
   document.body.append(container)
@@ -468,6 +498,110 @@ describe("AppAgentSessions persistence call site", () => {
     })
 
     expect(harness.eveSendCallCount).toBe(2)
+  })
+
+  it("rejects an overlapping tool-input continuation before it reaches Eve, then allows a subsequent continuation once the turn clears", async () => {
+    repository.create(TEST_USER_ID, { title: "Fixed title" })
+    await renderSessions()
+
+    const holdFirstContinuation = deferredTurn()
+    harness.pendingToolInput = holdFirstContinuation.promise
+
+    let firstContinuation: Promise<AgentTurnResult> | undefined
+    await act(async () => {
+      firstContinuation = harness.session?.respondToToolInput?.([
+        { optionId: "allow", requestId: "request-1" },
+      ])
+      await flush()
+    })
+
+    expect(harness.eveToolInputCallCount).toBe(1)
+
+    let secondContinuation: Promise<AgentTurnResult> | undefined
+    await act(async () => {
+      secondContinuation = harness.session?.respondToToolInput?.([
+        { optionId: "allow", requestId: "request-2" },
+      ])
+      await flush()
+    })
+
+    expect(harness.eveToolInputCallCount).toBe(1)
+    await expect(secondContinuation).resolves.toMatchObject({
+      status: "failed",
+      error: {
+        message: "The agent session is already processing a turn.",
+      },
+    })
+
+    await act(async () => {
+      harness.pendingToolInput = null
+      holdFirstContinuation.resolve({ status: "succeeded" })
+      await firstContinuation
+    })
+
+    await act(async () => {
+      const thirdResult = await harness.session?.respondToToolInput?.([
+        { optionId: "allow", requestId: "request-3" },
+      ])
+      expect(thirdResult).toMatchObject({ status: "succeeded" })
+    })
+
+    expect(harness.eveToolInputCallCount).toBe(2)
+  })
+
+  it("does not forward an empty tool-input continuation to Eve", async () => {
+    repository.create(TEST_USER_ID, { title: "Fixed title" })
+    await renderSessions()
+
+    await act(async () => {
+      const result = await harness.session?.respondToToolInput?.([])
+      expect(result).toMatchObject({
+        status: "failed",
+        error: {
+          message: "No tool input responses were provided.",
+        },
+      })
+    })
+
+    expect(harness.eveToolInputCallCount).toBe(0)
+  })
+
+  it("uses one turn boundary for mixed sends and tool-input continuations", async () => {
+    repository.create(TEST_USER_ID, { title: "Fixed title" })
+    await renderSessions()
+
+    const holdContinuation = deferredTurn()
+    harness.pendingToolInput = holdContinuation.promise
+
+    let continuation: Promise<AgentTurnResult> | undefined
+    await act(async () => {
+      continuation = harness.session?.respondToToolInput?.([
+        { optionId: "allow", requestId: "request-1" },
+      ])
+      await flush()
+    })
+
+    expect(harness.eveToolInputCallCount).toBe(1)
+
+    await act(async () => {
+      const sendResult = await harness.session?.send({
+        message: "Continue anyway",
+      })
+      expect(sendResult).toMatchObject({
+        status: "failed",
+        error: {
+          message: "The agent session is already processing a turn.",
+        },
+      })
+    })
+
+    expect(harness.eveSendCallCount).toBe(0)
+
+    await act(async () => {
+      harness.pendingToolInput = null
+      holdContinuation.resolve({ status: "succeeded" })
+      await continuation
+    })
   })
 
   it("routes participant channel sends to independent Eve sessions with per-target binding proofs", async () => {
