@@ -22,6 +22,7 @@ import { DEPLOYMENT_DEFAULT_PRESET_ID } from "@workspace/runtime-env/constants"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -225,11 +226,13 @@ export function ComposerModelControl({
           </DropdownMenuSub>
         ) : null}
         {error ? (
-          <DropdownMenuLabel className="max-w-64 text-destructive">
-            {error instanceof Error
-              ? error.message
-              : "That change was refused."}
-          </DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="max-w-64 text-destructive">
+              {error instanceof Error
+                ? error.message
+                : "That change was refused."}
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -253,16 +256,30 @@ function ModelMenuItems({
   onChange: (presetId: string) => void
   providers: readonly ModelProviderRecord[]
 }) {
-  if (loading) return <DropdownMenuLabel>Loading models…</DropdownMenuLabel>
+  // Bare labels crash Base UI's menu: DropdownMenuLabel renders a GroupLabel,
+  // which requires a Group/RadioGroup ancestor for its context.
+  if (loading) {
+    return (
+      <DropdownMenuGroup>
+        <DropdownMenuLabel>Loading models…</DropdownMenuLabel>
+      </DropdownMenuGroup>
+    )
+  }
   if (error) {
     return (
-      <DropdownMenuLabel className="text-destructive">
-        Model list unavailable
-      </DropdownMenuLabel>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="text-destructive">
+          Model list unavailable
+        </DropdownMenuLabel>
+      </DropdownMenuGroup>
     )
   }
   if (providers.length === 0) {
-    return <DropdownMenuLabel>No models enabled in Settings</DropdownMenuLabel>
+    return (
+      <DropdownMenuGroup>
+        <DropdownMenuLabel>No models enabled in Settings</DropdownMenuLabel>
+      </DropdownMenuGroup>
+    )
   }
 
   return (
