@@ -43,7 +43,7 @@ type comment is explicit: "carrying it confers nothing" (spec §7). The via
 param changes what link text and breadcrumb a component shows; it must
 never be read anywhere as a scope key, an authorization input, or a
 substitute for the resolved `.id` a query actually runs against (see
-[[route-identity-discipline]] for the general id-vs-display-alias rule this
+the route-identity-discipline skill for the general id-vs-display-alias rule this
 specializes).
 
 ## Where the actual data comes from
