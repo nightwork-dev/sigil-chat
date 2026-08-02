@@ -1,9 +1,6 @@
 import { ToolRegistry } from "@gonk/tool-registry"
 import type { ToolDefinition } from "@gonk/tool-registry"
-import type {
-  ImageGenerateInput,
-  ImageGenerateOutput,
-} from "@gonk/image-gen"
+import type { ImageGenerateInput, ImageGenerateOutput } from "@gonk/image-gen"
 import type { ScopedKnowledgeStore } from "@gonk/knowledge/scoped"
 import type { SessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { GraphRepository } from "@workspace/graph-store/repository"
@@ -25,7 +22,11 @@ import type { SigilRetrievalEvidenceCoordinator } from "./evidence.js"
 import { registerFeatureRequestTools } from "./feature-request.js"
 import { registerFileTools, type ResourceUniverseRegistries } from "./files.js"
 import { registerGraphTools } from "./graph.js"
-import { registerImageTools } from "./image.js"
+import {
+  registerImageTools,
+  type EditImageInput,
+  type EditImageOutput,
+} from "./image.js"
 import { registerRequestTools } from "./request.js"
 import { registerReviewTools } from "./review.js"
 import { registerRuntimeTools, registerUiCommandTools } from "./runtime.js"
@@ -52,6 +53,7 @@ export interface SigilAgentToolDependencies {
     ImageGenerateInput,
     ImageGenerateOutput
   >
+  portableImageEdit?: ToolDefinition<EditImageInput, EditImageOutput>
 }
 
 export function createSigilAgentToolRegistry(
@@ -83,6 +85,7 @@ export function createSigilAgentToolRegistry(
       ? null
       : undefined,
     dependencies.portableImageGeneration,
+    dependencies.portableImageEdit,
   )
   registerSpeechTools(
     registry,
