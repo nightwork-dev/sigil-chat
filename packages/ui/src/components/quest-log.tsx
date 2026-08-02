@@ -250,9 +250,12 @@ function Objective({
         <div className="min-w-0">
           <p className="font-medium text-foreground">{title}</p>
           {description ? (
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            <div
+              data-slot="quest-log-objective-description"
+              className="mt-1 text-sm leading-6 text-muted-foreground"
+            >
               {description}
-            </p>
+            </div>
           ) : null}
         </div>
       </div>
@@ -364,9 +367,12 @@ function Entry({
           {title}
         </p>
         {description ? (
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          <div
+            data-slot="quest-log-entry-description"
+            className="mt-1 text-sm leading-6 text-muted-foreground"
+          >
             {description}
-          </p>
+          </div>
         ) : null}
         {action ? <div className="mt-2">{action}</div> : null}
       </div>
