@@ -2,7 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { StoreBackedMemoryRecordStore } from "@gonk/memory"
+import {
+  StoreBackedMemoryRecordStore,
+  type MemoryAdmissionAuthority,
+} from "@gonk/memory"
+import { createPersonaExecutionBinding } from "@gonk/persona"
 
 const originalPersonaDir = process.env.SIGIL_PERSONA_DIR
 const originalMemoryDir = process.env.SIGIL_MEMORY_DIR
@@ -118,24 +122,67 @@ describe("agent profile persona resolution", () => {
         resolvePersonaHome: () => personaDir,
       },
     })
-    store.create({
-      id: recordId,
-      owner: { personaId: "example-two" },
-      scope: { tier: "persona", id: "example-two" },
-      kind: "fact",
-      subject: { kind: "persona", id: "example-two" },
-      audience: {
-        recall: { kind: "persona", personaId: "example-two" },
-        disclosure: { kind: "same-as-recall" },
+    const seedAuthority: MemoryAdmissionAuthority = {
+      authorityId: "sigil-chat-agent-profile-test-seed",
+      authorityRevision: "v1",
+      decide: () => ({
+        outcome: {
+          kind: "admit",
+          status: "candidate",
+          reason: "review",
+        },
+        decidedAt: now,
+      }),
+    }
+    const seedReceipt = store.execute(
+      {
+        binding: {
+          kind: "persona",
+          ...createPersonaExecutionBinding({
+            personaId: "example-two",
+            authoredBaseId: "example-two-v1",
+            channelId: "sigil-chat",
+            executionSessionId: "profile-test-seed",
+            boundAt: now,
+          }),
+        },
+        principalId: "owner",
+        presentPrincipalIds: ["owner"],
+        presentActorInstanceIds: [],
+        grantedScopeIds: ["persona:example-two"],
+        roleIds: ["owner"],
       },
-      content: "Candidate memory.",
-      provenance: {
-        source: "inferred",
-        evidence: [{ kind: "tool", id: "test" }],
+      {
+        command: {
+          kind: "propose",
+          draft: {
+            kind: "fact",
+            subject: { kind: "persona", id: "example-two" },
+            audience: {
+              recall: { kind: "persona", personaId: "example-two" },
+              disclosure: { kind: "same-as-recall" },
+            },
+            content: "Candidate memory.",
+            author: { kind: "principal", id: "owner" },
+          },
+          origin: {
+            source: "inferred",
+            modelInvolved: true,
+            evidence: [{ kind: "tool", id: "test" }],
+          },
+        },
+        idempotencyKey: "profile-test-seed",
       },
-      lifecycle: { status: "candidate", supersedes: [] },
-      createdAt: now,
-      updatedAt: now,
+      seedAuthority,
+      {
+        revision: "profile-test-seed-v1",
+        createId: () => recordId,
+        now: () => now,
+      },
+    )
+    expect(seedReceipt).toMatchObject({
+      outcome: { kind: "committed" },
+      affected: [{ recordId, to: "candidate" }],
     })
 
     const accepted = acceptAgentMemoryCandidate(

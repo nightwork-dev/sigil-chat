@@ -31,7 +31,20 @@ export interface AgentMemoryRecord {
     | "decision"
     | "relationship"
     | "summary"
-  subject: { kind: "persona" | "principal" | "relationship"; id: string }
+    | "perceived-speech"
+    | "experienced-event"
+    | "scene-summary"
+  subject: {
+    kind:
+      | "persona"
+      | "principal"
+      | "relationship"
+      | "project"
+      | "channel"
+      | "entity"
+      | "actor-instance"
+    id: string
+  }
   content: string
   lifecycle: {
     status: "candidate" | "accepted" | "rejected" | "superseded" | "archived"

@@ -2,13 +2,18 @@
 // without a live Eve chat session. Not part of the app bundle; run with
 // `tsx scripts/seed-agent-profile-dev.ts` to populate the shared local persona
 // and memory stores. Safe to re-run (idempotent, guarded by `alreadySeeded`).
-// Disposable fixtures write directly to MemoryRecordStore; product writes go
-// through the host authorization path.
+// Disposable fixtures use an explicit seed authority; product writes use the
+// owner-facing host authority in agent-profile.server.ts.
 
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
-import { StoreBackedMemoryRecordStore, type MemoryRecord } from "@gonk/memory"
-import { PersonaRegistry } from "@gonk/persona"
+import {
+  StoreBackedMemoryRecordStore,
+  type MemoryAdmissionAuthority,
+  type MemoryRecordDraft,
+  type TrustedTurnEnvelope,
+} from "@gonk/memory"
+import { createPersonaExecutionBinding, PersonaRegistry } from "@gonk/persona"
 import { readIdentityEnvironment } from "@workspace/runtime-env/server"
 
 const { personaDir, memoryDir } = readIdentityEnvironment(process.env)
@@ -51,27 +56,82 @@ function alreadySeeded(content: string): boolean {
   return store.list().some((r) => r.content === content)
 }
 
-function writeRecord(partial: Pick<MemoryRecord, "kind" | "subject" | "content"> & { status: MemoryRecord["lifecycle"]["status"] }) {
+function writeRecord(
+  partial: Pick<MemoryRecordDraft, "kind" | "subject" | "content"> & {
+    status: "accepted" | "candidate"
+  },
+) {
   if (alreadySeeded(partial.content)) return
   const now = Date.now()
-  const record: MemoryRecord = {
-    id: nextId(),
-    owner: { personaId: PERSONA.id },
-    scope: { tier: "persona", id: PERSONA.id },
-    kind: partial.kind,
-    subject: partial.subject,
-    // "same-as-recall" discloses to whoever is authorized to recall it (the
-    // owner viewing their own agent's memory); "persona-only" is reserved
-    // for genuinely internal-only material that must never render to any
-    // principal, even the owner — not what this seed's example records are.
-    audience: { recall: { kind: "persona", personaId: PERSONA.id }, disclosure: { kind: "same-as-recall" } },
-    content: partial.content,
-    provenance: { source: "stated", evidence: [] },
-    lifecycle: { status: partial.status, supersedes: [] },
-    createdAt: now,
-    updatedAt: now,
+  const envelope: TrustedTurnEnvelope = {
+    binding: {
+      kind: "persona",
+      ...createPersonaExecutionBinding({
+        personaId: PERSONA.id,
+        authoredBaseId: `${PERSONA.id}-v1`,
+        channelId: "sigil-chat",
+        executionSessionId: "agent-profile-dev-seed",
+        boundAt: now,
+      }),
+    },
+    principalId: "owner",
+    presentPrincipalIds: ["owner"],
+    presentActorInstanceIds: [],
+    grantedScopeIds: [`persona:${PERSONA.id}`],
+    roleIds: ["owner"],
   }
-  store.create(record)
+  const authority: MemoryAdmissionAuthority = {
+    authorityId: "sigil-chat-agent-profile-dev-seed",
+    authorityRevision: "v1",
+    decide: () => ({
+      outcome: {
+        kind: "admit",
+        status: partial.status,
+        reason: partial.status === "accepted" ? "explicit-remember" : "review",
+      },
+      decidedAt: now,
+    }),
+  }
+  const receipt = store.execute(
+    envelope,
+    {
+      command: {
+        kind: "propose",
+        draft: {
+          kind: partial.kind,
+          subject: partial.subject,
+          audience: {
+            recall: { kind: "persona", personaId: PERSONA.id },
+            disclosure: { kind: "same-as-recall" },
+          },
+          content: partial.content,
+          author: { kind: "principal", id: "owner" },
+        },
+        origin: {
+          source: partial.status === "accepted" ? "stated" : "inferred",
+          modelInvolved: partial.status === "candidate",
+          producer: {
+            componentId: "sigil-chat-agent-profile-dev-seed",
+            componentRevision: "v1",
+          },
+          evidence: [{ kind: "tool", id: "seed-agent-profile-dev" }],
+        },
+      },
+      idempotencyKey: `sigil-chat-agent-profile-dev-seed:${partial.content}`,
+      ...(partial.status === "accepted"
+        ? { policyAction: "explicit-remember" as const }
+        : {}),
+    },
+    authority,
+    {
+      revision: "sigil-chat-agent-profile-dev-seed-v1",
+      createId: nextId,
+      now: () => now,
+    },
+  )
+  if (receipt.outcome.kind !== "committed") {
+    throw new Error(`Memory seed was refused: ${receipt.outcome.code}`)
+  }
 }
 
 writeRecord({

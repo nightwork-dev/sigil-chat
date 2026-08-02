@@ -16,6 +16,9 @@ import {
   MemoryActions,
   loadIdentityFloorAtSessionStart,
   type IdentityFloorPolicy,
+  type MemoryAdmissionAuthority,
+  type MemoryAdmissionDecision,
+  type MemoryAdmissionRequest,
   type MemoryAuthorizedQueryResult,
   type MemoryDisclosureResult,
   type MemoryRecordDraft,
@@ -71,11 +74,29 @@ export function resolvePersonaVoice(
 // that Eve uses. Store writes are atomic rename operations; the agent can read
 // safely while the owner curates memory or updates an identity.
 const store = new StoreBackedMemoryRecordStore({ scopeEnv })
+const profileMemoryAdmissionAuthority: MemoryAdmissionAuthority = {
+  authorityId: "sigil-chat-agent-profile-memory-admission",
+  authorityRevision: "v1",
+  decide(envelope, request) {
+    const refusal = refuseProfileMemoryAdmission(envelope, request)
+    if (refusal) return refusal
+    switch (request.command.kind) {
+      case "accept":
+        return admitProfileMemory("accepted", "review")
+      case "correct":
+        return admitProfileMemory("candidate", "explicit-correct")
+      case "archive":
+        return admitProfileMemory("archived", "explicit-forget")
+      default:
+        return refuseProfileMemory("profile-action-not-supported")
+    }
+  },
+}
 const memoryActions = new MemoryActions(store, {
   revision: "sigil-profile-memory-v1",
   createId: randomUUID,
   now: Date.now,
-})
+}, profileMemoryAdmissionAuthority)
 
 const READ_CHANNEL = "sigil-chat"
 
@@ -83,7 +104,7 @@ function readEnvelope(
   principalId: string,
   persona: ResolvedPersona,
 ): TrustedTurnEnvelope {
-  const binding = createPersonaExecutionBinding({
+  const personaBinding = createPersonaExecutionBinding({
     personaId: persona.id,
     authoredBaseId: `${persona.id}-v1`,
     channelId: READ_CHANNEL,
@@ -91,9 +112,10 @@ function readEnvelope(
     boundAt: Date.now(),
   })
   return {
-    binding,
+    binding: { kind: "persona", ...personaBinding },
     principalId,
     presentPrincipalIds: [principalId],
+    presentActorInstanceIds: [],
     // queryAuthorized's isAuthorizedForRecall gates on
     // grantedScopeIds.includes(`${record.scope.tier}:${record.scope.id}`)
     // (@gonk/memory dist/chunk-QDOF3JKW.js, scopeGrantId) — an empty array
@@ -102,6 +124,7 @@ function readEnvelope(
     // grant this profile exists to make: the persona-tier scope for the one
     // persona this view renders, nothing broader.
     grantedScopeIds: [`persona:${persona.id}`],
+    roleIds: ["owner"],
   }
 }
 
@@ -188,7 +211,9 @@ export function loadAgentProfile(
     .list()
     .filter(
       (r) =>
-        r.owner.personaId === personaId && r.lifecycle.status === "candidate",
+        r.owner.kind === "persona" &&
+        r.owner.personaId === personaId &&
+        r.lifecycle.status === "candidate",
     )
 
   const hasPortrait = personaRegistry.portraitFor(personaId) !== undefined
@@ -196,7 +221,7 @@ export function loadAgentProfile(
   return {
     persona,
     lineage: {
-      authoredBaseId: envelope.binding.authoredBaseId,
+      authoredBaseId: personaBindingBaseId(persona),
       policyRevision: identity.policyRevision,
     },
     hasPortrait,
@@ -244,7 +269,11 @@ export function acceptAgentMemoryCandidate(
   recordId: string,
 ): AgentProfile {
   assertOwnedMemory(personaId, recordId, "candidate")
-  store.acceptCandidate(recordId, { reason: "review" })
+  const persona = personaRegistry.get(personaId)
+  if (!persona) throw new Error(`persona ${personaId} not found`)
+  assertCommittedProfileMemory(
+    memoryActions.acceptCandidate(readEnvelope(principalId, persona), recordId),
+  )
   return loadAgentProfile(principalId, personaId)
 }
 
@@ -259,7 +288,9 @@ export function archiveAgentMemoryRecord(
   assertOwnedMemory(personaId, recordId, "accepted")
   const persona = personaRegistry.get(personaId)
   if (!persona) throw new Error(`persona ${personaId} not found`)
-  memoryActions.forget(readEnvelope(principalId, persona), recordId)
+  assertCommittedProfileMemory(
+    memoryActions.forget(readEnvelope(principalId, persona), recordId),
+  )
   return loadAgentProfile(principalId, personaId)
 }
 
@@ -276,17 +307,90 @@ export function correctAgentMemoryRecord(
     subject: target.subject,
     audience: target.audience,
     content: input.content,
-    evidence: [{ kind: "tool", id: "sigil-agent-studio" }],
     author: { kind: "principal", id: principalId },
   }
   const persona = personaRegistry.get(input.personaId)
   if (!persona) throw new Error(`persona ${input.personaId} not found`)
-  memoryActions.correct(
-    readEnvelope(principalId, persona),
+  const envelope = readEnvelope(principalId, persona)
+  const correctionReceipt = memoryActions.correct(
+    envelope,
     input.recordId,
     replacement,
+    {
+      source: "stated",
+      modelInvolved: false,
+      producer: {
+        componentId: "sigil-chat-agent-profile",
+        componentRevision: "v1",
+      },
+      evidence: [{ kind: "tool", id: "sigil-agent-studio" }],
+    },
+  )
+  const correctionRecordId = assertCommittedProfileMemory(
+    correctionReceipt,
+    "Correction did not create a candidate memory",
+  )
+  assertCommittedProfileMemory(
+    memoryActions.acceptCandidate(envelope, correctionRecordId),
   )
   return loadAgentProfile(principalId, input.personaId)
+}
+
+function refuseProfileMemoryAdmission(
+  envelope: TrustedTurnEnvelope,
+  request: MemoryAdmissionRequest,
+): MemoryAdmissionDecision | undefined {
+  if (envelope.binding.kind !== "persona") {
+    return refuseProfileMemory("unsupported-memory-owner")
+  }
+  const principalId = envelope.principalId?.trim()
+  if (!principalId || !envelope.presentPrincipalIds.includes(principalId)) {
+    return refuseProfileMemory("principal-not-present")
+  }
+  if (request.command.kind !== "correct") return undefined
+  const replacement = request.command.replacement
+  if (
+    replacement.author?.kind === "principal" &&
+    replacement.author.id !== principalId
+  ) {
+    return refuseProfileMemory("author-principal-mismatch")
+  }
+  if (
+    replacement.subject.kind === "principal" &&
+    replacement.subject.id !== principalId
+  ) {
+    return refuseProfileMemory("subject-principal-mismatch")
+  }
+  return undefined
+}
+
+function admitProfileMemory(
+  status: "candidate" | "accepted" | "archived",
+  reason: "review" | "explicit-correct" | "explicit-forget",
+): MemoryAdmissionDecision {
+  return {
+    outcome: { kind: "admit", status, reason },
+    decidedAt: Date.now(),
+  }
+}
+
+function refuseProfileMemory(code: string): MemoryAdmissionDecision {
+  return {
+    outcome: { kind: "refuse", code },
+    decidedAt: Date.now(),
+  }
+}
+
+function assertCommittedProfileMemory(
+  receipt: ReturnType<MemoryActions["execute"]>,
+  missingRecordMessage?: string,
+): string {
+  if (receipt.outcome.kind !== "committed") {
+    throw new Error(`Agent profile memory update was refused: ${receipt.outcome.code}`)
+  }
+  const recordId = receipt.affected[0]?.recordId
+  if (missingRecordMessage && !recordId) throw new Error(missingRecordMessage)
+  return recordId ?? ""
 }
 
 function assertPersonaExists(personaId: string): void {
@@ -302,7 +406,11 @@ function assertOwnedMemory(
   assertPersonaExists(personaId)
   const record = store.get(recordId)
   if (!record) throw new Error(`memory record ${recordId} not found`)
-  if (record.owner.personaId !== personaId || record.scope.id !== personaId) {
+  if (
+    record.owner.kind !== "persona" ||
+    record.owner.personaId !== personaId ||
+    record.scope.id !== personaId
+  ) {
     throw new Error("Memory record belongs to another persona.")
   }
   if (record.lifecycle.status !== status) {
@@ -311,4 +419,8 @@ function assertOwnedMemory(
     )
   }
   return record
+}
+
+function personaBindingBaseId(persona: ResolvedPersona): string {
+  return `${persona.id}-v1`
 }
