@@ -29,6 +29,7 @@
     "@gonk/context": "catalog:",
     "@gonk/eve-host": "catalog:",
     "@gonk/image-gen": "catalog:",
+    "@gonk/knowledge": "catalog:",
     "@gonk/memory": "catalog:",
     "@gonk/persona": "catalog:",
     "@gonk/retrieval": "catalog:",

@@ -4,6 +4,7 @@ import type {
   ImageGenerateInput,
   ImageGenerateOutput,
 } from "@gonk/image-gen"
+import type { ScopedKnowledgeStore } from "@gonk/knowledge/scoped"
 import type { SessionArtifactStore } from "@workspace/artifact-store/repository"
 import type { GraphRepository } from "@workspace/graph-store/repository"
 import type { ReviewRepository } from "@workspace/review-store"
@@ -44,6 +45,7 @@ export interface SigilAgentToolDependencies {
   sessions?: ResourceUniverseRegistries["sessions"]
   skills: SkillRegistryResolver
   scopedKnowledgeTools?: readonly ToolDefinition[]
+  scopedKnowledgeStore?: ScopedKnowledgeStore
   retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator
   personaVoice?: PersonaVoiceResolver
   portableImageGeneration?: ToolDefinition<
@@ -96,6 +98,7 @@ export function createSigilAgentToolRegistry(
     registry,
     dependencies.artifacts,
     dependencies.retrievalEvidenceCoordinator,
+    dependencies.scopedKnowledgeStore,
   )
   registerDistillTools(registry, dependencies.artifacts)
   registerDemoSeedTools(registry, dependencies.artifacts)
