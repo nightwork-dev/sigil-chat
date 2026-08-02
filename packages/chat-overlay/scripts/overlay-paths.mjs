@@ -36,6 +36,7 @@ export const overlayPaths = Object.freeze([
   "packages/ui/src/components/floating-dock.tsx",
   "packages/ui/src/components/layouts/shells.tsx",
   "packages/ui/src/components/part-projection.tsx",
+  "packages/ui/src/components/quest-log.tsx",
   "packages/ui/src/components/tool-call.tsx",
   "packages/ui/src/components/tool-renderer-registry.tsx",
   "packages/ui/src/components/tone-chip.tsx",
