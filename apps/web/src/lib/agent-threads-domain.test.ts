@@ -515,6 +515,64 @@ describe("AgentThreadRepository", () => {
     ).toThrow(AgentThreadConflictError)
   })
 
+  it("accepts an identical final snapshot replay without another revision", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    const snapshot = {
+      session: {
+        continuationToken: "continue-secret",
+        sessionId: "eve-session-1",
+        streamIndex: 17,
+      },
+      events: [
+        userEvent("What changed?", "turn-1"),
+        assistantEvent("Two launch rules changed.", "turn-1"),
+      ],
+    }
+
+    const first = repo.saveSnapshot(
+      USER_A,
+      thread.id,
+      snapshot,
+      thread.revision,
+    )
+    const replay = repo.saveSnapshot(
+      USER_A,
+      thread.id,
+      snapshot,
+      thread.revision,
+    )
+
+    expect(replay).toEqual(first)
+    expect(replay.revision).toBe(thread.revision + 1)
+  })
+
+  it("still rejects a stale snapshot when its retained state differs", () => {
+    const repo = repository()
+    const thread = repo.create(USER_A)
+    repo.saveSnapshot(
+      USER_A,
+      thread.id,
+      {
+        session: { sessionId: "eve-session-1", streamIndex: 1 },
+        events: [userEvent("First message", "turn-1")],
+      },
+      thread.revision,
+    )
+
+    expect(() =>
+      repo.saveSnapshot(
+        USER_A,
+        thread.id,
+        {
+          session: { sessionId: "eve-session-1", streamIndex: 2 },
+          events: [userEvent("Different message", "turn-2")],
+        },
+        thread.revision,
+      ),
+    ).toThrow(AgentThreadConflictError)
+  })
+
   it("sets and replaces mutable request options without a fork (MDL.4)", () => {
     const repo = repository()
     const thread = repo.create(USER_A)

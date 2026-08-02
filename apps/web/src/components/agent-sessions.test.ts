@@ -329,6 +329,37 @@ describe("AppAgentSessions persistence call site", () => {
     )
   })
 
+  it("treats duplicate final-snapshot delivery as an idempotent replay", async () => {
+    const thread = createForkedConversation()
+    const finalSnapshot = snapshot(2)
+    await renderSessions()
+
+    repository.saveSnapshot(
+      TEST_USER_ID,
+      thread.id,
+      finalSnapshot,
+      thread.revision,
+    )
+
+    await act(async () => {
+      harness.nextSnapshot = finalSnapshot
+      await harness.session?.send({
+        message: "Name the rollback owner",
+      })
+    })
+
+    expect(harness.expectedRevisions).toEqual([
+      { operation: "snapshot", revision: thread.revision },
+      { operation: "consume", revision: thread.revision + 1 },
+      { operation: "rename", revision: thread.revision + 2 },
+    ])
+    expect(repository.get(TEST_USER_ID, thread.id)).toMatchObject({
+      revision: thread.revision + 3,
+      title: "Name the rollback owner",
+    })
+    expect(container.textContent).not.toContain("Agent session was not saved")
+  })
+
   it("chains one final snapshot through seed consumption and rename without a false conflict", async () => {
     const thread = createForkedConversation()
     await renderSessions()

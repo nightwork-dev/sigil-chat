@@ -609,10 +609,20 @@ export class AgentThreadRepository {
     snapshot: AgentThreadSnapshot,
     expectedRevision?: number,
   ): AgentThread {
-    return this.update(userId, id, expectedRevision, (thread, timestamp) => ({
-      ...thread,
+    const current = this.require(userId, id)
+    if (
+      expectedRevision !== undefined &&
+      expectedRevision !== current.revision &&
+      snapshotMatchesRuntime(current, snapshot)
+    ) {
+      return current
+    }
+    assertRevision(current, expectedRevision)
+    const timestamp = this.now().toISOString()
+    const updated: AgentThread = {
+      ...current,
       updatedAt: timestamp,
-      revision: thread.revision + 1,
+      revision: current.revision + 1,
       runtime: {
         schemaVersion: 1,
         session: cloneSession(snapshot.session),
@@ -620,7 +630,9 @@ export class AgentThreadRepository {
           now: () => new Date(timestamp),
         }),
       },
-    }))
+    }
+    this.write(updated)
+    return cloneThread(updated)
   }
 
   fork(userId: string, input: ForkAgentThreadInput): AgentThread {
@@ -1178,6 +1190,26 @@ function cloneSession(
     ...(session.sessionId ? { sessionId: session.sessionId } : {}),
     streamIndex: session.streamIndex,
   }
+}
+
+function snapshotMatchesRuntime(
+  thread: AgentThread,
+  snapshot: AgentThreadSnapshot,
+): boolean {
+  const retained = sanitizeAndBoundAgentEvents(snapshot.events, {
+    now: () => new Date(thread.runtime.compaction.compactedAt),
+  })
+  return (
+    JSON.stringify(thread.runtime.session) ===
+      JSON.stringify(cloneSession(snapshot.session)) &&
+    JSON.stringify(thread.runtime.events) === JSON.stringify(retained.events) &&
+    thread.runtime.compaction.policyVersion ===
+      retained.compaction.policyVersion &&
+    thread.runtime.compaction.firstRetainedStreamIndex ===
+      retained.compaction.firstRetainedStreamIndex &&
+    thread.runtime.compaction.omittedEventCount ===
+      retained.compaction.omittedEventCount
+  )
 }
 
 function cloneThread(thread: AgentThread): AgentThread {
