@@ -36,6 +36,7 @@
     "./evidence": "./src/evidence.ts",
     "./files": "./src/files.ts",
     "./feature-request": "./src/feature-request.ts",
+    "./image": "./src/image.ts",
     "./registry": "./src/registry.ts",
     "./request": "./src/request.ts",
     "./schemas": "./src/schemas.ts",

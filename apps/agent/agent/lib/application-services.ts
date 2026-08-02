@@ -13,6 +13,7 @@ import {
   type FabricDispatchMetadataV1,
 } from "@gonk/eve-host/fabric"
 import type { ToolContext } from "@gonk/tool-registry"
+import { createSigilEditImageTool } from "@workspace/agent-tools/image"
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
 import { createSigilRetrievalEvidenceCoordinator } from "@workspace/agent-tools/evidence"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
@@ -33,6 +34,10 @@ import { specsRepository } from "@workspace/work-items-store/specs"
 
 import { MirkAgentThreadScopeOwnerRegistry } from "./agent-thread-scope-owners"
 import { MirkEveSessionOwnerStore } from "./eve-session-owners"
+import {
+  IMAGE_EDIT_CAPABILITY,
+  resolveFabricImageEditMetadata,
+} from "./fabric-image-edit"
 import { personalScopeId } from "./personal-scope"
 import { getProjectWorkspaceRegistries } from "./project-workspace-registries"
 import { createScopeGrantPolicy } from "./scope-authorization"
@@ -112,6 +117,14 @@ const portableImageGeneration = eveFabricHost?.bind(
   fabricCapabilityCoordinate(IMAGE_GENERATE_CAPABILITY),
   resolveFabricImageMetadata,
 )
+const portableImageEdit = eveFabricHost?.bind(
+  createSigilEditImageTool(artifactStore, async () => {
+    throw new Error("The Fabric image edit implementation was not bound")
+  }),
+  fabricCapabilityCoordinate(IMAGE_EDIT_CAPABILITY),
+  (input, context) =>
+    resolveFabricImageEditMetadata(input, context, eveFabricHost),
+)
 
 export const agentToolRegistry = createSigilAgentToolRegistry({
   artifacts: artifactStore,
@@ -131,6 +144,7 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   workItems: workItemsRepository,
   personaVoice: resolvePersonaVoice,
   ...(portableImageGeneration ? { portableImageGeneration } : {}),
+  ...(portableImageEdit ? { portableImageEdit } : {}),
 })
 
 async function resolveFabricImageMetadata(

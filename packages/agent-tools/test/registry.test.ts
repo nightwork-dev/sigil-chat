@@ -11,6 +11,8 @@ import {
 import {
   collectToolOutcome,
   makeBaseContext,
+  shape,
+  type ToolDefinition,
   ToolRegistry,
 } from "@gonk/tool-registry";
 import { FileGraphRepository } from "@workspace/graph-store/repository";
@@ -28,7 +30,11 @@ import { ProjectRegistry } from "../../../apps/agent/agent/lib/project-registry.
 import { WorkspaceRegistry } from "../../../apps/agent/agent/lib/workspace-registry.js";
 import { sigilApprovalProvider } from "../src/approval.js";
 import { registerBlackboardTools } from "../src/blackboard.js";
-import { registerImageTools } from "../src/image.js";
+import {
+  registerImageTools,
+  type EditImageInput,
+  type EditImageOutput,
+} from "../src/image.js";
 import { createSigilAgentToolRegistry } from "../src/registry.js";
 import { createReviewDemoRepository } from "../src/review.js";
 import { expectedRegistryToolContracts } from "./fixtures/registry-contract.js";
@@ -133,15 +139,10 @@ describe("Sigil Chat Gonk registry", () => {
     const registry = new ToolRegistry({
       security: { approvalProvider: sigilApprovalProvider },
     });
-    registerImageTools(
-      registry,
-      artifacts,
-      undefined,
-      async () => ({
-        bytes: new Uint8Array([1, 2, 3]),
-        mimeType: "image/png",
-      }),
-    );
+    registerImageTools(registry, artifacts, undefined, async () => ({
+      bytes: new Uint8Array([1, 2, 3]),
+      mimeType: "image/png",
+    }));
 
     const outcome = await collectToolOutcome(
       registry.invoke(
@@ -179,6 +180,85 @@ describe("Sigil Chat Gonk registry", () => {
         },
       },
     });
+  });
+
+  it("keeps sigil-edit-image contract while using an injected portable edit capability", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-portable-edit-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    const localEdit = vi.fn(async () => {
+      throw new Error("local edit provider must not run");
+    });
+    const portableHandler = vi.fn(async (input: EditImageInput) => ({
+      data: {
+        artifactId: "uploads/fabric-edited.png",
+        url: "/api/media/artifact?key=uploads%2Ffabric-edited.png&scope=session%3Aportable-edit",
+        mediaType: "image/png",
+        backend: "fabric:image_edit@1",
+        sourceArtifactId: input.sourceArtifactId!,
+        instruction: input.instruction,
+        prompt: input.instruction,
+      },
+    }));
+    const portableEdit: ToolDefinition<EditImageInput, EditImageOutput> = {
+      name: "sigil-edit-image",
+      description: "Portable image edit implementation",
+      visibility: "always",
+      approval: "write",
+      input: shape(
+        (value: unknown): value is EditImageInput =>
+          typeof value === "object" && value !== null,
+        "Expected edit input",
+      ),
+      handler: portableHandler,
+    };
+    const registry = new ToolRegistry({
+      security: { approvalProvider: sigilApprovalProvider },
+    });
+    registerImageTools(
+      registry,
+      artifacts,
+      localEdit,
+      null,
+      undefined,
+      portableEdit,
+    );
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-edit-image",
+        {
+          sourceArtifactId: "uploads/source.png",
+          instruction: "Replace the red scarf with blue silk",
+          width: 512,
+          height: 512,
+        },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "session:portable-edit"),
+          host: { resourceScope: "session:portable-edit" },
+        }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        artifactId: "uploads/fabric-edited.png",
+        backend: "fabric:image_edit@1",
+        sourceArtifactId: "uploads/source.png",
+        instruction: "Replace the red scarf with blue silk",
+      },
+    });
+    expect(portableHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceArtifactId: "uploads/source.png",
+        instruction: "Replace the red scarf with blue silk",
+        width: 512,
+        height: 512,
+      }),
+      expect.any(Object),
+    );
+    expect(localEdit).not.toHaveBeenCalled();
   });
 
   it("bounds the session blackboard at the tool and store boundary", async () => {

@@ -11,9 +11,7 @@ import {
   type ImageGenerateInput,
   type ImageGenerateOutput,
 } from "@gonk/image-gen";
-import type {
-  ImageArtifactDescriptor,
-} from "@gonk/image-gen";
+import type { ImageArtifactDescriptor } from "@gonk/image-gen";
 import {
   artifactPublicUrl,
   getSessionArtifactStore,
@@ -38,6 +36,8 @@ export type ImageGenerationProvider = typeof generateCodexImage;
 
 const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_INLINE_IMAGE_BASE64_CHARS =
+  Math.ceil(MAX_INLINE_IMAGE_BYTES / 3) * 4 + 64;
 
 export interface EditImageInput {
   instruction: string;
@@ -49,6 +49,16 @@ export interface EditImageInput {
   };
   width?: number;
   height?: number;
+}
+
+export interface EditImageOutput {
+  artifactId: string;
+  url: string;
+  mediaType: string;
+  backend: string;
+  sourceArtifactId: string;
+  instruction: string;
+  prompt: string;
 }
 
 function isGenerateImageInput(value: unknown): value is GenerateImageInput {
@@ -70,6 +80,7 @@ export function registerImageTools(
     ImageGenerateInput,
     ImageGenerateOutput
   >,
+  portableImageEdit?: ToolDefinition<EditImageInput, EditImageOutput>,
 ): void {
   const portable =
     portableImageGeneration ??
@@ -129,7 +140,61 @@ export function registerImageTools(
       },
     });
 
-  registry.register({
+  const editDefinition = createSigilEditImageTool(artifacts, editImage);
+  registry.register(portableImageEdit ?? editDefinition);
+}
+
+export const imageEditInputJsonSchema = {
+  type: "object",
+  properties: {
+    instruction: { type: "string", minLength: 1 },
+    sourceArtifactId: { type: "string", minLength: 1 },
+    inlineImage: {
+      type: "object",
+      properties: {
+        base64: { type: "string", minLength: 1 },
+        mediaType: { type: "string", enum: IMAGE_MEDIA_TYPES },
+        filename: { type: "string", minLength: 1 },
+      },
+      required: ["base64", "mediaType"],
+      additionalProperties: false,
+    },
+    width: { type: "integer", minimum: 64, maximum: 2048 },
+    height: { type: "integer", minimum: 64, maximum: 2048 },
+  },
+  required: ["instruction"],
+  oneOf: [{ required: ["sourceArtifactId"] }, { required: ["inlineImage"] }],
+  additionalProperties: false,
+} as const;
+
+export const imageEditOutputJsonSchema = {
+  type: "object",
+  properties: {
+    artifactId: { type: "string", minLength: 1 },
+    url: { type: "string", minLength: 1 },
+    mediaType: { type: "string", enum: IMAGE_MEDIA_TYPES },
+    backend: { type: "string", minLength: 1 },
+    sourceArtifactId: { type: "string", minLength: 1 },
+    instruction: { type: "string", minLength: 1 },
+    prompt: { type: "string", minLength: 1 },
+  },
+  required: [
+    "artifactId",
+    "url",
+    "mediaType",
+    "backend",
+    "sourceArtifactId",
+    "instruction",
+    "prompt",
+  ],
+  additionalProperties: false,
+} as const;
+
+export function createSigilEditImageTool(
+  artifacts: SessionArtifactStore,
+  editImage: ImageEditProvider = editImageThroughGateway,
+): ToolDefinition<EditImageInput, EditImageOutput> {
+  return {
     name: "sigil-edit-image",
     description:
       "Edit an existing session image from a source artifact or inline image using a real instruction-edit backend. Returns a new session artifact and same-origin authenticated media URL with derivation provenance. Fails loudly if the edit backend is unavailable; it never substitutes text-to-image generation.",
@@ -139,31 +204,7 @@ export function registerImageTools(
       isEditImageInput,
       "Expected a non-empty `instruction`, exactly one of `sourceArtifactId` or `inlineImage`, and optional numeric `width`/`height`.",
     ),
-    inputJsonSchema: {
-      type: "object",
-      properties: {
-        instruction: { type: "string", minLength: 1 },
-        sourceArtifactId: { type: "string", minLength: 1 },
-        inlineImage: {
-          type: "object",
-          properties: {
-            base64: { type: "string", minLength: 1 },
-            mediaType: { type: "string", enum: IMAGE_MEDIA_TYPES },
-            filename: { type: "string", minLength: 1 },
-          },
-          required: ["base64", "mediaType"],
-          additionalProperties: false,
-        },
-        width: { type: "integer", minimum: 64, maximum: 2048 },
-        height: { type: "integer", minimum: 64, maximum: 2048 },
-      },
-      required: ["instruction"],
-      oneOf: [
-        { required: ["sourceArtifactId"] },
-        { required: ["inlineImage"] },
-      ],
-      additionalProperties: false,
-    },
+    inputJsonSchema: imageEditInputJsonSchema,
     hints: writeHints,
     handler: async (input, ctx) => {
       const scope = requireResourceScope(undefined, ctx);
@@ -254,7 +295,7 @@ export function registerImageTools(
         },
       };
     },
-  });
+  };
 }
 
 export function createPortableImageGenerationTool(
@@ -362,7 +403,7 @@ function isInlineImage(
     isRecord(value) &&
     hasOnlyKeys(value, ["base64", "mediaType", "filename"]) &&
     typeof value.base64 === "string" &&
-    value.base64.length > 0 &&
+    isInlineImageBase64(value.base64) &&
     typeof value.mediaType === "string" &&
     (IMAGE_MEDIA_TYPES as readonly string[]).includes(value.mediaType) &&
     (value.filename === undefined ||
@@ -382,9 +423,8 @@ function validDimension(value: unknown): boolean {
 
 function decodeInlineImage(encoded: string): Uint8Array {
   const base64 = encoded.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+  if (!validBase64ImagePayload(base64))
     throw new Error("inlineImage.base64 is not valid base64 image data.");
-  }
   const bytes = new Uint8Array(Buffer.from(base64, "base64"));
   if (bytes.byteLength === 0) {
     throw new Error("inlineImage.base64 decoded to an empty image.");
@@ -393,6 +433,22 @@ function decodeInlineImage(encoded: string): Uint8Array {
     throw new Error("inlineImage exceeds the 10 MiB edit-source limit.");
   }
   return bytes;
+}
+
+function isInlineImageBase64(encoded: string): boolean {
+  if (encoded.length === 0 || encoded.length > MAX_INLINE_IMAGE_BASE64_CHARS)
+    return false;
+  const base64 = encoded.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
+  if (!validBase64ImagePayload(base64)) return false;
+  return Buffer.from(base64, "base64").byteLength <= MAX_INLINE_IMAGE_BYTES;
+}
+
+function validBase64ImagePayload(base64: string): boolean {
+  return (
+    base64.length > 0 &&
+    base64.length % 4 === 0 &&
+    /^[A-Za-z0-9+/]*={0,2}$/.test(base64)
+  );
 }
 
 function assertImageMediaType(mediaType: string): void {
