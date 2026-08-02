@@ -2,6 +2,11 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { AuthContext } from "@gonk/auth";
+import {
+  ScopedKnowledgeStore,
+  bindScopedKnowledgeToTool,
+  scopedKnowledgeTools,
+} from "@gonk/knowledge/scoped";
 import type { KvStore } from "@gonk/store/types";
 import {
   FilesystemManagedSkillRegistry,
@@ -46,6 +51,10 @@ afterEach(async () => {
 async function makeRegistry(
   artifacts?: SessionArtifactStore,
   skillRegistry?: WritableManagedSkillRegistry,
+  scopedKnowledge?: {
+    store: ScopedKnowledgeStore
+    tools?: ReturnType<typeof scopedKnowledgeTools>
+  },
 ) {
   const directory = await mkdtemp(join(tmpdir(), "sigil-chat-gonk-"));
   temporaryDirectories.push(directory);
@@ -69,6 +78,14 @@ async function makeRegistry(
       containers: { projects: projectRegistry, workspaces: workspaceRegistry },
       graph: repository,
       reviews: reviewRepository,
+      ...(scopedKnowledge
+        ? {
+            scopedKnowledgeStore: scopedKnowledge.store,
+            scopedKnowledgeTools: (
+              scopedKnowledge.tools ?? scopedKnowledgeTools()
+            ).map((tool) => bindScopedKnowledgeToTool(tool, scopedKnowledge.store)),
+          }
+        : {}),
       skills:
         skillRegistry ??
         new FilesystemManagedSkillRegistry({
@@ -875,6 +892,75 @@ describe("Sigil Chat Gonk registry", () => {
       ok: false,
       code: "INTERNAL",
       message: expect.stringContaining("requires an authenticated"),
+    });
+  });
+
+  it("contributes scoped knowledge evidence through the shared retrieval receipt", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-knowledge-evidence-"));
+    temporaryDirectories.push(directory);
+    const scopedKnowledge = new ScopedKnowledgeStore({
+      authority: {
+        resolveWorkspaceParentProject: () => undefined,
+        authorizeRead: ({ principal, container }) =>
+          principal.principalId === "user-1" &&
+          container.tier === "project" &&
+          container.id === "project-a"
+            ? { allowed: true, role: "owner" }
+            : { allowed: false, reason: "test denies scoped knowledge" },
+        authorizeWrite: ({ principal, container }) =>
+          principal.principalId === "user-1" &&
+          container.tier === "project" &&
+          container.id === "project-a"
+            ? { allowed: true, role: "owner" }
+            : { allowed: false, reason: "test denies scoped knowledge" },
+      },
+      containerHome: (container) =>
+        join(directory, "knowledge", container.tier, encodeURIComponent(container.id)),
+      scanWrites: () => ({ allowed: true }),
+      now: () => 1_000,
+    });
+    await scopedKnowledge.write({
+      principal: { principalId: "user-1" },
+      targetContainer: { tier: "project", id: "project-a" },
+      id: "lantern-economy",
+      title: "Lantern economy",
+      body: "Lantern loot uses governed spoils and receipts.",
+      category: "reference",
+      expectedRevision: 0,
+    });
+    const { registry } = await makeRegistry(undefined, undefined, {
+      store: scopedKnowledge,
+    });
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "What uses governed spoils?", scope: { tier: "project", id: "project-a" } },
+        makeBaseContext({
+          auth: humanAuth("user-1", "project:project-a"),
+          host: { resourceScope: "project:project-a" },
+        }),
+      ),
+    );
+    scopedKnowledge.close();
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      data: {
+        grounding: "grounded",
+        citations: [
+          expect.objectContaining({
+            source: "knowledge",
+            pageId: "lantern-economy",
+            title: "Lantern economy",
+            container: { tier: "project", id: "project-a" },
+            revision: 1,
+          }),
+        ],
+        evidenceReceipt: {
+          sources: expect.arrayContaining(["sigil.knowledge"]),
+        },
+      },
     });
   });
 

@@ -1,5 +1,14 @@
 import type { AuthContext } from "@gonk/auth";
 import {
+  ScopedKnowledgeAccessError,
+  type ScopedKnowledgeStore,
+} from "@gonk/knowledge/scoped";
+import type {
+  KnowledgeContainerRef,
+  KnowledgeHit,
+  KnowledgePage,
+} from "@gonk/knowledge/types";
+import {
   canonicalResourceKey,
   RetrievalEvidenceCoordinator,
   type RetrievalEvidenceBudget,
@@ -28,6 +37,7 @@ import { isRecord } from "./validators.js";
 
 const EVIDENCE_COLLECTION = "session-artifact-passages";
 const ARTIFACT_SOURCE_ID = "sigil.artifacts";
+const KNOWLEDGE_SOURCE_ID = "sigil.knowledge";
 const DEFAULT_RESULT_LIMIT = 5;
 const MAX_RESULT_LIMIT = 8;
 const MAX_PASSAGE_CHARS = 1_200;
@@ -89,7 +99,7 @@ export interface EvidenceLocator {
   endLine: number;
 }
 
-export interface EvidenceCitation {
+export interface ArtifactEvidenceCitation {
   citationId: string;
   source: "artifact";
   artifactId: string;
@@ -100,6 +110,22 @@ export interface EvidenceCitation {
   score: number;
   matchedTerms: string[];
 }
+
+export interface KnowledgeEvidenceCitation {
+  citationId: string;
+  source: "knowledge";
+  pageId: string;
+  title: string;
+  container: KnowledgeContainerRef;
+  revision: number;
+  quote: string;
+  score: number;
+  matchedTerms: string[];
+}
+
+export type EvidenceCitation =
+  | ArtifactEvidenceCitation
+  | KnowledgeEvidenceCitation;
 
 export interface SigilEvidenceCandidate {
   citation: EvidenceCitation;
@@ -152,6 +178,7 @@ export function registerEvidenceTools(
   artifacts: SessionArtifactStore = getSessionArtifactStore(),
   retrievalEvidenceCoordinator: SigilRetrievalEvidenceCoordinator =
     createSigilRetrievalEvidenceCoordinator(),
+  scopedKnowledgeStore?: ScopedKnowledgeStore,
 ): void {
   registry.register({
     name: "sigil-evidence-ask",
@@ -178,6 +205,7 @@ export function registerEvidenceTools(
         data: await searchArtifactEvidence({
           artifacts,
           retrievalEvidenceCoordinator,
+          scopedKnowledgeStore,
           scope,
           auth: ctx.auth,
           question: input.question,
@@ -191,6 +219,7 @@ export function registerEvidenceTools(
 export async function searchArtifactEvidence(input: {
   artifacts: SessionArtifactStore;
   retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator;
+  scopedKnowledgeStore?: ScopedKnowledgeStore;
   scope: ResourceScope;
   auth?: AuthContext;
   question: string;
@@ -280,16 +309,24 @@ export async function searchArtifactEvidence(input: {
     },
     hit: retrievalHitForArtifact(hit, matchedTerms),
   }));
+  const knowledgeCandidates = await knowledgeCandidatesForScope({
+    scopedKnowledgeStore: input.scopedKnowledgeStore,
+    auth: input.auth,
+    scope: input.scope,
+    question,
+    limit: Math.max(resultLimit * 4, 20),
+    meaningfulTerms,
+  });
   const coordinated =
     await (input.retrievalEvidenceCoordinator ??
       createSigilRetrievalEvidenceCoordinator()).collect({
-      candidates: artifactCandidates,
+      candidates: [...artifactCandidates, ...knowledgeCandidates],
       auth: input.auth,
       question,
       resultLimit,
     });
   const citationByResourceKey = new Map(
-    artifactCandidates.map((candidate) => [
+    [...artifactCandidates, ...knowledgeCandidates].map((candidate) => [
       canonicalResourceKey(candidate.hit.resource),
       candidate.citation,
     ]),
@@ -341,6 +378,89 @@ export async function searchArtifactEvidence(input: {
     answerInstruction:
       "Answer only from these passages. Cite claims with the returned citationId values and preserve each quote, source identifier, and locator exactly as supplied.",
   };
+}
+
+async function knowledgeCandidatesForScope(input: {
+  scopedKnowledgeStore: ScopedKnowledgeStore | undefined;
+  auth: AuthContext;
+  scope: ResourceScope;
+  question: string;
+  limit: number;
+  meaningfulTerms: readonly string[];
+}): Promise<SigilEvidenceCandidate[]> {
+  if (!input.scopedKnowledgeStore) return [];
+  const activeContainer = knowledgeContainerForScope(input.scope);
+  if (!activeContainer) return [];
+  const principalId = input.auth.principal?.id;
+  if (!principalId) return [];
+  try {
+    const result = await input.scopedKnowledgeStore.query({
+      principal: { principalId },
+      activeContainer,
+      text: input.question,
+      limit: input.limit,
+    });
+    return result.results.map((hit) =>
+      evidenceCandidateForKnowledge(hit, input.meaningfulTerms),
+    );
+  } catch (error) {
+    if (error instanceof ScopedKnowledgeAccessError) return [];
+    throw error;
+  }
+}
+
+function knowledgeContainerForScope(
+  scope: ResourceScope,
+): KnowledgeContainerRef | undefined {
+  return scope.tier === "project" || scope.tier === "workspace"
+    ? { tier: scope.tier, id: scope.id }
+    : undefined;
+}
+
+function evidenceCandidateForKnowledge(
+  hit: KnowledgeHit & { page: KnowledgePage & { container: KnowledgeContainerRef; revision: number } },
+  meaningfulTerms: readonly string[],
+): SigilEvidenceCandidate {
+  const matchedTerms = knowledgeMatchedTerms(hit.page, meaningfulTerms);
+  const quote = truncateQuote(hit.page.body);
+  return {
+    citation: {
+      citationId: "",
+      source: "knowledge",
+      pageId: hit.page.id,
+      title: hit.page.title,
+      container: hit.page.container,
+      revision: hit.page.revision,
+      quote,
+      score: hit.score,
+      matchedTerms,
+    },
+    hit: retrievalHit({
+      resource: {
+        sourceId: KNOWLEDGE_SOURCE_ID,
+        kind: "knowledge-page",
+        id: `${hit.page.container.tier}:${hit.page.container.id}/${hit.page.id}`,
+        revision: String(hit.page.revision),
+      },
+      sourceId: KNOWLEDGE_SOURCE_ID,
+      score: hit.score,
+      matchedTerms,
+    }),
+  };
+}
+
+function knowledgeMatchedTerms(
+  page: Pick<KnowledgePage, "title" | "body">,
+  meaningfulTerms: readonly string[],
+): string[] {
+  const pageTerms = new Set(tokenize(`${page.title} ${page.body}`));
+  return meaningfulTerms.filter((term) => pageTerms.has(term));
+}
+
+function truncateQuote(body: string): string {
+  const trimmed = body.trim();
+  if (trimmed.length <= MAX_PASSAGE_CHARS) return trimmed;
+  return `${trimmed.slice(0, MAX_PASSAGE_CHARS - 1).trimEnd()}…`;
 }
 
 export function createSigilRetrievalEvidenceCoordinator(): SigilRetrievalEvidenceCoordinator {
