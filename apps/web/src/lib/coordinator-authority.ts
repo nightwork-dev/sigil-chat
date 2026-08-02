@@ -45,7 +45,7 @@ import {
   type ScopeGrant,
 } from "@workspace/agent-contracts/scope-authorization"
 
-import { announceAuthorization } from "./speakable-text"
+import { announceAuthorization } from "@zigil/agent/voice"
 
 /** Every action a delegated grant may name. Mirrors the contract union; a
  *  grant naming all of them is refused as broad (see NARROWNESS below). */

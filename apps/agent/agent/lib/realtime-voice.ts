@@ -33,8 +33,17 @@ import { readAgentSessionBinding } from "@workspace/agent-contracts/session-bind
 import {
   RealtimeAppServerClient,
   RealtimeAppServerError,
-} from "./realtime-appserver"
+} from "@zigil/agent/voice/server"
+
 import { requireAuthorizedResourceScope } from "./scope-authorization"
+
+/** Identifies this process to the codex app-server. The SDK's own default is
+ *  deliberately generic — every host must say who it is. */
+const SIGIL_CHAT_CLIENT_INFO = {
+  name: "sigil-chat",
+  title: "Sigil Chat",
+  version: "0.0.1",
+} as const
 
 export const REALTIME_OFFER_PATH = "/sigil/v1/realtime/offer"
 export const REALTIME_STOP_PATH = "/sigil/v1/realtime/stop"
@@ -151,7 +160,9 @@ export class RealtimeVoiceHost {
   #pending: { owner: RealtimeVoiceCallOwner; client: RealtimeVoiceClient } | undefined
 
   constructor(options: RealtimeVoiceHostOptions = {}) {
-    this.#createClient = options.createClient ?? (() => new RealtimeAppServerClient())
+    this.#createClient =
+      options.createClient ??
+      (() => new RealtimeAppServerClient({ clientInfo: SIGIL_CHAT_CLIENT_INFO }))
   }
 
   /** The live call, named by the thread it is bound to. */

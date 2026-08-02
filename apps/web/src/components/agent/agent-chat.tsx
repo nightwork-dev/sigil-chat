@@ -58,13 +58,16 @@ import { useActiveThreadContainers } from "@/hooks/use-active-thread-containers"
 import { useAppAgentSession } from "@/hooks/use-app-agent-session"
 import { useAgentThread } from "@/lib/agent-threads"
 import { useUploadAgentAttachment } from "@/lib/agent-attachments"
-import { appendDictationDraft } from "@/lib/voice-dictation"
+import {
+  appendDictationDraft,
+  useSpokenAgentReplies,
+  type VoiceBoundThread,
+} from "@zigil/agent/voice"
 import { useSpeakReplies } from "@/lib/agent-preferences"
-import { useSpokenAgentReplies } from "@/lib/spoken-replies"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
-import type { VoiceBoundThread } from "@/lib/voice-session-binding"
 import type { WorkspaceResourceCandidate } from "@/lib/add-sources"
 import {
+  AGENT_PERSONA_HEADER,
   AGENT_SCOPE_HEADER,
   sessionResourceScope,
 } from "@/lib/agent-session-scope"
@@ -225,7 +228,7 @@ export function AgentChat({
     enabled: conversationMode || speakRepliesPreference,
     isStreaming: session.status === "streaming",
     messages: session.data.messages,
-    personaId: personaId ?? undefined,
+    headers: personaId ? { [AGENT_PERSONA_HEADER]: personaId } : undefined,
   })
 
   const handleAttachUrl = useCallback(

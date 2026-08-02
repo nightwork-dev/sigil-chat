@@ -21,11 +21,11 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 
 import {
+  appendDictationDraft,
   createVoiceSessionStore,
+  type VoiceRecorder,
   type VoiceSessionStore,
-} from "@/lib/voice-session-binding"
-import type { VoiceRecorder } from "@/lib/voice-dictation"
-import { appendDictationDraft } from "@/lib/voice-dictation"
+} from "@zigil/agent/voice"
 
 import { ComposerVoiceControl } from "./voice-composer-control"
 import { VoiceBoundThread } from "./voice-bound-thread"

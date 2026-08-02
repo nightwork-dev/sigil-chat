@@ -14,16 +14,14 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
 import type { AgentMessagePart } from "@zigil/agent/contracts"
 
-import { speakMessageParts } from "@/lib/agent-voice"
-import { createAudioFocusManager } from "@/lib/audio-focus"
 import {
+  speakMessageParts,
+  createAudioFocusManager,
   NON_SPEAKABLE_PARTS,
   SPEECH_LEAK_CANARY,
-} from "@/lib/speakable-parts.fixture"
-import {
   createSpeechPlayer,
   type SpeechPlaybackDriver,
-} from "@/lib/speech-playback"
+} from "@zigil/agent/voice"
 
 import { MessageReadAloud } from "./message-read-aloud"
 

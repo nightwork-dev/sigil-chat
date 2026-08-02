@@ -26,7 +26,7 @@ import {
   voiceBoundThreadHref,
   voiceSessionStore,
   type VoiceSessionStore,
-} from "@/lib/voice-session-binding"
+} from "@zigil/agent/voice"
 
 export function VoiceBoundThread({
   store = voiceSessionStore,
