@@ -125,7 +125,7 @@ describe("Sigil Chat overlay", () => {
       "version",
     ]);
     expect(item.name).toBe("chat-overlay");
-    expect(item.version).toBe("0.1.1");
+    expect(item.version).toBe("0.1.2");
     expect(item.overlay.name).toBe("sigil-chat");
     expect(item.overlay.sigilOverlayVersion).toBe(1);
     expect(item.digest).toMatch(/^sha256-[A-Za-z0-9_-]{43}$/);
