@@ -145,7 +145,11 @@ export function ComposerModelControl({
         ) : null}
         {fastMode ? <span className="text-muted-foreground">Fast</span> : null}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56" side="top">
+      <DropdownMenuContent
+        align="end"
+        className="w-64 max-w-[calc(100vw-1rem)]"
+        side="top"
+      >
         {hasTuning ? (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger disabled={pending || !thread}>
@@ -154,7 +158,7 @@ export function ComposerModelControl({
                 {triggerLabel}
               </DropdownMenuShortcut>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-[min(24rem,calc(100vh-2rem))] min-w-64 overflow-y-auto">
+            <DropdownMenuSubContent className="max-h-[min(24rem,calc(100vh-2rem))] w-64 max-w-[calc(100vw-1rem)] overflow-y-auto">
               <ModelMenuItems
                 boundPresetId={boundPresetId}
                 error={endpoints.isError}
@@ -268,11 +272,12 @@ function ModelMenuItems({
           <DropdownMenuLabel>{provider.label}</DropdownMenuLabel>
           {provider.models.map((model) => (
             <DropdownMenuRadioItem
-              className="font-mono"
+              className="min-w-0 font-mono"
               key={model.id}
+              title={model.model}
               value={model.id}
             >
-              {model.model}
+              <span className="min-w-0 flex-1 truncate">{model.model}</span>
             </DropdownMenuRadioItem>
           ))}
         </div>
