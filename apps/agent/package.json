@@ -31,6 +31,7 @@
     "@gonk/image-gen": "catalog:",
     "@gonk/memory": "catalog:",
     "@gonk/persona": "catalog:",
+    "@gonk/retrieval": "catalog:",
     "@gonk/scope": "catalog:",
     "@gonk/skills": "catalog:",
     "@gonk/store": "catalog:",

@@ -776,6 +776,7 @@ describe("Sigil Chat Gonk registry", () => {
     });
     const { registry } = await makeRegistry(artifacts);
     const context = makeBaseContext({
+      auth: humanAuth("owner-1", "session:evidence-room-demo"),
       host: { resourceScope: "session:evidence-room-demo" },
     });
 
@@ -793,6 +794,7 @@ describe("Sigil Chat Gonk registry", () => {
         citations: [
           {
             citationId: "c1",
+            source: "artifact",
             artifactId: stored.id,
             filename: "cerebras-knowledge-base.md",
             quote: expect.stringContaining("biggest stated accuracy win"),
@@ -836,6 +838,7 @@ describe("Sigil Chat Gonk registry", () => {
         "sigil-evidence-ask",
         { question: "biggest accuracy win" },
         makeBaseContext({
+          auth: humanAuth("owner-1", "session:another-session"),
           host: { resourceScope: "session:another-session" },
         }),
       ),
@@ -843,6 +846,88 @@ describe("Sigil Chat Gonk registry", () => {
     expect(otherScope).toMatchObject({
       ok: true,
       data: { grounding: "no-evidence", citations: [] },
+    });
+  });
+
+  it("requires authenticated evidence retrieval", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sigil-evidence-auth-"));
+    temporaryDirectories.push(directory);
+    const artifacts = createFileSessionArtifactStore({ root: directory });
+    await artifacts.putFile({
+      bytes: new TextEncoder().encode("A private note about Slack evidence."),
+      filename: "private-note.md",
+      mediaType: "text/markdown",
+      scope: "session:evidence-room-demo",
+    });
+    const { registry } = await makeRegistry(artifacts);
+
+    const outcome = await collectToolOutcome(
+      registry.invoke(
+        "sigil-evidence-ask",
+        { question: "What evidence exists about Slack?" },
+        makeBaseContext({
+          host: { resourceScope: "session:evidence-room-demo" },
+        }),
+      ),
+    );
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+      message: expect.stringContaining("requires an authenticated"),
+    });
+  });
+
+  it("does not expose raw Gonk knowledge or triple tools without the scoped Sigil adapter", async () => {
+    const { registry } = await makeRegistry();
+    const rawToolNames = [
+      "knowledge_write",
+      "knowledge_query",
+      "knowledge_get",
+      "knowledge_links",
+      "triple_assert",
+      "triple_query",
+      "triple_invalidate",
+    ];
+
+    const catalogNames = registry.list().map((tool) => tool.name);
+    for (const name of rawToolNames) {
+      expect(catalogNames).not.toContain(name);
+    }
+
+    const writeAttempt = await collectToolOutcome(
+      registry.invoke(
+        "knowledge_write",
+        {
+          id: "unsafe-write",
+          title: "Unsafe Write",
+          body: "This must wait for the scoped Sigil adapter.",
+          category: "project",
+        },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "project:sigil-chat"),
+          host: { resourceScope: "project:sigil-chat" },
+        }),
+      ),
+    );
+    expect(writeAttempt).toMatchObject({
+      ok: false,
+      code: "TOOL_NOT_FOUND",
+    });
+
+    const tripleAttempt = await collectToolOutcome(
+      registry.invoke(
+        "triple_assert",
+        { subject: "project", predicate: "has", object: "boundary" },
+        makeBaseContext({
+          auth: humanAuth("owner-1", "project:sigil-chat"),
+          host: { resourceScope: "project:sigil-chat" },
+        }),
+      ),
+    );
+    expect(tripleAttempt).toMatchObject({
+      ok: false,
+      code: "TOOL_NOT_FOUND",
     });
   });
 

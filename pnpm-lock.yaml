@@ -27,6 +27,9 @@ catalogs:
     '@gonk/persona':
       specifier: 0.7.0
       version: 0.7.0
+    '@gonk/retrieval':
+      specifier: 0.6.0
+      version: 0.6.0
     '@gonk/scope':
       specifier: 0.5.1
       version: 0.5.1
@@ -107,6 +110,9 @@ importers:
       '@gonk/persona':
         specifier: 'catalog:'
         version: 0.7.0
+      '@gonk/retrieval':
+        specifier: 'catalog:'
+        version: 0.6.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/scope':
         specifier: 'catalog:'
         version: 0.5.1
@@ -365,6 +371,9 @@ importers:
       '@gonk/image-gen':
         specifier: 'catalog:'
         version: 0.6.0
+      '@gonk/retrieval':
+        specifier: 'catalog:'
+        version: 0.6.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
       '@gonk/skills':
         specifier: 'catalog:'
         version: 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
@@ -1507,6 +1516,9 @@ packages:
 
   '@gonk/persona@0.7.0':
     resolution: {integrity: sha512-HPjTcv6jt/C6aPIm321UXYi6ABJITDsUIdjbY3o2MQyzLfLW0Maj4x3uvmAzX4McoFFYEiJw02AhmmvRzJH2Rw==}
+
+  '@gonk/retrieval@0.6.0':
+    resolution: {integrity: sha512-eX1Ik2Hlce8A7QzH/TgQTnWUBY94+XD2mm3U1EAdaoKQYyl305L5Ektmt30QssvSZ8ZPLaHb3PXfvqmA/X9nzA==}
 
   '@gonk/rlm@0.5.0':
     resolution: {integrity: sha512-fzxBMgsO70MB2/8WE4Ahb+6W2y8tlVfNG+jdAsPZIWGdCMLX+tMJaK7W1IVQJf2rVltv8SpFNU74BIINugzb2Q==}
@@ -7553,6 +7565,16 @@ snapshots:
       '@gonk/tool-registry': 0.5.1(@gonk/scope@0.5.1)
       acausal: 3.0.0-alpha.3
       yaml: 2.9.0
+
+  '@gonk/retrieval@0.6.0(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)':
+    dependencies:
+      '@gonk/auth': 0.5.1
+      '@gonk/context': 0.5.1
+      '@gonk/store': 0.5.1(better-sqlite3@12.10.0)(sqlite-vec@0.1.9)
+      '@standard-schema/spec': 1.1.0
+    transitivePeerDependencies:
+      - better-sqlite3
+      - sqlite-vec
 
   '@gonk/rlm@0.5.0(sqlite-vec@0.1.9)':
     dependencies:

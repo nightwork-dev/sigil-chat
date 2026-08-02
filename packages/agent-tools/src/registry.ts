@@ -20,6 +20,7 @@ import {
 import { registerDemoSeedTools } from "./demo-seed.js"
 import { registerDistillTools } from "./distill.js"
 import { registerEvidenceTools } from "./evidence.js"
+import type { SigilRetrievalEvidenceCoordinator } from "./evidence.js"
 import { registerFeatureRequestTools } from "./feature-request.js"
 import { registerFileTools, type ResourceUniverseRegistries } from "./files.js"
 import { registerGraphTools } from "./graph.js"
@@ -42,6 +43,8 @@ export interface SigilAgentToolDependencies {
   specs?: SpecsRepository
   sessions?: ResourceUniverseRegistries["sessions"]
   skills: SkillRegistryResolver
+  scopedKnowledgeTools?: readonly ToolDefinition[]
+  retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator
   personaVoice?: PersonaVoiceResolver
   portableImageGeneration?: ToolDefinition<
     ImageGenerateInput,
@@ -65,6 +68,9 @@ export function createSigilAgentToolRegistry(
   if (dependencies.specs) registerSpecTools(registry, dependencies.specs)
   registerContainerTools(registry, dependencies.containers)
   registerAnnotationTools(registry)
+  for (const tool of dependencies.scopedKnowledgeTools ?? []) {
+    registry.register(tool)
+  }
   registerSkillTools(registry, dependencies.skills)
   registerUiCommandTools(registry)
   registerImageTools(
@@ -86,7 +92,11 @@ export function createSigilAgentToolRegistry(
     ...dependencies.containers,
     ...(dependencies.sessions ? { sessions: dependencies.sessions } : {}),
   })
-  registerEvidenceTools(registry, dependencies.artifacts)
+  registerEvidenceTools(
+    registry,
+    dependencies.artifacts,
+    dependencies.retrievalEvidenceCoordinator,
+  )
   registerDistillTools(registry, dependencies.artifacts)
   registerDemoSeedTools(registry, dependencies.artifacts)
   registerBlackboardTools(registry)

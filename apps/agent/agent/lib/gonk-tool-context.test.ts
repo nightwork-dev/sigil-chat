@@ -7,6 +7,7 @@ import {
   createFabricToolHostContext,
   createGonkAuthContext,
   fabricRestrictionPolicyRefs,
+  makeGonkToolContext,
 } from "./gonk-tool-context"
 
 const principal: AuthenticatedPrincipal = {
@@ -28,7 +29,7 @@ describe("native Gonk tool context", () => {
     )
   })
 
-  it("reauthorizes the live resource scope for discovery and invocation", () => {
+  it("reauthorizes the live resource scope for discovery, invocation, and retrieval reads", () => {
     let allowed = true
     const authorize = (action: "tool.discover" | "tool.invoke") =>
       authorizeGonkRequest(
@@ -45,8 +46,42 @@ describe("native Gonk tool context", () => {
       )
 
     expect(authorize("tool.discover").outcome).toBe("allow")
+    expect(
+      authorizeGonkRequest(
+        {
+          request: {
+            action: "retrieval.hit.read",
+            resource: {
+              kind: "retrieval-resource",
+              target: "sigil.artifacts:artifact-passage:thread-notes",
+            },
+          },
+          principal,
+          resourceScope: "project:sigil-chat",
+          personaId: undefined,
+        },
+        () => allowed,
+      ).outcome,
+    ).toBe("allow")
     allowed = false
     expect(authorize("tool.invoke").outcome).toBe("deny")
+    expect(
+      authorizeGonkRequest(
+        {
+          request: {
+            action: "retrieval.hit.read",
+            resource: {
+              kind: "retrieval-resource",
+              target: "sigil.artifacts:artifact-passage:thread-notes",
+            },
+          },
+          principal,
+          resourceScope: "project:sigil-chat",
+          personaId: undefined,
+        },
+        () => allowed,
+      ).outcome,
+    ).toBe("deny")
   })
 
   it("enforces tool roles after scope authorization", () => {
@@ -82,6 +117,28 @@ describe("native Gonk tool context", () => {
         }),
       }),
     ).toBe("not-applicable")
+  })
+
+  it("binds the retrieval evidence coordinator into tool host context", async () => {
+    const context = await makeGonkToolContext({
+      dynamic: dynamicContext({
+        sigilResourceScope: "project:sigil-chat",
+      }),
+      eve: {
+        abortSignal: new AbortController().signal,
+        callId: "call-1",
+        session: { turn: { id: "turn-1" } },
+      },
+    } as never)
+
+    expect(context.host).toMatchObject({
+      resourceScope: "project:sigil-chat",
+      retrievalEvidenceCoordinator: expect.objectContaining({
+        collect: expect.any(Function),
+      }),
+    })
+    expect(context.host).not.toHaveProperty("knowledge")
+    expect(context.host).not.toHaveProperty("triples")
   })
 
   it("projects the immutable Eve binding into an exact Fabric execution seam", () => {

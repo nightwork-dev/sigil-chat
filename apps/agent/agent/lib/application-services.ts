@@ -14,6 +14,7 @@ import {
 } from "@gonk/eve-host/fabric"
 import type { ToolContext } from "@gonk/tool-registry"
 import { createSigilAgentToolRegistry } from "@workspace/agent-tools/registry"
+import { createSigilRetrievalEvidenceCoordinator } from "@workspace/agent-tools/evidence"
 import { createRequestBoundSkillRegistry } from "@workspace/agent-tools/skills"
 import {
   createFileSessionArtifactStore,
@@ -71,6 +72,9 @@ export const usageLedgerRepository = new MirkUsageLedgerRepository({
   ),
 })
 
+export const retrievalEvidenceCoordinator =
+  createSigilRetrievalEvidenceCoordinator()
+
 export const projectWorkspaceRegistries = getProjectWorkspaceRegistries()
 export const scopeGrantPolicy = createScopeGrantPolicy({
   registries: projectWorkspaceRegistries,
@@ -100,6 +104,7 @@ export const agentToolRegistry = createSigilAgentToolRegistry({
   containers: projectWorkspaceRegistries,
   graph: graphRepository,
   reviews: reviewRepository,
+  retrievalEvidenceCoordinator,
   skills: createRequestBoundSkillRegistry(
     readDataEnvironment(process.env).skillsDir,
   ),

@@ -14,6 +14,7 @@ interface EvidenceLocator {
 }
 export interface EvidenceCitation {
   citationId: string
+  source?: "artifact"
   artifactId: string
   filename: string
   quote: string
