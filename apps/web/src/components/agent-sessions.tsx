@@ -22,6 +22,8 @@ import {
   setContextDraftScope,
 } from "@zigil/agent/react"
 import {
+  ExclusiveAgentTurnGate,
+  serializeAgentSession,
   useEveRuntimeSession,
   type UseEveRuntimeSessionOptions,
 } from "@zigil/agent/react/eve"
@@ -29,7 +31,6 @@ import type {
   AgentRuntimeSession,
   AgentSendInput,
   AgentThreadControls,
-  AgentTurnResult,
 } from "@zigil/agent/contracts"
 import {
   Alert,
@@ -354,31 +355,13 @@ function ActiveAgentSession({
     session: eveSession,
     thread,
   })
-  const turnActive = useRef(false)
-  const runExclusiveTurn = useCallback(
-    async (run: () => Promise<AgentTurnResult>): Promise<AgentTurnResult> => {
-      if (turnActive.current) {
-        return {
-          status: "failed",
-          error: {
-            message: "The agent session is already processing a turn.",
-          },
-        }
-      }
-      turnActive.current = true
-      try {
-        return await run()
-      } finally {
-        turnActive.current = false
-      }
-    },
-    [],
-  )
+  const turnGateRef = useRef<ExclusiveAgentTurnGate | undefined>(undefined)
+  if (!turnGateRef.current) turnGateRef.current = new ExclusiveAgentTurnGate()
   const session = useMemo<AgentRuntimeSession>(
-    () => ({
-      ...eveSession,
-      send: (input) =>
-        runExclusiveTurn(async () => {
+    () =>
+      serializeAgentSession(turnGateRef.current!, {
+        session: eveSession,
+        sendTurn: async (input, base) => {
           const resourceScope = input.headers?.[AGENT_SCOPE_HEADER]
           const [scopeProof, sessionBindingProof] = await Promise.all([
             resourceScope
@@ -386,7 +369,7 @@ function ActiveAgentSession({
               : Promise.resolve(undefined),
             getAgentSessionBindingProof(thread.id, principalId),
           ])
-          const result = await eveSession.send({
+          const result = await base.send({
             ...input,
             headers: {
               ...input.headers,
@@ -401,27 +384,15 @@ function ActiveAgentSession({
           })
           if (result.status === "succeeded") await handleSendSuccess(input)
           return result
-        }),
-      respondToToolInput: eveSession.respondToToolInput
-        ? (responses) =>
-            runExclusiveTurn(() => {
-              if (responses.length === 0) {
-                return Promise.resolve({
-                  status: "failed",
-                  error: {
-                    message: "No tool input responses were provided.",
-                  },
-                })
-              }
-              return eveSession.respondToToolInput!(responses)
-            })
-        : undefined,
-    }),
+        },
+        respondToToolInputTurn: eveSession.respondToToolInput
+          ? (responses, base) => base.respondToToolInput!(responses)
+          : undefined,
+      }),
     [
       eveSession,
       handleSendSuccess,
       principalId,
-      runExclusiveTurn,
       thread.forkSeed,
       thread.id,
       thread.personaId,

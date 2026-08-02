@@ -86,7 +86,8 @@ let repository: AgentThreadRepository
 let threadStore: TestAgentThreadKvStore<AgentThread>
 const TEST_USER_ID = "session-test-user"
 
-vi.mock("@zigil/agent/react/eve", () => ({
+vi.mock("@zigil/agent/react/eve", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@zigil/agent/react/eve")>()),
   useEveRuntimeSession: (callbacks: EveCallbacks) => {
     const fallbackId = ReactRuntime.useRef<string | null>(null)
     if (!fallbackId.current) {
