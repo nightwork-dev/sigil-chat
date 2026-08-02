@@ -110,6 +110,25 @@ gpt-5.6-luna` at high thinking, or codex doing the equivalent mechanical
 - UI changes carry a browser gate: verify in a real browser (or delegate to
   a subagent driving Playwright with a concrete checklist), console clean.
 
+## Story-comment @mentions
+
+Story comments (`apps/web/src/lib/story-comment-mentions.ts`) are a second,
+lighter coordination channel alongside the roadmap store's frontmatter —
+use it to address feedback or a question at a specific agent or role
+without pulling them into the story's own status fields. The composer's `@`
+trigger (`mention-trigger.ts`, `isAtWordBoundary`) only opens the Add menu
+at a word boundary — start of input or right after whitespace — so an email
+address or a mid-word `@` never hijacks composing; `/` is deliberately not a
+trigger, since that would advertise a command palette this menu doesn't
+provide.
+
+A comment resolves to a routing receipt, not silence: `delivered` means the
+addressed selector's active session received the comment in its
+coordination inbox; `unresolved` means the selector isn't currently
+reachable, and the comment stays on the story for the next reviewer to
+pick up. Either way the receipt is visible on the comment — check it before
+assuming a mention landed.
+
 ## Commit protocol
 
 - Commit verified work to `dev` as it lands; concern-grouped commits (one

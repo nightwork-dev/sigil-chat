@@ -95,6 +95,32 @@ shipping, run the repo typecheck/test/lint/build gates and a cold-boot `pnpm
 dev` smoke. Confirm the authenticated catalog is non-empty and the tool can be
 invoked through a normal Eve turn.
 
+## Pending-tool-input batching
+
+When several tool calls are awaiting approval input at once,
+`apps/web/src/lib/agent-tool-input-batch.ts` coalesces the human's rapid
+approve/deny decisions into one batch response rather than firing a
+response per click. `collectPendingToolInputRequests` scans the message
+list for parts in `approval-requested` state with an unanswered
+`inputRequest`; `buildToolInputResponseBatch` accepts incoming responses
+into a `queued` map keyed by `requestId` and only emits `batchResponses`
+once **every** currently-pending request id has a queued answer — until
+then it returns `batchResponses: null` and keeps accumulating in
+`queuedResponses`.
+
+The consequence for a tool surface: **a client sending a single
+approve/deny is not guaranteed an immediate matching response.** If two
+requests are pending and the user answers one, nothing is sent yet — the
+answer sits queued until the second is also answered (or the pending set
+changes and only one remains). Any UI or handler built against this batching
+contract must expect a batched continuation, not a one-request-in
+one-response-out round trip, and must not assume a decision fires
+synchronously with the click that made it.
+
+This module is in the process of moving into `@zigil/agent` (story DX.10) —
+expect import sites to change; the batching contract described here does
+not.
+
 ## Failure checklist
 
 - Tool absent: confirm it is registered by `createApplicationToolRegistry`.

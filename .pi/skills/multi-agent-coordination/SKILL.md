@@ -93,6 +93,22 @@ work.
       checklist. Never drive Playwright directly from the orchestrating
       session. Console must be clean.
 
+## RULE 5.5: Story-comment @mentions
+
+- [ ] Story comments (`apps/web/src/lib/story-comment-mentions.ts`) are a
+      SECOND, lighter coordination channel alongside roadmap frontmatter —
+      use to address feedback/a question at a specific agent or role without
+      touching the story's status fields.
+- [ ] The composer's `@` trigger (`mention-trigger.ts`, `isAtWordBoundary`)
+      opens the Add menu ONLY at a word boundary (start of input, or right
+      after whitespace) — an email address or mid-word `@` never hijacks
+      composing. `/` is deliberately NOT a trigger — no command palette here.
+- [ ] Every comment resolves to a routing receipt, never silence:
+      `delivered` = the addressed selector's active session received it in
+      its coordination inbox; `unresolved` = not currently reachable, stays
+      on the story for the next reviewer. Check the receipt before assuming
+      a mention landed.
+
 ## RULE 6: Commit protocol
 
 - [ ] Commit verified work to `dev` as it lands. **Concern-grouped commits**

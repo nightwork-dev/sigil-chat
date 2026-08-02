@@ -37,3 +37,19 @@ pnpm --filter sigil-chat-agent typecheck
 - [ ] Before shipping, run repo typecheck/test/lint/build plus cold-boot smoke.
 - [ ] Prove the authenticated catalog is non-empty and invoke the tool through a
       normal Eve turn.
+
+## Pending-tool-input batching
+
+- [ ] When multiple tool calls await approval input at once,
+      `apps/web/src/lib/agent-tool-input-batch.ts` coalesces rapid
+      approve/deny decisions into ONE batch response, not one response per
+      click. `buildToolInputResponseBatch` only emits `batchResponses` once
+      EVERY currently-pending request id has a queued answer; until then it
+      returns `batchResponses: null` and keeps accumulating.
+- [ ] Consequence: a tool surface must NOT assume a single approve/deny
+      fires an immediate matching response. If two requests are pending and
+      only one is answered, nothing sends yet. Build any UI/handler against
+      this contract expecting a batched continuation, never a synchronous
+      one-request one-response round trip.
+- [ ] This module is moving into `@zigil/agent` (story DX.10) — import sites
+      may change; the batching contract does not.

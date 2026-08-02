@@ -64,3 +64,10 @@ python3 scripts/check-story-integrity.py --strict
 validates verify blocks (frontmatter parses, steps are a non-empty string
 list, url is a same-origin path) alongside the path-integrity rules, and
 runs automatically from the roadmap repository's tracked pre-commit hook.
+
+## Owner feedback travels as story comments
+
+Once the owner works this queue, their feedback on a story comes back as a
+story comment, not a new roadmap field — see `multi-agent-coordination`'s
+story-comment @mentions subsection for the routing/delivery-receipt
+contract that carries it back to the right agent.
