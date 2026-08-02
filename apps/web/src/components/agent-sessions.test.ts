@@ -7,7 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { UseEveRuntimeSessionOptions } from "@zigil/agent/react/eve"
 import { useAgentRuntimeSession } from "@zigil/agent/react"
 import type {
+  AgentMessage,
   AgentRuntimeSession,
+  AgentSessionData,
   AgentToolInputResponse,
   AgentTurnResult,
 } from "@zigil/agent/contracts"
@@ -504,6 +506,11 @@ describe("AppAgentSessions persistence call site", () => {
   it("rejects an overlapping tool-input continuation before it reaches Eve, then allows a subsequent continuation once the turn clears", async () => {
     repository.create(TEST_USER_ID, { title: "Fixed title" })
     await renderSessions()
+    stagePendingToolInputRequests(primaryMockSession(), [
+      "request-1",
+      "request-2",
+      "request-3",
+    ])
 
     const holdFirstContinuation = deferredTurn()
     harness.pendingToolInput = holdFirstContinuation.promise
@@ -567,9 +574,33 @@ describe("AppAgentSessions persistence call site", () => {
     expect(harness.eveToolInputCallCount).toBe(0)
   })
 
+  it("rejects a tool-input continuation for a request that is no longer pending, without forwarding it to Eve", async () => {
+    repository.create(TEST_USER_ID, { title: "Fixed title" })
+    await renderSessions()
+    // Deliberately stage a different request as pending than the one this
+    // test responds to, so "request-1" is not among the session's pending
+    // approval-requested parts.
+    stagePendingToolInputRequests(primaryMockSession(), ["request-2"])
+
+    await act(async () => {
+      const result = await harness.session?.respondToToolInput?.([
+        { optionId: "allow", requestId: "request-1" },
+      ])
+      expect(result).toMatchObject({
+        status: "failed",
+        error: {
+          code: "stale-tool-input-approval",
+        },
+      })
+    })
+
+    expect(harness.eveToolInputCallCount).toBe(0)
+  })
+
   it("uses one turn boundary for mixed sends and tool-input continuations", async () => {
     repository.create(TEST_USER_ID, { title: "Fixed title" })
     await renderSessions()
+    stagePendingToolInputRequests(primaryMockSession(), ["request-1"])
 
     const holdContinuation = deferredTurn()
     harness.pendingToolInput = holdContinuation.promise
@@ -1055,6 +1086,48 @@ function deferredTurn(): {
     resolve = next
   })
   return { promise, resolve }
+}
+
+// serializeAgentSession's stale-approval guard reads pending tool-input
+// requests straight off session.data.messages (the same source a real
+// approval UI derives its prompts from via collectPendingToolInputRequests).
+// The mock Eve session normally reports no messages at all, so any test that
+// exercises respondToToolInput must first stage the request ids it responds
+// to as pending approval-requested parts here, or the guard will — correctly
+// — treat them as stale and never reach Eve.
+function pendingToolInputMessage(requestId: string): AgentMessage {
+  return {
+    id: `message:pending:${requestId}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-call",
+        id: `tool:${requestId}`,
+        name: "sigil-test-tool",
+        state: "approval-requested",
+        inputRequest: {
+          requestId,
+          prompt: `Approve ${requestId}?`,
+        },
+      },
+    ],
+  } as AgentMessage
+}
+
+function stagePendingToolInputRequests(
+  session: MockEveSession,
+  requestIds: readonly string[],
+): void {
+  ;(session as { data: AgentSessionData }).data = {
+    messages: [...session.data.messages, ...requestIds.map(pendingToolInputMessage)],
+  }
+}
+
+function primaryMockSession(): MockEveSession {
+  for (const session of harness.eveSessions.values()) {
+    if (session.primary) return session
+  }
+  throw new Error("No primary Eve session has been created yet.")
 }
 
 function snapshot(streamIndex: number): AgentAdapterSnapshot {
