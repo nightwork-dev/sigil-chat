@@ -11,6 +11,7 @@ import {
 } from "@gonk/context"
 import type { ManagedSkillRegistry } from "@gonk/skills"
 import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
+import { createSigilRetrievalEvidenceCoordinator } from "@workspace/agent-tools/evidence"
 import { eveChannel } from "eve/channels/eve"
 import {
   blackboardContextBlock,
@@ -109,14 +110,18 @@ describe("Sigil Eve context integration", () => {
       category: "reference",
       expectedRevision: 0,
     })
+    const retrievalEvidenceCoordinator = createRecordingRetrievalCoordinator()
+    const auth = authForKnowledge("user-1", "project:project-a")
     const compiler = createDefaultSigilContextCompiler({
+      authContext: auth,
+      retrievalEvidenceCoordinator,
       scopedKnowledgeStore: scopedKnowledge,
       tokenCounter,
     })
     const result = await compiler.compile({
       requestId: "knowledge-passive-injection",
       audience: "model",
-      auth: authForKnowledge("user-1", "project:project-a"),
+      auth,
       maxTokens: 1_000,
       query: "lantern loot governed spoils receipts",
       requestedContributorIds: [SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID],
@@ -134,6 +139,22 @@ describe("Sigil Eve context integration", () => {
     expect(result.content).toContain("## Relevant durable knowledge")
     expect(result.content).toContain("Lantern economy")
     expect(result.content).not.toContain("governed spoils and receipts")
+    expect(retrievalEvidenceCoordinator.calls).toEqual([
+      expect.objectContaining({
+        question: "lantern loot governed spoils receipts",
+        resultLimit: 5,
+        candidates: [
+          expect.objectContaining({
+            hit: expect.objectContaining({
+              resource: expect.objectContaining({
+                sourceId: "sigil.knowledge",
+                kind: "knowledge-page",
+              }),
+            }),
+          }),
+        ],
+      }),
+    ])
   })
 
   it("does not leak scoped knowledge when the active principal is not authorized", async () => {
@@ -148,6 +169,7 @@ describe("Sigil Eve context integration", () => {
       expectedRevision: 0,
     })
     const compiler = createDefaultSigilContextCompiler({
+      retrievalEvidenceCoordinator: createSigilRetrievalEvidenceCoordinator(),
       scopedKnowledgeStore: scopedKnowledge,
       tokenCounter,
     })
@@ -180,6 +202,7 @@ describe("Sigil Eve context integration", () => {
       expectedRevision: 0,
     })
     const compiler = createDefaultSigilContextCompiler({
+      retrievalEvidenceCoordinator: createSigilRetrievalEvidenceCoordinator(),
       scopedKnowledgeStore: scopedKnowledge,
       tokenCounter,
     })
@@ -937,6 +960,18 @@ async function testScopedKnowledgeStore() {
     scanWrites: () => ({ allowed: true }),
     now: () => 1_000,
   })
+}
+
+function createRecordingRetrievalCoordinator() {
+  const inner = createSigilRetrievalEvidenceCoordinator()
+  const calls: Array<Parameters<typeof inner.collect>[0]> = []
+  return {
+    calls,
+    collect: async (input: Parameters<typeof inner.collect>[0]) => {
+      calls.push(input)
+      return inner.collect(input)
+    },
+  }
 }
 
 function authForKnowledge(principalId: string, resourceScope: string) {

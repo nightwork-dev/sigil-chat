@@ -9,13 +9,12 @@ import {
   type ScopedKnowledgeStore,
 } from "@gonk/knowledge/scoped"
 import {
-  RetrievalEngine,
   RetrievalSourceRegistry,
   canonicalResourceKey,
   type NativeRetrievalCandidate,
-  type RetrievalGenerationStorage,
   type RetrievalHit,
   type RetrievalResourceRef,
+  type RetrievalResolveResult,
 } from "@gonk/retrieval"
 import {
   createRetrievalContextContributor,
@@ -27,8 +26,10 @@ import {
   type AuthenticatedPrincipal,
 } from "@gonk/auth"
 import type { ContextContributor } from "@gonk/context"
-import type { KvStore } from "@gonk/store/types"
-import { RetrievalIndexCoordinator } from "@gonk/retrieval"
+import type {
+  SigilEvidenceCandidate,
+  SigilRetrievalEvidenceCoordinator,
+} from "@workspace/agent-tools/evidence"
 
 export const SIGIL_KNOWLEDGE_RETRIEVAL_SOURCE_ID = "sigil.knowledge"
 export const SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID = "sigil.retrieval"
@@ -39,6 +40,8 @@ const SOURCE_PRIORITY = 50
 const FILTER_SCHEMA_ID = "sigil.knowledge.context-filter"
 
 export interface SigilKnowledgeContextOptions {
+  authContext?: AuthContext
+  retrievalEvidenceCoordinator: SigilRetrievalEvidenceCoordinator
   store: ScopedKnowledgeStore
   thresholdForPersona?: (personaId: string | undefined) => number | undefined
   limit?: number
@@ -49,14 +52,6 @@ export function createSigilKnowledgeContextContributor(
 ): ContextContributor {
   const registry = new RetrievalSourceRegistry()
   registry.register(createSigilKnowledgeRetrievalSource(options))
-  const engine = new RetrievalEngine({
-    registry,
-    coordinator: new RetrievalIndexCoordinator({
-      registry,
-      storage: memoryRetrievalStorage(),
-    }),
-    storage: memoryRetrievalStorage(),
-  })
   const selectionsByRequest = new Map<
     string,
     readonly RetrievalContextSelection[]
@@ -65,13 +60,26 @@ export function createSigilKnowledgeContextContributor(
   return createRetrievalContextContributor({
     contributorId: SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID,
     registry,
-    engine,
+    engine: {
+      resolve: ({ auth, requestId, resource }) =>
+        resolveSigilKnowledgeResource(options, resource, auth, requestId),
+    },
     authForRequest: async (_requestId, principal) =>
+      matchingAuthContext(options.authContext, principal) ??
       authContextForPrincipal(principal),
     selections: async (request) => {
       const cacheKey = knowledgeSelectionCacheKey(request)
       if (request.query !== undefined) {
-        const selections = await selectKnowledgeContext(request, options)
+        const auth =
+          matchingAuthContext(options.authContext, request.principal) ??
+          authContextForPrincipal(request.principal)
+        const selections = await selectKnowledgeContext(
+          {
+            auth,
+            query: request.query,
+          },
+          options,
+        )
         selectionsByRequest.set(cacheKey, selections)
         trimSelectionCache(selectionsByRequest)
         return selections
@@ -83,49 +91,69 @@ export function createSigilKnowledgeContextContributor(
 
 export async function selectKnowledgeContext(
   request: {
-    principal: AuthenticatedPrincipal
+    auth: AuthContext
     query?: string
   },
   options: SigilKnowledgeContextOptions,
 ): Promise<readonly RetrievalContextSelection[]> {
-  const activeContainer = activeKnowledgeContainer(request.principal)
+  const activeContainer = activeKnowledgeContainer(request.auth.principal)
   if (!activeContainer) return []
   const query = request.query?.trim() ?? ""
   if (!query) return []
   const threshold =
-    validThreshold(options.thresholdForPersona?.(personaId(request.principal))) ??
-    DEFAULT_PASSIVE_KNOWLEDGE_THRESHOLD
+    validThreshold(
+      options.thresholdForPersona?.(personaId(request.auth.principal)),
+    ) ?? DEFAULT_PASSIVE_KNOWLEDGE_THRESHOLD
   const queryTerms = relevanceTerms(query)
   if (queryTerms.length === 0) return []
+
   try {
     const result = await options.store.query({
-      principal: { principalId: request.principal.id },
+      principal: { principalId: request.auth.principal.id },
       activeContainer,
       text: query,
       limit: Math.max((options.limit ?? DEFAULT_PASSIVE_KNOWLEDGE_LIMIT) * 4, 20),
     })
-    return result.results
+    const candidates = result.results
       .map((hit) => ({
         hit,
         relevance: absoluteRelevance(queryTerms, hit),
       }))
       .filter(({ relevance }) => relevance >= threshold)
       .sort((left, right) => {
-        if (right.relevance !== left.relevance) return right.relevance - left.relevance
+        if (right.relevance !== left.relevance) {
+          return right.relevance - left.relevance
+        }
         return right.hit.score - left.hit.score
       })
       .slice(0, options.limit ?? DEFAULT_PASSIVE_KNOWLEDGE_LIMIT)
-      .map(({ hit, relevance }) => {
-        const retrievalHit = retrievalHitForKnowledge(hit, relevance)
-        return {
-          candidateId: `knowledge:${canonicalResourceKey(retrievalHit.resource)}`,
-          hit: retrievalHit,
+      .map(({ hit, relevance }) => evidenceCandidateForKnowledge(hit, relevance))
+    const coordinated = await options.retrievalEvidenceCoordinator.collect({
+      auth: request.auth,
+      question: query,
+      resultLimit: options.limit ?? DEFAULT_PASSIVE_KNOWLEDGE_LIMIT,
+      candidates,
+    })
+    const hitByResourceKey = new Map(
+      candidates.map((candidate) => [
+        canonicalResourceKey(candidate.hit.resource),
+        candidate.hit,
+      ]),
+    )
+    return coordinated.packets.flatMap((packet) => {
+      const hit = hitByResourceKey.get(packet.resourceKey)
+      if (!hit) return []
+      return [
+        {
+          candidateId: `knowledge:${packet.resourceKey}`,
+          hit,
           necessity: "optional" as const,
-          priority: retrievalHit.scores.final,
-          estimatedTokens: estimateKnowledgePointerTokens(retrievalHit),
-          estimateQuality: "fallback" as const,
-        }
-      })
+          priority: packet.ranking.final,
+          estimatedTokens: packet.budget.estimatedTokens,
+          estimateQuality: packet.budget.estimateQuality,
+        },
+      ]
+    })
   } catch (error) {
     if (error instanceof ScopedKnowledgeAccessError) return []
     throw error
@@ -181,7 +209,9 @@ function createSigilKnowledgeRetrievalSource(options: SigilKnowledgeContextOptio
               relevance >= (threshold ?? DEFAULT_PASSIVE_KNOWLEDGE_THRESHOLD),
           )
           .sort((left, right) => {
-            if (right.relevance !== left.relevance) return right.relevance - left.relevance
+            if (right.relevance !== left.relevance) {
+              return right.relevance - left.relevance
+            }
             return right.hit.score - left.hit.score
           })
           .slice(0, request.limit)
@@ -193,43 +223,122 @@ function createSigilKnowledgeRetrievalSource(options: SigilKnowledgeContextOptio
         throw error
       }
     },
-    resolve: async (
-      resource: RetrievalResourceRef,
-      auth: AuthContext,
-    ) => {
-      const activeContainer = activeKnowledgeContainer(auth.principal)
-      const ref = parseKnowledgeResource(resource)
-      if (!activeContainer || !ref) {
-        return { status: "revision-unavailable" as const, resource }
+    resolve: async (resource: RetrievalResourceRef, auth: AuthContext) => {
+      const resolved = await resolveSigilKnowledgeResource(
+        options,
+        resource,
+        auth,
+        crypto.randomUUID(),
+      )
+      if (resolved.status === "resolved") {
+        return { status: "resolved" as const, value: resolved.value }
       }
-      try {
-        const result = await options.store.get({
-          principal: { principalId: auth.principal.id },
-          activeContainer,
-          id: ref.pageId,
-        })
-        const page = result.pages.find(
-          (candidate) =>
-            sameContainer(candidate.container, ref.container) &&
-            candidate.revision === Number(resource.revision),
-        )
-        if (!page) return { status: "revision-unavailable" as const, resource }
+      if (resolved.status === "changed") {
         return {
-          status: "resolved" as const,
-          value: {
-            resource,
-            label: page.title,
-            content: formatKnowledgePointer(page),
-            audience: "public" as const,
-          },
+          status: "changed" as const,
+          requested: resolved.requested,
+          current: resolved.current,
         }
-      } catch (error) {
-        if (error instanceof ScopedKnowledgeAccessError) {
-          return { status: "deleted" as const, resource }
-        }
-        throw error
       }
+      return resolved.status === "deleted"
+        ? { status: "deleted" as const, resource: resolved.resource }
+        : {
+            status: "revision-unavailable" as const,
+            resource: resolved.resource,
+          }
     },
+  }
+}
+
+async function resolveSigilKnowledgeResource(
+  options: SigilKnowledgeContextOptions,
+  resource: RetrievalResourceRef,
+  auth: AuthContext,
+  requestId: string,
+): Promise<RetrievalResolveResult> {
+  const activeContainer = activeKnowledgeContainer(auth.principal)
+  const ref = parseKnowledgeResource(resource)
+  if (!activeContainer || !ref) {
+    return unresolvedKnowledgeResource(resource, requestId, "revision-unavailable")
+  }
+  try {
+    const result = await options.store.get({
+      principal: { principalId: auth.principal.id },
+      activeContainer,
+      id: ref.pageId,
+    })
+    const page = result.pages.find(
+      (candidate) =>
+        sameContainer(candidate.container, ref.container) &&
+        candidate.revision === Number(resource.revision),
+    )
+    if (!page) {
+      return unresolvedKnowledgeResource(resource, requestId, "revision-unavailable")
+    }
+    return {
+      status: "resolved" as const,
+      value: {
+        resource,
+        label: page.title,
+        content: formatKnowledgePointer(page),
+        audience: "public" as const,
+      },
+      receipt: {
+        kind: "retrieval-resolve" as const,
+        receiptVersion: 1 as const,
+        requestId,
+        timestamp: new Date().toISOString(),
+        resourceKey: canonicalResourceKey(resource),
+        outcome: "resolved" as const,
+      },
+    }
+  } catch (error) {
+    if (error instanceof ScopedKnowledgeAccessError) {
+      return unresolvedKnowledgeResource(resource, requestId, "deleted")
+    }
+    throw error
+  }
+}
+
+function unresolvedKnowledgeResource(
+  resource: RetrievalResourceRef,
+  requestId: string,
+  status: "revision-unavailable" | "deleted" | "unauthorized",
+): RetrievalResolveResult {
+  return {
+    status,
+    resource,
+    receipt: {
+      kind: "retrieval-resolve",
+      receiptVersion: 1,
+      requestId,
+      timestamp: new Date().toISOString(),
+      resourceKey: canonicalResourceKey(resource),
+      outcome: status,
+    },
+  }
+}
+
+function evidenceCandidateForKnowledge(
+  hit: KnowledgeHit & {
+    page: KnowledgePage & { container: KnowledgeContainerRef; revision: number }
+  },
+  relevance: number,
+): SigilEvidenceCandidate {
+  const retrievalHit = retrievalHitForKnowledge(hit, relevance)
+  return {
+    citation: {
+      citationId: "",
+      source: "knowledge",
+      pageId: hit.page.id,
+      title: hit.page.title,
+      container: hit.page.container,
+      revision: hit.page.revision,
+      quote: formatKnowledgePointer(hit.page),
+      score: hit.score,
+      matchedTerms: [...retrievalHit.matchedTerms],
+    },
+    hit: retrievalHit,
   }
 }
 
@@ -251,8 +360,21 @@ function trimSelectionCache(
   }
 }
 
+function matchingAuthContext(
+  auth: AuthContext | undefined,
+  principal: AuthenticatedPrincipal,
+): AuthContext | undefined {
+  if (!auth) return undefined
+  return securityContextKey({ principal: auth.principal }) ===
+    securityContextKey({ principal })
+    ? auth
+    : undefined
+}
+
 function nativeCandidateForKnowledge(
-  hit: KnowledgeHit & { page: KnowledgePage & { container: KnowledgeContainerRef; revision: number } },
+  hit: KnowledgeHit & {
+    page: KnowledgePage & { container: KnowledgeContainerRef; revision: number }
+  },
   relevance: number,
 ): NativeRetrievalCandidate {
   return {
@@ -263,7 +385,9 @@ function nativeCandidateForKnowledge(
 }
 
 function retrievalHitForKnowledge(
-  hit: KnowledgeHit & { page: KnowledgePage & { container: KnowledgeContainerRef; revision: number } },
+  hit: KnowledgeHit & {
+    page: KnowledgePage & { container: KnowledgeContainerRef; revision: number }
+  },
   relevance: number,
 ): RetrievalHit {
   return {
@@ -390,10 +514,6 @@ function absoluteRelevance(
   return matched / terms.length
 }
 
-function estimateKnowledgePointerTokens(hit: RetrievalHit): number {
-  return Math.max(1, Math.ceil(canonicalResourceKey(hit.resource).length / 4))
-}
-
 function sameContainer(
   left: KnowledgeContainerRef,
   right: KnowledgeContainerRef,
@@ -414,51 +534,6 @@ function authContextForPrincipal(principal: AuthenticatedPrincipal): AuthContext
       }
       return { outcome: "deny", reason: "Sigil knowledge adapter only handles retrieval" }
     },
-  }
-}
-
-function memoryRetrievalStorage(): RetrievalGenerationStorage {
-  return {
-    generations: memoryKv(),
-    pointers: memoryKv(),
-    citations: memoryKv(),
-  }
-}
-
-function memoryKv(): KvStore<unknown> {
-  const values = new Map<string, unknown>()
-  return {
-    get: (key: string) => values.get(key),
-    set: (key: string, value: unknown) => {
-      values.set(key, value)
-    },
-    patch: (key: string, partial: Partial<unknown>) => {
-      const existing = values.get(key)
-      if (
-        existing !== undefined &&
-        (existing === null ||
-          typeof existing !== "object" ||
-          Array.isArray(existing))
-      ) {
-        throw new TypeError("Cannot patch a non-object retrieval storage record")
-      }
-      values.set(key, {
-        ...(existing as Record<string, unknown> | undefined),
-        ...(partial as Record<string, unknown>),
-      })
-    },
-    delete: (key: string) => {
-      values.delete(key)
-    },
-    list: (prefix?: string) =>
-      [...values.keys()]
-        .filter((key) => prefix === undefined || key.startsWith(prefix))
-        .sort(),
-    entries: (prefix?: string) =>
-      [...values.entries()]
-        .filter(([key]) => prefix === undefined || key.startsWith(prefix))
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, value]) => ({ key, value })),
   }
 }
 

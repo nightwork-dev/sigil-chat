@@ -45,6 +45,7 @@ import type {
   ScopedMemorySourceLabel,
 } from "./memory"
 import { createSigilKnowledgeContextContributor } from "./knowledge-context"
+import type { SigilRetrievalEvidenceCoordinator } from "@workspace/agent-tools/evidence"
 
 type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
@@ -591,8 +592,10 @@ export async function compileSigilContextForMessage(input: {
 }
 
 export function createDefaultSigilContextCompiler(options?: {
+  authContext?: AuthContext
   binding?: SkillRegistryBinding
   requiredSkillIds?: readonly string[]
+  retrievalEvidenceCoordinator?: SigilRetrievalEvidenceCoordinator
   skillsDataRoot?: string
   scopedKnowledgeStore?: ScopedKnowledgeStore
   tokenCounter?: ContextTokenCounter
@@ -606,9 +609,11 @@ export function createDefaultSigilContextCompiler(options?: {
       requiredSkillIds: options?.requiredSkillIds,
     }),
   )
-  if (options?.scopedKnowledgeStore) {
+  if (options?.scopedKnowledgeStore && options.retrievalEvidenceCoordinator) {
     registry.register(
       createSigilKnowledgeContextContributor({
+        authContext: options.authContext,
+        retrievalEvidenceCoordinator: options.retrievalEvidenceCoordinator,
         store: options.scopedKnowledgeStore,
       }),
     )
