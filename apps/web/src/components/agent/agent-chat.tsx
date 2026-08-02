@@ -74,7 +74,7 @@ import {
   buildToolInputResponseBatch,
   collectPendingToolInputRequests,
   toolInputBatchKey,
-} from "@/lib/agent-tool-input-batch"
+} from "@zigil/agent/agent-tool-input-batch"
 
 export interface AgentChatProps {
   session?: AgentRuntimeSession
