@@ -17,6 +17,7 @@ import { readOptionalSecretFromFile } from "@workspace/runtime-env/server"
 import {
   agentToolRegistry,
   eveSessionOwnerStore,
+  scopedKnowledgeStore,
   usageLedgerRepository,
 } from "../lib/application-services"
 import { createApplicationToolCatalogRoute } from "../lib/application-tool-catalog"
@@ -67,7 +68,11 @@ const contextReceiptRepository = new MirkAgentContextReceiptRepository({
 })
 const compileMessage = createSigilEveOnMessage({
   createCompiler: ({ binding }) =>
-    createDefaultSigilContextCompiler({ binding, requiredSkillIds }),
+    createDefaultSigilContextCompiler({
+      binding,
+      requiredSkillIds,
+      scopedKnowledgeStore,
+    }),
   pinnedResourceKeys,
   authorizeMemorySource: ({ principalId, source }) =>
     canReadMemorySource({

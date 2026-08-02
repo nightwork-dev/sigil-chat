@@ -29,6 +29,7 @@ import {
   createSkillRegistry,
   type SkillRegistryBinding,
 } from "@workspace/agent-tools/skills"
+import type { ScopedKnowledgeStore } from "@gonk/knowledge/scoped"
 import {
   AGENT_CONTEXT_COMPILE_RECEIPT_VERSION,
   type AgentContextCompileReceipt,
@@ -43,6 +44,7 @@ import type {
   ScopedMemoryRecallDelivery,
   ScopedMemorySourceLabel,
 } from "./memory"
+import { createSigilKnowledgeContextContributor } from "./knowledge-context"
 
 type EveSessionAuth = NonNullable<EveMessageContext["eve"]["caller"]>
 
@@ -592,6 +594,7 @@ export function createDefaultSigilContextCompiler(options?: {
   binding?: SkillRegistryBinding
   requiredSkillIds?: readonly string[]
   skillsDataRoot?: string
+  scopedKnowledgeStore?: ScopedKnowledgeStore
   tokenCounter?: ContextTokenCounter
 }) {
   const registry = new ContextContributorRegistry()
@@ -603,6 +606,13 @@ export function createDefaultSigilContextCompiler(options?: {
       requiredSkillIds: options?.requiredSkillIds,
     }),
   )
+  if (options?.scopedKnowledgeStore) {
+    registry.register(
+      createSigilKnowledgeContextContributor({
+        store: options.scopedKnowledgeStore,
+      }),
+    )
+  }
   return new ContextCompiler({
     registry,
     tokenCounter: options?.tokenCounter ?? fallbackTokenCounter,
@@ -737,6 +747,9 @@ function authorizeSigilContextRequest(
   const allowedActions = new Set([
     "context.discover",
     "context.use",
+    "retrieval.content.resolve",
+    "retrieval.hit.read",
+    "retrieval.source.discover",
     "skill.discover",
     "skill.read",
   ])
