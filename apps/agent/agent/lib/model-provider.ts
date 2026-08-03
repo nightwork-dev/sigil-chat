@@ -1,7 +1,8 @@
-import type { LanguageModel } from "ai"
+import type { LanguageModel, LanguageModelMiddleware } from "ai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import { wrapLanguageModel } from "ai"
 import { experimental_chatgpt } from "eve/models/openai"
 
 import {
@@ -9,6 +10,21 @@ import {
   type NormalizedSigilAgentModelConfig,
   type SigilAgentModelConfig,
 } from "@workspace/runtime-env/config"
+
+import { stripClientApprovalParts } from "./strip-client-approval-parts"
+
+/**
+ * Guards the Codex/Responses path against an @ai-sdk/openai upstream defect:
+ * see strip-client-approval-parts.ts for the full bug shape. Delete this
+ * middleware (and the wrapLanguageModel call below) once that converter
+ * gates its `mcp_approval_response` conversion on `providerExecuted`.
+ */
+const dropSpuriousMcpApprovalResponseMiddleware: LanguageModelMiddleware = {
+  transformParams: async ({ params }) => ({
+    ...params,
+    prompt: stripClientApprovalParts(params.prompt),
+  }),
+}
 
 export class MissingModelCredentialError extends Error {
   readonly envName: string
@@ -53,7 +69,12 @@ export function resolveSigilAgentModel(
     return {
       contextWindowTokens,
       display: display(model),
-      model: experimental_chatgpt(model.model),
+      model: wrapLanguageModel({
+        model: experimental_chatgpt(
+          model.model,
+        ) as Parameters<typeof wrapLanguageModel>[0]["model"],
+        middleware: dropSpuriousMcpApprovalResponseMiddleware,
+      }),
     }
   }
 
