@@ -382,7 +382,7 @@ function completedMessage(
   return {
     type: "message.completed",
     data: { finishReason: "stop", message, sequence: 3, stepIndex, turnId },
-    meta: { at },
+    meta: { at, id: `seed:${turnId}:message-completed` },
   }
 }
 
@@ -407,7 +407,7 @@ function completedAnnotation(
       stepIndex: 1,
       turnId,
     },
-    meta: { at },
+    meta: { at, id: `seed:${turnId}:annotation:${anchorId}` },
   }
 }
 

@@ -934,6 +934,7 @@ describe("AppAgentSessions persistence call site", () => {
           stepIndex: 0,
           turnId: "turn-a",
         },
+        meta: { at: "2026-08-02T00:00:02.000Z", id: "evt-actions-requested-a" },
       } as AgentRuntimeStreamEvent)
       eveA.callbacks.onEvent?.({
         type: "action.result",
@@ -957,6 +958,7 @@ describe("AppAgentSessions persistence call site", () => {
           stepIndex: 0,
           turnId: "turn-a",
         },
+        meta: { at: "2026-08-02T00:00:03.000Z", id: "evt-action-result-a" },
       } as AgentRuntimeStreamEvent)
       await flush()
     })

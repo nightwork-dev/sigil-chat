@@ -296,6 +296,7 @@ describe("AgentThreadRepository", () => {
               stepIndex: 0,
               turnId: "turn-1",
             },
+            meta: { at: "2026-07-16T10:00:30.000Z", id: "evt-reasoning-1" },
           },
         ],
       },
@@ -1037,6 +1038,7 @@ function userEvent(message: string, turnId: string): AgentRuntimeStreamEvent {
   return {
     type: "message.received",
     data: { message, sequence: 0, turnId },
+    meta: { at: "2026-07-16T10:00:00.000Z", id: `evt-received-${turnId}` },
   }
 }
 
@@ -1053,5 +1055,6 @@ function assistantEvent(
       stepIndex: 0,
       turnId,
     },
+    meta: { at: "2026-07-16T10:00:15.000Z", id: `evt-completed-${turnId}` },
   }
 }
