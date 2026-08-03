@@ -456,7 +456,9 @@ export function AgentChat({
         actionClassName="max-sm:size-11"
         attachments={attachments}
         className="mx-4 mb-4 max-w-3xl"
-        disabled={session.status === "error" || attachmentsUploading}
+        // Never disable on error: send() is the only path that clears an
+        // errored session, so disabling here deadlocks the surface.
+        disabled={attachmentsUploading}
         isStreaming={busy}
         leadingControls={
           hideHeader
