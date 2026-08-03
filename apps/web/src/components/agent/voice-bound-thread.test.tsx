@@ -18,7 +18,7 @@ import {
   createVoiceSessionStore,
   voiceBoundThreadHref,
   type VoiceBoundThread as VoiceBoundThreadRecord,
-} from "@/lib/voice-session-binding"
+} from "@zigil/agent/voice"
 
 import { VoiceBoundThread } from "./voice-bound-thread"
 

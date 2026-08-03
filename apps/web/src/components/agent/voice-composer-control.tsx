@@ -12,14 +12,16 @@
 
 import { useCallback, useRef } from "react"
 
-import { VoiceMicControl } from "@/components/agent/voice-mic-control"
-import type { AudioFocusManager } from "@/lib/audio-focus"
-import { useVoiceDictation, type VoiceRecorder } from "@/lib/voice-dictation"
 import {
+  useVoiceDictation,
   voiceSessionStore,
+  type AudioFocusManager,
   type VoiceBoundThread,
+  type VoiceRecorder,
   type VoiceSessionStore,
-} from "@/lib/voice-session-binding"
+} from "@zigil/agent/voice"
+
+import { VoiceMicControl } from "@/components/agent/voice-mic-control"
 
 export interface ComposerVoiceControlProps {
   /** The thread this composer writes into. Omitted on composers with no

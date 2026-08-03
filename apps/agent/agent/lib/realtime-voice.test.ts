@@ -5,7 +5,8 @@ import { issueAgentSessionBinding } from "@workspace/agent-contracts/session-bin
 import { AGENT_SCOPE_PROOF_HEADER } from "@workspace/agent-contracts/scope-delegation"
 import { issueScopeDelegation } from "@workspace/agent-contracts/scope-delegation.server"
 
-import { RealtimeAppServerError } from "./realtime-appserver"
+import { RealtimeAppServerError } from "@zigil/agent/voice/server"
+
 import { requireAuthorizedResourceScope } from "./scope-authorization"
 import {
   createRealtimeVoiceRoutes,

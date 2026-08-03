@@ -18,11 +18,17 @@ import { useCallback, useRef, useState } from "react"
 import { Volume2Icon, SquareIcon } from "lucide-react"
 
 import type { AgentMessagePart } from "@zigil/agent/contracts"
+import {
+  speakMessageParts,
+  speakableText,
+  agentSpeechPlayer,
+  type SpeakOutcome,
+  type SpeakableOptions,
+  type SpeechPlayer,
+} from "@zigil/agent/voice"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { speakMessageParts, type SpeakOutcome } from "@/lib/agent-voice"
-import { speakableText, type SpeakableOptions } from "@/lib/speakable-text"
-import { agentSpeechPlayer, type SpeechPlayer } from "@/lib/speech-playback"
+import { AGENT_PERSONA_HEADER } from "@/lib/agent-session-scope"
 import { useAgentPersonaSession } from "@/components/agent/agent-persona-session"
 
 const FAILED = "Could not play that."
@@ -31,7 +37,7 @@ type SpeakFn = (
   parts: readonly AgentMessagePart[],
   options?: SpeakableOptions,
   fetchImpl?: typeof fetch,
-  personaId?: string,
+  headers?: Record<string, string>,
 ) => Promise<SpeakOutcome>
 
 export interface MessageReadAloudProps {
@@ -73,7 +79,7 @@ export function MessageReadAloud({
         parts,
         { announceApprovals: true },
         fetch,
-        personaId ?? undefined,
+        personaId ? { [AGENT_PERSONA_HEADER]: personaId } : undefined,
       )
       if (outcome.status !== "spoken") {
         // Silence, not a broken message: `speakMessageParts` never throws, and

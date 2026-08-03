@@ -14,7 +14,7 @@ import {
   VOICE_CONTROL_STATES,
   isVoiceCaptureActive,
   voiceControlPresentation,
-} from "@/lib/voice-control-state"
+} from "@zigil/agent/voice"
 
 import { VoiceMicControl } from "./voice-mic-control"
 

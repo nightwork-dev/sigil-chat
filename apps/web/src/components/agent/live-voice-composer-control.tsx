@@ -17,24 +17,27 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { LiveVoiceControl } from "@/components/agent/live-voice-control"
-import { voiceAudioFocus, type AudioFocusManager } from "@/lib/audio-focus"
-import { nextLiveVoiceState, type LiveVoiceState } from "@/lib/voice-live-state"
 import {
   browserAudioSink,
   browserMicrophone,
   browserPeerConnection,
-  endRealtimeVoiceFromBrowser,
-  exchangeRealtimeOfferFromBrowser,
+  nextLiveVoiceState,
   startRealtimeVoiceSession,
+  voiceAudioFocus,
+  voiceSessionStore,
+  type AudioFocusManager,
+  type LiveVoiceState,
   type RealtimeVoicePrimitives,
   type RealtimeVoiceSession,
-} from "@/lib/voice-realtime"
-import {
-  voiceSessionStore,
   type VoiceBoundThread,
   type VoiceSessionStore,
-} from "@/lib/voice-session-binding"
+} from "@zigil/agent/voice"
+
+import { LiveVoiceControl } from "@/components/agent/live-voice-control"
+import {
+  endRealtimeVoiceFromBrowser,
+  exchangeRealtimeOfferFromBrowser,
+} from "@/lib/voice-realtime"
 
 const DICTATION_ACTIVE = "Finish dictation before starting a live voice call."
 const NO_THREAD = "Open a conversation before starting a live voice call."

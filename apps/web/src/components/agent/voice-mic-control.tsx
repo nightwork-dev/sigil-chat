@@ -26,7 +26,7 @@ import {
   voiceControlPresentation,
   type VoiceControlPresentation,
   type VoiceControlState,
-} from "@/lib/voice-control-state"
+} from "@zigil/agent/voice"
 
 const ICONS: Record<VoiceControlPresentation["icon"], LucideIcon> = {
   mic: MicIcon,

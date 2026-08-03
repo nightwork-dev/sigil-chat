@@ -23,27 +23,22 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { AgentMessage } from "@zigil/agent/contracts"
 import { ChatInput } from "@workspace/chat/components/chat-input"
 
-import { speakMessageParts } from "@/lib/agent-voice"
 import {
+  appendDictationDraft,
   createAudioFocusManager,
-  type AudioFocusManager,
-} from "@/lib/audio-focus"
-import {
+  createSpeechPlayer,
+  createVoiceSessionStore,
   NON_SPEAKABLE_PARTS,
   SPEECH_LEAK_CANARY,
-} from "@/lib/speakable-parts.fixture"
-import {
-  createSpeechPlayer,
+  speakMessageParts,
+  useSpokenAgentReplies,
+  type AudioFocusManager,
+  type RealtimeVoicePrimitives,
   type SpeechPlaybackDriver,
   type SpeechPlayer,
-} from "@/lib/speech-playback"
-import { useSpokenAgentReplies } from "@/lib/spoken-replies"
-import { appendDictationDraft, type VoiceRecorder } from "@/lib/voice-dictation"
-import {
-  createVoiceSessionStore,
+  type VoiceRecorder,
   type VoiceSessionStore,
-} from "@/lib/voice-session-binding"
-import type { RealtimeVoicePrimitives } from "@/lib/voice-realtime"
+} from "@zigil/agent/voice"
 
 import { ComposerVoiceControl } from "./voice-composer-control"
 import { LiveVoiceComposerControl } from "./live-voice-composer-control"

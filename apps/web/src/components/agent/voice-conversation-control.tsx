@@ -19,12 +19,13 @@ import { SpeechIcon } from "lucide-react"
 
 import { cn } from "@workspace/ui/lib/utils"
 
-import { voiceAudioFocus, type AudioFocusManager } from "@/lib/audio-focus"
 import {
+  voiceAudioFocus,
   voiceConversationMode,
   voiceConversationPresentation,
+  type AudioFocusManager,
   type VoiceConversationPresentation,
-} from "@/lib/voice-conversation-state"
+} from "@zigil/agent/voice"
 
 /** Plain wording, and it names the thing to end — a user who sees this has a
  *  call running and needs to know that is what is in the way. */

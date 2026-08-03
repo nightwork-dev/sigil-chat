@@ -46,6 +46,7 @@
     "@workspace/review-store": "workspace:*",
     "@workspace/runtime-env": "workspace:*",
     "@workspace/work-items-store": "workspace:*",
+    "@zigil/agent": "catalog:",
     "ai": "^7.0.26",
     "better-sqlite3": "12.10.0",
     "eve": "0.27.13",

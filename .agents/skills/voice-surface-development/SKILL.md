@@ -5,11 +5,25 @@ description: Use when adding a voice-adjacent surface (dictation, live call, voi
 
 # Voice surface development
 
+The voice/realtime subsystem lives upstream in `@zigil/agent/voice`
+(client-safe: the three state machines, capture-lifecycle, dictation-outcome,
+audio-focus, speech-playback, speakable-text, the TTS/STT clients, the
+realtime-voice negotiation engine, and the React hooks that compose them) and
+`@zigil/agent/voice/server` (the codex realtime app-server client). Import
+from those subpaths — do not recreate copies under `apps/web/src/lib`. What
+stays in this repo is product policy wired around that surface: the TTS/STT
+server routes (`agent-voice.server.ts`, `agent-transcribe.server.ts` — auth,
+persona resolution, and the deployment-specific runtime-env voice profile),
+the realtime offer-exchange authorization (`voice-realtime.server.ts`, and
+its browser-side TanStack server-fn wrapper `voice-realtime.ts`), and the
+Eve-side realtime route (`apps/agent/agent/lib/realtime-voice.ts`).
+
 Three composer controls touch the microphone: dictation
-(`voice-control-state.ts`), a live voice call (`voice-live-state.ts`), and
-voice-conversation mode (`voice-conversation-state.ts`). Each is a separate,
-pure state machine — no DOM, no React, no fetch — and that separation is a
-design decision, not an oversight.
+(`voice-control-state`), a live voice call (`voice-live-state`), and
+voice-conversation mode (`voice-conversation-state`) — all three exported
+from `@zigil/agent/voice`. Each is a separate, pure state machine — no DOM,
+no React, no fetch — and that separation is a design decision, not an
+oversight.
 
 ## Three machines because three different promises
 

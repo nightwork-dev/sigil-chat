@@ -13,17 +13,15 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 
-import { createAudioFocusManager } from "@/lib/audio-focus"
 import {
+  createAudioFocusManager,
   createVoiceSessionStore,
+  type RealtimeMediaStreamLike,
+  type RealtimeOfferExchange,
+  type RealtimePeerConnectionLike,
+  type RealtimeVoicePrimitives,
   type VoiceSessionStore,
-} from "@/lib/voice-session-binding"
-import type {
-  RealtimeMediaStreamLike,
-  RealtimeOfferExchange,
-  RealtimePeerConnectionLike,
-  RealtimeVoicePrimitives,
-} from "@/lib/voice-realtime"
+} from "@zigil/agent/voice"
 
 import { LiveVoiceComposerControl } from "./live-voice-composer-control"
 

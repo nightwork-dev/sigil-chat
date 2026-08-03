@@ -23,7 +23,7 @@ import {
   liveVoicePresentation,
   type LiveVoicePresentation,
   type LiveVoiceState,
-} from "@/lib/voice-live-state"
+} from "@zigil/agent/voice"
 
 const ICONS: Record<LiveVoicePresentation["icon"], LucideIcon> = {
   waveform: AudioLinesIcon,
