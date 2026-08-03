@@ -20,6 +20,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible"
+import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { JsonValue } from "@workspace/ui/components/blocks/json-value"
@@ -63,6 +64,13 @@ export function ToolCall({
   const respond = (optionId: string) => {
     if (!inputRequest || !canRespondToRequest) return
     void onInputResponses([{ optionId, requestId: inputRequest.requestId }])
+  }
+  const [freeformText, setFreeformText] = useState("")
+  const submitFreeformText = () => {
+    const text = freeformText.trim()
+    if (!text || !inputRequest || !canRespondToRequest) return
+    void onInputResponses([{ requestId: inputRequest.requestId, text }])
+    setFreeformText("")
   }
 
   return (
@@ -130,22 +138,50 @@ export function ToolCall({
                   ) : null}
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {inputRequest.options?.map((option) => (
-                    <Button
+                <>
+                  {options?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {inputRequest.options?.map((option) => (
+                        <Button
+                          className="max-sm:min-h-11"
+                          disabled={!canRespondToRequest}
+                          key={option.id}
+                          onClick={() => respond(option.id)}
+                          size="sm"
+                          variant={
+                            option.style === "danger" ? "destructive" : "default"
+                          }
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2">
+                    <Input
                       className="max-sm:min-h-11"
                       disabled={!canRespondToRequest}
-                      key={option.id}
-                      onClick={() => respond(option.id)}
+                      onChange={(event) => setFreeformText(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault()
+                          submitFreeformText()
+                        }
+                      }}
+                      placeholder="Type a response…"
+                      value={freeformText}
+                    />
+                    <Button
+                      className="max-sm:min-h-11"
+                      disabled={!canRespondToRequest || !freeformText.trim()}
+                      onClick={submitFreeformText}
                       size="sm"
-                      variant={
-                        option.style === "danger" ? "destructive" : "default"
-                      }
+                      variant="secondary"
                     >
-                      {option.label}
+                      Send
                     </Button>
-                  ))}
-                </div>
+                  </div>
+                </>
               )}
             </div>
           ) : null}

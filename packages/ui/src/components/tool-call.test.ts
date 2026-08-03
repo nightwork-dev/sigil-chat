@@ -24,6 +24,88 @@ afterEach(() => {
   container.remove()
 })
 
+describe("ToolCall question controls", () => {
+  it("renders a text input for a zero-option pending request", () => {
+    act(() => {
+      root.render(
+        createElement(ToolCall, {
+          canRespond: true,
+          onInputResponses: vi.fn(),
+          part: questionPart("request-2", []),
+        }),
+      )
+    })
+
+    expect(textbox()).not.toBeNull()
+  })
+
+  it("submits typed text as {requestId, text}", () => {
+    const onInputResponses = vi.fn()
+
+    act(() => {
+      root.render(
+        createElement(ToolCall, {
+          canRespond: true,
+          onInputResponses,
+          part: questionPart("request-3", []),
+        }),
+      )
+    })
+
+    const input = textbox()!
+    act(() => {
+      const setValue = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )!.set!
+      setValue.call(input, "  a plain answer  ")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    act(() => {
+      button("Send").click()
+    })
+
+    expect(onInputResponses).toHaveBeenCalledWith([
+      { requestId: "request-3", text: "a plain answer" },
+    ])
+  })
+
+  it("renders no text input for a binary approval", () => {
+    act(() => {
+      root.render(
+        createElement(ToolCall, {
+          canRespond: true,
+          onInputResponses: vi.fn(),
+          part: approvalPart("request-4"),
+        }),
+      )
+    })
+
+    expect(textbox()).toBeNull()
+  })
+
+  it("renders both option buttons and a text input for a question with options", () => {
+    act(() => {
+      root.render(
+        createElement(ToolCall, {
+          canRespond: true,
+          onInputResponses: vi.fn(),
+          part: questionPart("request-5", [
+            { id: "yes", label: "Yes" },
+            { id: "no", label: "No" },
+            { id: "maybe", label: "Maybe" },
+          ]),
+        }),
+      )
+    })
+
+    expect(button("Yes")).not.toBeNull()
+    expect(button("No")).not.toBeNull()
+    expect(button("Maybe")).not.toBeNull()
+    expect(textbox()).not.toBeNull()
+  })
+})
+
 describe("ToolCall approval controls", () => {
   it("disables a replayed approval request when the app says it is not resumable", () => {
     const onInputResponses = vi.fn()
@@ -95,4 +177,27 @@ function button(label: string): HTMLButtonElement {
   )
   if (!match) throw new Error(`Missing button ${label}`)
   return match
+}
+
+function textbox(): HTMLInputElement | null {
+  return container.querySelector("input[type='text'], input:not([type])")
+}
+
+function questionPart(
+  requestId: string,
+  options: { id: string; label: string }[],
+): AgentToolCallPart {
+  return {
+    id: `tool:${requestId}`,
+    input: {},
+    inputRequest: {
+      options,
+      prompt: "What should I do next?",
+      requestId,
+    },
+    kind: "tool-call",
+    name: "sigil-test-question",
+    state: "approval-requested",
+    type: "tool-call",
+  }
 }
