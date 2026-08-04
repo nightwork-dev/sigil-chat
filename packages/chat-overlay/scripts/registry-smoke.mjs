@@ -1,15 +1,9 @@
 import { execFileSync, spawn } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { emitRegistryItem } from "./emit-registry-item.mjs";
-import { repositoryRoot } from "./stage-overlay.mjs";
+import { packageRoot, repositoryRoot } from "./stage-overlay.mjs";
 
 const timeoutMs = Number(
   process.env.SIGIL_CHAT_OVERLAY_SMOKE_TIMEOUT_MS ?? 180_000,
@@ -19,31 +13,36 @@ const designCli = resolveRequiredDesignCli();
 const scratch = mkdtempSync(join(tmpdir(), "sigil-chat-overlay-smoke-"));
 
 try {
-  const registryRoot = join(scratch, "registry");
   const targetName = `chat-smoke-${Date.now().toString(36)}`;
   const target = join(scratch, targetName);
-  mkdirSync(registryRoot, { recursive: true });
 
   const { item } = emitRegistryItem({
-    output: join(registryRoot, "chat-overlay.json"),
+    output: join(scratch, "chat-overlay.json"),
   });
-  run("node", [
-    designCli.path,
-    "create",
-    targetName,
-    "--cwd",
-    scratch,
-    "--profile",
-    "chat",
-    "--registry",
-    registryRoot,
-    "--no-install",
-    "--no-git",
-  ], { cwd: designCli.designRoot });
-  assertGeneratedConsumerIdentity(target, targetName, item.digest);
+  run(
+    "node",
+    [
+      designCli.path,
+      "create",
+      targetName,
+      "--cwd",
+      scratch,
+      "--profile",
+      "chat",
+      "--overlay",
+      packageRoot,
+      "--no-install",
+      "--no-git",
+    ],
+    { cwd: designCli.designRoot },
+  );
+  assertGeneratedConsumerIdentity(target, targetName);
   run("pnpm", ["install", "--reporter", "append-only"], { cwd: target });
+  run("pnpm", ["typecheck"], { cwd: target });
   await waitForDevReadiness(target, targetName, timeoutMs);
-  run("node", [designCli.path, "doctor", target], { cwd: designCli.designRoot });
+  run("node", [designCli.path, "doctor", target], {
+    cwd: designCli.designRoot,
+  });
 
   console.log(
     `Registry smoke passed for ${targetName} (${item.files.length} files, ${item.digest})`,
@@ -61,7 +60,7 @@ function run(command, args, options) {
   });
 }
 
-function assertGeneratedConsumerIdentity(target, targetName, digest) {
+function assertGeneratedConsumerIdentity(target, targetName) {
   const rootPackage = readJson(join(target, "package.json"));
   const workspace = readFileSync(join(target, "pnpm-workspace.yaml"), "utf8");
   const devPrepare = readFileSync(
@@ -71,15 +70,18 @@ function assertGeneratedConsumerIdentity(target, targetName, digest) {
   const webPackage = readJson(join(target, "apps/web/package.json"));
   const agentPackage = readJson(join(target, "apps/agent/package.json"));
   const doctor = readJson(join(target, "sigil.doctor.json"));
-  const provenance = readJson(join(target, ".sigil/scaffold.json"));
 
-  assert(rootPackage.name === targetName, "root package name was not rewritten");
+  assert(
+    rootPackage.name === targetName,
+    "root package name was not rewritten",
+  );
   assert(
     !Object.hasOwn(rootPackage.scripts ?? {}, "overlay:stage"),
     "consumer root package still contains overlay:stage",
   );
   assert(
-    rootPackage.scripts?.["auth:migrate"] === "pnpm --dir apps/web auth:migrate",
+    rootPackage.scripts?.["auth:migrate"] ===
+      "pnpm --dir apps/web auth:migrate",
     "root auth:migrate script was not rewritten to apps/web",
   );
   assert(
@@ -125,10 +127,6 @@ function assertGeneratedConsumerIdentity(target, targetName, digest) {
     doctor.serviceProbes?.[0]?.url ===
       `http://${targetName}-agent.localhost:1355/eve/v1/health`,
     "doctor service probe was not rewritten",
-  );
-  assert(
-    provenance.overlays?.[0]?.digest === digest,
-    "scaffold provenance does not record the emitted registry digest",
   );
 }
 

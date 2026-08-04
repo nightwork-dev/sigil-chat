@@ -25,6 +25,7 @@ export const overlayPaths = Object.freeze([
   "packages/runtime-env",
   "packages/work-items-store",
   "packages/ui/package.json",
+  "packages/ui/tsconfig.json",
   "packages/ui/src/components/agent-variants.tsx",
   "packages/ui/src/components/agent-hud.tsx",
   "packages/ui/src/components/ambient-panel.tsx",
@@ -35,8 +36,10 @@ export const overlayPaths = Object.freeze([
   "packages/ui/src/components/floating-dock.tsx",
   "packages/ui/src/components/layouts/shells.tsx",
   "packages/ui/src/components/part-projection.tsx",
+  "packages/ui/src/components/quest-log.tsx",
   "packages/ui/src/components/tool-call.tsx",
   "packages/ui/src/components/tool-renderer-registry.tsx",
+  "packages/ui/src/components/tone-chip.tsx",
   "packages/ui/src/components/views/entity-browser.tsx",
   "packages/ui/src/hooks/use-attachments.ts",
   "packages/ui/src/hooks/use-clipboard.ts",
@@ -67,37 +70,6 @@ export const requiredWorkspacePackages = Object.freeze([
   "packages/runtime-env",
   "packages/work-items-store",
 ])
-
-export const routeTombstonePaths = Object.freeze([
-  "apps/web/src/routes/-types.ts",
-  "apps/web/src/routes/footer.tsx",
-  "apps/web/src/routes/footer/index.tsx",
-  "apps/web/src/routes/index.tsx",
-  "apps/web/src/routes/inspector.tsx",
-  "apps/web/src/routes/inspector/index.tsx",
-  "apps/web/src/routes/menubar.tsx",
-  "apps/web/src/routes/menubar/index.tsx",
-  "apps/web/src/routes/menubar/workflow.tsx",
-  "apps/web/src/routes/settings.tsx",
-  "apps/web/src/routes/settings/appearance.tsx",
-  "apps/web/src/routes/settings/general.tsx",
-  "apps/web/src/routes/settings/index.tsx",
-  "apps/web/src/routes/settings/notifications.tsx",
-  "apps/web/src/routes/sidebar.tsx",
-  "apps/web/src/routes/sidebar/canvas.tsx",
-  "apps/web/src/routes/sidebar/index.tsx",
-  "apps/web/src/routes/split.tsx",
-  "apps/web/src/routes/split/$id.tsx",
-  "apps/web/src/routes/split/index.tsx",
-])
-
-export const overlayTombstonePaths = Object.freeze([
-  ...routeTombstonePaths,
-  "packages/ui/src/lib/agent-hud-state.test.ts",
-])
-
-export const overlayTombstoneContent =
-  "export {}\n"
 
 export const consumerTransformedPaths = Object.freeze([
   "package.json",
