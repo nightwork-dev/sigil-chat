@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from "vitest"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { ScopedKnowledgeStore } from "@gonk/knowledge/scoped"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   ContextCompiler,
   ContextContributorRegistry,
@@ -6,6 +11,7 @@ import {
 } from "@gonk/context"
 import type { ManagedSkillRegistry } from "@gonk/skills"
 import { MAX_BLACKBOARD_CONTENT_CHARS } from "@workspace/blackboard-store/limits"
+import { createSigilRetrievalEvidenceCoordinator } from "@workspace/agent-tools/evidence"
 import { eveChannel } from "eve/channels/eve"
 import {
   blackboardContextBlock,
@@ -16,6 +22,19 @@ import {
   createSkillContextContributor,
   type SigilContextOptions,
 } from "./sigil-context"
+import {
+  SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID,
+} from "./knowledge-context"
+
+const temporaryDirectories: string[] = []
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) =>
+      rm(directory, { recursive: true, force: true }),
+    ),
+  )
+})
 
 const SESSION_AUTH = {
   attributes: sessionAttributes("personal-scope:user-1") as Record<
@@ -78,6 +97,130 @@ describe("Sigil Eve context integration", () => {
         provenance: { contributorId: "sigil.retrieval" },
       }),
     )
+  })
+
+  it("passively injects threshold-cleared scoped knowledge through the retrieval context contributor", async () => {
+    const scopedKnowledge = await testScopedKnowledgeStore()
+    await scopedKnowledge.write({
+      principal: { principalId: "user-1" },
+      targetContainer: { tier: "project", id: "project-a" },
+      id: "lantern-economy",
+      title: "Lantern economy",
+      body: "Lantern loot uses governed spoils and receipts.",
+      category: "reference",
+      expectedRevision: 0,
+    })
+    const retrievalEvidenceCoordinator = createRecordingRetrievalCoordinator()
+    const auth = authForKnowledge("user-1", "project:project-a")
+    const compiler = createDefaultSigilContextCompiler({
+      authContext: auth,
+      retrievalEvidenceCoordinator,
+      scopedKnowledgeStore: scopedKnowledge,
+      tokenCounter,
+    })
+    const result = await compiler.compile({
+      requestId: "knowledge-passive-injection",
+      audience: "model",
+      auth,
+      maxTokens: 1_000,
+      query: "lantern loot governed spoils receipts",
+      requestedContributorIds: [SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID],
+    })
+    scopedKnowledge.close()
+
+    expect(result.status).toBe("ready")
+    if (result.status !== "ready") throw new Error("Expected ready context result")
+    expect(result.receipt.selected).toContainEqual(
+      expect.objectContaining({
+        contributorId: SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID,
+        resourceKey: expect.stringContaining('"sigil.knowledge"'),
+      }),
+    )
+    expect(result.content).toContain("## Relevant durable knowledge")
+    expect(result.content).toContain("Lantern economy")
+    expect(result.content).not.toContain("governed spoils and receipts")
+    expect(retrievalEvidenceCoordinator.calls).toEqual([
+      expect.objectContaining({
+        question: "lantern loot governed spoils receipts",
+        resultLimit: 5,
+        candidates: [
+          expect.objectContaining({
+            hit: expect.objectContaining({
+              resource: expect.objectContaining({
+                sourceId: "sigil.knowledge",
+                kind: "knowledge-page",
+              }),
+            }),
+          }),
+        ],
+      }),
+    ])
+  })
+
+  it("does not leak scoped knowledge when the active principal is not authorized", async () => {
+    const scopedKnowledge = await testScopedKnowledgeStore()
+    await scopedKnowledge.write({
+      principal: { principalId: "user-1" },
+      targetContainer: { tier: "project", id: "project-a" },
+      id: "secret-lantern",
+      title: "Secret lantern",
+      body: "Hidden lantern stores the spoil ledger.",
+      category: "reference",
+      expectedRevision: 0,
+    })
+    const compiler = createDefaultSigilContextCompiler({
+      retrievalEvidenceCoordinator: createSigilRetrievalEvidenceCoordinator(),
+      scopedKnowledgeStore: scopedKnowledge,
+      tokenCounter,
+    })
+    const result = await compiler.compile({
+      requestId: "knowledge-passive-denied",
+      audience: "model",
+      auth: authForKnowledge("user-2", "project:project-a"),
+      maxTokens: 1_000,
+      query: "Where is the hidden lantern spoil ledger?",
+      requestedContributorIds: [SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID],
+    })
+    scopedKnowledge.close()
+
+    expect(result.status).toBe("ready")
+    if (result.status !== "ready") throw new Error("Expected ready context result")
+    expect(result.receipt.selected).toEqual([])
+    expect(result.content).not.toContain("Secret lantern")
+    expect(result.content).not.toContain("spoil ledger")
+  })
+
+  it("keeps weakly related knowledge below the passive injection threshold", async () => {
+    const scopedKnowledge = await testScopedKnowledgeStore()
+    await scopedKnowledge.write({
+      principal: { principalId: "user-1" },
+      targetContainer: { tier: "project", id: "project-a" },
+      id: "partial-match",
+      title: "Alpha note",
+      body: "Alpha is the only matching term.",
+      category: "reference",
+      expectedRevision: 0,
+    })
+    const compiler = createDefaultSigilContextCompiler({
+      retrievalEvidenceCoordinator: createSigilRetrievalEvidenceCoordinator(),
+      scopedKnowledgeStore: scopedKnowledge,
+      tokenCounter,
+    })
+
+    const result = await compiler.compile({
+      requestId: "knowledge-passive-threshold",
+      audience: "model",
+      auth: authForKnowledge("user-1", "project:project-a"),
+      maxTokens: 1_000,
+      query: "alpha beta gamma",
+      requestedContributorIds: [SIGIL_KNOWLEDGE_CONTEXT_CONTRIBUTOR_ID],
+    })
+    scopedKnowledge.close()
+
+    expect(result.status).toBe("ready")
+    if (result.status !== "ready") throw new Error("Expected ready context result")
+    expect(result.receipt.selected).toEqual([])
+    expect(result.content).not.toContain("Alpha note")
   })
 
   it("adds deterministically selected authorized skill context to the next model turn", async () => {
@@ -799,6 +942,65 @@ function compilerWith(
     tokenCounter,
     configVersion: "test",
   })
+}
+
+async function testScopedKnowledgeStore() {
+  const directory = await mkdtemp(join(tmpdir(), "sigil-context-knowledge-"))
+  temporaryDirectories.push(directory)
+  return new ScopedKnowledgeStore({
+    authority: {
+      resolveWorkspaceParentProject: () => undefined,
+      authorizeRead: ({ principal, container }) =>
+        principal.principalId === "user-1" &&
+        container.tier === "project" &&
+        container.id === "project-a"
+          ? { allowed: true, role: "owner" }
+          : { allowed: false, reason: "test denies scoped knowledge" },
+      authorizeWrite: ({ principal, container }) =>
+        principal.principalId === "user-1" &&
+        container.tier === "project" &&
+        container.id === "project-a"
+          ? { allowed: true, role: "owner" }
+          : { allowed: false, reason: "test denies scoped knowledge" },
+    },
+    containerHome: (container) =>
+      join(directory, "knowledge", container.tier, encodeURIComponent(container.id)),
+    scanWrites: () => ({ allowed: true }),
+    now: () => 1_000,
+  })
+}
+
+function createRecordingRetrievalCoordinator() {
+  const inner = createSigilRetrievalEvidenceCoordinator()
+  const calls: Array<Parameters<typeof inner.collect>[0]> = []
+  return {
+    calls,
+    collect: async (input: Parameters<typeof inner.collect>[0]) => {
+      calls.push(input)
+      return inner.collect(input)
+    },
+  }
+}
+
+function authForKnowledge(principalId: string, resourceScope: string) {
+  return {
+    principal: {
+      id: principalId,
+      kind: "human" as const,
+      identity: {
+        issuer: "test",
+        subject: principalId,
+        method: "session" as const,
+      },
+      roles: [],
+      scopes: [],
+      attributes: {
+        sigilPersonaId: "agent-a",
+        sigilResourceScope: resourceScope,
+      },
+    },
+    authorize: () => ({ outcome: "allow" as const, reason: "test policy" }),
+  }
 }
 
 const tokenCounter = {
